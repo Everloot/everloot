@@ -65,7 +65,7 @@ local CHECKING = "Checking the price file..."
 local FAILED = "The price file failed its checksum and is not used. Vendor prices you saw still count."
 local NO_REALM = "The price file has no market values for this realm yet. Vendor prices you saw still count."
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
-local ADD_TO_LIST = "Add to shopping list"
+local ADD_TO_LIST = "Add reagents to shopping list"
 
 local refresh, buildCrafting
 
@@ -600,23 +600,30 @@ local function drawBuy(c, row)
   if not row then
     b.title:SetText("What to buy")
     for _, line in ipairs(b.lines) do line:Hide() end
-    b.up:Hide(); b.down:Hide(); b.add:Hide()
+    b.up:Hide(); b.down:Hide(); b.add:Hide(); b.details:Hide()
+    b.count:Hide(); b.receipt:Hide()
+    for _, step in ipairs(b.steps) do step:Hide() end
     b.output:Hide(); b.math:Hide()
     b.total:SetText("Choose a recipe in the list.")
     return
   end
   if E.Shopping then b.add:Show() else b.add:Hide() end
+  b.count:SetText(plural(c.count, "craft"))
+  b.count:Show(); b.details:Show(); b.receipt:Show()
+  for _, step in ipairs(b.steps) do step:Show() end
+  b.receipt:SetText(c.added or "")
   b.row = row
   b.title:SetText("What to buy: " .. c.count .. " × " .. row.name)
-  if row.key ~= b.key then b.key = row.key; b.offset = 0 end
+  if row.key ~= b.key then b.key = row.key; b.offset = 0; b.showDetails = false end
+  b.details:SetText(b.showDetails and "Reagents" or "Cost details")
   local n = #row.parts
   b.offset = math.min(b.offset, math.floor(math.max(n - 1, 0) / BUY_LINES) * BUY_LINES)
   for i, line in ipairs(b.lines) do
     local part = row.parts[b.offset + i]
-    if part then line:SetText(buyLine(part, c.count)); line:Show() else line:Hide() end
+    if part and not b.showDetails then line:SetText(buyLine(part, c.count)); line:Show() else line:Hide() end
   end
-  if b.offset > 0 then b.up:Show() else b.up:Hide() end
-  if b.offset + BUY_LINES < n then b.down:Show() else b.down:Hide() end
+  if not b.showDetails and b.offset > 0 then b.up:Show() else b.up:Hide() end
+  if not b.showDetails and b.offset + BUY_LINES < n then b.down:Show() else b.down:Hide() end
   local priced = 0
   for _, part in ipairs(row.parts) do
     if part.unit then priced = priced + part.unit * part.count * c.count end
@@ -650,10 +657,11 @@ local function drawBuy(c, row)
     calculation = "Profit unknown: no market price for the finished item."
   end
   b.math:SetText(calculation)
-  b.output:Show(); b.math:Show()
+  if b.showDetails then b.output:Show(); b.math:Show() else b.output:Hide(); b.math:Hide() end
 end
 
 local function drawCraftRow(line, row, selected)
+  if selected then line.selection:Show() else line.selection:Hide() end
   line.name:SetText(row.name)
   line.name:SetTextColor(unpack(selected and COLORS.accent or COLORS.text))
   -- An unknown cost says in its own column how many reagents have no price; the product's value still shows.
@@ -691,9 +699,6 @@ local function refreshCrafting(c)
   c.age:SetText(age)
   c.age:SetTextColor(unpack(color))
   c.ageDetail = detail
-  -- What the last Add to shopping list did, until another recipe is chosen; else what the values mean.
-  c.note:SetText(c.added or PER_ITEM)
-  c.note:SetTextColor(unpack(c.added and COLORS.accent or COLORS.muted))
   if age == CHECKING and not c.waiting and C_Timer and C_Timer.After then
     -- A large file is checked a slice per frame; draw again once it can be read.
     c.waiting = true
@@ -811,15 +816,15 @@ buildCrafting = function(parent)
   c.sortButton:SetPoint("TOPLEFT", 0, -6)
   c.filterButton = button(c.page, PROFITABLE, 150, function() c.profitable = not c.profitable; c.rows.offset = 0 end)
   c.filterButton:SetPoint("TOPLEFT", 154, -6)
-  -- One line right of the buttons; the full sentence and how to read the columns are in its hover.
+  -- The market status has a dedicated full-width line below the controls.
   c.age = text(c.page, 12, nil, COLORS.muted)
-  c.age:SetPoint("TOPRIGHT", -4, -10)
-  c.age:SetWidth(W - 316)
-  c.age:SetJustifyH("RIGHT")
+  c.age:SetPoint("TOPLEFT", 8, -30)
+  c.age:SetWidth(W - 16)
+  c.age:SetJustifyH("LEFT")
   if c.age.SetWordWrap then c.age:SetWordWrap(false) end
-  c.source = helpOver(c.page, c, "TOPRIGHT", -4, -7, W - 316)
+  c.source = helpOver(c.page, c, "TOPLEFT", 8, -27, W - 16)
 
-  local list = box(c.page, 0, -30, W, 184)
+  local list = box(c.page, 0, -48, W, 176)
   c.list = list
   c.head = {}
   for _, col in ipairs(CRAFT_COLUMNS) do
@@ -849,6 +854,10 @@ buildCrafting = function(parent)
     local line = CreateFrame("Button", nil, list)
     line:SetPoint("TOPLEFT", 4, -22 - (i - 1) * CRAFT_ROW_H)
     line:SetSize(W - 8, CRAFT_ROW_H)
+    line.selection = line:CreateTexture(nil, "BACKGROUND")
+    line.selection:SetAllPoints()
+    line.selection:SetColorTexture(0.612, 0.941, 0.227, 0.12)
+    line.selection:Hide()
     for _, col in ipairs(CRAFT_COLUMNS) do
       local s = text(line, 12, col[1] ~= "name" and NARROW or nil) -- numbers in the narrow figures, words in Friz
       s:SetPoint("LEFT", col[2], 0)
@@ -890,51 +899,59 @@ buildCrafting = function(parent)
   rows.down:SetPoint("BOTTOMRIGHT", -6, 6)
   c.rows = rows
 
-  local buy = box(c.page, 0, -218, W, PAGE_H - 218)
+  local buy = box(c.page, 0, -229, W, PAGE_H - 229)
   local b = { lines = {}, steps = {}, offset = 0 }
   b.title = text(buy, 12)
   b.title:SetPoint("TOPLEFT", 8, -9)
-  -- The title leaves the top right to Add to shopping list and the four count buttons.
-  b.title:SetWidth(W - 16 - 4 * 40 - 150)
+  b.title:SetWidth(W - 16 - 118)
   if b.title.SetWordWrap then b.title:SetWordWrap(false) end
-  for i, step in ipairs({ -10, -1, 1, 10 }) do
-    local s = button(buy, (step > 0 and "+" or "") .. step, 36, function()
-      c.count = math.max(1, math.min(MAX_COUNT, c.count + step))
+  b.count = text(buy, 12, nil, COLORS.muted)
+  b.count:SetPoint("TOPRIGHT", -32, -9)
+  b.count:SetWidth(64)
+  b.count:SetJustifyH("CENTER")
+  for i, step in ipairs({ -1, 1 }) do
+    local s = button(buy, step > 0 and "+" or "-", 24, function()
+      local amount = IsShiftKeyDown and IsShiftKeyDown() and 10 or 1
+      c.count = math.max(1, math.min(MAX_COUNT, c.count + step * amount))
+      c.added = nil
     end)
-    s:SetPoint("TOPRIGHT", -6 - (4 - i) * 40, -6)
+    s:SetPoint("TOPRIGHT", i == 1 and -96 or -6, -6)
     b.steps[i] = s
   end
-  -- The reagent lines and the calculation leave the bottom right to Up and Down (106 wide).
-  local spacing = 13
+  -- Reagents and expanded cost details share the body. The total and actions have their own rows.
+  local spacing = 12
   for i = 1, BUY_LINES do
     local line = text(buy, 12, nil, COLORS.muted)
-    line:SetPoint("TOPLEFT", 8, -32 - (i - 1) * spacing)
+    line:SetPoint("TOPLEFT", 8, -29 - (i - 1) * spacing)
     line:SetWidth(W - 16 - 110)
     if line.SetWordWrap then line:SetWordWrap(false) end
     b.lines[i] = line
   end
   b.total = text(buy, 12)
-  b.total:SetPoint("TOPLEFT", 8, -32 - BUY_LINES * spacing)
+  b.total:SetPoint("TOPLEFT", 8, -91)
   b.total:SetWidth(W - 16 - 110)
   b.output = text(buy, 12, nil, COLORS.muted)
-  b.output:SetPoint("TOPLEFT", 8, -32 - (BUY_LINES + 1) * spacing)
-  b.output:SetWidth(W - 16 - 110)
-  if b.output.SetWordWrap then b.output:SetWordWrap(false) end
+  b.output:SetPoint("TOPLEFT", 8, -32)
+  b.output:SetWidth(W - 16)
   b.math = text(buy, 12, nil, COLORS.muted)
-  b.math:SetPoint("TOPLEFT", 8, -32 - (BUY_LINES + 2) * spacing)
-  b.math:SetWidth(W - 16 - 110)
-  if b.math.SetWordWrap then b.math:SetWordWrap(false) end
-  -- Adds this recipe's reagents for the chosen count to the active shopping list; the outcome shows under the list.
-  b.add = button(buy, ADD_TO_LIST, 146, function()
+  b.math:SetPoint("TOPLEFT", 8, -56)
+  b.math:SetWidth(W - 16)
+  b.details = button(buy, "Cost details", 90, function() b.showDetails = not b.showDetails end)
+  b.details:SetPoint("BOTTOMLEFT", 6, 5)
+  b.receipt = text(buy, 11, nil, COLORS.accent)
+  b.receipt:SetPoint("BOTTOMLEFT", 104, 4)
+  b.receipt:SetWidth(W - 328)
+  b.receipt:SetJustifyV("BOTTOM")
+  b.add = button(buy, ADD_TO_LIST, 214, function()
     if not (E.Shopping and b.row) then return end
     local _, _, _, said = E.Shopping.AddReagents(b.row.parts, c.count)
     c.added = said
   end)
-  b.add:SetPoint("TOPRIGHT", -6 - 4 * 40, -6)
+  b.add:SetPoint("BOTTOMRIGHT", -6, 5)
   b.up = button(buy, "Up", 48, function() b.offset = math.max(0, b.offset - BUY_LINES) end)
-  b.up:SetPoint("BOTTOMRIGHT", -58, 6)
+  b.up:SetPoint("TOPRIGHT", -58, -86)
   b.down = button(buy, "Down", 48, function() b.offset = b.offset + BUY_LINES end)
-  b.down:SetPoint("BOTTOMRIGHT", -6, 6)
+  b.down:SetPoint("TOPRIGHT", -6, -86)
   c.buy = b
   return c
 end

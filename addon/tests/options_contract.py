@@ -224,6 +224,15 @@ for i, c in ipairs(subs) do
   end
   checkRows(page)
 end
+local tooltipPage = O.groupPages.tooltips
+assert(tooltipPage.tooltipPreview.text:find('Market value', 1, true))
+local savedMarket = EverlootDB.tooltipMarket
+EverlootDB.tooltipMarket = false
+O.Refresh()
+assert(not tooltipPage.tooltipPreview.text:find('Market value', 1, true))
+assert(tooltipPage.tooltipPreview.text:find('Last sale', 1, true))
+EverlootDB.tooltipMarket = savedMarket
+O.Refresh()
 local censusBox
 for _, box in ipairs(O.groupPages.data.boxes) do if box.row.key == 'census' then censusBox = box end end
 assert(censusBox and not censusBox.checked, 'census off by command shows unticked on the first visit')

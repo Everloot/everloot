@@ -34,7 +34,9 @@ local MATCHES = 20  -- the most items a part of a name lists
 local NONE = "No Everloot price for that item on this realm yet."
 -- The shopping page: rows on screen at once, their height, and each column's left edge and width.
 local SHOP_ROWS, SHOP_ROW_H = 10, 18
-local SHOP_COLUMNS = { { "name", 0, 220 }, { "want", 226, 40 }, { "max", 272, 90 }, { "market", 368, 130 }, { "found", 504, 90 } }
+local SHOP_COLUMNS = { { "name", 0, 156 }, { "want", 160, 38 }, { "max", 203, 67 },
+  { "market", 275, 113 }, { "found", 393, 83 }, { "decision", 481, 85 } }
+local MODE_WIDTH = 94
 local SHOP_HELP = "Item: a name, an id or shift-click. Want: how many. Max each: like 1g 50s, blank for no limit."
 local SHOP_EMPTY = "Nothing on this list yet. Add an item above, or a recipe's reagents from the Professions tab of the Everloot window."
 local FALLBACK_COLORS = { text = { 1, 1, 1, 1 }, muted = { 0.788, 0.765, 0.69, 1 }, accent = { 0.612, 0.941, 0.227, 1 } }
@@ -258,7 +260,7 @@ local function layout(panel, width)
   end
   -- The scan's bar runs from the help button to the page button, or to the panel's edge without one.
   local used = TITLE_X + (tonumber(panel.title:GetStringWidth()) or 80) + 8 + 22 + 16
-  local right = 16 + (panel.modeButton and (120 + 16) or 0)
+  local right = 16 + (panel.modeButton and (2 * MODE_WIDTH + 16) or 0)
   panel.progress:SetWidth(math.max(60, width - used - right))
   panel.shareButton:SetWidth(math.min(120, column / 2))
   panel.lookup:SetWidth(math.max(40, math.min(300, column - 90)))
@@ -362,8 +364,10 @@ local function drawShopRow(line, item)
   line.max:SetText(item.max and S.Money(item.max) or "no limit")
   line.max:SetTextColor(unpack(tone(item.max and "text" or "muted")))
   local market = S.Market(item.itemId)
+  local stale
   if market then
-    local age, stale = S.Age(market.day)
+    local age
+    age, stale = S.Age(market.day)
     line.market:SetText(S.Money(market.market) .. " · " .. age)
     line.market:SetTextColor(unpack(stale and WARN or tone("text")))
   else
@@ -377,6 +381,18 @@ local function drawShopRow(line, item)
   else
     line.found:SetText(f and "none" or "-")
     line.found:SetTextColor(unpack(tone("muted")))
+  end
+  -- Compare the current house's market quote. A previous browse result may have come from a different house.
+  local price = not stale and market and market.market
+  if not price then
+    line.decision:SetText(stale and "Stale quote" or "No quote")
+    line.decision:SetTextColor(unpack(stale and WARN or tone("muted")))
+  elseif not item.max then
+    line.decision:SetText("No cap")
+    line.decision:SetTextColor(unpack(tone("muted")))
+  else
+    line.decision:SetText(price < item.max and "Below cap" or (price == item.max and "At cap" or "Over cap"))
+    line.decision:SetTextColor(unpack(price <= item.max and tone("accent") or WARN))
   end
 end
 
@@ -472,7 +488,8 @@ local function buildShop(panel)
   shop.file:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -70)
 
   shop.head = {}
-  local heads = { name = "Item", want = "Want", max = "Max each", market = "Market · age", found = "Lowest found" }
+  local heads = { name = "Item", want = "Want", max = "Max each", market = "Market · age",
+    found = "Lowest found", decision = "Market vs cap" }
   for _, col in ipairs(SHOP_COLUMNS) do
     local s = words(page, "GameFontDisable")
     s:SetPoint("TOPLEFT", page, "TOPLEFT", col[2], -90)
@@ -547,7 +564,13 @@ function T.SetMode(mode)
     panel.shop.page:Hide()
     T.Refresh()
   end
-  panel.modeButton:SetText(shopping and "Price lookup" or "Shopping list")
+  if shopping then
+    panel.modeButton:Disable()
+    panel.lookupModeButton:Enable()
+  else
+    panel.lookupModeButton:Disable()
+    panel.modeButton:Enable()
+  end
 end
 
 --- Looks up what the player typed and shows it in the panel.
@@ -732,15 +755,21 @@ local function buildPanel(house)
   panel.unit:SetText("per unit")
   panel.message = words(content, "GameFontHighlight")
   render(panel, { message = HINT })
-  -- The shopping lists, behind a button at the top right, when their file is loaded.
+  -- Both modes keep their names and positions while a scan or lookup is running.
   if E.Shopping then
     buildShop(panel)
     panel.mode = "lookup"
     panel.modeButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    panel.modeButton:SetSize(120, 22)
+    panel.modeButton:SetSize(MODE_WIDTH, 22)
     panel.modeButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -12)
     panel.modeButton:SetText("Shopping list")
-    panel.modeButton:SetScript("OnClick", function() T.SetMode(panel.mode == "shop" and "lookup" or "shop") end)
+    panel.modeButton:SetScript("OnClick", function() T.SetMode("shop") end)
+    panel.lookupModeButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    panel.lookupModeButton:SetSize(MODE_WIDTH, 22)
+    panel.lookupModeButton:SetPoint("RIGHT", panel.modeButton, "LEFT", -4, 0)
+    panel.lookupModeButton:SetText("Price lookup")
+    panel.lookupModeButton:SetScript("OnClick", function() T.SetMode("lookup") end)
+    panel.lookupModeButton:Disable()
   end
   -- While a scan runs, a bar across the top of the page, from the help button to the page button, says what the
   -- scan is doing and how far it is. The top is the same on both pages, so it shows on either; layout sets its width.

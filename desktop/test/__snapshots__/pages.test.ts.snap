@@ -197,7 +197,7 @@ exports[`market > populated 1`] = `
       <form id="priceForm" class="row" autocomplete="off"><input type="text" id="priceItem" name="priceItem" class="grow" aria-label="Item id or link" placeholder="Item id, or an item link pasted from game chat" maxlength="500"><button type="submit" class="btn">Look up</button></form>
       <div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody><tr><td>Doomhowl</td><td>Alliance</td><td class="num">12s 50c</td><td class="num">11s 0c</td><td class="num">13s 0c</td><td class="num">400</td><td class="num">3</td><td>2026-10-19</td><td><button type="button" class="link" data-open="https://everloot.app/tools/auctions?realm=Doomhowl&amp;item=2589&amp;utm_source=desktop-app&amp;utm_medium=app">history ↗</button></td></tr></tbody></table></div>
     <p class="muted small">Item 2589. Market weighs the last 14 public days, historical is the 60-day median, min is the lowest buyout per unit. Each auction house is its own market; the game shows the one your character uses.</p>
-      <p class="muted small">From the prices file in your game, the same numbers your tooltips show. In game, <code>/everloot price [item]</code> prints them in chat, anywhere in the world. Charts, every realm and item names are on the site.</p>
+      <p class="muted small">Reads the file on disk. The Day column is the item's latest price observation. Charts, every realm and item names are on the site.</p>
     </section>
     <p class="fg2">Community market values written into <code>EverlootPrices</code> so item tooltips show them after <code>/reload</code>. Realms from your own auction scans are always included; pick more below, the way TSM lets you pick realms, except the values are Everloot's own: a day counts once three reporters scanned it. Refreshed after each upload and every hour.</p>
     <p class="callout fg2"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg><span>Follow your characters' realms: <b>Skull Rock</b>. Their community prices then go into your tooltips like any realm you follow; nothing is asked of everloot.app for them until you press Follow. <button type="button" class="btn btn-primary" data-suggestion="follow">Follow</button> <button type="button" class="link" data-suggestion="dismiss">No thanks</button></span></p>
@@ -211,9 +211,10 @@ exports[`market > populated 1`] = `
       <div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody><tr><td>Doomhowl</td><td>3 h ago</td><td class="ok">fresh</td></tr><tr><td>Nightslayer</td><td>5 d ago</td><td class="warn">scan again next time you are at the auction house</td></tr></tbody></table></div>
       <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
     </section>
-    <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small"></span></div>
+    <section class="panel"><div class="row between"><h2>Price file for the add-on</h2><span class="muted small"></span></div>
       
       <div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody><tr><td>Doomhowl</td><td>Alliance</td><td class="num">1200</td><td>2026-10-20T06:00:00Z</td><td class="muted">your scans</td></tr></tbody></table></div>
+      <p class="muted small"><strong>Verify in WoW.</strong> Run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Check the house and price date in the result.</p>
     </section>
   </div>"
 `;
