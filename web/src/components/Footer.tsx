@@ -5,6 +5,7 @@ import { deployedSha, REPO_URL, sourceUrl } from "@/lib/source";
 import { BETA, LAUNCH, longDate } from "@/data/wow-forever";
 import { hasLaunched } from "@/data/wow-forever-launch";
 import { CookiePreferencesButton } from "./CookieConsent";
+import GameVersionLabel from "./GameVersionLabel";
 import FooterGlint from "./glint/FooterGlint";
 import LaunchTense from "./LaunchTense";
 import Icon from "./ui/Icon";
@@ -147,6 +148,8 @@ export default function Footer() {
             The beta {betaOver ? "ran" : "runs"} until {longDate(BETA.endsOn)}, and the game <LaunchTense launchedAtRender={hasLaunched(now)} /> {longDate(LAUNCH.date)}.
           </p>
           <SiteCredit />
+          {/* The header shows the builds only from 1536 px; here they are at every width. */}
+          <GameVersionLabel className="py-1" />
           <p>
             &copy; {year} {OPERATOR}. Code AGPL-3.0.
             {sha && <> Build <a href={sourceUrl()} rel="noopener" className="font-mono hover:text-accent transition-colors">{sha.slice(0, 7)}</a>.</>}

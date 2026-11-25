@@ -36,12 +36,14 @@ test("the bar's items show from 1280 px, where Players, Guilds and Rankings fit 
   expect(html).toMatch(/<nav aria-label="Primary" class="hidden shrink-0 items-center text-sm font-medium xl:flex">/);
 });
 
-test("Community holds the people pages: Players and Guilds when their routes are enabled, Rankings, the census and addons", () => {
+test("Players and Guilds stand in the bar when their routes are enabled; Community holds them too, with Rankings, the census and addons", () => {
   const enabled = renderToStaticMarkup(<Header players guilds />);
   const nav = enabled.match(/<nav aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
-  expect(topItems(nav)).toEqual(["Community", "Database", "Tools", "Guides", "Chat", "Profile"]);
+  expect(topItems(nav)).toEqual(["Players", "Guilds", "Community", "Database", "Tools", "Guides", "Chat", "Profile"]);
   expect(menuHrefs("Community", navItems({ players: true, guilds: true }))).toEqual(["/players", "/guilds", "/rankings", "/census", "/addons"]);
-  for (const href of ["/players", "/guilds", "/rankings"]) expect(nav.split(`href="${href}"`)).toHaveLength(2);
+  // Players and Guilds: the bar's link and Community's; Rankings only in Community.
+  for (const href of ["/players", "/guilds"]) expect(nav.split(`href="${href}"`)).toHaveLength(3);
+  expect(nav.split(`href="/rankings"`)).toHaveLength(2);
   // Without the guild routes the Guild board stands in for Guilds.
   expect(menuHrefs("Community")).toEqual(["/rankings", "/census", "/tools/guild-board", "/addons"]);
   expect(primary).not.toMatch(/href="\/(?:players|guilds)"/);
@@ -93,8 +95,8 @@ test("the item holding the page is marked, by its longest matching link", () => 
   expect(currentItem("/tools/gold-ledger")).toBe("Profile");
   expect(currentItem("/tools/builds")).toBe("Profile");
   expect(currentItem("/tools/auctions/nightslayer")).toBe("Tools");
-  expect(currentItem("/guilds/eu/realm/guild")).toBe("Community");
-  expect(currentItem("/players/us/realm/name")).toBe("Community");
+  expect(currentItem("/guilds/eu/realm/guild")).toBe("Guilds");
+  expect(currentItem("/players/us/realm/name")).toBe("Players");
   expect(currentItem("/rankings/classes")).toBe("Community");
   expect(currentItem("/lore/npcs")).toBe("Guides");
   expect(currentItem("/chat")).toBe("Chat");
@@ -134,7 +136,11 @@ test("the bar stays 44 px with centered search and shows the build label inline 
   expect(bar).not.toContain("min-h-16");
   // The search sits in its own growing slot, centred between the nav and the account area.
   expect(html).toMatch(/<div class="[^"]*\bflex-1\b[^"]*\bjustify-center\b[^"]*"><form [^>]*role="search"/);
-  expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 xl:block\b[^"]*"><div class="[^"]*rounded-full[^"]*"><a [^>]*>files read /);
+  // The build chip waits for 1536 px, so Players, Guilds and the search field fit from 1280; the footer always has it.
+  expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 2xl:block\b[^"]*"><div class="[^"]*rounded-full[^"]*"><a [^>]*>files read /);
+  const footer = renderToStaticMarkup(<Footer />);
+  expect(footer).toMatch(/<a [^>]*href="\/changes\?show=builds[^"]*"[^>]*>files read /);
+  expect(footer).toMatch(/>newest seen /);
   // Tighter nav items.
   expect(primary).toMatch(/<a href="\/chat"[^>]*class="[^"]*\bpx-2\b/);
   // Menu repeats the bar, so it shows only while the bar is hidden; on a phone the bar keeps the page's 16 px gutter.

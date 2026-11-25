@@ -33,7 +33,7 @@ afterEach(async () => {
 const toolsButton = () => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Tools")!;
 const menu = () => container.querySelector("#tools-menu:not([hidden])");
 
-test("the menu keeps both build links reachable below the desktop build chip breakpoint", async () => {
+test("the menu keeps both build links reachable while the bar is hidden (the footer has them at every width)", async () => {
   const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
   expect(toggle.className).toContain("xl:hidden");
   expect(toggle.className).not.toContain("2xl:hidden");

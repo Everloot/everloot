@@ -76,14 +76,17 @@ first table column share one left edge.
 
 ## Navigation
 
-Six items instead of nine plus Menu: **Community · Database · Tools · Guides · Chat · Profile**.
+Eight items instead of nine plus Menu: **Players · Guilds · Community · Database · Tools · Guides · Chat · Profile**.
+Players and Guilds stand in the bar itself (owner, 2026-11-25): the character and guild pages are what most visitors
+look for. Without their switches the bar is the six others.
 
 - Community: Players, Guilds (when on; the Guild board before that), Rankings, Census, Addons. The people pages.
 - Database: unchanged (overview, items, NPCs, quests, zones, spells, world map).
 - Tools: Auction House, Bag upgrades, Disenchanting, then Raid builder, Talent calculator, Professions, All tools.
 - Guides, Chat, Profile: unchanged.
 
-From 1280 px the bar shows every item and the build chip, and Menu is gone (it used to repeat the bar up to 1535 px).
+From 1280 px the bar shows every item, and Menu is gone (it used to repeat the bar up to 1535 px). The build chip
+joins at 1536 px so the search field keeps about 240 px at 1280; the footer shows both builds at every width.
 Below 1280 px Menu lists the same menus as groups, then More (Chat, Docs, About, Report a bug). No destination was
 dropped; `header.test.tsx` checks every one is still one click from the header or footer.
 

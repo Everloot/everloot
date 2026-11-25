@@ -25,7 +25,8 @@ export { TOOL_GROUPS };
 const MARKET_HREFS = ["/tools/auctions", "/tools/bags", "/tools/disenchanting"];
 
 /**
- * The top bar (docs/design/direction.md): five menus and one link, in order. Community (the people pages: Players and
+ * The top bar (docs/design/direction.md): Players and Guilds when their switches are on, then five menus and one link, in
+ * order. Community (the people pages: Players and
  * Guilds when their switches are on, Rankings, the census and addons players run), Database (reference from the game
  * files and uploads), Tools (market tools, then planners), Guides (static reference), Chat, and Profile (the player's
  * own pages, and the lists kept in this browser). The phone menu shows the same menus as groups. Only existing pages
@@ -37,6 +38,10 @@ export function navItems({ guilds = false, players = false, savedBuilds = false,
   const lookup = catalogue("Lookup");
   const people = lookup.filter((link) => !MARKET_HREFS.includes(link.href) && link.href !== "/rankings" && link.href !== "/guilds");
   return [
+    // Players and Guilds also stand in the bar itself (owner, 11/25): the character and guild pages are what most
+    // visitors look for. Community still lists them, so the phone menu keeps them in its Community group.
+    ...(players ? [{ label: "Players", href: "/players" }] : []),
+    ...(guilds ? [{ label: "Guilds", href: "/guilds" }] : []),
     {
       label: "Community",
       links: [
@@ -117,7 +122,9 @@ const PHONE_LINKS = 3;
 /** The phone menu: each top bar menu as a group, in the bar's order, then More with the single links (Chat), Docs and
  *  About. */
 export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[] }[] {
-  const singles = items.flatMap((item) => (item.links ? [] : [{ label: item.label, href: item.href }]));
+  // A single link a group already lists (Players and Guilds, in Community) is not repeated in More.
+  const grouped = new Set(items.flatMap((item) => item.links?.map((l) => l.href) ?? []));
+  const singles = items.flatMap((item) => (item.links || grouped.has(item.href) ? [] : [{ label: item.label, href: item.href }]));
   return [
     ...items.flatMap((item) => (item.links ? [{ label: item.label, links: item.links }] : [])),
     { label: "More", links: [...singles, { label: "Docs", href: "/docs" }, { label: "About", href: "/about" }] },
@@ -318,8 +325,9 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             onClick={() => setSearchOpen(!searchOpen)}
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-fg-2 hover:text-accent focus-visible:outline-offset-[-2px] xl:hidden"
           ><SearchIcon /></button>
-          {/* Below 1280 px the right group has no room for both builds; the menu panel shows them. */}
-          <GameVersionLabel className="hidden shrink-0 xl:block" />
+          {/* From 1280 px the bar holds Players and Guilds, and the search field needs the room: the build chip shows
+              from 1536 px. Below 1280 the menu panel shows both builds, and the footer shows them at every width. */}
+          <GameVersionLabel className="hidden shrink-0 2xl:block" />
           <AccountControls savedBuilds={savedBuilds} profiles={profiles} accountSwitching={accountSwitching} />
           <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn btn-sm shrink-0 xl:hidden">
             {open ? "Close" : "Menu"}
