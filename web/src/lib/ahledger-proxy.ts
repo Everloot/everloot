@@ -36,8 +36,11 @@ export async function readAhledger(path: string, select: (body: unknown) => Reco
   }
 }
 
-/** The longest a page read is shared between renders, whatever AH Ledger allows: the professions pages' own edge lifetime. */
-const PAGE_READ_MAX_AGE = 300;
+/**
+ * The longest a page read is shared between renders, whatever AH Ledger allows. With the professions pages' 180 s at the
+ * edge (cache-policy.js), a price on screen is at most 300 s old, AH Ledger's own max-age.
+ */
+const PAGE_READ_MAX_AGE = 120;
 
 type PageRead<T> = { ok: true; value: T; credit: AhledgerCredit } | { ok: false };
 

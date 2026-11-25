@@ -8,7 +8,8 @@ import type { Region, RulesetSlug } from "@/data/realms";
  * (app/api/ahledger) passes that lifetime on and keeps nothing else. The prices reach pages only, read in the browser
  * or, for the profession pages' crafting margins, at render on the server (ahledger-proxy.ts `readAhledgerPage`). That
  * read is shared by the market's sorts, filters and pages in the Worker's Cache API for as long as AH Ledger's
- * Cache-Control allows, at most 5 minutes, and the page the edge keeps 5 minutes with no stale copy: never the
+ * Cache-Control allows, at most 2 minutes, and the page the edge keeps 3 minutes with no stale copy, so a price on
+ * screen is never older than AH Ledger's max-age of 5 minutes: never the
  * database, the MCP server, Chat, the API's own data or the open-data exports (ahledger.test.ts).
  */
 

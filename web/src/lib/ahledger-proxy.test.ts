@@ -41,7 +41,7 @@ function fakeStore() {
 const market = "crafting/forever.normal.alliance.us?profession=Alchemy";
 const select = (body: unknown) => ({ recipes: (body as { recipes: number[] }).recipes, asOf: "2026-11-24T05:45:44.000Z" });
 
-test("every sort, filter and page of one market shares one AH Ledger read, kept no longer than AH Ledger allows and at most 300 s", async () => {
+test("every sort, filter and page of one market shares one AH Ledger read, kept no longer than AH Ledger allows and at most 120 s", async () => {
   const store = fakeStore();
   const fetchImpl = vi.fn(async () => Response.json({ recipes: [1, 2], secret: true }, { headers: { "Cache-Control": "public, max-age=600, s-maxage=900" } }));
   vi.stubGlobal("fetch", fetchImpl);
@@ -53,7 +53,7 @@ test("every sort, filter and page of one market shares one AH Ledger read, kept 
   expect(second).toEqual({ ok: true, value: { recipes: [1, 2], asOf: "2026-11-24T05:45:44.000Z" }, credit: { text: "Prices from AHledger", url: "https://ahledger.com" } });
   const [key, copy] = store.put.mock.calls[0];
   expect(key.url).toBe(`https://api.ahledger.com/v1/${market}`);
-  expect(copy.headers.get("Cache-Control")).toBe("public, max-age=300");
+  expect(copy.headers.get("Cache-Control")).toBe("public, max-age=120");
   // Only what the page selects is kept, never the rest of the answer.
   expect(await copy.clone().text()).not.toContain("secret");
 
