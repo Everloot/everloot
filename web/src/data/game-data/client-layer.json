@@ -4,17 +4,17 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 71037,
-  "version": "1.60.1.71037",
-  "buildConfig": "0acab1e6aa41b46165d2ca66853b417b",
-  "definitions": "3a7954cfb8ee",
-  "extractedAt": "2026-11-23T17:39:13.986Z"
+  "buildId": 71091,
+  "version": "1.60.1.71091",
+  "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
+  "definitions": "3783c908726e",
+  "extractedAt": "2026-11-24T18:12:10.461Z"
  },
  "counts": {
   "created_by": 3337,
   "reagent_for": 9635,
   "part_of_set": 3141,
-  "same_icon": 29138,
+  "same_icon": 29139,
   "in_skill_line": 2670
  },
  "edges": [
@@ -44073,6 +44073,7 @@
   ["item",252678,"same_icon","icon",133852],
   ["item",278078,"same_icon","icon",133852],
   ["item",281040,"same_icon","icon",133852],
+  ["item",291874,"same_icon","icon",133852],
   ["item",219454,"same_icon","icon",134207],
   ["item",251983,"same_icon","icon",134207],
   ["item",219515,"same_icon","icon",133594],
@@ -47957,7 +47958,7 @@
   {"id":12,"name":"Quest","label":"Quest","slug":"quest","items":4068},
   {"id":13,"name":"Key","label":"Keys","slug":"keys","items":150},
   {"id":14,"name":"Permanent(OBSOLETE)","label":"Permanent","slug":"permanent","items":0},
-  {"id":15,"name":"Miscellaneous","label":"Miscellaneous","slug":"miscellaneous","items":2286},
+  {"id":15,"name":"Miscellaneous","label":"Miscellaneous","slug":"miscellaneous","items":2287},
   {"id":18,"name":"WoW Token","label":"WoW Tokens","slug":"wow-tokens","items":2}
  ],
  "subclasses": [
@@ -48006,8 +48007,8 @@
   {"classId":2,"id":19,"name":"Wands","slug":"wands","items":203},
   {"classId":2,"id":20,"name":"Fishing Pole","slug":"fishing-pole","items":9},
   {"classId":3,"id":0,"name":"Jewelry(OBSOLETE)","slug":"jewelry-obsolete","items":0},
-  {"classId":4,"id":0,"name":"Miscellaneous","slug":"miscellaneous","items":2315},
-  {"classId":4,"id":1,"name":"Cloth","slug":"cloth","items":4219},
+  {"classId":4,"id":0,"name":"Miscellaneous","slug":"miscellaneous","items":2313},
+  {"classId":4,"id":1,"name":"Cloth","slug":"cloth","items":4221},
   {"classId":4,"id":2,"name":"Leather","slug":"leather","items":3229},
   {"classId":4,"id":3,"name":"Mail","slug":"mail","items":2860},
   {"classId":4,"id":4,"name":"Plate","slug":"plate","items":1832},
@@ -48054,7 +48055,7 @@
   {"classId":13,"id":0,"name":"Key","slug":"key","items":144},
   {"classId":13,"id":1,"name":"Lockpick","slug":"lockpick","items":6},
   {"classId":14,"id":0,"name":"Permanent","slug":"permanent","items":0},
-  {"classId":15,"id":0,"name":"Junk","slug":"junk","items":1771},
+  {"classId":15,"id":0,"name":"Junk","slug":"junk","items":1772},
   {"classId":15,"id":1,"name":"Reagent","slug":"reagent","items":54},
   {"classId":15,"id":2,"name":"Pet","slug":"pet","items":88},
   {"classId":15,"id":3,"name":"Holiday","slug":"holiday","items":127},
@@ -53651,7 +53652,7 @@
   [6783,12,0,0,1],
   [6784,4,2,10,2],
   [6785,12,0,0,1],
-  [6786,4,0,20,1],
+  [6786,4,1,20,1],
   [6787,4,1,20,2],
   [6788,4,2,6,2],
   [6789,4,1,16,2],
@@ -55917,7 +55918,7 @@
   [10050,1,0,18,1],
   [10051,1,0,18,1],
   [10052,4,0,4,1],
-  [10053,4,0,20,1],
+  [10053,4,1,20,1],
   [10054,4,0,4,1],
   [10055,4,0,4,1],
   [10056,4,0,4,1],
@@ -80060,6 +80061,7 @@
   [289559,0,6,0,1],
   [289560,9,8,0,2],
   [290333,2,3,26,2],
-  [291005,0,14,0,1]
+  [291005,0,14,0,1],
+  [291874,15,0,0,0]
  ]
 }
