@@ -4,6 +4,7 @@ import { entityHref } from "@/components/EntityLink";
 import { describe } from "@kb/item-taxonomy";
 import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
+import { holidayEntries, holidayHref, petFamilyEntries, petFamilyHref } from "./world-events";
 import { CLIENT_TAXONOMY } from "./items";
 import type { SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
@@ -25,7 +26,7 @@ export { byTypo, editDistance } from "./name-match";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "holiday" | "family" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
 /**
  * `total` counts every match; `results` holds the first `limit` of them. `respelled` is how the typo fallback read the
  * query ("linen cloth" for "lnen clth"), on every group when it fired.
@@ -35,17 +36,17 @@ export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", holiday: "Holidays and world events", family: "Hunter pet families", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
 /** The lore group's heading when its pages hold only some of the asked words. */
 export const LORE_SOME_WORDS = "Lore archive, some of your words";
-const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "instance", "guide", "lore", "tool", "doc"];
+const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "holiday", "family", "zone", "instance", "guide", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
 export const isScope = (v: unknown): v is Scope => (SCOPES as readonly unknown[]).includes(v);
 /** These groups keep search's matching rules and page within search rather than a database list. */
-export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "zone", "instance"] as const;
+export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "holiday", "family", "zone", "instance"] as const;
 export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
 export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
 export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
@@ -138,6 +139,16 @@ function zoneHits(match: Match): { id: number; label: string; href: string; exac
     .map(({ entry, exact, r }) => ({ id: entry.id, label: entry.name, href: zoneHref(entry.id, entry.name), exact, r }));
 }
 
+/** A game-file list's hits by name, with an exact id first; none when the file could not be read. */
+function fileHits(rows: { id: number; name: string }[] | null, match: Match, id: number | null, href: (id: number, name: string) => string): (SearchResult & { r: number })[] {
+  if (!rows) return [];
+  const out: (SearchResult & { r: number })[] = [];
+  const exact = id === null ? undefined : rows.find((x) => x.id === id);
+  if (exact) out.push({ label: exact.name, href: href(exact.id, exact.name), note: `id ${exact.id}`, exact: true, id: exact.id, r: -1 });
+  for (const { entry, exact: same, r } of byName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: href(entry.id, entry.name), note: `id ${entry.id}`, exact: same, id: entry.id, r });
+  return out;
+}
+
 type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
 const publicObjects = new WeakMap<object, WeakMap<object, Set<number>>>();
 const namedObjects = new WeakMap<Map<number, string>, WeakMap<Set<number>, NamedRow[]>>();
@@ -228,6 +239,9 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
     if (!only || paged) {
       if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
       if (want("instance")) hits.set("instance", instanceHits(match));
+      // Holidays and hunter pet families the game files list, by name or id.
+      if (want("holiday")) hits.set("holiday", fileHits(holidayEntries(), match, id, holidayHref));
+      if (want("family")) hits.set("family", fileHits(petFamilyEntries(), match, id, petFamilyHref));
     }
     return hits;
   };

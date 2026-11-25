@@ -9,6 +9,7 @@ import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
 import { loadCatalog } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
+import { holidayEntries, petFamilyEntries } from "@/lib/world-events";
 import { instanceRows } from "@/lib/instances";
 import { publicZones } from "@/lib/zones";
 import { terrainTypes } from "@/lib/terrain";
@@ -83,6 +84,8 @@ export default async function DatabasePage() {
     "/database/factions": listed(catalog?.factions.length),
     "/database/titles": listed(catalog?.titles.length),
     "/database/quest-chains": listed(catalog?.chains.length),
+    "/database/holidays": listed(holidayEntries()?.length),
+    "/database/pet-families": listed(petFamilyEntries()?.length),
     "/database/drops": seen(live),
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.

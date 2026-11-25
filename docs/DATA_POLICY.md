@@ -656,6 +656,22 @@ text stay on pages.* The index is built from the same committed files, outside t
 answer carries the label and the build, the game-data credit, and a link to a page that exists on the site: only
 the factions the game shows are indexed, and statistics are not achievements.
 
+**Holidays and hunter pet families.** *Proposed 2026-11-25 in the pull request that adds them (the maintainer
+review).* `/database/holidays` and `/database/pet-families` list what the game files list, with a page for each. The
+rules:
+
+- Holidays read `client-holidays.json` (`npm run kb -- client-holidays`, from `Holidays`, `HolidayNames` and
+  `HolidayDescriptions`): the name, the files' own description, how many hours it lasts and its starts (the client's
+  packed dates, read as every year, every week or a dated start, in server time). A holiday with no name is a
+  server-side helper and is left out. The descriptions are game text and stay on the pages.
+- Hunter pet families read `client-pet-families.json` (`npm run kb -- client-pet-families`, from `CreatureFamily`,
+  `SkillLineAbility` and `SpellName`): the families whose food mask names any food, with their icon file, their own
+  skill line and the spell ids on it, development helpers left out. The food mask itself is not published: the files
+  name no foods for its bits. Spell names follow the spell name rule on the pages.
+- Every page is labelled *found in game files, unconfirmed* with its build; no player report confirms either yet.
+  The family icons are the existing `familyIcons` in asset storage. None of it is in the API, the MCP server or the
+  bulk download.
+
 **Build changes, beta builds included.** Decided 2026-10-18, the same way Wowhead and other
 datamining sites work: when Blizzard ships a new build, a reviewed pull request records what
 changed in the tables we read, and that change list may be public in the PR text and committed in

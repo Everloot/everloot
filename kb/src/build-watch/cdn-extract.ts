@@ -25,6 +25,8 @@ import { disenchantLua } from "../disenchant-lua.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
+import { writeClientHolidays } from "../client-holidays.js";
+import { writeClientPetFamilies } from "../client-pet-families.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
 import { writeRaceTable } from "../client-races.js";
@@ -98,6 +100,8 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));
+        writeClientHolidays(snapshot, join(root, GAME_DATA_DIR, "client-holidays.json"));
+        writeClientPetFamilies(snapshot, join(root, GAME_DATA_DIR, "client-pet-families.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
       encryptedTables: manifest.tables.map((t) => ({ table: t.table, blocks: t.encryptedBlocks })),

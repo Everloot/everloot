@@ -124,6 +124,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/terrain/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
   "web/src/app/database/spells/[id]/page.tsx",
+  // The hunter pet family list and pages: the family icons and the icons and names of the spells on its skill line.
+  "web/src/app/database/pet-families/page.tsx", "web/src/app/database/pet-families/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
