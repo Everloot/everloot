@@ -286,3 +286,13 @@ test("classification filters reach storage, preserve each other in links and lin
   await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
 });
+
+test("a character page shows its dungeons and raids where the dungeon progress line was, linked to the full checklist", async () => {
+  const out = await html(pages.character("eu", "velkara-duskmantle"));
+  const section = out.split('aria-labelledby="dungeons-raids"')[1]?.split("</section>")[0] ?? "";
+  expect(section).toContain("Dungeons &amp; raids");
+  expect(section).toContain('href="#progress"');
+  // No storage in this test: no synced history is unknown, never 0 cleared.
+  expect(section).toContain("No boss kills are synced for this character");
+  expect(out.indexOf('aria-labelledby="dungeons-raids"')).toBeLessThan(out.indexOf('id="progress"'));
+});

@@ -29,6 +29,11 @@ export function dungeonProgressOn(): boolean {
   return process.env.EVERLOOT_DUNGEON_PROGRESS === "1";
 }
 
+/** Keep the instance pages' clears reader dark until 20261125120000_instance_clears.sql is applied. */
+export function instanceClearsOn(): boolean {
+  return process.env.EVERLOOT_INSTANCE_CLEARS === "1";
+}
+
 /** Last kill, not the original capture time: the addon updates cumulative rows in place. */
 export function bossKillCapture(rows: readonly BossKillRow[], now: Date) {
   const usable = rows.filter((r) => Date.parse(r.lastKillAt) <= now.getTime() + 86_400_000);

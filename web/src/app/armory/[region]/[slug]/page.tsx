@@ -18,7 +18,7 @@ import { publicArmoryLink } from "@/lib/armory-links";
 import { readTimes } from "../../profile";
 import { characterTabs } from "../../character-tabs";
 import { loadCharacterProgression } from "@/lib/progression";
-import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
+import DungeonsAndRaids from "@/components/progress/DungeonsAndRaids";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
@@ -136,7 +136,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
           }
         />
         </div>
-        <DungeonProgressSummary progress={progression.summary} href="#progress" />
+        <DungeonsAndRaids data={progression.dungeons} href="#progress" />
 
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <span className="rounded-control border border-edge px-2 py-1 text-fg-2">Blizzard profile</span>
