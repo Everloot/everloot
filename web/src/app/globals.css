@@ -209,6 +209,14 @@ main p a, main .list-disc a {
   border-color: rgb(var(--accent-hover));
   background: rgb(var(--accent-hover));
 }
+/* The small pill: the same button at the data controls' height (32 px, 13 px text), for the 44 px header and for
+   actions beside a title, a filter bar or a table. Add it to .btn or .btn btn-primary. */
+.btn-sm {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 13px;
+  line-height: 20px;
+}
 /* A disabled primary button drops its fill: at half opacity the green read as a different olive colour. */
 .btn-primary:disabled,
 .btn-primary[aria-disabled="true"] {

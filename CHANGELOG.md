@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the header has six items instead of nine: Community (players, guilds, rankings, census, addons), Database, Tools (market tools and planners), Guides, Chat and Profile, with Menu only below 1280 px; labels, badges and table headers are sans, the header's pills share one small button size, and docs/design/direction.md sets the site's type, colour and component rules.
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: profession pages draw the AH Ledger crafting margins on the server, with each recipe's icon and skill, sorting on every money column, skill, sales-per-day and priced-only filters, 25 to 200 rows a page, all kept in the link, and the time AH Ledger last scanned the prices.

@@ -110,7 +110,7 @@ export default function Footer() {
             <div className="hidden min-w-0 flex-1 md:block">
               {GROUPS.map((group) => (
                 <div key={group.title} className="flex flex-wrap items-baseline gap-x-4">
-                  <h2 className="w-24 shrink-0 font-mono text-xs text-muted">{group.title}</h2>
+                  <h2 className="w-24 shrink-0 text-xs font-medium text-muted">{group.title}</h2>
                   <ul className="flex min-w-0 flex-1 flex-wrap gap-x-4">
                     {groupItems(group).map((item) => <li key={item.href}><FooterLink item={item} /></li>)}
                   </ul>
@@ -121,7 +121,7 @@ export default function Footer() {
             <div className="flex flex-wrap gap-x-6 md:hidden">
               {GROUPS.map((group) => (
                 <details key={group.title} className="group">
-                  <summary className="inline-flex min-h-8 cursor-pointer items-center gap-1 font-mono text-xs text-muted hover:text-fg-2 transition-colors">
+                  <summary className="inline-flex min-h-8 cursor-pointer items-center gap-1 text-xs font-medium text-muted hover:text-fg-2 transition-colors">
                     {group.title}
                     <svg aria-hidden="true" viewBox="0 0 10 6" width="10" height="6" className="group-open:rotate-180"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
                   </summary>
