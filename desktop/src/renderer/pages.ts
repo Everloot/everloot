@@ -596,7 +596,7 @@ export function market(s: AppState, v: View): string {
     <section class="panel"><div class="row between"><h2>Look up a price</h2>${ext(websiteUrl(s.settings.endpoint, "/tools/auctions"), "Auction prices on everloot.app ↗")}</div>
       <form id="priceForm" class="row" autocomplete="off"><input type="text" id="priceItem" name="priceItem" class="grow" aria-label="Item id or link" placeholder="Item id, or an item link pasted from game chat" maxlength="500"><button type="submit" class="btn">Look up</button></form>
       ${priceResult(s, v.priceLookup)}
-      <p class="muted small">From the prices file in your game, the same numbers your tooltips show. In game, <code>/everloot price [item]</code> prints them in chat, anywhere in the world. Charts, every realm and item names are on the site.</p>
+      <p class="muted small">Reads the file on disk. The Day column is the item's latest price observation. Charts, every realm and item names are on the site.</p>
     </section>
     <p class="fg2">Community market values written into <code>EverlootPrices</code> so item tooltips show them after <code>/reload</code>. Realms from your own auction scans are always included; pick more below, the way TSM lets you pick realms, except the values are Everloot's own: a day counts once three reporters scanned it. Refreshed after each upload and every hour.</p>
     ${realmSuggestion(m)}
@@ -610,11 +610,12 @@ export function market(s: AppState, v: View): string {
       ${scans ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody>${scans}</tbody></table></div>` : emptyState(emptyCause("market", s), icon("market"))}
       <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
     </section>
-    <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div>
+    <section class="panel"><div class="row between"><h2>Price file for the add-on</h2><span class="muted small">${j.state === "ok" && j.at && last.length ? `Last successful refresh ${when(j.at)}` : ""}</span></div>
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
       ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td>${esc(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
         : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td>${houseCell(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
         : emptyState(marketWritten, icon("market"))}
+      <p class="muted small"><strong>Verify in WoW.</strong> Run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Check the house and price date in the result.</p>
     </section>
   </div>`;
 }

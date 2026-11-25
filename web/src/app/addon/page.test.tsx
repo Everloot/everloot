@@ -8,6 +8,15 @@ import nextConfig from "../../../next.config.js";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { servedFile } from "@/lib/everloot-releases";
 
+const release = vi.hoisted(() => ({ liveVerified: undefined as boolean | undefined }));
+vi.mock("@/lib/addon-release", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/addon-release")>("@/lib/addon-release");
+  return {
+    ...actual,
+    get ADDON_LIVE_VERIFIED() { return release.liveVerified ?? actual.ADDON_LIVE_VERIFIED; },
+  };
+});
+
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
@@ -42,7 +51,7 @@ async function render(answer: () => Promise<Response>) {
   return renderToStaticMarkup(await AddonPage());
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+afterEach(() => { release.liveVerified = undefined; vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 test("the page describes the in-game window, feature chooser and local-only stores", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
@@ -52,6 +61,7 @@ test("the page describes the in-game window, feature chooser and local-only stor
   }
   expect(html).toContain('href="/docs/guides/addon#window"');
   expect(text).toContain("boss kills sync with a linked character and are public");
+  expect(text).toContain("Player tooltips require Desktop App 0.1.24 or later to show shared dungeon progress once it is available for your realm.");
 });
 
 test("the addon choices lead with the app, then website, then zip; desktop starts neutral", async () => {
@@ -69,10 +79,22 @@ test("the addon choices lead with the app, then website, then zip; desktop start
   expect(visible(html)).toContain("Choose your download");
 });
 
-test("the download is a regular release, not labelled Alpha, without the pending note once checked in the live client", async () => {
-  const html = await render(() => Promise.resolve(Response.json(releases)));
-  expect(visible(html)).not.toContain("Alpha");
-  expect(visible(html)).not.toContain("Live-client verification is pending");
+test.each([
+  { liveVerified: false, showsPendingNote: true },
+  { liveVerified: true, showsPendingNote: false },
+])("the regular release shows the pending note only before verification (verified: $liveVerified)",
+  async ({ liveVerified, showsPendingNote }) => {
+    release.liveVerified = liveVerified;
+    const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+    expect(text).not.toContain("Alpha");
+    expect(text.includes("Live-client verification is pending")).toBe(showsPendingNote);
+  },
+);
+
+test("the release paragraph describes this release: the Disenchanting tab is gone and its estimate is in the tooltip", async () => {
+  const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+  expect(text).not.toContain("talent and raid plan imports");
+  expect(text).toContain("The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.");
 });
 
 test.each([

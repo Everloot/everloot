@@ -37,6 +37,7 @@ import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
 import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
 import ShoppingList from "../shopping-list";
+import RecipeShopping from "../recipe-shopping";
 import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
 
 export const dynamic = "force-dynamic";
@@ -184,9 +185,14 @@ export default async function ProfessionPage(props: Props) {
 
   const spellName = (id: number) => spellNames?.names.get(id);
   const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
+  const selectedRecipe = catalog.find(r => String(r.spellId) === searchParams.recipe && r.reagents.length > 0);
+  const requestedCrafts = Number(searchParams.crafts);
+  const crafts = Number.isInteger(requestedCrafts) && requestedCrafts >= 1 && requestedCrafts <= 999 ? requestedCrafts : 1;
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
   // The recipe table, filtered and paged here: the page carries only the rows it shows (`?page=&size=&q=&min=&max=`).
   const listQuery = recipeListQuery(searchParams);
+  const planHref = (id: number) => recipeListHref(path, { ...searchParams, recipe: String(id), crafts: undefined },
+    listQuery, { page: listQuery.page }).replace(/#prof-recipes$/, "#recipe-shopping");
   const listed = recipePage(filterRecipeViews(recipeGroups(p.recipes).flatMap((g) => g.recipes), catalog, listQuery), listQuery);
   const listHere = (change: Parameters<typeof recipeListHref>[3]) => recipeListHref(path, searchParams, listQuery, change);
   const teaching = new Map(catalog.map((r) => [r.spellId, r.recipeItems]));
@@ -229,6 +235,7 @@ export default async function ProfessionPage(props: Props) {
               <Link prefetch={false} href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
               <Badge tone="files" />
             </span>
+            {r.reagents.length > 0 && <Link prefetch={false} href={planHref(r.spellId)} className={LINK}>Plan this recipe</Link>}
             {/* The recipe item the files link to this spell (client-recipe-items.json): unconfirmed, like the rest of the row. */}
             {taught.length > 0 && <span className="inline-flex flex-wrap items-center gap-x-2 text-cell-2 text-fg-2">Recipe item: {taught.map((x) => <ItemLink key={x.itemId} id={x.itemId} size={16} />)}</span>}
           </span>
@@ -331,6 +338,7 @@ export default async function ProfessionPage(props: Props) {
             Found in game files, unconfirmed, build {RECIPES_BUILD}. Grouped by the skill where a recipe turns yellow.
             {p.otherSpells > 0 && ` ${plural(p.otherSpells, "other spell")} on the ${p.name} line make and cost nothing and are not listed.`}
           </p>
+          {selectedRecipe && <RecipeShopping key={selectedRecipe.spellId} recipe={selectedRecipe} initialCrafts={crafts} />}
           {groups.length > 0 && (
             <FilterBar
               label={`${p.name} recipe filters`}
