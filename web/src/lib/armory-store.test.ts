@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "./armory.fixture";
 import { armoryStore, armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
+import { StorageError } from "./supabase/server";
 
 test("guild queue fallback matches duplicate and recheck rules independently of character queue keys", async () => {
   const now = () => new Date("2026-11-30T00:00:00Z");
@@ -99,6 +100,26 @@ describe("the Supabase store", () => {
     expect(await fake([]).store.guild("eu", "a-b")).toBeNull();
     expect(await fake(true).store.enqueue("eu", "character", "a-b", "website")).toBe(true);
     expect(await fake(false).store.enqueue("eu", "character", "a-b", "website")).toBe(false);
+  });
+
+  test("the site search reads characters and guilds in one call, and is null until its migration is applied", async () => {
+    const { query, store } = fake([
+      { kind: "character", source: "armory", region: "us", slug: "volvik-morningstar", name: "Volvik", surname: "Morningstar", level: 31, class: "Warrior", faction: "Alliance", ruleset: "PvP", realm: null, member_count: null },
+      { kind: "character", source: "players", region: null, slug: null, name: "Volvikar", surname: null, level: 24, class: "SHAMAN", faction: null, ruleset: "forever", realm: "Forever Pioneer", member_count: null },
+      { kind: "guild", source: "armory", region: "eu", slug: "volvik-guard", name: "Volvik Guard", surname: null, level: null, class: null, faction: "Horde", ruleset: "Normal", realm: null, member_count: 12 },
+    ]);
+    expect(await store.people("volvik", 25)).toEqual({
+      armory: [{ region: "us", slug: "volvik-morningstar", name: "Volvik", surname: "Morningstar", level: 31, class: "Warrior", faction: "Alliance", ruleset: "PvP" }],
+      players: [{ name: "Volvikar", level: 24, class: "SHAMAN", ruleset: "forever", realm: "Forever Pioneer" }],
+      guilds: [{ region: "eu", slug: "volvik-guard", name: "Volvik Guard", faction: "Horde", ruleset: "Normal", memberCount: 12 }],
+    });
+    expect(call(query)).toEqual({ path: "rpc/site_people_search", method: "POST", body: { p_prefix: "volvik", p_limit: 25 } });
+    const missing = createCloudArmoryStore((async () => { throw new StorageError(404, "PGRST202", "Could not find the function public.site_people_search"); }) as never);
+    expect(await missing.people("volvik", 25)).toBeNull();
+    const down = createCloudArmoryStore((async () => { throw new StorageError(503, null, "down"); }) as never);
+    await expect(down.people("volvik", 25)).rejects.toThrow();
+    // The development store has no players table to join, so it keeps the separate reads.
+    expect(await createMemoryArmoryStore().people("volvik", 25)).toBeNull();
   });
 
   test("a refused call throws, for the page to say storage is unreachable", async () => {

@@ -28,6 +28,7 @@ import ProjectView, { type AttachedNote } from "./ProjectView";
 import SaveToProject, { type SaveRequest } from "./SaveToProject";
 import { useWorkspace } from "./useWorkspace";
 import Container from "@/components/ui/Container";
+import { REPORT_BUG_EVENT } from "@/components/BugReport";
 import WorkspaceRail, { type LocalChat } from "./WorkspaceRail";
 
 export const SUGGESTIONS = WELCOME.map((s) => s.text);
@@ -725,6 +726,9 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
           {!railOpen && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={busy} aria-keyshortcuts="Control+Shift+O" onClick={() => newChat()}>New chat</button>}
           {workspace && !view && <SaveLine key={currentId} meta={meta} save={save} empty={messages.length === 0} projectName={projectName} busy={busy}
             onRetry={persist} onNewer={() => void loadNewer()} onCopy={saveCopy} onNew={() => newChat()} />}
+          {/* In place of the floating pill, hidden here; below md the site menu has the same entry. */}
+          <button type="button" aria-haspopup="dialog" className="ml-auto hidden min-h-9 shrink-0 items-center text-xs text-fg-2 underline underline-offset-4 hover:text-accent md:inline-flex"
+            onClick={() => window.dispatchEvent(new Event(REPORT_BUG_EVENT))}>Report a bug</button>
         </div>
 
         {workspace && others.length > 0 && (

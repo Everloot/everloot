@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
+- Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
 - Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - Site: rankings show US and EU side by side, each ranked on its own, so the region with more characters read no longer hides the other. The Rankings page shows one character board at a time with a tab for each, and names carry their class colour.
@@ -274,6 +276,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
@@ -661,7 +664,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
 
-## [0.3.30] - 2026-11-23
+## [0.3.30] - 2026-11-24
 
 The Everloot window reads at a glance: Collection opens on an overview of every area, Gold charts what you earned and
 spent each day, and Professions has its own Ranks and trainers screen and a crafting cost breakdown. The Disenchanting

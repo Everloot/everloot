@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.30. Automated coverage includes the reworked window (Collection overview, Gold chart, Professions screens), disenchant estimates in item tooltips, dungeon progress and the lifetime gold statistics. The live Forever client check of 0.3.30 is pending.
+**Status:** 0.3.30. Automated coverage includes the reworked window (Collection overview, Gold chart, Professions screens), disenchant estimates in item tooltips, dungeon progress and the lifetime gold statistics. Live Forever check: Transmute: Arcanite displayed Thorium Bar and Arcane Crystal in Everloot Crafting costs.
 
 ## Run it
 

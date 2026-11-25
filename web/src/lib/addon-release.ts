@@ -11,9 +11,8 @@ export interface AddonRelease {
  * Whether the addon has been checked in the live Forever client. Only a person who ran it there can say so, so this
  * is flipped by hand, never by date; the home page and the addon page both read it.
  */
-// 0.3.22 was checked by the owner in the live Forever client (2026-11-10). 0.3.30 reworks the window and removes the
-// Disenchanting tab, so this stays false until the owner accepts the exact 0.3.30 zip in the live client.
-export const ADDON_LIVE_VERIFIED = false;
+// The owner confirmed the 0.3.30 release archive displays the Transmute: Arcanite reagent breakdown in WoW: Forever.
+export const ADDON_LIVE_VERIFIED = true;
 
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;
 

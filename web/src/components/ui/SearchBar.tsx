@@ -4,17 +4,29 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import GameIcon from "@/components/game/GameIcon";
 import type { PeopleSearch } from "@/lib/people-search-types";
+import { CLASS_TEXT, classColour } from "./class-colour";
 import { QUALITY_TEXT, qualityOf } from "./quality";
 
 /**
  * One row under the field: a database page from GET /search/suggest, or (unscoped only) a character or guild from
  * GET /search/people. Characters and guilds have no id; their `note` says who and where.
  */
-export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "zone" | "instance" | "character" | "guild" | "all"; id?: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
+export interface Suggestion {
+  type: "item" | "npc" | "quest" | "object" | "zone" | "instance" | "character" | "guild" | "all"; id?: number; label: string; href: string;
+  quality?: number | null; icon?: string; note?: string;
+  /** A character or guild whose name is the text (from /search/people); a database row is exact when its label is the text. */
+  exact?: boolean;
+  /** A character's class ("warrior") and a guild's faction ("Horde"), for the row's colour. */
+  class?: string; faction?: string;
+}
 
 const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", zone: "Zone", instance: "Instance", character: "Character", guild: "Guild", all: "Search" };
 /** The row's right-hand note: a dungeon or raid says which and its level, a character or guild who and where; the rest their type and id. */
 const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.id === undefined || row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
+/** An item's quality colour, a character's class colour; plain text for the rest. */
+const labelColour = (row: Suggestion) =>
+  row.type === "item" && typeof row.quality === "number" && row.quality <= 5 ? QUALITY_TEXT[qualityOf(row.quality)]
+    : (row.type === "character" && classColour(CLASS_TEXT, row.class)) || "text-fg";
 export const SEARCH_SCOPES = [
   { value: "", label: "All" }, { value: "item", label: "Items" }, { value: "npc", label: "NPCs" }, { value: "quest", label: "Quests" }, { value: "object", label: "Objects" },
 ] as const;
@@ -30,7 +42,27 @@ export const PEOPLE_ROWS = 3;
 export function peopleRows(body: Partial<PeopleSearch> | null): Suggestion[] {
   const rows = [...(body?.characters?.results ?? []), ...(body?.guilds?.results ?? [])];
   return rows.sort((a, b) => Number(b.exact) - Number(a.exact)).slice(0, PEOPLE_ROWS)
-    .map((r) => ({ type: r.type, label: r.label, href: r.href, note: r.type === "guild" ? `Guild · ${r.meta}` : r.meta }));
+    .map((r) => ({ type: r.type, label: r.label, href: r.href, note: r.meta, exact: r.exact, ...(r.class ? { class: r.class } : {}), ...(r.faction ? { faction: r.faction } : {}) }));
+}
+
+/** The list's sections, in order: each row type belongs to one; the "All results" row closes the list outside them. */
+export const SECTIONS = [
+  { key: "characters", label: "Characters", types: ["character"] },
+  { key: "guilds", label: "Guilds", types: ["guild"] },
+  { key: "items", label: "Items", types: ["item"] },
+  { key: "places", label: "Zones & NPCs", types: ["zone", "instance", "npc"] },
+  { key: "other", label: "Quests & objects", types: ["quest", "object"] },
+] as const satisfies readonly { key: string; label: string; types: readonly Suggestion["type"][] }[];
+
+/** The rows grouped into their sections, empty ones left out, each keeping the order it arrived in. */
+export function sectioned(rows: Suggestion[]): { key: string; label: string; rows: Suggestion[] }[] {
+  return SECTIONS.map((s) => ({ key: s.key, label: s.label, rows: rows.filter((r) => (s.types as readonly string[]).includes(r.type)) })).filter((s) => s.rows.length);
+}
+
+/** The first row, in list order, whose name is the text: what Enter opens when no row is picked. */
+export function bestExact(rows: Suggestion[], text: string): Suggestion | undefined {
+  const q = text.trim().toLowerCase();
+  return rows.find((r) => r.type !== "all" && (r.exact ?? r.label.toLowerCase() === q));
 }
 
 /** Database pages first, cut so up to 3 character and guild rows fit under them in the 8. */
@@ -63,22 +95,23 @@ export function couldBeName(text: string): boolean {
  */
 export const suggestUrl = (text: string, scope: string) => `/search/suggest?q=${encodeURIComponent(text.trim().toLowerCase())}${scope ? `&in=${scope}` : ""}`;
 
-/** Database rows wait 120 ms after the last key; characters and guilds wait longer, as they reach storage. */
-const PEOPLE_PAUSE_MS = 280;
+/** Both requests wait this long after the last key; text shorter than MIN_CHARS asks nothing. */
+export const PAUSE_MS = 200;
+export const MIN_CHARS = 2;
 /** A character and guild answer slower than this is dropped: the database rows never wait for it. */
 export const PEOPLE_TIMEOUT_MS = 800;
 
 /**
- * The suggestions for what is typed, 120 ms after the last key; the answer to an older text is dropped. An unscoped
- * box also asks /search/people (uncached) when the text could start a name; its rows are added under the database
- * rows when they arrive, and nothing waits for them.
+ * The suggestions for what is typed (2 characters or more), 200 ms after the last key; a newer text aborts the requests
+ * of the older one. An unscoped box also asks /search/people (uncached) when the text could start a name; its rows
+ * join the database rows when they arrive, and nothing waits for them.
  */
 function useSuggestions(text: string, scope: string): Suggestion[] {
   const [rows, setRows] = useState<Suggestion[]>([]);
   useEffect(() => {
     const q = text.trim();
     const key = `${scope}|${q.toLowerCase()}`;
-    if (!q) { setRows([]); return; }
+    if (q.length < MIN_CHARS) { setRows([]); return; }
     const hit = cache.get(key);
     const ctrl = new AbortController();
     // What this text has so far; the list shows the older text's rows until its database rows arrive.
@@ -94,7 +127,7 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
           .then((r) => (r.ok ? r.json() : { results: [] }))
           .then((body: { results?: Suggestion[] }) => { database = body.results ?? []; cache.set(key, database); show(); })
           .catch(() => {});
-      }, 120));
+      }, PAUSE_MS));
     }
     if (!scope && couldBeName(q)) {
       timers.push(setTimeout(() => {
@@ -106,7 +139,7 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
           .then((r) => (r.ok ? r.json() : null))
           .then((body) => { people = peopleRows(body); show(); })
           .catch(() => {});
-      }, PEOPLE_PAUSE_MS));
+      }, PAUSE_MS));
     }
     return () => { timers.forEach(clearTimeout); ctrl.abort(); };
   }, [text, scope]);
@@ -114,10 +147,10 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
 }
 
 /**
- * A search field with instant suggestions (items, NPCs, quests, objects, zones, dungeons and raids, characters and guilds,
- * then a row for every result on the search page), as a combobox:
- * arrow keys move through the list, Enter opens the one picked, or searches when none is, Escape closes. Inside
- * a GET form, so without JavaScript it is a plain search.
+ * A search field with instant suggestions in sections (characters, guilds, items, zones and NPCs, quests and objects,
+ * then a row for every result on the search page), as a combobox: arrow keys move through the list, Enter opens the
+ * one picked, or the first row named exactly what is typed, or searches; Escape closes. Inside a GET form, so without
+ * JavaScript it is a plain search.
  */
 export function SuggestField({ id, name = "q", label, placeholder, defaultValue = "", scope = "", className, listClassName = "", inputRef, describedBy, after }: {
   id: string; name?: string; label: string; placeholder?: string; defaultValue?: string; scope?: string; className: string; listClassName?: string;
@@ -127,7 +160,8 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
   const [open, setOpen] = useState(false);
   // The picked row is held by its link, so rows added under it (characters, guilds) leave the pick where it is.
   const [picked, setPicked] = useState<string | null>(null);
-  const found = useSuggestions(text, scope);
+  const sections = sectioned(useSuggestions(text, scope));
+  const found = sections.flatMap((s) => s.rows);
   const rows = found.length ? [...found, allResultsRow(text, scope)] : found;
   const active = picked === null ? -1 : rows.findIndex((r) => r.href === picked);
   const list = useRef<HTMLUListElement>(null);
@@ -140,8 +174,35 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
     else if (event.key === "ArrowUp" && rows.length) { event.preventDefault(); setOpen(true); setPicked(rows[active <= 0 ? rows.length - 1 : active - 1].href); }
     // Each row is a link, so Enter follows the picked one the way a click does (client-side navigation).
     else if (event.key === "Enter" && shown && active >= 0) { event.preventDefault(); list.current?.querySelectorAll("a")[active]?.click(); setOpen(false); }
+    else if (event.key === "Enter" && shown && bestExact(found, text)) {
+      // The form's own submit handler still sees the search (its "search" event carries no text); an event sent by a
+      // script never submits a form, so only the row's link navigates.
+      event.preventDefault();
+      event.currentTarget.form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      list.current?.querySelectorAll("a")[found.indexOf(bestExact(found, text)!)]?.click();
+      setOpen(false);
+    }
     else if (event.key === "Escape" && shown) { event.preventDefault(); event.stopPropagation(); setOpen(false); }
   };
+
+  const option = (row: Suggestion, i: number) => (
+    <li key={`${row.type}-${row.href}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
+      <Link
+        href={row.href}
+        tabIndex={-1}
+        // Pressing a row must not take focus from the field first, or the list closes before the click lands.
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setPicked(row.href)}
+        onClick={() => setOpen(false)}
+        className={`flex h-9 items-center gap-3 px-3 text-cell ${i === active ? "bg-canvas" : ""}`}
+      >
+        {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
+        {row.faction && <span role="img" aria-label={row.faction} className={`h-2 w-2 shrink-0 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} />}
+        <span className={`min-w-0 flex-1 truncate ${labelColour(row)}`}>{row.label}</span>
+        <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
+      </Link>
+    </li>
+  );
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -171,23 +232,15 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
       {after}
       <ul ref={list} id={listId} role="listbox" aria-label={`Suggestions for ${label.toLowerCase()}`} hidden={!shown}
         className={`absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-control border border-edge bg-panel py-1 ${listClassName}`}>
-        {rows.map((row, i) => (
-          <li key={`${row.type}-${row.href}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
-            <Link
-              href={row.href}
-              tabIndex={-1}
-              // Pressing a row must not take focus from the field first, or the list closes before the click lands.
-              onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setPicked(row.href)}
-              onClick={() => setOpen(false)}
-              className={`flex h-9 items-center gap-3 px-3 text-cell ${i === active ? "bg-canvas" : ""}`}
-            >
-              {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
-              <span className={`min-w-0 flex-1 truncate ${row.type === "item" && typeof row.quality === "number" && row.quality <= 5 ? QUALITY_TEXT[qualityOf(row.quality)] : "text-fg"}`}>{row.label}</span>
-              <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
-            </Link>
+        {sections.map((section) => (
+          <li key={section.key} role="presentation">
+            <div id={`${listId}-${section.key}`} role="presentation" className="px-3 pb-1 pt-2 text-meta text-muted">{section.label}</div>
+            <ul role="group" aria-labelledby={`${listId}-${section.key}`}>
+              {section.rows.map((row) => option(row, found.indexOf(row)))}
+            </ul>
           </li>
         ))}
+        {found.length > 0 && option(rows[rows.length - 1], rows.length - 1)}
       </ul>
     </div>
   );

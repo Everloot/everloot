@@ -7,16 +7,16 @@ vi.mock("next/link", () => ({
   default: ({ children, onNavigate: _onNavigate, ...props }: { children: React.ReactNode; onNavigate?: () => void; href: string }) => <a {...props}>{children}</a>,
 }));
 
-import SearchBar, { couldBeName, suggestUrl } from "./SearchBar";
+import SearchBar, { couldBeName, PAUSE_MS, suggestUrl } from "./SearchBar";
 
 // Each test types its own text: the suggestion cache outlives a render.
-// The suggestions arrive 120 ms after the last key. Until they do, the list still shows the rows for what was
+// The suggestions are asked for 200 ms after the last key. Until they do, the list still shows the rows for what was
 // typed before, so a highlight picked on those rows must not outlive the text it was picked for.
 
 let container: HTMLDivElement;
 let root: Root;
 let answers: Map<string, (rows: unknown[]) => void>;
-let people: { status: number; body: unknown; never?: boolean };
+let people: { status: number; body: unknown; never?: boolean; held?: () => void };
 let peopleAsked: { q: string; cache?: RequestCache; signal?: AbortSignal | null }[];
 
 const suggestion = (id: number, label: string) => ({ type: "item", id, label, href: `/database/items/${id}` });
@@ -35,7 +35,10 @@ beforeEach(async () => {
     if (u.pathname === "/search/people") {
       peopleAsked.push({ q, cache: init?.cache, signal: init?.signal });
       if (people.never) return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
-      return Promise.resolve({ ok: people.status === 200, json: async () => people.body });
+      const reply = { ok: people.status === 200, json: async () => people.body };
+      // `held` set: the answer waits until the test calls people.held().
+      if (people.held) return new Promise((resolve) => { people.held = () => resolve(reply); });
+      return Promise.resolve(reply);
     }
     return new Promise((resolve) => { answers.set(q, (results) => resolve({ ok: true, json: async () => ({ results }) })); });
   }));
@@ -54,15 +57,21 @@ afterEach(async () => {
 
 const field = () => container.querySelector<HTMLInputElement>("#bar")!;
 
+/** Types the text and lets the 200 ms pause pass. */
 async function type(text: string) {
+  await key(text);
+  await act(async () => { await vi.advanceTimersByTimeAsync(PAUSE_MS); });
+}
+
+/** Types the text with no pause after it. */
+async function key(text: string) {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(), text);
     field().dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await act(async () => { await vi.advanceTimersByTimeAsync(120); });
 }
 
-/** Lets `ms` more pass: the character and guild request starts 280 ms after the last key. */
+/** Lets `ms` more pass. */
 async function wait(ms: number) {
   await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
@@ -126,7 +135,9 @@ test("a dungeon row says which it is and its level, and is picked like any other
   await type("deadm");
   await answer("deadm", [{ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" }, suggestion(4, "Deadmines Map")]);
   const options = [...container.querySelectorAll("[role=option]")];
-  expect(options.map((o) => o.textContent)).toEqual(["DeadminesDungeon, level 16", "Deadmines MapItem 4", "All results for “deadm”Search"]);
+  // Items come before zones, dungeons and NPCs.
+  expect(options.map((o) => o.textContent)).toEqual(["Deadmines MapItem 4", "DeadminesDungeon, level 16", "All results for “deadm”Search"]);
+  await press("ArrowDown");
   await press("ArrowDown");
   const clicks = watchClicks();
   await press("Enter");
@@ -137,23 +148,26 @@ const person = (type: "character" | "guild", label: string, meta: string, exact 
   ({ type, label, href: type === "character" ? `/players/forever/pioneer/${label.toLowerCase()}` : `/guilds/pioneer/${label.toLowerCase()}`, meta, exact });
 /** The database, character and guild rows, without the closing "All results" row (pinned in its own test). */
 const texts = () => [...container.querySelectorAll("[role=option]")].map((o) => o.textContent).filter((t) => !t!.startsWith("All results for"));
+const headings = () => [...container.querySelectorAll("[role=listbox] > li > div")].map((h) => h.textContent);
 
-test("characters and guilds come after the database pages, at most 3, and the 8 rows still hold", async () => {
+test("characters and guilds lead the list in their own sections, at most 3, and the 8 rows still hold", async () => {
   people.body = {
     characters: { results: [person("character", "Thrallina", "Level 24 Shaman · Pioneer"), person("character", "Thrall", "Level 60 Shaman · Pioneer", true)], total: 2 },
     guilds: { results: [person("guild", "Thrall Fans", "Pioneer · 4 members seen"), person("guild", "Thralls", "Pioneer")], total: 2 },
   };
+  people.held = () => {};
   await type("thrall");
   await answer("thrall", Array.from({ length: 8 }, (_, i) => suggestion(10 + i, `Thrall item ${i}`)));
-  // The database rows show at once; the people rows join them when they arrive.
+  // Both are asked at once; the database rows show without waiting, the people rows join them when they arrive.
+  expect(peopleAsked.map((a) => a.q)).toEqual(["thrall"]);
   expect(texts()).toHaveLength(8);
-  expect(peopleAsked).toEqual([]);
-  await wait(160);
+  await act(async () => people.held!());
   const rows = texts();
   expect(rows).toHaveLength(8);
-  expect(rows.slice(0, 5).every((t) => t!.startsWith("Thrall item"))).toBe(true);
-  // An exact name first, then characters before guilds; a guild row says it is one.
-  expect(rows.slice(5)).toEqual(["ThrallLevel 60 Shaman · Pioneer", "ThrallinaLevel 24 Shaman · Pioneer", "Thrall FansGuild · Pioneer · 4 members seen"]);
+  // An exact name first, characters before guilds, then the database pages.
+  expect(rows.slice(0, 3)).toEqual(["ThrallLevel 60 Shaman · Pioneer", "ThrallinaLevel 24 Shaman · Pioneer", "Thrall FansPioneer · 4 members seen"]);
+  expect(rows.slice(3).every((t) => t!.startsWith("Thrall item"))).toBe(true);
+  expect(headings()).toEqual(["Characters", "Guilds", "Items"]);
 });
 
 test("with no database match the character rows are the list, and they open their own pages", async () => {
@@ -196,16 +210,17 @@ test("a character lookup that never answers holds nothing back, and is dropped a
   expect(texts()).toEqual(["Mageweave ClothItem 5"]);
 });
 
-test("rows added under the list leave the picked row picked", async () => {
+test("rows added to the list leave the picked row picked", async () => {
   people.body = { characters: { results: [person("character", "Silkie", "Level 9 Rogue · Pioneer")], total: 1 } };
+  people.held = () => {};
   await type("silk");
   await answer("silk", [suggestion(6, "Silk Cloth"), suggestion(7, "Silk Thread")]);
   await press("ArrowDown");
   await press("ArrowDown");
   const picked = () => container.querySelector("[aria-selected=true]")?.textContent;
   expect(picked()).toBe("Silk ThreadItem 7");
-  await wait(160);
-  expect(texts()).toEqual(["Silk ClothItem 6", "Silk ThreadItem 7", "SilkieLevel 9 Rogue · Pioneer"]);
+  await act(async () => people.held!());
+  expect(texts()).toEqual(["SilkieLevel 9 Rogue · Pioneer", "Silk ClothItem 6", "Silk ThreadItem 7"]);
   expect(picked()).toBe("Silk ThreadItem 7");
 });
 
@@ -218,12 +233,73 @@ test("text that cannot start a character or guild name never asks for them", asy
   expect(peopleAsked.map((a) => a.q)).toEqual(["it's-"]);
 });
 
-test("a quick typist asks for characters once, for the text they stopped on", async () => {
-  await type("th");
-  await type("thr");
-  await type("thra");
+test("a quick typist asks once, for the text they stopped on; one letter asks nothing", async () => {
+  await key("th");
+  await wait(150);
+  await key("thr");
+  await wait(150);
+  await key("thra");
   await wait(400);
   expect(peopleAsked.map((a) => a.q)).toEqual(["thra"]);
+  expect([...answers.keys()]).toEqual(["thra"]);
+  await type("x");
+  await wait(400);
+  expect([...answers.keys()]).toEqual(["thra"]);
+  expect(container.querySelectorAll("[role=option]")).toHaveLength(0);
+});
+
+test("a newer text aborts the requests still out for the older one", async () => {
+  people.never = true;
+  await type("cop");
+  const old = vi.mocked(fetch).mock.calls.map(([, init]) => init?.signal);
+  expect(old).toHaveLength(2);
+  expect(old.every((signal) => signal && !signal.aborted)).toBe(true);
+  await key("copp");
+  expect(old.every((signal) => signal!.aborted)).toBe(true);
+});
+
+test("sections are labelled groups inside the listbox; characters take their class colour and guilds show their faction", async () => {
+  people.body = {
+    characters: { results: [{ ...person("character", "Ashvane", "Level 40 Mage · Pioneer"), class: "mage" }], total: 1 },
+    guilds: { results: [{ ...person("guild", "Ash Wardens", "EU Normal · 12 members"), faction: "Horde" }], total: 1 },
+  };
+  await type("ash");
+  await answer("ash", [{ ...suggestion(8, "Ashwood Bow"), quality: 3 }, { type: "zone", id: 3, label: "Ashenvale", href: "/database/zones/3", note: "Zone" }]);
+  expect(headings()).toEqual(["Characters", "Guilds", "Items", "Zones & NPCs"]);
+  const groups = [...container.querySelectorAll("[role=listbox] [role=group]")];
+  expect(groups.map((g) => container.querySelector(`#${g.getAttribute("aria-labelledby")}`)!.textContent)).toEqual(["Characters", "Guilds", "Items", "Zones & NPCs"]);
+  expect(groups.map((g) => g.querySelectorAll("[role=option]").length)).toEqual([1, 1, 1, 1]);
+  // Option ids follow the list order, so the arrow keys and aria-activedescendant agree.
+  expect([...container.querySelectorAll("[role=option]")].map((o) => o.id)).toEqual(["bar-suggestions-0", "bar-suggestions-1", "bar-suggestions-2", "bar-suggestions-3", "bar-suggestions-4"]);
+  await press("ArrowDown");
+  await press("ArrowDown");
+  expect(field().getAttribute("aria-activedescendant")).toBe("bar-suggestions-1");
+  expect(container.querySelector("#bar-suggestions-1")!.textContent).toContain("Ash Wardens");
+  const label = (text: string) => [...container.querySelectorAll("[role=option] a span")].find((s) => s.textContent === text)!;
+  expect(label("Ashvane").className).toContain("text-class-mage");
+  expect(container.querySelector("[role=option] [role=img][aria-label=Horde]")!.className).toContain("bg-faction-horde");
+  expect(label("Ashwood Bow").className).not.toContain("text-fg");
+});
+
+test("Enter with nothing picked opens the first row named exactly what is typed, and the form still counts the search", async () => {
+  const submitted = vi.fn();
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await act(async () => root.render(<div onSubmit={(e) => { submitted(); e.preventDefault(); }}><SearchBar action="/search" label="Search Everloot" id="bar" /></div>));
+  people.body = { characters: { results: [person("character", "Linen", "Level 3 Mage · Pioneer", true)], total: 1 } };
+  await type("linen");
+  await answer("linen", [suggestion(2, "Linen Cloth")]);
+  const clicks = watchClicks();
+  expect((await press("Enter")).defaultPrevented).toBe(true);
+  expect(clicks).toEqual(["/players/forever/pioneer/linen"]);
+  expect(submitted).toHaveBeenCalledOnce();
+  // A database row named exactly what is typed counts too, in any case.
+  people.body = {};
+  await type("Linen Cloth");
+  await answer("linen cloth", [suggestion(2, "Linen Cloth")]);
+  const more = watchClicks();
+  await press("Enter");
+  expect(more).toEqual(["/database/items/2"]);
 });
 
 test("a failed character lookup leaves the database rows; a scoped box never asks for characters", async () => {
