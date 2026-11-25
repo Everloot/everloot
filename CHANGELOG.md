@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a guild page is the guild's home: its crest (or a faction emblem), faction, region and ruleset, members and founding day on top, then a roster you can sort by any column, filter by class and level and page through, with names in class colours, item level and last login; progression, what the addon saw of the guild and the charts follow. A /guilds address for a guild the armory has now redirects there for good, and search and character pages link to it (#1272).
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: profession pages draw the AH Ledger crafting margins on the server, with each recipe's icon and skill, sorting on every money column, skill, sales-per-day and priced-only filters, 25 to 200 rows a page, all kept in the link, and the time AH Ledger last scanned the prices.
