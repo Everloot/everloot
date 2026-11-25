@@ -21,19 +21,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
-- Addon: Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
 - Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - Site: rankings show US and EU side by side, each ranked on its own, so the region with more characters read no longer hides the other. The Rankings page shows one character board at a time with a tab for each, and names carry their class colour.
-- Addon: Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
-- Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
-- Addon: a kill's loot window also records the map and position you looted the corpse from, so the site can tell which zone a mob is farmed in. Inside an instance, or when the game gives no position, it records none.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
 - Site: a zone's page links to Farming routes and the cloth and leather lists by the same rule: a mob counts in the zone where 3 installs looted its kills, otherwise where its agreed pin is.
-- Addon: Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
-- Addon: the Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
-- Addon: Gold links to Professions crafting costs. Select a recipe to see material subtotals, output, cost per item and estimated profit after the auction-house cut.
-- Addon: the item tooltip compares disenchanting with selling and says what your own disenchants of that item gave; the Disenchanting tab is removed.
-- Addon: with the gold switch on, the addon reads your logged-in character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) into your file; they never go in an upload, and only the Desktop App's private sync sends them for a character you linked.
 - Site: a linked character's page can show its lifetime gold from the addon, under its own Gold sync and "Show gold" switches, both off by default; your lifetime totals add total gold acquired and most gold ever owned. Gold is never ranked.
 - Site: armory character pages gain a Play history tab from Blizzard's lifetime statistics (quests, kills, deaths, fish, flight paths, dungeons, boss kills and more), with six new rankings and each character's place on them. Owners can show it on a linked character's page with a new switch, and see their linked characters' lifetime totals in one table.
 - Site: Guild Masters can claim their guild through a linked armory character, appoint member editors, and publish a bio, raid days, links and recruiting needs. Claims are checked against the stored roster on every edit; in-game crests appear when Blizzard provides their images.
@@ -291,8 +282,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
-- Addon: Home fits 100,000 gold and more in its gold column (copper left off), the Gold chart's hour tooltips say UTC, a crafting price change that rounds to nothing shows a muted "0%", turning off the gold switch no longer says its rows may not have been uploaded, and the disenchant tooltip no longer rereads your disenchant history each time.
-- Addon: the window is opaque, its resize grip no longer covers buttons, and Home shows full gold amounts, short dates and only the columns and counts that say something.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.
@@ -677,6 +666,33 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
+
+## [0.3.30] - 2026-11-24
+
+The Everloot window reads at a glance: Collection opens on an overview of every area, Gold charts what you earned and
+spent each day, and Professions has its own Ranks and trainers screen and a crafting cost breakdown. The Disenchanting
+tab is removed: item tooltips now say whether disenchanting beats selling, after the auction house cut, and what your
+own disenchants of that item gave. With the gold switch on, the addon also keeps your character's lifetime gold
+statistics for private sync.
+
+### Added
+
+- Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
+- A kill's loot window also records the map and position you looted the corpse from, so the site can tell which zone a mob is farmed in. Inside an instance, or when the game gives no position, it records none.
+- Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
+- The Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
+- Gold links to Professions crafting costs. Select a recipe to see material subtotals, output, cost per item and estimated profit after the auction-house cut.
+- The item tooltip compares disenchanting with selling and says what your own disenchants of that item gave; the Disenchanting tab is removed.
+- With the gold switch on, the addon reads your logged-in character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) into your file; they never go in an upload, and only the Desktop App's private sync sends them for a character you linked.
+
+### Fixed
+
+- Home fits 100,000 gold and more in its gold column (copper left off), the Gold chart's hour tooltips say UTC, a crafting price change that rounds to nothing shows a muted "0%", turning off the gold switch no longer says its rows may not have been uploaded, and the disenchant tooltip no longer rereads your disenchant history each time.
+- The window is opaque, its resize grip no longer covers buttons, and Home shows full gold amounts, short dates and only the columns and counts that say something.
+
+Lifetime gold leaves your computer only through the Desktop App's private sync (0.1.24) for a character you linked,
+and everloot.app keeps it only while that character's Gold sync is on. Dungeon progress on player tooltips needs the
+Desktop App 0.1.24 and shows only players who shared it. The bundled dungeon and raid data targets Forever build 1.60.1.71037.
 
 ## [0.3.29] - 2026-11-21
 
