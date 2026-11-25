@@ -28,6 +28,7 @@ import { writeClientDisenchant } from "./client-disenchant.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
+import { writeClientPlaces } from "./client-places.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -230,6 +231,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+  client-places <snapshot.sqlite> [--out ../web/src/data/game-data/client-places.json]
     (every quest line with its quest ids in order. Pages and search, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
@@ -799,6 +801,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
       const table = writeClientQuestLines(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
+      return 0;
+    }
+    case "client-places": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-places.json";
+      const table = writeClientPlaces(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.subzones.length} subzones, ${table.pois.length} points of interest -> ${path}`);
       return 0;
     }
     case "client-diff": {

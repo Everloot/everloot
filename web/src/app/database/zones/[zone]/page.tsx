@@ -29,7 +29,7 @@ import { confirmedLine, dayLabel } from "@/lib/report-labels";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { WORLD_MAP } from "@/lib/world-map";
+import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import {
   hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneHref, zoneMapHref,
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
@@ -38,6 +38,8 @@ import { zoneLore } from "@/lib/zone-lore";
 import { gearFor, TERRAIN_BUILD, TERRAIN_PATH, zoneTerrain } from "@/lib/terrain";
 import TerrainGearTable from "@/components/TerrainGearTable";
 import { instanceRows } from "@/lib/instances";
+import { zonePlaces, type ZonePoi } from "@/lib/places";
+import { CLIENT_LABEL } from "@kb/edges";
 import { UNAVAILABLE } from "@/lib/lore";
 import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
@@ -238,8 +240,30 @@ export default async function ZonePage(props: Props) {
     { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },
   ];
-  // Storage down: an empty list would read as "nobody has seen anything", so only the game-file list stays.
-  const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons") : all;
+  // The named places the game files list in the zone: points of interest at their spot, then the subzones.
+  const places = zonePlaces(zone.mapId);
+  if (places && (places.pois.length || places.subzones.length)) {
+    const poiColumns: Column<ZonePoi>[] = [
+      { key: "name", header: "Name", cell: (p) => p.name },
+      { key: "at", header: "Position", numeric: true, cell: (p) => (p.x !== null && p.y !== null ? position(p.x, p.y) : "–") },
+      { key: "show", header: <span className="sr-only">Map link</span>, cell: (p) => {
+        const href = p.x !== null && p.y !== null ? pinLink(zone.mapId, p.x, p.y) : null;
+        return href ? <Link href={href} className={link} aria-label={`Show ${p.name} on the map`}>Show on the map</Link> : null;
+      } },
+    ];
+    all.push({ id: "places", label: "Places", count: places.pois.length + places.subzones.length, panel: <>
+      <p data-places-note className="px-4 py-2 text-meta text-muted sm:px-6">The places the game files name in {zone.name}, build {places.build}. {CLIENT_LABEL}.</p>
+      {places.pois.length > 0 && <DataTable dense caption={`Points of interest the world map labels in ${zone.name}`} columns={poiColumns} rows={places.pois} rowKey={(p) => String(p.id)} />}
+      {places.subzones.length > 0 && (
+        <section aria-label={`Subzones of ${zone.name}`} className="px-4 py-3 sm:px-6">
+          <h3 className="text-meta font-semibold text-fg">Subzones ({places.subzones.length})</h3>
+          <p data-subzones className="mt-1 text-cell text-fg-2">{places.subzones.map((s) => s.name).join(" · ")}</p>
+        </section>
+      )}
+    </> });
+  }
+  // Storage down: an empty list would read as "nobody has seen anything", so only the game-file lists stay.
+  const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons" || t.id === "places") : all;
 
   return (
     <Container width="data">
