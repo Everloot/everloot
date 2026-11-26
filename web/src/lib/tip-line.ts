@@ -17,6 +17,8 @@ export const ARMOR: Record<number, string> = { 1: "Cloth", 2: "Leather", 3: "Mai
 
 /** What joins the two halves of a slot line or a damage line in the plain text. */
 export const PAIR = " · ";
+/** What opens a set piece's line under the set's name in the plain text: the game indents it. */
+export const PIECE = "  ";
 
 export type Metal = "gold" | "silver" | "copper";
 
@@ -24,14 +26,19 @@ export type Metal = "gold" | "silver" | "copper";
  * One tooltip line as the game draws it:
  * - `pair`: two columns, slot left and kind right ("Head" / "Plate"), or damage left and speed right;
  * - `effect`: an Equip, Use or Chance on hit line, in the game's green;
- * - `yellow`: the item level, a named set and the quoted flavour text, in the game's yellow;
+ * - `yellow`: the item level, a named set ("Set: Name", or "Name (0/8)" over its pieces) and the quoted flavour text,
+ *   in the game's yellow;
+ * - `stat`: an armour, block, stat, resistance or damage per second line with its number, in the game's white; one
+ *   still `[?]` stays neutral, like every placeholder;
+ * - `piece`: a set piece's name under the set's name, indented; `bonus`: a set bonus, "(2) Set: …". Both in the
+ *   game's grey for what is not active, as nobody's equipped pieces are known;
  * - `price`: the sell price, as coins;
- * - `plain`: everything else (binding, requirements, stats), in the neutral colour. Whether a requirement is met
+ * - `plain`: everything else (binding, requirements), in the neutral colour. Whether a requirement is met
  *   depends on the character, which the site does not know, so none is drawn red.
  */
 export type TipLine =
   | { kind: "pair"; left: string; right: string }
-  | { kind: "effect" | "yellow" | "plain"; text: string }
+  | { kind: "effect" | "yellow" | "stat" | "piece" | "bonus" | "plain"; text: string }
   | { kind: "price"; label: string; coins: { metal: Metal; amount: number }[] };
 
 const SLOTS = new Set(Object.values(SLOT));
@@ -39,7 +46,11 @@ const KINDS = new Set([...Object.values(WEAPON), ...Object.values(ARMOR)]);
 const DAMAGE = /^(.+ Damage) · (Speed \d+\.\d\d)$/;
 const EFFECT = /^(?:Equip|Use|Chance on hit): /;
 // "Set: [?]" stands for a set name or set lines nobody has read; it stays neutral, like the other placeholders.
-const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|".+")$/;
+const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|(?!\[\?\] ).+ \(0\/\d+\)|".+")$/;
+// A number players reported may still wait for a third install: the line says so after the value.
+const UNCONFIRMED = String.raw`(?: \(unconfirmed, seen by \d+ players?\))?`;
+const STAT = new RegExp(String.raw`^(?:[+-]\d+ [A-Z][A-Za-z ]*[a-z]|\d+ (?:Armor|Block)|\(\d+(?:\.\d)? damage per second\))${UNCONFIRMED}$`);
+const BONUS = /^\(\d+\) Set: /;
 const PRICE = /^(Sell Price:) (?:(\d+)g )?(?:(\d+)s )?(\d+)c$/;
 
 const ITEM_LEVEL = /^Item Level \d+$/;
@@ -67,6 +78,9 @@ export function tipLine(line: string): TipLine {
     return { kind: "price", label: price[1], coins };
   }
   if (EFFECT.test(line)) return { kind: "effect", text: line };
+  if (line.startsWith(PIECE) && line.trim()) return { kind: "piece", text: line.slice(PIECE.length) };
+  if (BONUS.test(line)) return { kind: "bonus", text: line };
   if (YELLOW.test(line)) return { kind: "yellow", text: line };
+  if (STAT.test(line)) return { kind: "stat", text: line };
   return { kind: "plain", text: line };
 }

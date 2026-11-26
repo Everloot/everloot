@@ -16,13 +16,15 @@ import { loadDisenchant } from "@/lib/disenchant";
 import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
-import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
-import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
-import { PLACEHOLDER, splitWhy } from "@/lib/placeholder";
+import { FACT_WORD, withReported } from "@/lib/item-names";
+import { itemTooltip } from "@/lib/item-tooltip";
+import { itemSetOf } from "@/lib/item-sets";
+import { GameCard } from "@/components/game/GameCard";
 import type { Crumb } from "@/lib/jsonld";
 import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
@@ -110,7 +112,6 @@ export default async function ItemPage(props: Props) {
   const tip = filesTip && withReported(filesTip, reported);
   const spellIcon = (spellId: number) => assets?.spellIcons.get(spellId);
   const category = categoryOf(CLIENT_TAXONOMY, itemId);
-  const quality = category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined;
   const names = await loadNames();
   const nameFor = nameOf(names);
   // By the name the page shows, players' or the Warcraft Wiki's, so an item nobody has reported still links its lore page.
@@ -231,13 +232,16 @@ export default async function ItemPage(props: Props) {
     }] : []),
   ];
 
-  const tooltipLines = tip
-    ? tipLines(tip)
-    : [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l));
-  // As the hover card shows it: the reasons for a [?] go under the box, not inside the game's tooltip.
-  const tipWhy = tip ? splitWhy(tip.why) : { reasons: [], evidence: [] };
-  const boxLines = tip ? [...tip.lines, ...tipWhy.evidence] : tooltipLines;
-  const boxNotes = tip && tip.lines.some((line) => line.includes(PLACEHOLDER)) ? tipWhy.reasons : [];
+  // The box, as the hover card draws it (lib/item-tooltip.ts): the game file lines, the set's pieces and bonuses, and
+  // the reasons for a [?] under the box, not inside the game's tooltip.
+  const set = tip ? itemSetOf(itemId) : undefined;
+  const bonusNames = set?.bonuses.length ? spellNames ?? await loadSpellNames(version) : null;
+  const box = itemTooltip({
+    // The name as the hover card has it: the game file name where the tooltip shows and no other source names the item.
+    id: itemId, tip, name: shownItemName(itemId, agreed, matched?.names, tip), category, namesQuality: matched?.names.get(itemId)?.quality,
+    set: set && { ...set, pieceName: itemName, spellName: (spell) => bonusNames?.names.get(spell) },
+  });
+  const tooltipLines = tip ? [...box.card.lines, ...(box.card.notes ?? [])] : box.card.lines;
   // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain. The
   // taxonomy gives the quality, else the names file (for an item whose quality the taxonomy leaves unrecorded).
   const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;
@@ -301,16 +305,8 @@ export default async function ItemPage(props: Props) {
         meta: [category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null],
       }}
       box={
-        <>
-          <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
-            <TooltipLines lines={boxLines} />
-          </TooltipFrame>
-          {boxNotes.length > 0 && (
-            <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
-              {boxNotes.map((note) => <p key={note}>{note}</p>)}
-            </div>
-          )}
-        </>
+        // The page draws the icon in its header and says where the name came from in its facts.
+        <GameCard card={{ ...box.card, icon: null, foot: null }} links={box.links} label={`${box.card.title}, from the game files`} />
       }
       facts={quickFacts}
       notices={(isDevelopmentItemName(name?.name) || (!reported.unreachable && Boolean(reported.progress?.length))) && <>

@@ -574,6 +574,11 @@ the item pages. They come from the game files alone, so:
   set and bonus names from the private file above, and its pieces' names and icons under the item name rule. A
   set page is indexed and listed in the sitemap only when the names file names the set. Search does not read set
   names, as it does not read spell names.
+- *Added 2026-11-26.* An item's tooltip box and its hover card lay its set out as the game does, under the set's
+  name: the pieces, named under the item name rule ("Item N" otherwise, development leftovers left out), then each
+  bonus by its spell's name from the private file ("Spell N" without one), never the spell's description. Only where
+  the item's game file tooltip shows (the same gate as its other lines). A card whose spell names file could not be
+  read is not served (503), never cached with ids in their place.
 
 **The talent catalog.** The talent calculator at `/tools/talents` uses our own catalog, read from
 the public client by a maintainer, not taken from any other site. The catalog is the trait node
