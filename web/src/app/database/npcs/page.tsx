@@ -3,10 +3,10 @@ import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "@kb/world-pages";
-import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
+import { Badge, Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@/lib/world-lists";
-import { parseZoneSegment, publicZones, zoneSlug } from "@/lib/zones";
+import { parseZoneSegment, publicZones, zoneHref, zoneSlug } from "@/lib/zones";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
@@ -90,11 +90,12 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const columns: SparseColumn<NpcRow>[] = [
     { key: "name", header: "Name", sortable: true, cell: (n) => <NameCell href={`/database/npcs/${n.npcId}`}>{n.name ?? `NPC ${n.npcId}`}</NameCell> },
     { key: "type", header: "Type", sortable: true, cell: (n) => n.creatureType ?? dash, blank: (n) => !n.creatureType },
-    { key: "rank", header: "Rank", sortable: true, cell: (n) => (n.rank ? RANK_LABEL[n.rank] : dash), blank: (n) => !n.rank },
+    // A rank above normal (elite, rare, boss) is what you scan the list for, so it is a badge.
+    { key: "rank", header: "Rank", sortable: true, cell: (n) => (!n.rank ? dash : n.rank === "normal" ? RANK_LABEL[n.rank] : <Badge tone="neutral">{RANK_LABEL[n.rank]}</Badge>), blank: (n) => !n.rank },
     { key: "react", header: "Reaction", sortable: true, cell: (n) => (n.reaction ? REACTION_LABEL[n.reaction] : dash), blank: (n) => !n.reaction },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (n) => n.level ?? dash, blank: (n) => n.level === null },
     { key: "drops", header: "Drops", numeric: true, sortable: true, cell: (n) => n.drops || dash, blank: (n) => !n.drops },
-    { key: "zone", header: "Zone", sortable: true, cell: (n) => n.zone?.name ?? dash, blank: (n) => !n.zone },
+    { key: "zone", header: "Zone", sortable: true, cell: (n) => (n.zone ? <Link prefetch={false} href={zoneHref(n.zone.mapId, n.zone.name)} className={LINK}>{n.zone.name}</Link> : dash), blank: (n) => !n.zone },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (n) => n.npcId },
   ];
 

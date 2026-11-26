@@ -49,7 +49,7 @@ test("an NPC with no agreed position and a quest with no agreed level draw no na
   const npc = await html(NpcPage(props("1")));
   expect(npc).not.toContain('data-tab-panel="map"');
   expect(npc).not.toContain("No agreed position yet.");
-  expect(npc).toContain('data-tab-panel="goods"');
+  expect(npc).toContain('data-tab-panel="sells"');
 });
 
 test("an NPC's pin table names the zone, keeps the map id in a tooltip, and names its link and its link column", async () => {
