@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { SITE } from "@everloot/protocol";
 import { z } from "zod";
 import { catalogPath } from "./catalog-paths.js";
-import { ClientAchievements } from "./client-achievements.js";
+import { ClientAchievements, isDevelopmentAchievement } from "./client-achievements.js";
 import { ClientEncounters } from "./client-encounters.js";
 import { ClientFactions } from "./client-factions.js";
 import { ClientMounts } from "./client-mounts.js";
@@ -163,7 +163,7 @@ function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fi
 const stampOf = (f: { build: Stamp }): Stamp => f.build;
 
 function recordsOfAchievements(f: ClientAchievements): (CatalogRecord | undefined)[] {
-  return Object.entries(f.achievements).filter(([, a]) => !a.statistic).map(([id, a]) =>
+  return Object.entries(f.achievements).filter(([id, a]) => !a.statistic && !isDevelopmentAchievement(f, Number(id), a.title)).map(([id, a]) =>
     record("achievement", id, a.title, stampOf(f), { points: a.points, criteriaCount: a.criteria.length }));
 }
 

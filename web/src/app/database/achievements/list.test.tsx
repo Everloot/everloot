@@ -19,11 +19,12 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 import AchievementList from "./page";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { categoryPath } from "./categories";
+import { isDevelopmentAchievement } from "@/lib/completion-lists";
 
 const html = async (search: Record<string, string> = {}) => renderToStaticMarkup(await AchievementList({ searchParams: Promise.resolve(search) }));
 /** The listed (non-statistic) achievements the files file under `name` or a category beneath it, and their points. */
 function totals(name: string) {
-  const rows = Object.values(CLIENT_ACHIEVEMENTS.achievements).filter((a) => !a.statistic && categoryPath(a.category).some((s) => s.name === name));
+  const rows = Object.entries(CLIENT_ACHIEVEMENTS.achievements).filter(([id, a]) => !a.statistic && !isDevelopmentAchievement(Number(id), a.title) && categoryPath(a.category).some((s) => s.name === name)).map(([, a]) => a);
   return { achievements: rows.length, points: rows.reduce((n, a) => n + a.points, 0) };
 }
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -53,4 +54,18 @@ test("a parent category filters to everything under it; a filtered list drops th
 test("each row carries the achievement's icon where the asset manifest lists one", async () => {
   const out = await html({ category: "Eastern Kingdoms" });
   expect(out).toMatch(/<img[^>]*src="https:\/\/a\.test\/icons\/236755\.webp"[^>]*>(?:<[^>]*>)*\s*<a href="\/database\/achievements\/627-explore-dun-morogh">/);
+});
+
+test("the files' Do Not Display category and the [DNT], UNUSED and <Hidden> rows stay out of the list and its overview", async () => {
+  // The overview and the Category menu name no such category, and searches and the category's filter find none of them.
+  expect(await html()).not.toContain("Do Not Display");
+  for (const q of ["DNT", "UNUSED", "Adventure Awaits - Hit 60", "Self-Found Soul", "Rune Learned"]) expect(await html({ q })).toContain("No achievements match these filters.");
+  expect(await html({ category: "Do Not Display" })).not.toContain("The Immortal");
+});
+
+test("on a phone the overview folds behind a disclosure; rows say 1 point, not 1 points", async () => {
+  const out = await html();
+  const section = out.split('aria-labelledby="by-category"')[1]?.split("</section>")[0] ?? "";
+  expect(section).toMatch(/<details class="[^"]*sm:hidden[^"]*"><summary[^>]*>By category/);
+  expect(out).not.toMatch(/(?<!\d)1 points\b/);
 });

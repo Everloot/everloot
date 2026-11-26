@@ -8,7 +8,7 @@ import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemSetName
 import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { currencyEntries, mountEntries, petEntries } from "./collectibles";
-import { factionInFiles, loadCatalog, titleDisplayName } from "./completion-lists";
+import { factionInFiles, isDevelopmentAchievement, loadCatalog, titleDisplayName } from "./completion-lists";
 import { instanceRows, levelLabel } from "./instances";
 import { itemSet, itemSetOf } from "./item-sets";
 import { bossEntry } from "./bosses";
@@ -209,7 +209,7 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
       if (type === "achievement") {
         const listed = catalog.achievements.find((a) => a.achievementId === id);
         const files = CLIENT_ACHIEVEMENTS.achievements[String(id)];
-        if (!listed && !files) return NO_CARD;
+        if ((!listed && !files) || isDevelopmentAchievement(id, files?.title ?? listed?.name)) return NO_CARD;
         const entry = listed?.confirmed ? listed : null;
         const points = entry?.points ?? files?.points ?? null;
         const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;

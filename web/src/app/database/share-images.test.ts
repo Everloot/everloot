@@ -126,7 +126,7 @@ describe("the share card of each database type", () => {
     ["hunter pet family", () => PetFamilyImage(props(String(family.id))), { title: family.name, type: "Hunter pet family", facts: [plural(family.spellIds.length, "spell"), CLIENT_LABEL] }],
     ["item set", () => ItemSetImage(props("1")),
       { title: "Dal'Rend's Arms", type: "Item set", facts: [plural(set.items.length, "piece"), plural(set.bonuses.length, "set bonus", "set bonuses"), CLIENT_LABEL] }],
-    ["achievement", () => AchievementImage(props(achievementId)), { title: achievement.title, type: "Achievement", facts: [`${achievement.points} points`, CLIENT_LABEL] }],
+    ["achievement", () => AchievementImage(props(achievementId)), { title: achievement.title, type: "Achievement", facts: [`${achievement.points} ${achievement.points === 1 ? "point" : "points"}`, CLIENT_LABEL] }],
     ["faction", () => FactionImage(props(String(faction.id))), { title: faction.name, type: "Faction", facts: [`Under ${factionParent.name}`, CLIENT_LABEL] }],
     ["title", () => TitleImage(props(String(title.id))), { title: titleDisplayName(title.name), type: "Title", facts: [CLIENT_LABEL] }],
     ["quest chain", () => ChainImage(props(String(chain.id))), { title: chain.name, type: "Quest chain", facts: [plural(chain.questIds.length, "quest"), CLIENT_LABEL] }],

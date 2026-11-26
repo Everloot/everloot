@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { buildClientAchievements, criteriaOf, serializeClientAchievements, writeClientAchievements, type TreeRow } from "../src/client-achievements.js";
+import { buildClientAchievements, criteriaOf, isDevelopmentAchievement, serializeClientAchievements, writeClientAchievements, type TreeRow } from "../src/client-achievements.js";
 import { writeClientSnapshot, type ClientBuildMeta, type ExtractedTable } from "../src/client-snapshot.js";
 
 const meta: ClientBuildMeta = {
@@ -122,3 +122,15 @@ test("writeClientAchievements writes one achievement per line in id order; the f
 function lineCount(text: string, needle: string): number {
   return text.split("\n").filter((l) => l.startsWith(needle)).length;
 }
+
+test("development leftovers: [DNT], UNUSED and <Hidden> names, and anything under the files' Do Not Display category", () => {
+  const files = {
+    categories: { "15425": { name: "Do Not Display" }, "15426": { name: "Old Runes", parent: 15425 }, "14777": { name: "Eastern Kingdoms" } },
+    achievements: { "1": { category: 15426 }, "2": { category: 14777 } },
+  } as unknown as Parameters<typeof isDevelopmentAchievement>[0];
+  expect(isDevelopmentAchievement(files, 9, "[DNT] Self-Found Soul (Level 1)")).toBe(true);
+  expect(isDevelopmentAchievement(files, 9, "UNUSED Bael'Gar Defeated (Daily)")).toBe(true);
+  expect(isDevelopmentAchievement(files, 9, "<Hidden> Adventure Awaits")).toBe(true);
+  expect(isDevelopmentAchievement(files, 1, "Rune Learned")).toBe(true);
+  expect(isDevelopmentAchievement(files, 2, "Explore Elwynn Forest")).toBe(false);
+});

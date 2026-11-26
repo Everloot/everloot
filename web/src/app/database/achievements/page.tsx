@@ -107,7 +107,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
             rowKey={(x) => String(x.achievementId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => [x.category, `${x.points} points`, `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].join(" · ")}
+            meta={(x) => [x.category, plural(x.points, "point"), `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].join(" · ")}
             empty={empty}
           />
         </div>
@@ -128,27 +128,38 @@ function ByCategory({ rows }: { rows: readonly Listed<AchievementEntry>[] }) {
   if (groups.length === 0) return null;
   return (
     <section aria-labelledby="by-category" className="mt-4 mb-6">
-      <h2 id="by-category" className="mb-2 text-h2-sm text-fg sm:text-h2">By category</h2>
-      <ul className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {groups.map((g) => (
-          <Card key={g.name} as="li" padding="sm">
-            <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <Link prefetch={false} href={categoryHref(g.name)} className="text-cell font-semibold text-fg hover:underline underline-offset-4">{g.name}</Link>
-              <Totals t={g} />
-            </p>
-            {g.children.length > 0 && (
-              <ul className="mt-2 space-y-1 border-t border-line pt-2">
-                {g.children.map((c) => (
-                  <li key={c.name} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <Link prefetch={false} href={categoryHref(c.name)} className="text-cell text-fg-2 hover:underline underline-offset-4">{c.name}</Link>
-                    <Totals t={c} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        ))}
-      </ul>
+      <h2 id="by-category" className="mb-2 hidden text-h2-sm text-fg sm:block sm:text-h2">By category</h2>
+      {/* On a phone the overview would push the table far down, so it folds behind a disclosure there. */}
+      <details className="sm:hidden">
+        <summary className="cursor-pointer text-h2-sm text-fg">By category</summary>
+        <div className="mt-2"><Groups groups={groups} /></div>
+      </details>
+      <div className="hidden sm:block"><Groups groups={groups} /></div>
     </section>
+  );
+}
+
+function Groups({ groups }: { groups: ReturnType<typeof categoryGroups> }) {
+  return (
+    <ul className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {groups.map((g) => (
+        <Card key={g.name} as="li" padding="sm">
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <Link prefetch={false} href={categoryHref(g.name)} className="text-cell font-semibold text-fg hover:underline underline-offset-4">{g.name}</Link>
+            <Totals t={g} />
+          </p>
+          {g.children.length > 0 && (
+            <ul className="mt-2 space-y-1 border-t border-line pt-2">
+              {g.children.map((c) => (
+                <li key={c.name} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <Link prefetch={false} href={categoryHref(c.name)} className="text-cell text-fg-2 hover:underline underline-offset-4">{c.name}</Link>
+                  <Totals t={c} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ))}
+    </ul>
   );
 }
