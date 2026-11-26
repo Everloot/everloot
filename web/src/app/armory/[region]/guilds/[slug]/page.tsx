@@ -70,7 +70,12 @@ const FIRST_DIRECTION: Record<SortKey, SortDirection> = { rank: "asc", name: "as
 const LEVEL_BANDS = [...CENSUS_LEVEL_BANDS].reverse();
 const ROSTER_PAGE = 50;
 
-interface RosterView { sort: SortKey; dir: SortDirection; cls: string | null; level: string | null; page: number }
+/** Last-login buckets: within 7 days, 8 to 30 days, longer ago; members with no login read are "unknown". */
+const ACTIVITY = ["7d", "30d", "older"] as const;
+type Activity = (typeof ACTIVITY)[number];
+const DAY_MS = 86_400_000;
+
+interface RosterView { sort: SortKey; dir: SortDirection; cls: string | null; level: string | null; active: Activity | null; page: number }
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -80,8 +85,9 @@ function rosterView(search: Search): RosterView {
   const dir: SortDirection = rawDir === "asc" || rawDir === "desc" ? rawDir : FIRST_DIRECTION[sort];
   const cls = one(search.class)?.toLowerCase() ?? null;
   const level = LEVEL_BANDS.find((b) => b.id === one(search.level))?.id ?? null;
+  const active = ACTIVITY.find((a) => a === one(search.active)) ?? null;
   const page = Number(one(search.p));
-  return { sort, dir, cls: cls && /^[a-z]{3,12}$/.test(cls) ? cls : null, level, page: Number.isInteger(page) && page > 1 && page <= 1000 ? page : 1 };
+  return { sort, dir, cls: cls && /^[a-z]{3,12}$/.test(cls) ? cls : null, level, active, page: Number.isInteger(page) && page > 1 && page <= 1000 ? page : 1 };
 }
 
 /** The address of a roster view; the default (every class and level, by rank, page 1) is the bare guild address. */
@@ -89,6 +95,7 @@ function rosterHref(path: string, v: RosterView): string {
   const params = new URLSearchParams();
   if (v.cls) params.set("class", v.cls);
   if (v.level) params.set("level", v.level);
+  if (v.active) params.set("active", v.active);
   if (v.sort !== "rank" || v.dir !== "asc") { params.set("sort", v.sort); params.set("dir", v.dir); }
   if (v.page > 1) params.set("p", String(v.page));
   const s = params.toString();
@@ -101,6 +108,14 @@ interface Row { m: ArmoryMember; token: string | null; seen: string | null }
 const lastDay = (r: Row) => day(r.m.lastLogin ?? null) ?? r.seen;
 const fullName = (m: ArmoryMember) => [m.name, m.surname].filter(Boolean).join(" ");
 const byName = (a: Row, b: Row) => a.m.name.localeCompare(b.m.name) || a.m.surname.localeCompare(b.m.surname);
+/** The member's last-login bucket against now, or null when no login has been read. */
+function activityOf(m: ArmoryMember, now: number): Activity | null {
+  const at = m.lastLogin ? Date.parse(m.lastLogin) : NaN;
+  if (!Number.isFinite(at)) return null;
+  const days = (now - at) / DAY_MS;
+  return days <= 7 ? "7d" : days <= 30 ? "30d" : "older";
+}
+
 /** Guild rank first (0 is the leader), then name. */
 const byRank = (a: Row, b: Row) => (a.m.rank ?? 99) - (b.m.rank ?? 99) || byName(a, b);
 
@@ -164,6 +179,7 @@ function rowMeta({ m, token }: Row): string {
     `${m.level ?? "?"} ${raceOfId(m.raceId)} ${token ? className(token) : ""}`.trim(),
     m.itemLevel === null ? null : `item level ${metricValue("item-level", m.itemLevel)}`,
     login ? `last login ${login}` : null,
+    m.rank === null ? null : rankName(m.rank),
   ].filter(Boolean).join(" · ");
 }
 
@@ -207,7 +223,9 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
   const rows: Row[] = roster.map((m) => ({ m, token: classTokenOfId(m.classId), seen: seen.get(m.name.toLowerCase()) ?? null }));
 
   const band = LEVEL_BANDS.find((b) => b.id === view.level);
-  const filtered = rows.filter((r) => (!view.cls || r.token?.toLowerCase() === view.cls) && (!band || (r.m.level !== null && r.m.level >= band.min && r.m.level <= band.max)));
+  const now = Date.now();
+  const filtered = rows.filter((r) => (!view.cls || r.token?.toLowerCase() === view.cls) && (!band || (r.m.level !== null && r.m.level >= band.min && r.m.level <= band.max))
+    && (!view.active || activityOf(r.m, now) === view.active));
   const sorted = sortRows(filtered, view.sort, view.dir);
   const pages = Math.max(1, Math.ceil(sorted.length / ROSTER_PAGE));
   const page = Math.min(view.page, pages);
@@ -220,7 +238,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
     <Container width="data">
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
-        <SummaryStrip guild={g} members={roster} summary={summary} />
+        <SummaryStrip guild={g} members={roster} summary={summary} activity={<ActivityStrip members={roster} now={now} href={(active) => href({ active })} />} />
         <GuildProfile guild={g} />
         <TopItemLevels region={g.region} rows={rows} />
 
@@ -229,8 +247,8 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
           {roster.length === 0 ? <p className="text-sm text-fg-2">No members listed.</p> : (
             <>
               <FilterBar
-                label="Roster filters" controls={filters} active={[view.cls, view.level].filter(Boolean).length}
-                clearHref={href({ cls: null, level: null })} nofollow
+                label="Roster filters" controls={filters} active={[view.cls, view.level, view.active].filter(Boolean).length}
+                clearHref={href({ cls: null, level: null, active: null })} nofollow
                 aside={<span className="text-meta text-muted">{sorted.length.toLocaleString("en-US")} of {roster.length.toLocaleString("en-US")} {roster.length === 1 ? "member" : "members"}</span>}
               />
               <DataTable
@@ -349,7 +367,7 @@ function AddonSection({ addon }: { addon: GuildPageData }) {
 }
 
 /** The guild at a glance, under its header: roster size, members read, level 60s, average item level, roster read, and the class mix as one bar. */
-function SummaryStrip({ guild: g, members, summary: s }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary }) {
+function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary; activity: ReactNode }) {
   const read = members.filter((m) => m.stored).length;
   return (
     <section data-guild-summary aria-label="Guild summary" className="space-y-3">
@@ -365,7 +383,39 @@ function SummaryStrip({ guild: g, members, summary: s }: { guild: ArmoryGuild; m
         { label: "Roster read", value: day(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
       {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}
+      {activity}
     </section>
+  );
+}
+
+const ACTIVITY_ROWS: { key: Activity | null; label: string; colour: string }[] = [
+  { key: "7d", label: "Last 7 days", colour: "bg-accent" },
+  { key: "30d", label: "8 to 30 days", colour: "bg-fg-2" },
+  { key: "older", label: "Longer", colour: "bg-muted" },
+  { key: null, label: "Not known", colour: "bg-line" },
+];
+
+/** Members by last login as one bar, then each bucket's count, linking the roster filtered to it (unknown has no filter). */
+function ActivityStrip({ members, now, href }: { members: readonly ArmoryMember[]; now: number; href: (active: Activity) => string }) {
+  if (members.length === 0) return null;
+  const counts = new Map<Activity | null, number>();
+  for (const m of members) { const a = activityOf(m, now); counts.set(a, (counts.get(a) ?? 0) + 1); }
+  const rows = ACTIVITY_ROWS.map((r) => ({ ...r, count: counts.get(r.key) ?? 0 }));
+  return (
+    <div data-guild-activity className="space-y-2">
+      <div role="img" aria-label={`Last login: ${rows.map((r) => `${r.label.toLowerCase()} ${r.count}`).join(", ")}`} className="flex h-2 overflow-hidden rounded-full bg-panel">
+        {rows.map((r) => (r.count ? <span key={r.label} className={`block h-2 ${r.colour}`} style={{ width: `${share(r.count, members.length)}%` }} /> : null))}
+      </div>
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-meta">
+        <span className="text-muted">Last login</span>
+        {rows.map((r) => {
+          const body = <><span aria-hidden="true" className={`mr-1.5 inline-block size-2 rounded-full ${r.colour}`} /><span className="font-mono tabular-nums text-fg">{r.count}</span> <span className="text-fg-2">{r.label}</span></>;
+          return r.key
+            ? <Link key={r.label} href={href(r.key)} rel="nofollow" className="underline decoration-edge underline-offset-4 hover:decoration-fg">{body}</Link>
+            : <span key={r.label}>{body}</span>;
+        })}
+      </p>
+    </div>
   );
 }
 

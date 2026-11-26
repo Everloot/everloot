@@ -277,6 +277,48 @@ test("the roster names rank 0 Guild Master and the others Rank n", async () => {
   expect(roster).toContain(">Rank 2<");
 });
 
+describe("the guild activity strip", () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-12T11:00:00Z") }); });
+  afterEach(() => { vi.useRealTimers(); });
+  const strip = (out: string) => out.slice(out.indexOf("data-guild-activity"), out.indexOf('aria-labelledby="guild-top"'));
+
+  test("counts members by last login (7 days, 30 days, longer, unknown), each count a link to the filtered roster", async () => {
+    mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, level: 44, itemLevel: 50, lastLogin: "2026-10-25T10:00:00.000Z" }));
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    const s = strip(out);
+    expect(s).toContain('role="img"');
+    expect(s).toMatch(/href="\/armory\/eu\/guilds\/ember-wardens\?active=7d"[^>]*>(?:\s*<[^>]*>)*\s*1(?:\s*<[^>]*>)*\s*Last 7 days/);
+    expect(s).toMatch(/href="\/armory\/eu\/guilds\/ember-wardens\?active=30d"[^>]*>(?:\s*<[^>]*>)*\s*1(?:\s*<[^>]*>)*\s*8 to 30 days/);
+    expect(s).toMatch(/href="\/armory\/eu\/guilds\/ember-wardens\?active=older"[^>]*>(?:\s*<[^>]*>)*\s*0(?:\s*<[^>]*>)*\s*Longer/);
+    expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*Not known/);
+    expect(s).not.toMatch(/opacity|gradient/);
+  });
+
+  test("?active filters the roster server-side and keeps the rest of the view; hidden members stay out", async () => {
+    mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, level: 44, itemLevel: 50, lastLogin: "2026-08-01T10:00:00.000Z" }));
+    const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
+    expect(recent).toContain("Velkara Duskmantle</a>");
+    expect(recent).not.toContain("Torvin Ashbrook");
+    expect(recent).not.toContain("Brannoc Tide");
+    expect(recent).toContain('href="/armory/eu/guilds/ember-wardens?active=7d&amp;sort=name&amp;dir=asc"');
+    const older = roster(await html(pages.guild("eu", "ember-wardens", { active: "older" })));
+    expect(older).toContain("Torvin Ashbrook");
+    expect(older).not.toContain("Velkara Duskmantle</a>");
+    await mem.hide("eu", "torvin-ashbrook");
+    const hidden = await html(pages.guild("eu", "ember-wardens", { active: "older" }));
+    expect(hidden).not.toContain("Torvin");
+    expect(strip(hidden)).toMatch(/\?active=older"[^>]*>(?:\s*<[^>]*>)*\s*0/);
+    // An unknown value is ignored.
+    expect(roster(await html(pages.guild("eu", "ember-wardens", { active: "1y" })))).toContain("Brannoc Tide");
+  });
+
+  test("the folded phone row names the rank", async () => {
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toMatch(/sm:hidden[^"]*">[^<]*Guild Master/);
+    expect(out).toMatch(/sm:hidden[^"]*">[^<]*Rank 1/);
+  });
+});
+
 describe("the guild home", () => {
   test("its header names the guild with its emblem, faction, region and ruleset, members and the day it was made", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
