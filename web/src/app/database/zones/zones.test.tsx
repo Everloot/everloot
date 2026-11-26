@@ -416,6 +416,8 @@ test("the tabs open on Quests, each with its level and side in colour, then NPCs
   const quests = page.split('data-tab-panel="quests"')[1]?.split("data-tab-panel")[0] ?? "";
   expect(quests).toMatch(/text-faction-alliance[^>]*>Alliance</);
   expect(quests).toMatch(/>12</);
+  // The giver stands in the zone, so its agreed name is the link's text, not its id.
+  expect(quests).toMatch(/href="\/database\/npcs\/100"[^>]*>Guard Orin</);
   const npcs = page.split('data-tab-panel="npcs"')[1]?.split("data-tab-panel")[0] ?? "";
   expect(npcs).toMatch(/Old Murk-Eye(?:<[^>]*>)*\s*(?:<[^>]*>)*Elite/);
   expect(npcs).toMatch(/>20</);

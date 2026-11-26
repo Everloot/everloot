@@ -183,7 +183,9 @@ export default async function ZonePage(props: Props) {
     { key: "at", header: "Position", numeric: true, cell: (n) => position(n.x, n.y) },
     { key: "installs", header: "Installs", cell: (n) => <AgreementMeter count={n.reporters} /> },
   ];
-  const npcLink = (id: number | null) => (id === null ? "unrecorded" : <Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link>);
+  // A giver or turn-in NPC that stands here goes by its agreed name; one elsewhere keeps its id.
+  const npcNameHere = new Map((here?.npcs ?? []).filter((n) => n.name).map((n) => [n.npcId, n.name!]));
+  const npcLink = (id: number | null) => (id === null ? "unrecorded" : <Link href={`/database/npcs/${id}`} className={link}>{npcNameHere.get(id) ?? `NPC ${id}`}</Link>);
   const questColumns: Column<ZoneQuest>[] = [
     { key: "title", header: "Quest", cell: (q) => {
       // A title players agree on; else the Warcraft Wiki's, with its source in the link's hover card.
