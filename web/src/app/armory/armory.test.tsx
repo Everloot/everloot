@@ -208,7 +208,10 @@ describe("the guild page", () => {
   test("lists the roster by rank, links stored members and says Unknown for an id it does not know", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     expect(out).toContain("Ember Wardens");
-    expect(out).toContain("Horde guild · EU Normal · 3 members");
+    // The header says the faction, the region and ruleset and the roster size apart (the guild home's header).
+    expect(out).toMatch(/>Horde<\/span> guild/);
+    expect(out).toMatch(/>EU<\/span>Normal/);
+    expect(out).toContain("3 members");
     expect(out).toContain("2026-10-01");
     expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
     expect(out).not.toContain('href="/armory/eu/brannoc-tide"');

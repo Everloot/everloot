@@ -1,7 +1,8 @@
 import { unstable_cache } from "next/cache";
 import { className, PLAYER_SEARCH_TAG } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
-import { armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
+import { ARMORY_RULESETS, armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
+import { sameGuild } from "./guild-merge";
 import { armoryStore, type ArmoryGuildHit, type ArmoryHit, type SitePeople, type SitePlayerHit } from "./armory-store";
 import { GUILD_SEARCH_TAG, guildPath, guildSearchPrefix, guildsOn, loadGuildSearch } from "./guilds";
 import { playerPagesOn, playerPath, searchPrefix } from "./player-pages";
@@ -104,7 +105,8 @@ export async function peopleSearch(raw: string, limit = PEOPLE_LIMIT, lookup?: (
       const found = !stored.length && lookup ? await lookup(text) : null;
       return found ? [found] : stored;
     }) : null,
-    guild ? orNone(async () => (await searchGuildsKept(guild.toLowerCase())).map((g) => ({
+    // An addon guild the armory answered too is the armory's row (guild-merge.ts's rule), as its page redirects there.
+    guild ? orNone(async () => (await searchGuildsKept(guild.toLowerCase())).filter((g) => !inArmory(g, armoryGuild && one ? one.guilds : [])).map((g) => ({
       type: "guild" as const, label: g.guildName, href: guildPath(g.realm, g.guildName),
       meta: g.membersSeen === null ? g.realm : `${g.realm} · ${g.membersSeen.toLocaleString("en-US")} ${g.membersSeen === 1 ? "member" : "members"} seen`,
       exact: g.guildName.toLowerCase() === q, ...(g.faction ? { faction: g.faction } : {}),
@@ -119,6 +121,11 @@ export async function peopleSearch(raw: string, limit = PEOPLE_LIMIT, lookup?: (
   const characterLookups = [players, armory].filter((l): l is PersonResult[] => l !== null);
   const guildLookups = [guilds, armoryGuild && one ? one.guilds.map((g) => armoryGuildRow(g, q)) : null].filter((l): l is PersonResult[] => l !== null);
   return { characters: characterLookups.length ? group(characterLookups, limit) : EMPTY, guilds: guildLookups.length ? group(guildLookups, limit) : EMPTY };
+}
+
+/** Whether an addon guild is one of the armory guilds the search found. */
+function inArmory(g: { realm: string; guildName: string }, armory: readonly ArmoryGuildHit[]): boolean {
+  return armory.some((a) => sameGuild(g, { region: a.region, slug: a.slug, rulesetId: ARMORY_RULESETS.find((r) => r.label === a.ruleset)?.id ?? -1 }));
 }
 
 /** The one read, or null before its migration (and in development) or when it fails (logged), for the separate reads to answer. */

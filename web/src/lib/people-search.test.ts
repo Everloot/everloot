@@ -260,6 +260,17 @@ describe("one read for characters and guilds (site_people_search)", () => {
     ]);
   });
 
+  test("an addon guild the armory has is one row, the armory's; the same name in another region stays its own", async () => {
+    allOn();
+    vi.spyOn(held.armory!, "people").mockResolvedValue(answer);
+    held.guilds = [
+      { ...guild("Volvik Guard", 5), realm: "CAMWOW EU1 Realm 2 PvE" },
+      { ...guild("Volvik Guard", 2), key: "us volvik guard", realm: "CAMWOW US1 Realm 3 PvE" },
+    ];
+    const found = await peopleSearch("Volvik");
+    expect(found.guilds.results.map((r) => r.href)).toEqual([guildPath("CAMWOW US1 Realm 3 PvE", "Volvik Guard"), armoryGuildPath("eu", "volvik-guard")]);
+  });
+
   test("each kind still needs its switch: armory rows and armory guilds the armory's, addon rows the player pages'", async () => {
     vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
     vi.spyOn(held.armory!, "people").mockResolvedValue(answer);

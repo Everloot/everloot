@@ -91,7 +91,7 @@ function OwnerPart({ showcase }: { showcase: Showcase }) {
 }
 
 /** The sighting part: what another player's addon last saw, as the players table holds it, and nothing more. */
-function SightingPart({ seen }: { seen: Player }) {
+function SightingPart({ seen, guildHref }: { seen: Player; guildHref?: string }) {
   // Derived from the race, not reported: a race on both sides (Skyborne) names no faction.
   const faction = raceFaction(seen.race);
   return (
@@ -106,7 +106,7 @@ function SightingPart({ seen }: { seen: Player }) {
             ...(faction ? [{ label: "Faction", value: faction }] : []),
             { label: "Level", value: seen.level, numeric: true },
             // With the guild pages on, the guild names its page; the page 404s for a hidden guild.
-            { label: "Guild", value: seen.guild ? (guildsOn() ? <Link href={guildPath(seen.realm, seen.guild)} className={link}>{seen.guild}</Link> : seen.guild) : "None seen" },
+            { label: "Guild", value: seen.guild ? (guildsOn() ? <Link href={guildHref ?? guildPath(seen.realm, seen.guild)} className={link}>{seen.guild}</Link> : seen.guild) : "None seen" },
             { label: "Realm", value: seen.realm },
             { label: "Last seen", value: seen.lastSeen, numeric: true },
           ]}
@@ -270,7 +270,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
           {progress && <DungeonProgressSummary progress={progress.summary} href={`${armoryCharacterPath(progress.region, progress.slug)}#progress`} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {armory && <ArmoryPart armory={armory} tips={tips} />}
-          {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
+          {sighted ? <SightingPart seen={sighted} guildHref={guild?.path} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}
           {classSlug && <PlanPart classSlug={classSlug} level={level} />}
           {playerPagesOn() && (

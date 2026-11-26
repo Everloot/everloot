@@ -162,7 +162,8 @@ describe("the guild page summary", () => {
     expect(out).toContain('data-population="item-levels"');
     expect(out).toContain("50–59");
     expect(out).toContain("2 (100%)");
-    expect(out).toContain('action="/guilds"');
+    // The guild search belongs on the directory, not above the guild's name.
+    expect(out).not.toContain('action="/guilds"');
     expect(out).toContain('href="/armory/guilds/submit?region=eu&amp;name=Ember+Wardens"');
     await mem.hide("eu", "torvin-ashbrook");
     const hidden = await html(pages.guild("eu", "ember-wardens"));
@@ -222,9 +223,85 @@ test("ranking rows carry the region chip, and each side-by-side column its regio
   expect(await html(pages.board("item-level"))).toMatch(/id="board-us"[^>]*><span data-region="us"[^>]*>US<\/span>Item level/);
 });
 
-test("guild progression hook follows the population summary", async () => {
-  vi.stubEnv("EVERLOOT_ARMORY", "1");
+test("the roster comes first, then progression, then the summary charts", async () => {
   const result = await html(pages.guild("eu", "ember-wardens"));
-  expect(result.indexOf('aria-labelledby="armory-summary"')).toBeLessThan(result.indexOf("data-guild-progression-hook"));
   expect(result).toContain("data-guild-progression-hook");
+  expect(result.indexOf('aria-labelledby="armory-roster"')).toBeLessThan(result.indexOf("data-guild-progression-hook"));
+  expect(result.indexOf("data-guild-progression-hook")).toBeLessThan(result.indexOf('aria-labelledby="armory-summary"'));
+});
+
+describe("the guild home", () => {
+  test("its header names the guild with its emblem, faction, region and ruleset, members and the day it was made", async () => {
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    const header = out.slice(out.indexOf("data-guild-header"), out.indexOf('aria-labelledby="armory-roster"'));
+    expect(header).toMatch(/<h1[^>]*>Ember Wardens<\/h1>/);
+    // No crest stored: the faction's emblem, never a broken image.
+    expect(header).toContain('data-faction-emblem="Horde"');
+    expect(header).not.toContain("<img");
+    expect(header).toContain(">Horde<");
+    expect(header).toMatch(/data-region="eu"[^>]*>EU<\/span>/);
+    expect(header).toContain("Normal");
+    expect(header).toContain("3 members");
+    expect(header).toContain("2026-10-01");
+  });
+
+  test("roster rows carry the name in its class colour, linked when read, level, race and class, item level and last login", async () => {
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toMatch(/<a href="\/armory\/eu\/velkara-duskmantle" class="[^"]*text-class-hunter[^"]*">Velkara Duskmantle<\/a>/);
+    expect(out).toMatch(/<span class="[^"]*text-class-hunter[^"]*">Brannoc Tide<\/span>/);
+    expect(out).toContain("Troll Hunter");
+    expect(out).toContain("2026-11-08");
+    expect(out).toContain('aria-sort="ascending"');
+  });
+
+  test("sorts both ways by any column and filters by class and level, all in the address", async () => {
+    const byLevelUp = await html(pages.guild("eu", "ember-wardens", { sort: "level", dir: "asc" }));
+    expect(byLevelUp.indexOf("Brannoc")).toBeLessThan(byLevelUp.indexOf("Velkara"));
+    const byLevelDown = await html(pages.guild("eu", "ember-wardens", { sort: "level" }));
+    expect(byLevelDown.indexOf("Velkara")).toBeLessThan(byLevelDown.indexOf("Brannoc"));
+    expect(byLevelDown).toContain('href="/armory/eu/guilds/ember-wardens?sort=level&amp;dir=asc"');
+    const byLogin = await html(pages.guild("eu", "ember-wardens", { sort: "last-login" }));
+    expect(byLogin.indexOf("Torvin")).toBeLessThan(byLogin.indexOf("Brannoc"));
+    const warriors = await html(pages.guild("eu", "ember-wardens", { class: "warrior" }));
+    expect(warriors).toContain("Torvin Ashbrook");
+    expect(warriors).not.toContain("Velkara Duskmantle</a>");
+    expect(warriors).toContain('href="/armory/eu/guilds/ember-wardens?class=warrior&amp;sort=name&amp;dir=asc"');
+    const sixty = await html(pages.guild("eu", "ember-wardens", { level: "60" }));
+    expect(sixty).toContain("Velkara Duskmantle</a>");
+    expect(sixty).not.toContain("Brannoc Tide");
+    // The summary still counts the whole roster.
+    expect(sixty).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
+    expect(await html(pages.guild("eu", "ember-wardens", { class: "druid" }))).toContain("No member matches these filters.");
+  });
+
+  test("pages a big roster 50 at a time", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({ characterSlug: `m-${i}`, name: `Member${String(i).padStart(2, "0")}`, surname: "Hold", level: 20, classId: 1, raceId: 2, rank: 5 }));
+    mem.putGuild(armoryGuild({ memberCount: 60 }), many);
+    const first = await html(pages.guild("eu", "ember-wardens", { sort: "name", dir: "asc" }));
+    expect(first).toContain("Member49 Hold");
+    expect(first).not.toContain("Member50 Hold");
+    expect(first).toContain('href="/armory/eu/guilds/ember-wardens?sort=name&amp;dir=asc&amp;p=2"');
+    const second = await html(pages.guild("eu", "ember-wardens", { sort: "name", dir: "asc", p: "2" }));
+    expect(second).toContain("Member50 Hold");
+    expect(second).not.toContain("Member49 Hold");
+  });
+
+  test("shows what the addon saw of the guild: its members seen and their last sighting", async () => {
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+    await playerStore().upsert([
+      { name: "Brannoc", realm: "CAMWOW EU1 Realm 2 PvE", race: "Tauren", class: "HUNTER", level: 41, guild: "Ember Wardens", seen: "2026-11-07" },
+      { name: "Ashka", realm: "CAMWOW EU1 Realm 2 PvE", race: "Orc", class: "MAGE", level: 33, guild: "Ember Wardens", seen: "2026-11-06" },
+      // The same name on a US realm is another guild.
+      { name: "Usmir", realm: "CAMWOW US1 Realm 2 PvE", race: "Orc", class: "MAGE", level: 33, guild: "Ember Wardens", seen: "2026-11-06" },
+    ]);
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toContain('aria-labelledby="addon-members"');
+    expect(out).toContain("Ashka");
+    expect(out).not.toContain("Usmir");
+    // A roster member the armory has not read shows the day the addon saw them.
+    expect(out).toMatch(/2026-11-07[^<]*<span[^>]*>seen<\/span>/);
+    vi.stubEnv("EVERLOOT_GUILDS", "");
+    expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain("Ashka");
+  });
 });
