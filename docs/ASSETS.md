@@ -258,8 +258,14 @@ node scripts/upload-game-assets.mjs --renders ../kb/data/renders/<product>-<buil
 It checks the folder against `checksums.json` and refuses anything but hash-named WebP files. It then asks the
 public bucket which pictures it already holds, sends the others to `renders/` with a one-year immutable cache, and
 sends `renders.json` to the build folder last. If the live folder is a re-extract (`-2`), add
-`--folder=<that folder>`. The script refuses a folder of another build. The site does not show the pictures yet;
-item and NPC pages read `renders.json` in a later change.
+`--folder=<that folder>`. The script refuses a folder of another build.
+
+**On the site.** The item and NPC pages read `renders.json` from the build folder at the end of
+`NEXT_PUBLIC_GAME_ASSETS_URL` (`web/src/lib/game-renders.ts`, kept an hour, a miss a minute) and take the picture
+from `renders/` one level up. The picture is first in the side column, lazy-loaded, with the alt text "Model of
+<name>". An item's shows only where the page shows the item's name and its icon; an NPC's only where the page
+names the NPC. No picture, no `renders.json`, or one that cannot be read: nothing shows in its place. The
+credit is the site footer's, as for the icons. The social cards do not use the pictures.
 
 **Next build.** Run `render-ids.mts` again (the gates grow as players report), then `client-renders`, and
 compare the counts with the last run. A jump in `encrypted` or `failed` means Blizzard changed something.

@@ -39,7 +39,8 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "@kb/pending-loot";
 import { itemDropSources } from "@kb/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
+import { loadRenders } from "@/lib/game-renders";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { loadItemIcons } from "@/lib/item-icons";
 import { ItemSourcesPanel } from "../../loot-tables";
@@ -105,6 +106,8 @@ export default async function ItemPage(props: Props) {
   const filesTip = tipped ? (await loadItemTips(assets, [itemId])).get(itemId) : undefined;
   // An item the files give only an icon for (no ItemSparse row: the server sends it) shows that icon, unconfirmed.
   const filesIcon = tipped && !filesTip ? (await loadItemIcons(assets, [itemId])).get(itemId) : undefined;
+  // The model picture under the same rule as the icon and tooltip, and only beside a shown name.
+  const picture = tipped && name ? (await loadRenders())?.items.get(itemId) : undefined;
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
   const reported = await loadReportedItemFacts(itemId);
   const tip = filesTip && withReported(filesTip, reported);
@@ -329,6 +332,7 @@ export default async function ItemPage(props: Props) {
           </section>
         )}
         <EntitySidebar>
+          <ModelPicture picture={picture} name={title} />
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
           <OpenData
             text={[

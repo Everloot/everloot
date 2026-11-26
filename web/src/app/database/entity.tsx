@@ -3,6 +3,7 @@ import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
+import type { ModelPicture as ModelPictureFile } from "@/lib/game-renders";
 import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
@@ -138,6 +139,22 @@ export function PinTable<P extends Pin>({ caption, rows, rowKey, lead = [] }: { 
     { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />;
+}
+
+/**
+ * An item's or NPC's model picture (docs/ASSETS.md, "Model pictures"), first in the side column: the rail on a wide
+ * screen, under the quick facts on a phone. Nothing without one, no empty box. The credit is the site footer's, as for
+ * the icons.
+ */
+export function ModelPicture({ picture, name }: { picture: ModelPictureFile | null | undefined; name: string }) {
+  if (!picture) return null;
+  return (
+    <div data-model-picture className="w-full sm:max-w-tip">
+      {/* The picture from the asset bucket as it is; next/image would only proxy it. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={picture.url} alt={`Model of ${name}`} width={picture.size} height={picture.size} loading="lazy" decoding="async" className="block aspect-square h-auto w-full rounded-control border border-line bg-panel object-contain" />
+    </div>
+  );
 }
 
 /** A CSS-only wide rail; its tracks exist on the first server render. */

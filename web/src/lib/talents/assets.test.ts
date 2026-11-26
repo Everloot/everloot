@@ -107,6 +107,8 @@ const SHOWS_ART = new Set([
   // Approved entity share icons use the same page art switch and item visibility rule.
   "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
+  // Model pictures for the item and NPC pages (docs/ASSETS.md, "Model pictures").
+  "web/src/lib/game-renders.ts",
   "web/src/app/tools/raid/RaidBuilder.tsx",
   "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/app/tools/raid/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
   "web/src/app/tools/professions/page.tsx", "web/src/app/tools/professions/[profession]/page.tsx", "web/src/app/tools/professions/[profession]/gathering/page.tsx", "web/src/app/database/drops/page.tsx", "web/src/app/database/items/[id]/page.tsx", "web/src/app/database/items/category-page.tsx",
@@ -195,7 +197,7 @@ test("nothing outside the pages that show the art can read the asset URL or the 
     join(root, "web/src/lib/bulk-export.ts"), join(root, "web/scripts/export-bulk.ts"), ...sources(join(root, "kb/src")).filter((p) => /mcp|exporters/.test(p)),
   ];
   // site-search.ts serves /api/suggest too: the shown names reach it only as an argument from a page.
-  for (const p of [...api, join(root, "web/src/lib/site-search.ts")]) expect(readFileSync(p, "utf8"), p).not.toMatch(/talents\/(assets|catalogs)|GAME_ASSETS|GAME_DATA_(S3|BUCKET|ACCESS|SECRET|REGION)|game-assets|components\/game\/|shown-item-names|shown-search-names|src\/item-names|loadItemNames|loadShownNames|src\/game-names|loadQuestNames|loadItemSetNames|loadSpellNames/);
+  for (const p of [...api, join(root, "web/src/lib/site-search.ts")]) expect(readFileSync(p, "utf8"), p).not.toMatch(/talents\/(assets|catalogs)|GAME_ASSETS|GAME_DATA_(S3|BUCKET|ACCESS|SECRET|REGION)|game-assets|game-renders|components\/game\/|shown-item-names|shown-search-names|src\/item-names|loadItemNames|loadShownNames|src\/game-names|loadQuestNames|loadItemSetNames|loadSpellNames/);
 });
 
 let release = "";
