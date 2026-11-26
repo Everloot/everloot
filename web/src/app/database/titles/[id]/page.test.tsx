@@ -86,7 +86,8 @@ test("a confirmed title page has the header meta, the facts, In short, Open data
 
 test("a title only the game files know keeps an empty meter for player reports and says so in short", async () => {
   const out = await html("8-champion");
-  expect(factOf(out, "Player reports")).toContain('data-agreement="0"');
+  // Unreported, so it folds into the one Not yet reported row with its empty meter.
+  expect(factOf(out, "Not yet reported")).toMatch(/data-agreement="0"[\s\S]*Player reports/);
   expect(out).not.toContain("3 of 3 installs agree");
   expect(out).toContain("No player has reported holding it yet.");
   expect(out).toContain("The game files list it.");

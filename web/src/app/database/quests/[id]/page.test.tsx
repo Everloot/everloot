@@ -26,6 +26,8 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { DEGRADED_META } from "@/lib/cf-edge-cache";
 const html = async () => renderToStaticMarkup(await QuestPage({ params: Promise.resolve({ id: "8" }) }));
 const fact = (out: string, label: string) => new RegExp(`>${label}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1] ?? "";
+// Unreported facts fold into one row: their labels after a single empty meter.
+const unreported = (out: string) => fact(out, "Not yet reported");
 
 beforeEach(() => {
   data.chains = [];
@@ -47,8 +49,7 @@ test("a catalog chain links its ordered previous and next quests with source and
 
 test("an unlisted quest has an unknown chain and zone, without navigation", async () => {
   const out = await html();
-  expect(fact(out, "Chain")).toContain("Not reported yet");
-  expect(fact(out, "Zone")).toContain("Not reported yet");
+  expect(unreported(out)).toMatch(/data-agreement="0"[\s\S]*Chain[\s\S]*Zone/);
   expect(out).not.toContain("Previous quest");
   expect(out).not.toContain("Next quest");
 });
@@ -56,7 +57,7 @@ test("an unlisted quest has an unknown chain and zone, without navigation", asyn
 test("zone needs an agreed giver and three installs placing it, with source and date", async () => {
   data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
   data.facts.npcs = ["a", "b"].map((installId) => ({ installId, npcId: 10, name: "Giver", mapId: 1429, x: 40, y: 50, positionKind: "interaction", capturedAt: "2026-11-10T00:00:00Z" }));
-  expect(fact(await html(), "Zone")).toContain("Not reported yet");
+  expect(unreported(await html())).toContain("Zone");
   data.facts.npcs.push({ ...data.facts.npcs[0], installId: "c" });
   const zone = fact(await html(), "Zone");
   expect(zone).toContain('href="/database/zones/1429-elwynn-forest"');
@@ -87,7 +88,7 @@ test("the first and last quests only link their existing neighbor", async () => 
 test("a position without an eligible pin cannot establish the zone", async () => {
   data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
   data.facts.npcs = ["a", "b", "c"].map((installId) => ({ installId, npcId: 10, name: "Giver", mapId: 1429, x: 40, y: 50, positionKind: "player" }));
-  expect(fact(await html(), "Zone")).toContain("Not reported yet");
+  expect(unreported(await html())).toContain("Zone");
 });
 
 test("neighbors use known names and multiple chain membership is visible", async () => {
