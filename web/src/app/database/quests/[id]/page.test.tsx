@@ -6,8 +6,8 @@ const data = vi.hoisted(() => ({
   facts: { npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" } as WorldFacts & { unreachable: boolean; dataAsOf: string | null },
   confirmations: true,
   chains: [] as { questLineId: number; name: string; questIds: number[]; confirmed: boolean; reporters: number }[],
+  tips: new Map<number, { name: string; icon: string | null; quality: string; color: string }>(),
 }));
-vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => data.facts }));
 vi.mock("@/lib/completion-lists", () => ({
   loadCatalog: async () => ({ chains: data.chains, dataAsOf: "2026-11-10T00:00:00Z", confirmations: data.confirmations }),
   chainHref: (id: number) => `/database/quest-chains/${id}`,
@@ -15,8 +15,10 @@ vi.mock("@/lib/completion-lists", () => ({
 vi.mock("@/lib/game-assets", () => ({
   loadQuestNames: async () => ({ names: new Map([[7, { name: "Earlier quest" }], [8, { name: "A quest" }], [9, { name: "Later quest" }]]) }),
   loadSiteAssets: async () => null,
-  loadItemTips: async () => new Map(),
+  loadItemTips: async () => data.tips,
 }));
+vi.mock("@/lib/names", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/names")>()), itemNames: () => new Map() }));
+vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => data.facts, loadItemFacts: async () => ({ unreachable: true }) }));
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 
 import QuestPage from "./page";
@@ -28,7 +30,8 @@ const fact = (out: string, label: string) => new RegExp(`>${label}</dt><dd[^>]*>
 beforeEach(() => {
   data.chains = [];
   data.confirmations = true;
-  data.facts = { npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" };
+  data.tips = new Map();
+  data.facts ={ npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" };
 });
 
 test("a catalog chain links its ordered previous and next quests with source and date", async () => {
@@ -114,4 +117,66 @@ test("unreadable confirmations distinguish unavailable data from unreported fact
 test("unreachable world facts show the degraded notice", async () => {
   data.facts.unreachable = true;
   expect(await html()).toContain(DEGRADED_META);
+});
+
+const sighting = (installId: string, over: Record<string, unknown> = {}) => ({ installId, questId: 8, title: "A quest", level: 20, rewardItemIds: [], ...over });
+const header = (out: string) => /<header[^>]*data-entity-header[^>]*>(.*?)<\/header>/s.exec(out)?.[1] ?? "";
+
+test("the header names the side in its faction colour, the type and the category, once 3 installs agree", async () => {
+  data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { faction: "horde", tag: "dungeon", suggestedGroup: 5, category: "Elwynn Forest" }));
+  const out = await html();
+  const head = header(out);
+  expect(head).toMatch(/class="[^"]*text-faction-horde[^"]*">Horde</);
+  expect(head).toContain("Dungeon, 5 players");
+  expect(head).toContain('href="/database/zones/1429-elwynn-forest"');
+  expect(fact(out, "Side")).toContain("Horde");
+  expect(fact(out, "Type")).toContain("Dungeon, 5 players");
+  expect(fact(out, "Category")).toContain("Elwynn Forest");
+  // Two installs are not an agreement: no side, no type, and a category that is not a zone stays plain text.
+  data.facts.quests = ["a", "b"].map((id) => sighting(id, { faction: "horde", tag: "dungeon" })).concat(["a", "b", "c"].map((id) => sighting(id, { category: "Warrior" })));
+  const two = await html();
+  expect(header(two)).not.toContain("Horde");
+  expect(two).not.toContain(">Type</dt>");
+  expect(fact(two, "Category")).toContain("Warrior");
+  expect(fact(two, "Category")).not.toContain("href");
+});
+
+test("the start and end NPCs are labelled Start and End", async () => {
+  data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { giverNpcId: 10, turnInNpcId: 11 }));
+  const out = await html();
+  expect(fact(out, "Start")).toContain('href="/database/npcs/10"');
+  expect(fact(out, "End")).toContain('href="/database/npcs/11"');
+  expect(out).toContain("Start and end");
+});
+
+test("rewards show their icon and name in the quality colour, and say choices are not recorded", async () => {
+  data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { rewardItemIds: [100] }));
+  data.tips = new Map([[100, { name: "Sturdy Blade", icon: "/icons/blade.webp", quality: "Rare", color: "#0070dd" }]]);
+  const out = await html();
+  expect(out).toMatch(/<img[^>]*src="\/icons\/blade.webp"[^>]*class="[^"]*border-q-rare/);
+  const link = /<a[^>]*href="\/database\/items\/100"[^>]*>Sturdy Blade<\/a>/.exec(out)?.[0] ?? "";
+  expect(link).toMatch(/class="[^"]*text-q-rare/);
+  expect(out).toContain("which rewards were a choice");
+});
+
+test("the chain is drawn as ordered steps with this quest marked and a link to the whole chain", async () => {
+  data.chains = [{ questLineId: 900, name: "The road", questIds: [7, 8, 9], confirmed: false, reporters: 0 }];
+  const out = await html();
+  const flow = /<ol[^>]*data-quest-chain[^>]*>(.*?)<\/ol>/s.exec(out)?.[1] ?? "";
+  expect(flow).toContain('href="/database/quests/7"');
+  expect(flow).toContain('href="/database/quests/9"');
+  expect(flow).toMatch(/aria-current="step"[^>]*>.*A quest/s);
+  expect(flow).not.toContain('href="/database/quests/8"');
+  expect(flow.indexOf("Earlier quest")).toBeLessThan(flow.indexOf("Later quest"));
+  expect(out).toMatch(/href="\/database\/quest-chains\/900"[^>]*>All 3 quests/);
+});
+
+test("a long chain shows its ends and this quest's neighbours, and counts the steps it leaves out", async () => {
+  const ids = Array.from({ length: 20 }, (_, i) => i + 1);
+  data.chains = [{ questLineId: 900, name: "The long road", questIds: ids, confirmed: false, reporters: 0 }];
+  const flow = /<ol[^>]*data-quest-chain[^>]*>(.*?)<\/ol>/s.exec(await html())?.[1] ?? "";
+  for (const id of [1, 6, 7, 9, 10, 20]) expect(flow).toContain(`href="/database/quests/${id}"`);
+  for (const id of [2, 5, 11, 19]) expect(flow).not.toContain(`href="/database/quests/${id}"`);
+  expect(flow).toContain("4 more");
+  expect(flow).toContain("9 more");
 });
