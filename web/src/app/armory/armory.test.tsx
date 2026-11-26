@@ -98,7 +98,7 @@ describe("the character page", () => {
     expect(out).toContain("Level 60 Troll Hunter");
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Last login");
-    expect(out).toMatch(/Last read <time dateTime="2026-11-09T10:00:00.000Z"[^>]*>2026-11-09<\/time>/);
+    expect(out).toMatch(/Last read<\/dt><dd[^>]*><time dateTime="2026-11-09T10:00:00.000Z" title="Read 2026-11-09 10:00 UTC"/);
     expect(out).toContain('role="tablist"');
     expect(out).toContain('data-tab-panel="pvp"');
     expect(out).toContain("57.41");
@@ -124,7 +124,9 @@ describe("the character page", () => {
     expect(at("data-sheet-summary")).toBeLessThan(at('data-equipment-slot="HANDS"'));
     expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('role="tablist"'));
     const summary = out.slice(at("data-sheet-summary"), at('data-equipment-slot="HANDS"'));
-    for (const text of ["57.41", "61.2", "Gear Score", "#2 of 2", "4,512", "412"]) expect(summary).toContain(text);
+    // The item level, Gear Score and ranks moved up to the facts strip and the rank badges; the summary keeps the rest.
+    for (const text of ["Average item level", "58", "4,512", "412"]) expect(summary).toContain(text);
+    for (const text of ["57.41", "Gear Score", "#2 of 2"]) expect(summary).not.toContain(text);
     // A stat beyond the key ones stays in the Stats tab only.
     expect(summary).not.toContain("Fire resistance");
     expect(out).toContain('data-tab-panel="stats"');
@@ -136,14 +138,112 @@ describe("the character page", () => {
     expect(header).toContain('href="/armory/eu/guilds/ember-wardens"');
   });
 
-  test("the dungeons and raids section has its own named slot, below the gear sheet and above the tabs", async () => {
+  test("the dungeons and raids slot sits below the gear sheet and above the tabs, one muted line when nothing is synced", async () => {
     const out = await html(pages.character("eu", "velkara-duskmantle"));
     const at = (s: string) => out.indexOf(s);
-    const slot = out.slice(at('data-slot="dungeon-raid-progress"'));
     expect(out).toContain('data-slot="dungeon-raid-progress"');
-    expect(slot).toContain("data-dungeons-raids");
     expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('data-slot="dungeon-raid-progress"'));
     expect(at('data-slot="dungeon-raid-progress"')).toBeLessThan(at('role="tablist"'));
+    const slot = out.slice(at('data-slot="dungeon-raid-progress"'), at('role="tablist"'));
+    // No heading, no explainer paragraph: one line and its link to every instance.
+    expect(slot).not.toContain("data-dungeons-raids");
+    expect(slot).not.toContain("<h2");
+    expect(slot.match(/<\/p>/g) ?? []).toHaveLength(1);
+    expect(slot).toContain('href="#progress"');
+  });
+
+  describe("the first screen", () => {
+    const at = "2026-11-09T10:00:00.000Z";
+    const detailed = () => armoryCharacter({ details: {
+      revision: 1,
+      talents: { asOf: at, trees: [
+        { name: "Beast Mastery", points: 20, talents: [] }, { name: "Marksmanship", points: 31, talents: [] }, { name: "Survival", points: 0, talents: [] },
+      ] },
+      professions: { asOf: at, rows: [{ name: "Leatherworking", rank: 265, max: 300 }, { name: "Skinning", rank: 300, max: 300 }] },
+      achievements: { asOf: at, rows: [
+        { id: 6, name: "Level 10", completedAt: "2026-10-01T12:00:00.000Z" }, { id: 7, name: "Level 20", completedAt: "2026-10-05T12:00:00.000Z" },
+        { id: 8, name: "Level 30", completedAt: "2026-10-09T12:00:00.000Z" },
+      ] },
+      quests: { asOf: at, completed: [788, 789, 804, 805] },
+    } });
+    beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-12T11:00:00Z") }); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    test("the page uses the data width, so the sheet fills a wide screen", async () => {
+      expect(await html(pages.character("eu", "velkara-duskmantle"))).toContain('data-container="data"');
+    });
+
+    test("two button shapes in the header: a small pill to update and a text link to Blizzard, no box chip", async () => {
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      expect(out).toMatch(/<button type="submit" class="btn btn-sm">Update character<\/button>/);
+      expect(out).toMatch(/<a href="https:\/\/worldofwarcraft\.blizzard\.com\/forever\/eu\/armory\/character\/velkara-duskmantle" class="[^"]*underline[^"]*">Blizzard armory<\/a>/);
+      expect(out).not.toContain("Blizzard profile");
+      expect(out).not.toContain("btn-secondary");
+    });
+
+    test("a facts strip under the header: item level, Gear Score, kills, achievements, quests and how long ago it was read", async () => {
+      mem.putCharacter(detailed());
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const strip = out.slice(out.indexOf("data-character-facts"), out.indexOf("data-paper-doll"));
+      expect(out.indexOf("data-character-facts")).toBeGreaterThan(-1);
+      // The text between the tags of each <dd>, read rather than stripped.
+      const textOf = (markup: string) => [...`>${markup}<`.matchAll(/>([^<]*)</g)].map((t) => t[1]).join("");
+      const pairs = [...strip.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textOf(m[2])]);
+      expect(pairs).toEqual([
+        ["Item level", "57.41"], ["Gear Score", "61.2"], ["Honorable kills", "1,234"],
+        ["Achievements", "3"], ["Quests completed", "4"], ["Last read", "3 days ago"],
+      ]);
+      // The exact read time stays one hover away.
+      expect(strip).toContain('title="Read 2026-11-09 10:00 UTC"');
+    });
+
+    test("a fact the read did not bring is left out of the strip, never shown as 0", async () => {
+      mem.putCharacter(armoryCharacter({ gearScore: null, honorableKills: null }));
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const strip = out.slice(out.indexOf("data-character-facts"), out.indexOf("data-paper-doll"));
+      for (const absent of ["Gear Score", "Honorable kills", "Achievements", "Quests completed"]) expect(strip).not.toContain(absent);
+      expect(strip).toContain("Item level");
+    });
+
+    test("ranks are badges with their scope, each linking its board, above the gear", async () => {
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const badges = out.slice(out.indexOf("data-rank-badges"), out.indexOf("data-paper-doll"));
+      expect(out.indexOf("data-rank-badges")).toBeGreaterThan(-1);
+      expect(badges).toContain('href="/armory/rankings/item-level?ruleset=2&amp;region=eu"');
+      expect(badges).toMatch(/data-badge="neutral"[^>]*>EU Normal · Item level #2 of 2</);
+    });
+
+    test("spec cards, the largest tree first and brightest, then profession bars, all before the gear", async () => {
+      mem.putCharacter(detailed());
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      expect(out.indexOf("data-character-overview")).toBeGreaterThan(-1);
+      const cards = [...overview.matchAll(/data-spec-card="([^"]+)"[^>]*><p class="([^"]*)"/g)].map((m) => [m[1], m[2].includes("text-fg-2") ? "fg-2" : "fg"]);
+      expect(cards).toEqual([["Marksmanship", "fg"], ["Beast Mastery", "fg-2"], ["Survival", "fg-2"]]);
+      expect(overview).toContain("31 points");
+      expect(overview).toContain('href="#talents"');
+      expect(overview).toContain("265 / 300");
+      expect(overview).toMatch(/<progress[^>]*value="265" max="300"/);
+      // The Talents tab is still the one that opens (the default tab waits on an owner decision).
+      expect(out).toMatch(/aria-selected="true"[^>]*>Talents</);
+    });
+
+    test("synced kills still get the full dungeons and raids list", async () => {
+      const { DungeonRaidSlot } = await import("./[region]/[slug]/sheet");
+      const data = { synced: true, summary: { cleared: 1, total: 20 }, instances: [{
+        id: 36, name: "The Deadmines", group: "Dungeons" as const, killed: 2, total: 8, cleared: false, lastKillDay: "2026-11-01", firstClearDay: null,
+        bosses: [{ id: 1, name: "Rhahk'Zor", killed: true, kills: 1, firstKillDay: "2026-11-01", lastKillDay: "2026-11-01" }],
+      }] } as unknown as Parameters<typeof DungeonRaidSlot>[0]["data"];
+      const out = renderToStaticMarkup(<DungeonRaidSlot data={data} href="#progress" />);
+      expect(out).toContain("data-dungeons-raids");
+      expect(out).toContain("The Deadmines");
+      expect(renderToStaticMarkup(<DungeonRaidSlot data={{ synced: true, summary: null, instances: [] }} href="#progress" />)).not.toContain("data-dungeons-raids");
+    });
+
+    test("a character without talent or profession reads has no overview row", async () => {
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      expect(out).not.toContain("data-character-overview");
+    });
   });
 
   test("the addon's sighting fills in when the old address would redirect here: the day it was last seen and the guild it saw", async () => {
@@ -352,10 +452,10 @@ test("classification filters reach storage, preserve each other in links and lin
 
 test("a character page shows its dungeons and raids where the dungeon progress line was, linked to the full checklist", async () => {
   const out = await html(pages.character("eu", "velkara-duskmantle"));
-  const section = out.split('aria-labelledby="dungeons-raids"')[1]?.split("</section>")[0] ?? "";
-  expect(section).toContain("Dungeons &amp; raids");
-  expect(section).toContain('href="#progress"');
+  const line = out.split('data-slot="dungeon-raid-progress"')[1]?.split("</p>")[0] ?? "";
+  expect(line).toContain("Dungeons &amp; raids");
+  expect(line).toContain('href="#progress"');
   // No storage in this test: no synced history is unknown, never 0 cleared.
-  expect(section).toContain("No boss kills are synced for this character");
-  expect(out.indexOf('aria-labelledby="dungeons-raids"')).toBeLessThan(out.indexOf('id="progress"'));
+  expect(line).toContain("no boss kills are synced for this character");
+  expect(out.indexOf('data-slot="dungeon-raid-progress"')).toBeLessThan(out.indexOf('id="progress"'));
 });

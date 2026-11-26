@@ -51,3 +51,11 @@ test("each header search form reports its own surface, never lore", async () => 
     ["search", { surface: "menu" }],
   ]);
 });
+
+// A page can hold several search landmarks (the header's and a list's filter box): each is named, so a screen reader's
+// landmark list tells them apart.
+test("each header search form is a named search landmark", async () => {
+  await act(async () => (container.querySelector('button[aria-label="Menu"]') as HTMLButtonElement).click());
+  const names = Array.from(container.querySelectorAll<HTMLFormElement>('form[role="search"]')).map((f) => f.getAttribute("aria-label"));
+  expect(names).toEqual(["Site search", "Site search", "Site search"]);
+});

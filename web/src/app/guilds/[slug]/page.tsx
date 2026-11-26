@@ -118,7 +118,8 @@ function FactTable({ id, title, caption, rows }: { id: string; title: string; ca
   // A kind nobody has published yet is left out rather than drawn as an empty table.
   if (rows.length === 0) return null;
   return (
-    <section aria-labelledby={id}>
+    // Not a named region itself: the table's scroll box below is the region named `title`, and two of one name are noise.
+    <section>
       <SectionHeading id={id} note={caption}>{title}</SectionHeading>
       <DataTable<FamilyFact>
         caption={title}

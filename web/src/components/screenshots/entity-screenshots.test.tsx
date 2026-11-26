@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerenderToNodeStream } from "react-dom/static";
 import { afterEach, expect, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/database/items/19019" }));
+vi.mock("next/dynamic", async () => ({ default: (await import("react")).lazy }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: vi.fn(), authQuery: vi.fn(), siteUrl: () => "https://everloot.app" }));
 
 import EntityScreenshots from "./EntityScreenshots";
@@ -17,12 +19,29 @@ test("renders nothing unless EVERLOOT_SCREENSHOTS=1 with profiles on", () => {
   }
 });
 
-test("on, the page's HTML holds the empty section: no picture, no viewer, no session, so the page stays cacheable", () => {
+// The section is loaded lazily, so read the HTML the way the server sends it: after it has loaded. Outside Next's
+// compiler next/dynamic is the pages-router loader, which draws nothing on the server; the app router's is React.lazy.
+async function fullHtml(node: React.ReactNode): Promise<string> {
+  const { prelude } = await prerenderToNodeStream(node);
+  let html = "";
+  for await (const chunk of prelude) html += chunk;
+  return html;
+}
+
+test("on, the page's HTML holds the empty section: no picture, no viewer, no session, so the page stays cacheable", async () => {
   vi.stubEnv("EVERLOOT_SCREENSHOTS", "1");
   vi.stubEnv("EVERLOOT_PROFILES", "1");
-  const html = renderToStaticMarkup(<EntityScreenshots type="item" id={19019} name="Thunderfury" />);
+  const html = await fullHtml(<EntityScreenshots type="item" id={19019} name="Thunderfury" />);
   expect(html).toContain('id="screenshots"');
   expect(html).not.toMatch(/<img|<form|Sign in|@\w|type="file"/);
+});
+
+// Its code is a chunk of its own, so a page with the switch off (all of them today) never downloads it.
+test("the section's code reaches a page only through the lazy loader", () => {
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  expect(read("./EntityScreenshots.tsx")).not.toMatch(/from "\.\/ScreenshotsSection"/);
+  expect(read("./LazyScreenshotsSection.tsx")).toMatch(/dynamic\(\(\) => import\("\.\/ScreenshotsSection"\)\)/);
+  expect(read("./ScreenshotsSection.tsx")).not.toMatch(/from "@\/components\/ui"/);
 });
 
 test("site only: nothing but the screenshot routes, the moderation page and this section reads screenshots", () => {
