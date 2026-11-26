@@ -24,7 +24,7 @@ import GameTree from "./GameTree";
 import LevelingOrder, { forSet, pointName } from "./LevelingOrder";
 import SaveBuild, { restorePendingSave } from "./SaveBuild";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
-import TalentTreeView, { assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
+import TalentTreeView, { arrowTarget, assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
 
 // Client side of the calculator: the point rules live in lib/talents/rules.ts and the spend order's in
 // lib/talents/order.ts; this file only holds state and wires clicks, long presses and keys to them.
@@ -440,32 +440,10 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       doRemove(id);
       return;
     }
-    const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-    const dir = arrows[e.key];
-    if (!dir) return;
+    const target = arrowTarget(catalog, id, e.key);
+    if (target === undefined) return;
     e.preventDefault();
     const from = nodes.get(id)!;
-    const peers = catalog.nodes.filter((n) => n.treeId === from.treeId && n.id !== id);
-    let target;
-    if (dir[0] === 0) {
-      // Left and right stay on the row.
-      target = peers
-        .filter((n) => n.row === from.row && Math.sign(n.col - from.col) === dir[1])
-        .sort((a, b) => Math.abs(a.col - from.col) - Math.abs(b.col - from.col))[0];
-    } else {
-      // Up and down stay in the column if they can; otherwise they go to the next row that has
-      // anything, at the nearest column.
-      const below = peers.filter((n) => Math.sign(n.row - from.row) === dir[0]);
-      target = below
-        .filter((n) => n.col === from.col)
-        .sort((a, b) => Math.abs(a.row - from.row) - Math.abs(b.row - from.row))[0];
-      if (!target && below.length > 0) {
-        const nextRow = below.reduce((best, n) => (Math.abs(n.row - from.row) < Math.abs(best - from.row) ? n.row : best), below[0].row);
-        target = below
-          .filter((n) => n.row === nextRow)
-          .sort((a, b) => Math.abs(a.col - from.col) - Math.abs(b.col - from.col))[0];
-      }
-    }
     if (!target) return;
     setRovingByTree((r) => ({ ...r, [from.treeId]: target.id }));
     document.getElementById(target.kind === "choice" ? `talent-${target.id}-0` : `talent-${target.id}`)?.focus();

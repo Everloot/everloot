@@ -48,6 +48,8 @@ export interface Props extends TreeHandlers {
   highlighted?: number | null;
   /** The asset files, when the page has them; null shows the text tiles. */
   assets: GameAssets | null;
+  /** A build shown, not edited (the armory): labels leave out whether a point can be taken. */
+  readOnly?: boolean;
 }
 
 /** What a node's entry says in the asset manifest. */
@@ -66,18 +68,44 @@ export function nameSize(name: string): string {
   return longest >= 15 ? "text-[9px]" : longest >= 12 ? "text-[10px]" : "";
 }
 
-export function nodeLabel(catalog: TalentCatalog, node: TalentNode, ranks: Ranks, available: number): string {
+/** `readOnly` (a build shown, not edited) leaves out whether a point can be taken. */
+export function nodeLabel(catalog: TalentCatalog, node: TalentNode, ranks: Ranks, available: number, readOnly = false): string {
   const rank = rankOf(ranks, node.id);
   const name = node.kind === "choice" ? node.entries.map((e) => e.name).join(" or ") : entryAtRank(node, rank).name;
+  if (readOnly) return `${name}, rank ${rank} of ${node.maxRanks}, row ${node.row}`;
   const verdict = canAdd(catalog, ranks, node.id, available);
   const state = rank >= node.maxRanks ? "full" : verdict.ok ? "can take a point" : `locked. ${refusalText(verdict.reason!, node, catalog, ranks)}`;
   return `${name}, rank ${rank} of ${node.maxRanks}, row ${node.row}, ${state}`;
 }
 
+/**
+ * The node an arrow key moves focus to from `id`: undefined for a key that is not an arrow, null when there is none
+ * that way. Left and right stay on the row. Up and down stay in the column if they can; otherwise they go to the next
+ * row that has anything, at the nearest column.
+ */
+export function arrowTarget(catalog: TalentCatalog, id: number, key: string): TalentNode | null | undefined {
+  const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  const dir = arrows[key];
+  if (!dir) return undefined;
+  const from = catalog.nodes.find((n) => n.id === id);
+  if (!from) return null;
+  const peers = catalog.nodes.filter((n) => n.treeId === from.treeId && n.id !== id);
+  if (dir[0] === 0) {
+    return peers
+      .filter((n) => n.row === from.row && Math.sign(n.col - from.col) === dir[1])
+      .sort((a, b) => Math.abs(a.col - from.col) - Math.abs(b.col - from.col))[0] ?? null;
+  }
+  const below = peers.filter((n) => Math.sign(n.row - from.row) === dir[0]);
+  const inColumn = below.filter((n) => n.col === from.col).sort((a, b) => Math.abs(a.row - from.row) - Math.abs(b.row - from.row))[0];
+  if (inColumn || below.length === 0) return inColumn ?? null;
+  const nextRow = below.reduce((best, n) => (Math.abs(n.row - from.row) < Math.abs(best - from.row) ? n.row : best), below[0].row);
+  return below.filter((n) => n.row === nextRow).sort((a, b) => Math.abs(a.col - from.col) - Math.abs(b.col - from.col))[0] ?? null;
+}
+
 /** The preview's mark on its node: a ring inside the tile's own border, so it never covers the focus ring outside it. */
 const MARK = "pointer-events-none absolute inset-0 rounded-md border-2 border-accent";
 
-export default function TalentTreeView({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, onAdd, onSelect, onTip }: Props) {
+export default function TalentTreeView({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, readOnly = false, onAdd, onSelect, onTip }: Props) {
   const nodes = catalog.nodes.filter((n) => n.treeId === tree.id);
   const rows = Math.max(...nodes.map((n) => n.row));
   const cols = Math.max(...nodes.map((n) => n.col));
@@ -127,7 +155,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
 
           if (node.kind === "choice") {
             return (
-              <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} data-highlighted={marked || undefined} className={`absolute flex flex-col overflow-hidden ${base}`} style={style}>
+              <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available, readOnly)} data-highlighted={marked || undefined} className={`absolute flex flex-col overflow-hidden ${base}`} style={style}>
                 {node.entries.map((entry, i) => {
                   const picked = rank > 0 && ranks[node.id]?.choice === i;
                   return (
@@ -157,7 +185,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
               key={node.id}
               type="button"
               id={`talent-${node.id}`}
-              aria-label={nodeLabel(catalog, node, ranks, available)}
+              aria-label={nodeLabel(catalog, node, ranks, available, readOnly)}
               title={node.entries.map((e) => e.name).join(" / ")}
               tabIndex={tabIndex}
               {...common}
