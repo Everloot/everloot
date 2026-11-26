@@ -182,3 +182,31 @@ test("the Alliance and Horde pages show their emblem in the header; other factio
     art.assets = null;
   }
 });
+
+test("the header line links the parent faction the files name, beside the faction's own kind", async () => {
+  const out = await html("21-booty-bay");
+  const metaLine = /data-entity-meta[^>]*>(.*?)<\/p>/.exec(out)?.[1] ?? out;
+  expect(metaLine).toContain('href="/database/factions/169-steamwheedle-cartel"');
+});
+
+test("a faction with a standing shows the eight standings in order, and says the files hold no thresholds", async () => {
+  const out = await html("21-booty-bay");
+  const legend = /data-standings[^>]*>([\s\S]*?)<\/section>/.exec(out)?.[1] ?? "";
+  const names = [...legend.matchAll(/data-standing="([^"]+)"/g)].map((m) => m[1]);
+  expect(names).toEqual(["Hated", "Hostile", "Unfriendly", "Neutral", "Friendly", "Honored", "Revered", "Exalted"]);
+  expect(legend).toContain("The points each standing needs are in none of the game files read so far.");
+});
+
+test("a header the files list with no standing of its own shows no standing legend, and lists its sub-factions", async () => {
+  const out = await html("169-steamwheedle-cartel");
+  expect(out).not.toContain("data-standings");
+  const tab = out.split('data-tab-panel="sub-factions"')[1] ?? "";
+  expect(out).toContain("Sub-factions");
+  expect(tab).toContain('href="/database/factions/21-booty-bay"');
+  expect(factOf(out, "Sub-factions")).toBe("1");
+});
+
+test("a faction with no sub-factions in the files shows no sub-faction tab", async () => {
+  const out = await html("21-booty-bay");
+  expect(out).not.toContain("Sub-factions");
+});

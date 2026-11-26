@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { FactionEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl, stripBelow } from "@/components/ui";
-import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
+import Link from "next/link";
+import { factionChildren, factionHref, factionInFiles, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
@@ -56,9 +57,17 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const here = (over: Partial<FactionQuery>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
+  const listed = new Set(all.map((x) => x.factionId));
   const columns: Column<Listed<FactionEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={factionHref(x.factionId, x.name)} tone={sideTone(x.header)}>{x.name}</NameCell> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
+    // The parent the game files name, linked when it has a page; the count of the factions they list under this one.
+    { key: "parent", header: "Parent", cell: (x) => {
+      const p = factionInFiles(x.factionId)?.parent;
+      if (!p) return dash;
+      return listed.has(p.id) ? <Link href={factionHref(p.id, p.name)} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{p.name}</Link> : p.name;
+    } },
+    { key: "children", header: "Sub-factions", numeric: true, cell: (x) => factionChildren(x.factionId).filter((c) => listed.has(c.id)).length || dash },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
   ];

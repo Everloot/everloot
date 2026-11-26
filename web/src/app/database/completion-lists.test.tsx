@@ -31,9 +31,10 @@ vi.mock("next/navigation", () => ({
 }));
 // The faction page asks the lore archive for its name; no release is open here, so the page shows no lore block.
 vi.mock("@/lib/release", () => ({ getRelease: () => null }));
+const world = vi.hoisted(() => ({ facts: { npcs: [] as Record<string, unknown>[], quests: [] as Record<string, unknown>[], vendors: [], unreachable: false } }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
-  loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
+  loadWorldFacts: async () => world.facts,
   loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }),
 }));
 vi.mock("@/lib/names", async (importOriginal) => ({
@@ -108,6 +109,7 @@ beforeEach(() => {
   store.loadCompletion.mockReset();
   serve(rows);
   game.factions = null; game.titles = null; game.questLines = null; game.achievements = null;
+  world.facts = { npcs: [], quests: [], vendors: [], unreachable: false };
 });
 
 /** The table row that links `href`. */
@@ -479,4 +481,39 @@ test("a one-quest game-file chain explains why it is listed", async () => {
   expect(out).toContain("The game files list this chain with one quest.");
   expect(out).toContain("Quest 91564");
   expect(out).toContain("Position 1");
+});
+
+test("the faction list links the parent the files name and counts each faction's sub-factions", async () => {
+  game.factions = [{ id: 169, name: "Steamwheedle Cartel", shown: true }, { id: 21, name: "Booty Bay", shown: true, parentId: 169 }, { id: 577, name: "Everlook", shown: true, parentId: 169 }];
+  const out = await html(FactionList(search()));
+  expect(out).toContain(">Parent<");
+  expect(out).toContain(">Sub-factions<");
+  const bay = rowOf(out, "/database/factions/21-booty-bay");
+  expect(bay).toContain('href="/database/factions/169-steamwheedle-cartel"');
+  // The cartel's own row: the one whose name cell links it (Booty Bay's row links it as the parent).
+  const cartel = (out.split("<tr").find((r) => r.includes('href="/database/factions/169-steamwheedle-cartel" class="min-w-0')) ?? "").split("<td");
+  expect(cartel.some((cell) => /^[^>]*>2<\/td>/.test(cell))).toBe(true);
+});
+
+test("the title list says whether each title goes before or after the name", async () => {
+  game.titles = [{ id: 144, name: "Bloodsail Admiral %s" }, { id: 1224, name: "%s the Alchemist" }];
+  const out = await html(TitleList(search()));
+  expect(out).toContain(">Kind<");
+  expect(rowOf(out, "/database/titles/144-bloodsail-admiral")).toContain(">Prefix<");
+  expect(rowOf(out, "/database/titles/1224-the-alchemist")).toContain(">Suffix<");
+});
+
+test("the quest chain list shows the agreed level range and the start NPC", async () => {
+  world.facts.quests = ["a", "b", "c"].flatMap((installId) => [
+    { installId, questId: 7, title: "One", level: 18, giverNpcId: 234, rewardItemIds: [] },
+    { installId, questId: 9, title: "Three", level: 22, rewardItemIds: [] },
+  ]);
+  world.facts.npcs = ["a", "b", "c"].map((installId) => ({ installId, npcId: 234, name: "Gryan Stoutmantle", mapId: 1429, x: 1, y: 1, positionKind: "interaction", capturedAt: at }));
+  const out = await html(ChainList(search()));
+  expect(out).toContain(">Levels<");
+  expect(out).toContain(">Start<");
+  const defias = rowOf(out, "/database/quest-chains/900-the-defias");
+  expect(defias).toContain("18–22");
+  expect(defias).toContain('href="/database/npcs/234');
+  expect(rowOf(out, "/database/quest-chains/901-long-road")).not.toContain("–");
 });

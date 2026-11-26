@@ -4,7 +4,8 @@ import { notFound, permanentRedirect } from "next/navigation";
 import LoreSection from "@/components/LoreSection";
 import { Tabs, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { factionHeaderOnly, factionHref, factionInFiles, loadCatalog, parseSegment } from "@/lib/completion-lists";
+import { factionChildren, factionHeaderOnly, factionHref, factionInFiles, loadCatalog, parseSegment } from "@/lib/completion-lists";
+import { STANDING_NAMES } from "@kb/completion";
 import { entityTitle } from "@/lib/entity-meta";
 import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
@@ -22,6 +23,26 @@ type Props = { params: Promise<{ id: string }> };
 const REPORTED = "3 of 3 installs agree";
 /** The name line of a page whose name is the game files', in the words the item pages use for it. */
 const FILES_NAME = "The name is shown from the game files; players have not reported it yet.";
+
+/**
+ * The eight standings of a reputation, lowest first, as the game names them. The points each needs are not drawn: no
+ * game file read so far holds them, so the bar is a legend of the names and nothing more.
+ */
+function StandingLegend({ name }: { name: string }) {
+  return (
+    <section data-standings aria-labelledby="standings-heading" className="mb-6">
+      <h2 id="standings-heading" className="mb-2 text-h2-sm font-semibold text-fg sm:text-h2">Standings</h2>
+      <ol aria-label={`${name}: standings, lowest first`} className="grid grid-cols-4 gap-px overflow-hidden rounded-control border border-line bg-line sm:grid-cols-8">
+        {STANDING_NAMES.map((standing, i) => (
+          <li key={standing} data-standing={standing} className="flex items-center gap-2 bg-panel px-2 py-1.5 text-cell text-fg">
+            <span className="font-mono text-xs tabular-nums text-muted">{i + 1}</span>{standing}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-meta text-muted">The points each standing needs are in none of the game files read so far.</p>
+    </section>
+  );
+}
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { id: segment } = await props.params;
@@ -72,12 +93,16 @@ export default async function FactionPage(props: Props) {
   const lore = entry ? await loreFor("faction", id, entry.name) : null;
   // The Alliance and Horde have the game's own emblem; no other faction has art.
   const emblem = entry ? (await loadSiteAssets())?.factions.get(entry.name.toLowerCase()) : undefined;
+  // The factions the files list under this one, each with a page of its own.
+  const children = entry ? factionChildren(id).filter((c) => catalog?.factions.some((f) => f.factionId === c.id)) : [];
+  // The standings legend fits a faction with a standing of its own: not a renown faction, not a bare header.
+  const standings = entry && !entry.major && !factionHeaderOnly(entry);
 
   return (
     <EntityPage
       name={title}
       jsonLd={entry && { name: title, path: factionHref(entry.factionId, entry.name), identifier: `faction:${id}` }}
-      header={{ trail, icon: <EntityIcon src={emblem} />, title, meta: ["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      header={{ trail, icon: <EntityIcon src={emblem} />, title, meta: ["Faction", parent ?? null, <span key="id" className="tabular-nums">ID {id}</span>] }}
       box={entry && (
         <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}>
           {entry.header && <p>{entry.header}</p>}
@@ -88,13 +113,15 @@ export default async function FactionPage(props: Props) {
         ...(files ? [{ label: "Header", value: files.header ? "Yes" : "No" }] : []),
         ...(parent ? [{ label: "Parent faction", value: parent }] : []),
         ...(entry.major ? [{ label: "Kind", value: "Major faction" }] : []),
+        ...(children.length ? [{ label: "Sub-factions", value: children.length, numeric: true }] : []),
         // Short of three installs: the meter with how many have reported, never the words "not reported".
         { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
         { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
       ]}
       notices={!entry && <Unreachable />}
       summary={entry ? summary : undefined}
-      main={entry && (
+      main={entry && <>
+        {standings && <StandingLegend name={entry.name} />}
         <Tabs
           label={`${entry.name}: relations`}
           tabs={[
@@ -103,9 +130,17 @@ export default async function FactionPage(props: Props) {
               // A quest is public once 3 installs report it; which faction it pays is in no file read so far and in no report.
               panel: <EmptyTab action={null} message={EMPTY.factionQuests} />,
             },
+            ...(children.length ? [{
+              id: "sub-factions", label: "Sub-factions", count: children.length,
+              panel: (
+                <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {children.map((c) => <li key={c.id} className="text-cell"><Link href={factionHref(c.id, c.name)} className={LINK}>{c.name}</Link></li>)}
+                </ul>
+              ),
+            }] : []),
           ]}
         />
-      )}
+      </>}
       related={entry && <LoreSection match={lore} />}
       openData={entry && { report: { type: "Faction", id, path: factionHref(entry.factionId, entry.name) }, text: [`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n") }}
     />

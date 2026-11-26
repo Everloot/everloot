@@ -12,7 +12,11 @@ vi.mock("@/data/game-data/client-quest-lines", () => ({ get CLIENT_QUEST_LINES()
 vi.mock("@/data/game-data/client-titles", () => ({ get CLIENT_TITLES() { return { titles: [] }; } }));
 vi.mock("@/data/game-data/client-factions", () => ({ get CLIENT_FACTIONS() { return { factions: [] }; } }));
 vi.mock("@/data/game-data/client-achievements", () => ({ get CLIENT_ACHIEVEMENTS() { return { achievements: {} }; } }));
-vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
+vi.mock("@/lib/names", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/names")>()), loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
+// The world rollup: what three installs agree on for each quest (level, giver) and where the giver stands.
+const world = vi.hoisted(() => ({ facts: { npcs: [] as Record<string, unknown>[], quests: [] as Record<string, unknown>[], vendors: [], unreachable: false } }));
+vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => world.facts }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/game-assets")>()), loadQuestNames: async () => null }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -38,6 +42,7 @@ const openData = (out: string) => (/<pre data-open-data="true">([\s\S]*?)<\/pre>
 
 beforeEach(() => {
   seq = 0;
+  world.facts = { npcs: [], quests: [], vendors: [], unreachable: false };
   serve([...from(3, { questLineId: 900, name: "The Defias", questIds: [7, 8, 9] }), ...from(3, { questLineId: 901, name: "Long Road", questIds: [1, 2], truncated: true })]);
 });
 
@@ -89,4 +94,39 @@ test("a quest chain page sits in the wide-screen entity layout, In short and Ope
   const side = out.split("data-entity-sidebar")[1] ?? "";
   expect(side).toContain("In short");
   expect(side).toContain("data-open-data");
+});
+
+/** A quest three installs reported the same way. */
+const questFrom3 = (questId: number, level: number, giverNpcId?: number) => ["a", "b", "c"].map((installId) => ({ installId, questId, title: `Quest ${questId} title`, level, ...(giverNpcId ? { giverNpcId } : {}), rewardItemIds: [] }));
+const factOf = (out: string, label: string) => new RegExp(`>${label}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1] ?? "";
+
+test("the chain draws as numbered steps, every quest shown, none marked current", async () => {
+  const out = await html("900-the-defias");
+  const flow = out.split("data-quest-chain")[1]?.split("</ol>")[0] ?? "";
+  expect([...flow.matchAll(/href="\/database\/quests\/(\d+)"/g)].map((m) => m[1])).toEqual(["7", "8", "9"]);
+  expect(flow).not.toContain("aria-current");
+  expect(flow).not.toContain("more</a>");
+});
+
+test("level range, start NPC and zone come from what three installs agree on for the chain's quests", async () => {
+  world.facts.quests = [...questFrom3(7, 10, 50), ...questFrom3(8, 12), ...questFrom3(9, 14)];
+  world.facts.npcs = ["a", "b", "c"].map((installId) => ({ installId, npcId: 50, name: "Gryan Stoutmantle", mapId: 1429, x: 56, y: 47, positionKind: "interaction", capturedAt: at }));
+  const out = await html("900-the-defias");
+  expect(factOf(out, "Levels")).toBe("10–14");
+  expect(factOf(out, "Start")).toContain('href="/database/npcs/50');
+  expect(factOf(out, "Start")).toContain("Gryan Stoutmantle");
+  expect(factOf(out, "Zone")).toContain('href="/database/zones/1429-elwynn-forest"');
+  expect(factOf(out, "Quests")).toBe("3");
+});
+
+test("with no agreed levels or giver, the chain claims no level range, start or zone", async () => {
+  world.facts.quests = ["a", "b"].flatMap((installId) => [{ installId, questId: 7, title: "x", level: 10, giverNpcId: 50, rewardItemIds: [] }]);
+  const out = await html("900-the-defias");
+  for (const label of ["Levels", "Start", "Zone"]) expect(out).not.toMatch(new RegExp(`>${label}</dt><dd[^>]*>(?!<[^>]*data-agreement)`));
+  expect(out).not.toContain("10–");
+});
+
+test("one agreed level is a single level, not a range", async () => {
+  world.facts.quests = [...questFrom3(8, 12)];
+  expect(factOf(await html("900-the-defias"), "Levels")).toBe("12");
 });

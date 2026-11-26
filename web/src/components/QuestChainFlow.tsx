@@ -7,10 +7,13 @@ const AROUND = 2;
 
 type Step = { kind: "quest"; questId: number; position: number } | { kind: "gap"; count: number; key: string };
 
-/** The steps to draw: every quest of a short chain; of a long one, the ends and two either side of `current`. */
-export function chainSteps(questIds: readonly number[], current: number): Step[] {
-  const at = questIds.indexOf(current);
-  const keep = (i: number) => questIds.length <= WHOLE || i === 0 || i === questIds.length - 1 || Math.abs(i - at) <= AROUND;
+/**
+ * The steps to draw: every quest of a short chain; of a long one, the ends and two either side of `current`. With no
+ * `current` (the chain's own page) every quest is drawn.
+ */
+export function chainSteps(questIds: readonly number[], current?: number): Step[] {
+  const at = current === undefined ? -1 : questIds.indexOf(current);
+  const keep = (i: number) => current === undefined || questIds.length <= WHOLE || i === 0 || i === questIds.length - 1 || Math.abs(i - at) <= AROUND;
   const steps: Step[] = [];
   let skipped = 0;
   questIds.forEach((questId, i) => {
@@ -25,15 +28,17 @@ export function chainSteps(questIds: readonly number[], current: number): Step[]
 /**
  * A quest chain as a row of steps in order: each quest a link, this quest marked and unlinked, the steps a long chain
  * leaves out counted and linked to the chain's own page. On a phone the steps stack, so a long title never scrolls.
+ * Without `current` it is the chain's own page: every step drawn, and no link back to the page itself.
  */
 export default function QuestChainFlow({ questIds, current, name, href, nameOf, truncated }: {
-  questIds: readonly number[]; current: number; name: string; href: string; nameOf: (id: number) => string | undefined; truncated?: boolean;
+  questIds: readonly number[]; current?: number; name: string; href: string; nameOf: (id: number) => string | undefined; truncated?: boolean;
 }) {
   const steps = chainSteps(questIds, current);
+  const own = current === undefined;
   return (
     <section aria-labelledby="quest-chain-heading" className="mb-6">
       <h2 id="quest-chain-heading" className="mb-2 text-h2-sm font-semibold text-fg sm:text-h2">
-        Quest chain: <Link href={href} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{name}</Link>
+        {own ? "Steps" : <>Quest chain: <Link href={href} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{name}</Link></>}
       </h2>
       <ol data-quest-chain className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-2">
         {steps.map((step, i) => (
@@ -55,11 +60,11 @@ export default function QuestChainFlow({ questIds, current, name, href, nameOf, 
           </li>
         ))}
       </ol>
-      <p className="mt-2 text-meta">
+      {!own && <p className="mt-2 text-meta">
         <Link href={href} className="text-fg-2 underline decoration-edge underline-offset-4 hover:decoration-fg">
           All {questIds.length}{truncated ? "+" : ""} quests
         </Link>
-      </p>
+      </p>}
     </section>
   );
 }

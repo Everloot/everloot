@@ -143,6 +143,31 @@ export function factionInFiles(id: number): { parent: { id: number; name: string
   return { parent: parent ? { id: parent.id, name: parent.name } : null, header: factions.some((f) => f.parentId === id) };
 }
 
+/** The factions the game files name this one as parent of, that have a reputation pane slot (and so a page); [] when none or unreadable. */
+export function factionChildren(id: number): { id: number; name: string }[] {
+  try {
+    return CLIENT_FACTIONS.factions.filter((f) => f.parentId === id && f.shown).map((f) => ({ id: f.id, name: f.name }));
+  } catch { return []; }
+}
+
+/**
+ * Where a title goes, from the `%s` the game fills with the character's name: before it (a prefix, "Private %s") or after
+ * it (a suffix, "%s the Alchemist"). Null for a name with no slot: the files do not say.
+ */
+export function titlePlacement(name: string): "prefix" | "suffix" | null {
+  const at = name.indexOf("%s");
+  if (at < 0) return null;
+  return name.slice(at + 2).trim() ? "suffix" : name.slice(0, at).trim() ? "prefix" : null;
+}
+
+/** A title with a name in its slot, as the game shows it on a character. */
+export const titleWithName = (name: string, character: string) => name.replace(NAME_SLOT, character).trim();
+
+/** The files' own name for a title id (with its `%s`), or null when the file is unreadable or does not list it. */
+export function titleFilesName(id: number): string | null {
+  try { return CLIENT_TITLES.titles.find((t) => t.id === id)?.name ?? null; } catch { return null; }
+}
+
 /** A header the files list without a standing of its own: no player reported one, so its page is noindex and out of the sitemap. */
 export const factionHeaderOnly = (entry: Listed<FactionEntry>): boolean => !entry.confirmed && (factionInFiles(entry.factionId)?.header ?? false);
 
