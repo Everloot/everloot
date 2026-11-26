@@ -77,7 +77,7 @@ test("the home page states the promise with its numbers; with no stored score ev
 });
 
 test("the hero searches with the header's field, a GET form to /search, the one primary button there, with three example chips", () => {
-  const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('aria-labelledby="start-here"'));
+  const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('aria-labelledby="live-newest"'));
   const form = hero.match(/<form [^>]*>/)?.[0] ?? "";
   for (const attr of ['action="/search"', 'method="get"', 'role="search"']) expect(form).toContain(attr);
   const input = hero.match(/<input [^>]*id="home-search"[^>]*>/)?.[0] ?? "";
@@ -90,15 +90,14 @@ test("the hero searches with the header's field, a GET form to /search, the one 
 });
 
 
-test("Start here follows the hero with server-rendered job links and no new images or draft quiz", () => {
+test("Start here follows the live panels with one row of five server-rendered job links and no new images or draft quiz", () => {
   const start = html.indexOf('aria-labelledby="start-here"');
   const block = html.slice(start, html.indexOf("</section>", start));
-  expect(start).toBeGreaterThan(html.indexOf('id="hero-title"'));
+  expect(start).toBeGreaterThan(html.indexOf('aria-labelledby="live-newest"'));
   expect(start).toBeLessThan(html.indexOf('id="promise"'));
-  expect(block.match(/<li /g)).toHaveLength(9);
-  expect(block.match(/<a /g)).toHaveLength(9);
-  expect(block).toContain('href="/tools/talents"');
-  expect(block).toContain('href="/classes"');
+  expect(block.match(/<li /g)).toHaveLength(5);
+  expect(block.match(/<a /g)).toHaveLength(5);
+  expect([...block.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(["/tools/talents", "/database/items", "/database/instances", "/tools/professions", "/tools/auctions"]);
   expect(block).not.toContain("/classes/choose");
   expect(block).not.toContain("<img");
 });

@@ -5,15 +5,18 @@ import { playerPagesOn } from "@/lib/player-pages";
 import { startTiles } from "@/lib/start-here";
 import { ClassSelect, ClassStartLink, StartClassProvider } from "./StartClass";
 
-/** Server-rendered jobs, without images, request-time reads or speculative route prefetches. */
-export default function StartHere({ compact = false }: { compact?: boolean } = {}) {
+/**
+ * Server-rendered jobs, without images, request-time reads or speculative route prefetches. `limit` keeps the first
+ * jobs only: the landing page shows one row of five under its live panels.
+ */
+export default function StartHere({ compact = false, limit }: { compact?: boolean; limit?: number } = {}) {
   return (
     <section aria-labelledby="start-here">
       <SectionHeading id="start-here">Start here</SectionHeading>
       <StartClassProvider>
         <ClassSelect />
         <ul className={compact ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-5"}>
-          {startTiles(armoryOn(), playerPagesOn()).map((tile) => (
+          {startTiles(armoryOn(), playerPagesOn()).slice(0, limit).map((tile) => (
             <li key={tile.key} className="min-w-0">
               <Card padding="none" className="h-full p-4">
                 <p className="font-semibold">
