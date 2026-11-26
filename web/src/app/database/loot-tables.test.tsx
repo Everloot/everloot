@@ -127,3 +127,80 @@ test("the few-windows label stops at the minimum window count even when other se
   expect(rateWithRange(1, 50, 3)).not.toContain("few windows");
   expect(rateWithRange(0, 0, 3)).toBe("Not recorded");
 });
+
+const sourceRow = (npcId: number, withItem: number, windows: number) =>
+  ({ sourceNpcId: npcId, itemId: 750, withItem, windows, installs: 3, rate: withItem / windows, first: null, last: null });
+const sourceIds = (markup: string) => [...markup.matchAll(/data-source="(\d+)"/g)].map((m) => Number(m[1]));
+const sourceCell = (r: { sourceNpcId?: number }) => <span data-source={r.sourceNpcId}>Creature {r.sourceNpcId}</span>;
+
+test("Dropped by sorts by drop chance, then by windows with it", async () => {
+  const { ItemSourcesPanel } = await import("./loot-tables");
+  const rows = [sourceRow(1, 10, 100), sourceRow(2, 5, 10), sourceRow(3, 20, 200), sourceRow(4, 1, 50)];
+  const markup = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} dataAsOf={null} />);
+  // 50%, then the two 10% rows by count (20 before 10), then 2%.
+  expect(sourceIds(markup)).toEqual([2, 3, 1, 4]);
+});
+
+test("Dropped by gains a Zone column only where some source has an agreed zone", async () => {
+  const { ItemSourcesPanel } = await import("./loot-tables");
+  const rows = [sourceRow(1, 1, 2), sourceRow(2, 1, 4)];
+  const zone = (r: { sourceNpcId?: number }) => (r.sourceNpcId === 1 ? <a href="/database/zones/12">Elwynn Forest</a> : null);
+  const withZone = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} zone={zone} dataAsOf={null} />);
+  expect(withZone).toMatch(/<th[^>]*>(?:<[^>]*>)*Zone/);
+  expect(withZone).toContain('href="/database/zones/12"');
+  const none = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} zone={() => null} dataAsOf={null} />);
+  expect(none).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Zone/);
+});
+
+test("a long Dropped by list shows 25 rows with a server-rendered pager and a Show all link", async () => {
+  const { ItemSourcesPanel, LOOT_PER_PAGE } = await import("./loot-tables");
+  expect(LOOT_PER_PAGE).toBe(25);
+  const rows = Array.from({ length: 77 }, (_, i) => sourceRow(i + 1, 1, i + 2));
+  const href = (p: number | "all") => `/database/items/750?drops=${p}#dropped-by`;
+  const first = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} dataAsOf={null} pages={{ page: 1, href }} />);
+  expect(sourceIds(first)).toHaveLength(25);
+  expect(sourceIds(first)[0]).toBe(1);
+  expect(first).toContain("1–25");
+  expect(first).toContain('href="/database/items/750?drops=2#dropped-by"');
+  expect(first).toMatch(/href="\/database\/items\/750\?drops=all#dropped-by"[^>]*>Show all 77</);
+  const last = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} dataAsOf={null} pages={{ page: 4, href }} />);
+  expect(sourceIds(last)).toHaveLength(2);
+  const all = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows, short: null }} title="Item" source={sourceCell} dataAsOf={null} pages={{ page: "all", href }} />);
+  expect(sourceIds(all)).toHaveLength(77);
+  expect(all).not.toContain("Show all");
+  expect(all).toMatch(/href="\/database\/items\/750\?drops=1#dropped-by"[^>]*>Show 25 per page</);
+  // 25 rows or fewer: no pager.
+  const short = renderToStaticMarkup(<ItemSourcesPanel sources={{ rows: rows.slice(0, 25), short: null }} title="Item" source={sourceCell} dataAsOf={null} pages={{ page: 1, href }} />);
+  expect(short).not.toContain("Show all");
+  expect(short).not.toContain("1–25");
+});
+
+test("the NPC loot table pages the same way", async () => {
+  const { NpcLootPanel } = await import("./loot-tables");
+  const rows = Array.from({ length: 30 }, (_, i) => ({ ...sourceRow(40, 1, 4), itemId: 1000 + i }));
+  const table = { npcId: 40, state: "rated" as const, span: { windows: 4, installs: 3, first: null, last: null }, rows, missingInstalls: 0 };
+  const href = (p: number | "all") => `/database/npcs/40?drops=${p}#drops`;
+  const markup = renderToStaticMarkup(<NpcLootPanel table={table} title="Creature" item={(id) => <span data-item={id} />} dataAsOf={null} pages={{ page: 2, href }} />);
+  expect([...markup.matchAll(/data-item="(\d+)"/g)].map((m) => Number(m[1]))).toEqual([1025, 1026, 1027, 1028, 1029]);
+  expect(markup).toContain("26–30");
+});
+
+test("the drops page parameter: a page number, all, or the first page for anything else", async () => {
+  const { lootPage } = await import("./loot-tables");
+  expect(lootPage(undefined)).toBe(1);
+  expect(lootPage("3")).toBe(3);
+  expect(lootPage("all")).toBe("all");
+  for (const bad of ["0", "-1", "x", "1.5", ["2"], "99999999999"]) expect(lootPage(bad)).toBe(1);
+});
+
+test("an item page reads ?drops= for its Dropped by pages", async () => {
+  // 26 creatures each looted once by one install: 26 source rows, one past the first page.
+  store.loadCorpus.mockResolvedValue(corpus(Array.from({ length: 26 }, (_, i) => loot("install-aaaa", 100 + i, [750], "2026-10-10T08:00:00.000Z"))));
+  const { Item } = await pages();
+  const page = (drops?: string) => html(Item({ params: Promise.resolve({ id: "750" }), searchParams: Promise.resolve(drops ? { drops } : {}) }));
+  const first = await page();
+  expect(first).toContain('href="/database/items/750?drops=2#dropped-by"');
+  expect(first).toContain("Show all 26");
+  const second = await page("2");
+  expect(second).toContain("26–26");
+});

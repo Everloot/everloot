@@ -20,8 +20,8 @@ import { EMPTY, EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unrea
 import { loadRenders } from "@/lib/game-renders";
 import EntityMap from "../../EntityMap";
 import { entityMapZones } from "../../entity-map";
-import { NPC_LOOT_SORTS, NpcLootPanel } from "../../loot-tables";
-import { nextSort, sortParam, sortRows } from "../../list-parts";
+import { NPC_LOOT_SORTS, NpcLootPanel, lootPage } from "../../loot-tables";
+import { listHref, nextSort, sortParam, sortRows } from "../../list-parts";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
 import { unknownNpc } from "../../unknown";
@@ -94,7 +94,9 @@ function MapThumb({ pin, zone, art }: { pin: NpcPin; zone: string; art: string |
 
 export default async function NpcPage(props: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await props.params;
-  const drops = dropSort((await props.searchParams)?.sort);
+  const search = await props.searchParams;
+  const drops = dropSort(search?.sort);
+  const dropPage = lootPage(search?.drops);
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const npcId = Number(params.id);
   const facts = await loadWorldFacts();
@@ -134,6 +136,11 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
   const dropHref = (key: string, dir: SortDirection) => {
     const sort = sortParam(nextSort(key, dir, DROP_DEFAULT));
     return `/database/npcs/${npcId}${sort ? `?sort=${sort}` : ""}#drops`;
+  };
+  // A page of a long table keeps its sort; a new sort starts at the first page.
+  const dropPageHref = (page: number | "all") => {
+    const sort = sortParam(nextSort(drops.key, drops.desc ? "desc" : "asc", DROP_DEFAULT));
+    return `${listHref(`/database/npcs/${npcId}`, [["sort", sort], ["drops", page === 1 ? undefined : String(page)]])}#drops`;
   };
   const trail = [...trailFor("/database/npcs")!, { name: title, path: `/database/npcs/${npcId}` }];
   const named = title !== `NPC ${npcId}`;
@@ -215,6 +222,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
                   item={(itemId) => <ItemTip tip={tips.get(itemId)}><EntityLink kind="item" id={itemId} name={itemName(itemId)} quality={qualityNamed(tips.get(itemId)?.quality)} /></ItemTip>}
                   sort={{ key: drops.key, direction: drops.desc ? "desc" : "asc" }}
                   sortHref={dropHref}
+                  pages={{ page: dropPage, href: dropPageHref }}
                 />
                 {pending}
               </>,

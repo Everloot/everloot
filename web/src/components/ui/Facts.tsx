@@ -5,6 +5,8 @@ export interface Fact {
   value: ReactNode;
   /** Mono, tabular figures: counts, ids, dates, builds. */
   numeric?: boolean;
+  /** In the `list` layout, the value under its label and left-aligned: for a value that runs long, like a list. */
+  stacked?: boolean;
 }
 
 /**
@@ -18,7 +20,12 @@ export default function Facts({ items, layout = "grid", label }: { items: Fact[]
   if (layout === "list") {
     return (
       <dl data-facts="list" aria-label={label} className="columns-1 gap-x-6 text-meta lg:columns-2">
-        {items.map((item, i) => (
+        {items.map((item, i) => item.stacked ? (
+          <div key={i} className="flex min-w-0 break-inside-avoid flex-col gap-1.5 border-b border-line py-1.5">
+            <dt className="text-muted">{item.label}</dt>
+            <dd className="min-w-0 text-fg">{item.value}</dd>
+          </div>
+        ) : (
           <div key={i} className="flex min-h-7 min-w-0 break-inside-avoid items-center justify-between gap-3 border-b border-line py-1">
             <dt className="shrink-0 text-muted">{item.label}</dt>
             <dd className={`min-w-0 text-right text-fg [overflow-wrap:anywhere] ${item.numeric ? "tabular-nums" : ""}`}>{item.value}</dd>
