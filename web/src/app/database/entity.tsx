@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
@@ -46,12 +46,13 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
 /**
  * The top band: the tooltip box (or a map thumbnail) at left, the quick facts beside it (two 280 px columns
  * of them on a wide screen, so the band stays short); stacked on a phone. No box (a tooltip with no lines to
- * show) leaves the facts alone at the same width.
+ * show) leaves the facts alone at the same width. On the widest screens too the band stays in the main column,
+ * so nothing under the box waits for the facts beside it.
  */
-export function EntityTop({ box, facts, railMap = false }: { box: ReactNode; facts: ReactNode; railMap?: boolean }) {
+export function EntityTop({ box, facts }: { box: ReactNode; facts: ReactNode }) {
   if (!box) return facts ? <section data-slot="top" aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
   return (
-    <div data-slot="top" className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
+    <div data-slot="top" className={`entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
       <div className="entity-box min-w-0">{box}</div>
       <section aria-label="Quick facts" className="min-w-0">{facts}</section>
     </div>
@@ -64,6 +65,25 @@ export function EntityTop({ box, facts, railMap = false }: { box: ReactNode; fac
  */
 export const known = (value: ReactNode, reported = 0) =>
   (value === null || value === undefined || value === "" ? <AgreementMeter count={reported} withText={reported > 0} /> : value);
+
+/** A fact `known` shows as an empty meter: no install has reported it. */
+const unreported = (value: ReactNode) => isValidElement<{ count?: number }>(value) && value.type === AgreementMeter && !value.props.count;
+
+/**
+ * The quick facts with every unreported one folded into a last "Not yet reported" row: their labels and one empty
+ * meter, instead of a row of hollow diamonds each. A fact some installs have reported keeps its row and its count.
+ */
+function foldUnreported(facts: Fact[]): Fact[] {
+  const missing = facts.filter((f) => unreported(f.value));
+  if (missing.length === 0) return facts;
+  return [
+    ...facts.filter((f) => !unreported(f.value)),
+    {
+      label: "Not yet reported",
+      value: <><AgreementMeter count={0} /><span className="ml-2">{missing.map((f, i) => <Fragment key={i}>{i > 0 && " · "}{f.label}</Fragment>)}</span></>,
+    },
+  ];
+}
 
 /**
  * An empty tab: one line. The agreement meter and "Get the addon" for what players report; a plain line
@@ -221,7 +241,7 @@ export const ENTITY_SLOTS = ["header", "top", "notices", "side", "media", "summa
  * open-data row with its Report wrong data link and any credit line. Pages pass what they have; they never reorder.
  */
 export function EntityPage({
-  name, degraded, jsonLd, header, box, railMap, facts, notices, media, summary, main, related, map, changes, screenshots, comments, openData, credit,
+  name, degraded, jsonLd, header, box, facts, notices, media, summary, main, related, map, changes, screenshots, comments, openData, credit,
 }: {
   /** The plain name, for the quick facts' label. */
   name: string;
@@ -230,7 +250,6 @@ export function EntityPage({
   jsonLd?: Parameters<typeof entityPageJsonLd>[0] | null;
   header: Parameters<typeof EntityHeader>[0];
   box?: ReactNode;
-  railMap?: boolean;
   facts?: Fact[] | null | false;
   notices?: ReactNode;
   media?: ReactNode;
@@ -254,7 +273,7 @@ export function EntityPage({
       {jsonLd && <JsonLd data={entityPageJsonLd(jsonLd)} />}
       <EntityLayout>
         <EntityHeader {...header} />
-        <EntityTop box={box} railMap={railMap} facts={facts && <Facts layout="list" label={`${name}: quick facts`} items={facts} />} />
+        <EntityTop box={box} facts={facts && <Facts layout="list" label={`${name}: quick facts`} items={foldUnreported(facts)} />} />
         {notices && <div data-slot="notices">{notices}</div>}
         {(media || inShort) && (
           <EntitySidebar>

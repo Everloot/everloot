@@ -10,7 +10,7 @@ import { agreedNpc, npcPage, questPage, questTraits } from "@kb/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
-import { agreementLabel, reportedLabel, Badge, DataTable, Tabs, TooltipFrame } from "@/components/ui";
+import { agreementLabel, reportedLabel, Badge, DataTable, Tabs } from "@/components/ui";
 import { EMPTY, EmptyTab, EntityPage, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import EntityMap from "../../EntityMap";
 import { entityMapZones, type MapMark } from "../../entity-map";
@@ -141,15 +141,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
         ],
       }}
-      // No box without an agreed level, side, type or category: a frame with only the title would repeat the heading.
-      box={!facts.unreachable && (page.level !== null || traits.side || typeLabel || traits.category) && (
-        <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
-          {page.level !== null && <p>Level {page.level}</p>}
-          {typeLabel && <p>{typeLabel}</p>}
-          {sideChip && <p>{sideChip}</p>}
-          {traits.category && <p>{traits.category}</p>}
-        </TooltipFrame>
-      )}
+      // No box: its level, type, side and category are the header's type line again.
       facts={!facts.unreachable && [
         { label: "Reported title", value: known(page.title) },
         { label: "Level", value: known(page.level), numeric: true },
@@ -161,13 +153,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
           {chains.length > 1 && <span> (also in {chains.length - 1} other {chains.length === 2 ? "chain" : "chains"})</span>}
           <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? reportedLabel(chain.reporters) : "player reports could not be read just now"} · {dayLabel(chainDate)}</span>
-        </> : !catalog?.confirmations ? STORAGE_UNREACHABLE : <>Not reported yet {known(null)}</> },
+        </> : !catalog?.confirmations ? STORAGE_UNREACHABLE : known(null) },
         ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} name={questName(previous)} /> }] : []),
         ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} name={questName(next)} /> }] : []),
         { label: "Zone", value: zone ? <>
           <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
           <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
-        </> : <>Not reported yet {known(null)}</> },
+        </> : known(null) },
         { label: "Start", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
         { label: "End", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
         { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },

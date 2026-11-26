@@ -5,7 +5,7 @@ import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { npcLootTable } from "@kb/loot-tables";
 import { CLIENT_LABEL } from "@kb/edges";
 import EntityLink from "@/components/EntityLink";
-import { AgreementMeter, Badge, DataTable, Disclosure, Tabs, TooltipFrame, TooltipLines, type Column, type Fact, type TabItem } from "@/components/ui";
+import { AgreementMeter, Badge, DataTable, Disclosure, Tabs, type Column, type Fact, type TabItem } from "@/components/ui";
 import { bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
 import { trailFor } from "@/lib/breadcrumbs";
 import { observedLine } from "@/lib/evidence";
@@ -181,11 +181,7 @@ export default async function BossPage(props: Props) {
         title,
         meta: [kindOf(boss), instanceLink, <span key="id" className="tabular-nums">Encounter {boss.id}</span>, boss.filesName ? <Badge key="files" tone="files" /> : null],
       }}
-      box={
-        <TooltipFrame name={title} label={`${title}, ${boss.filesName ? CLIENT_LABEL.toLowerCase() : "as players reported it"}`}>
-          <TooltipLines lines={[instanceName, ...(order ? [`Boss ${order}`] : [])]} />
-        </TooltipFrame>
-      }
+      // No box: the name, the instance and the order are the header and the facts already.
       facts={facts}
       media={picture && <ModelPicture picture={picture} name={title} />}
       summary={summary}

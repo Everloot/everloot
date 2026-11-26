@@ -176,7 +176,6 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
           named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null,
         ],
       }}
-      railMap
       // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
       // With the map slot drawn, the thumbnail would be a second copy of it.
       box={firstPin && mapZones.length === 0 && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (

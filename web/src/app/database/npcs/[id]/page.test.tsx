@@ -120,8 +120,9 @@ test("unnamed NPC retains all agreed list traits, with unreported traits shown a
   expect(fact(out, "Rank")).toBe("Normal");
   facts.npcs = facts.npcs.slice(0, 2);
   const short = await html();
-  expect(fact(short, "Level")).toContain("data-agreement");
-  expect(fact(short, "Type")).not.toContain("Humanoid");
+  // Short of 3 installs, the traits fold into the one Not yet reported row with its empty meter.
+  expect(fact(short, "Not yet reported")).toMatch(/data-agreement="0"[\s\S]*Level[\s\S]*Type/);
+  expect(short).not.toContain("Humanoid");
 });
 
 test("missing dates say not reported yet; stock without agreement never becomes zero", async () => {

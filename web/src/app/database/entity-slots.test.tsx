@@ -27,8 +27,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-import { ENTITY_SLOTS } from "./entity";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { ENTITY_SLOTS, EntityPage, known } from "./entity";
 import AchievementPage from "./achievements/[id]/page";
+import BossPage from "./bosses/[boss]/page";
 import CurrencyPage from "./currencies/[id]/page";
 import FactionPage from "./factions/[id]/page";
 import HolidayPage from "./holidays/[id]/page";
@@ -96,6 +99,42 @@ test.each(PAGES)("the %s page fills the entity template's slots in its one order
   const footer = html.slice(html.indexOf('data-slot="footer"'));
   expect(footer).toContain("Copy for AI");
   expect(footer).toContain("Report wrong data");
+});
+
+test("facts nobody has reported fold into one Not yet reported row with a single meter", () => {
+  const html = renderToStaticMarkup(EntityPage({
+    name: "Hogger",
+    header: { trail: [], title: "Hogger" },
+    facts: [
+      { label: "Reported name", value: "Hogger" },
+      { label: "Level", value: known(null) },
+      { label: "Type", value: known(undefined) },
+      { label: "Rank", value: known(null, 2) },
+      { label: "Zone", value: known("") },
+    ],
+  }));
+  const rows = [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((m) => m[1]);
+  // Rank has 2 of 3 installs: its own meter says so, so it keeps its row.
+  expect(rows).toEqual(["Reported name", "Rank", "Not yet reported"]);
+  expect(html).toMatch(/Not yet reported<\/dt><dd[^>]*>(?:<[^>]*>)*Level · Type · Zone/);
+  expect(html.match(/data-agreement="0"/g)).toHaveLength(1);
+});
+
+test("quest and boss pages draw no box that would only repeat their header", async () => {
+  // The quest has an agreed level, so its old box was "Wanted: Hogger / Level 10", the header's own words.
+  for (const page of [QuestPage(id("176")), BossPage({ params: Promise.resolve({ boss: "2742-sneed" }) })]) {
+    expect(renderToStaticMarkup(await page)).not.toContain("entity-box");
+  }
+});
+
+test("at xl the quick facts stay in the main column beside the box, and the rail starts under the header", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+  const xl = css.slice(css.indexOf("Wide entity rails"));
+  const block = xl.slice(0, xl.indexOf("\n}\n"));
+  // Nothing of the top band goes to the rail: that is what left a void under the box as tall as the facts.
+  expect(block).not.toMatch(/\.entity-(?:top|facts)[^{]*\{[^}]*grid-column:\s*2/);
+  expect(block).not.toMatch(/\.entity-top\s*\{[^}]*display:\s*contents/);
+  expect(block).toMatch(/\.entity-layout > \.entity-sidebar \{[^}]*grid-row: 2 \/ span 30/);
 });
 
 test("a spell page fills the changes slot only when the spell changed in a live build", async () => {
