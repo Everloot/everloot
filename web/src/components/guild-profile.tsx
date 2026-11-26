@@ -3,15 +3,18 @@ import { Badge } from "@/components/ui";
 import { armoryGuildPath } from "@/lib/armory";
 import type { ArmoryGuild } from "@/lib/armory-store";
 import { getUser } from "@/lib/supabase/server";
-import { guildProfileStore } from "@/lib/guild-profile-store";
+import { guildProfileStore, type GuildProfileStore } from "@/lib/guild-profile-store";
 import { staleClaim } from "@/lib/guild-profile";
 
-export default async function GuildProfile({ guild }: { guild: ArmoryGuild }) {
+/** `profile`: the read when the page started it already; else this starts it, beside the visitor's session read. */
+export default async function GuildProfile({ guild, profile: started }: { guild: ArmoryGuild; profile?: ReturnType<GuildProfileStore["profile"]> }) {
+  const profileRead = started ?? (async () => guildProfileStore().profile(guild.region, guild.slug))();
+  profileRead.catch(() => {});
   const user = await getUser().catch(() => null);
   const edit = user && <Link href={`${armoryGuildPath(guild.region, guild.slug)}/edit`} className="text-sm text-fg underline underline-offset-4">Claim or edit this guild</Link>;
   try {
     const store = guildProfileStore();
-    const profile = await store.profile(guild.region, guild.slug);
+    const profile = await profileRead;
     const access = profile?.owner_user_id ? await store.access(user?.id ?? "00000000-0000-0000-0000-000000000000", guild.region, guild.slug) : null;
     return <section aria-label="Guild profile" className="space-y-3">
       {profile?.recruiting.on && <Badge tone="neutral">Recruiting</Badge>}
