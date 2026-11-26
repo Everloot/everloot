@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.everloot.app/b");
   mocks.assets.mockReset().mockResolvedValue({
     version: "70450", label: "Found in game files, unconfirmed",
-    spellIcons: new Map([[458, icon(458)]]), petIcons: new Map([[39, icon(39)]]), currencyIcons: new Map([[1792, icon(1792)]]), familyIcons: new Map([[1, icon(1)]]),
+    spellIcons: new Map([[458, icon(458)]]), achievementIcons: new Map([[627, icon(627)]]), petIcons: new Map([[39, icon(39)]]), currencyIcons: new Map([[1792, icon(1792)]]), familyIcons: new Map([[1, icon(1)]]),
   });
   mocks.setNames.mockReset().mockResolvedValue({ version: "70450", names: new Map([[1, "Ironfeather Armor"]]) });
   mocks.spellNames.mockReset().mockResolvedValue({ version: "70450", names: new Map([[9331, "Increased Defense"]]) });
@@ -41,7 +41,7 @@ const instance = [...instanceRows().values()].find((r) => r.name && r.encounters
 
 // One card per new type: its type, id, the page's name, and what its box and facts say in short.
 const CASES: [type: string, id: number, card: Record<string, unknown>][] = [
-  ["achievement", 627, { title: "Explore Dun Morogh", icon: null, foot: "Found in game files, unconfirmed" }],
+  ["achievement", 627, { title: "Explore Dun Morogh", icon: icon(627), foot: "Found in game files, unconfirmed" }],
   ["faction", 21, { title: "Booty Bay", icon: null, foot: "Found in game files, unconfirmed" }],
   ["title", 144, { title: "Bloodsail Admiral <Name>", lines: ["Character title"], foot: "Found in game files, unconfirmed" }],
   ["chain", 5963, { title: "To Have Loved and Lost", lines: ["1 quest"], foot: "Found in game files, unconfirmed" }],
@@ -72,7 +72,8 @@ test.each(CASES)("a %s card is the page's name, art and a few facts, cached an h
 
 test("each card's lines say what its page's box and facts say", async () => {
   const lines = async (type: string, id: number) => (await (await call(type, id)).json()).card.lines;
-  expect(await lines("achievement", 627)).toEqual(["Explore Dun Morogh, revealing the covered areas of the world map.", "0 points", expect.stringMatching(/^\d+ criteria$/)]);
+  // The page's category path, then the files' text, points and criteria.
+  expect(await lines("achievement", 627)).toEqual(["Adventure › Eastern Kingdoms", "Explore Dun Morogh, revealing the covered areas of the world map.", "0 points", "18 criteria"]);
   expect(await lines("faction", 21)).toEqual(["Steamwheedle Cartel"]);
   expect(await lines("zone", zone.mapId)).toEqual(expect.arrayContaining([`Zone in ${zone.continentName}`]));
   expect((await lines("instance", instance.instanceMapId))[1]).toBe(`${instance.encounters.length} ${instance.encounters.length === 1 ? "boss" : "bosses"} in the game files`);
@@ -81,6 +82,28 @@ test("each card's lines say what its page's box and facts say", async () => {
   expect(await lines("holiday", 62)).toEqual(["Every year on 4 July at 06:00", "Lasts 18 hours"]);
   expect(await lines("family", 1)).toEqual(["Hunter pet family", "16 spells on its skill line"]);
   expect(await lines("boss", 2732)).toEqual(["Dungeon boss", "Ragefire Chasm, boss 1 of 4"]);
+});
+
+test("an achievement for one side says so, as its page's facts do", async () => {
+  expect((await (await call("achievement", 58)).json()).card.lines).toContain("Alliance only");
+});
+
+test("a zone card leads with its territory and the creature levels 3 installs agree on, as the zone page's header does", async () => {
+  // Durotar (1411) is Horde territory in the committed map; three installs agree on a hostile level 10 boar and a level 12 one there.
+  const at = (npcId: number, level: number) => ["a", "b", "c"].map((installId) => ({ installId, npcId, name: `Boar ${npcId}`, positionKind: "npc", mapId: 1411, x: 50, y: 50, level, reaction: "hostile" }));
+  mocks.stored.mockResolvedValue({ dataAsOf: null, world: { npcs: [...at(3098, 10), ...at(3099, 12)], quests: [], vendors: [] }, instances: { entrances: [], encounters: [] }, edges: [] });
+  const lines = (await (await call("zone", 1411)).json()).card.lines;
+  expect(lines.slice(0, 3)).toEqual(["Zone in Kalimdor", "Horde territory", "Creatures 10–12 (agreed NPC levels)"]);
+  // Fewer than 3 installs: no level range, as on the page.
+  mocks.stored.mockResolvedValue({ dataAsOf: null, world: { npcs: at(3098, 10).slice(0, 2), quests: [], vendors: [] }, instances: { entrances: [], encounters: [] }, edges: [] });
+  expect((await (await call("zone", 1411)).json()).card.lines.join("\n")).not.toContain("Creatures");
+});
+
+test("a zone card whose read of the stored view failed is a 503 nobody keeps", async () => {
+  mocks.stored.mockResolvedValue(null);
+  const res = await call("zone", 1411);
+  expect(res.status).toBe(503);
+  expect(edgeTtl(res)).toBeNull();
 });
 
 test.each([

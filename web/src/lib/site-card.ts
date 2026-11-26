@@ -1,6 +1,6 @@
 import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
 import type { TooltipType } from "@everloot/protocol";
-import { npcPage, vendorPage } from "@kb/world-pages";
+import { agreedNpc, npcPage, npcTraits, questPage, questTraits, vendorPage, type NpcRank, type NpcReaction } from "@kb/world-pages";
 import { loadWorldFacts } from "./rollup-compute";
 import { loadStoredAggregates } from "./aggregate-store";
 import { categoryOf } from "@kb/item-taxonomy";
@@ -14,7 +14,7 @@ import { itemSet, itemSetOf } from "./item-sets";
 import { bossEntry } from "./bosses";
 import { zonePlaces } from "./places";
 import { holidayEntries, lastsLabel, petFamilyEntries, startLabel } from "./world-events";
-import { placedEntrances, zoneByMapId } from "./zones";
+import { creatureLevels, placedEntrances, zoneByMapId, zoneContents, type ZoneFaction } from "./zones";
 import { WORLD_MAP } from "./world-map";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
@@ -25,6 +25,14 @@ import { loadSpellTalents } from "./talents/spell-talents";
 import { pinLink } from "./world-map";
 import { assetsBaseUrl } from "./talents/assets";
 import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
+import { loadObjectFacts, OBJECT_KIND_LABELS, objectTraits, skillRangeText } from "./objects";
+import { SIDE_LABEL, questTypeLabel } from "./world-lists";
+import { durationText, schoolNames, spellNumbers, spellRanks, tooltipRows } from "./spell-card";
+import { PAIR } from "./tip-line";
+import { categoryPath } from "./achievement-categories";
+
+/** A zone's side in words, as the zone page's header shows it. */
+const TERRITORY: Record<ZoneFaction, string> = { alliance: "Alliance territory", horde: "Horde territory", contested: "Contested territory" };
 
 /**
  * The hover card on the site's own links to an item, NPC, quest, object, spell or vendor page (GET /card/<type>/<id>).
@@ -87,6 +95,63 @@ export async function loadSiteCard(type: SiteCardType, id: number): Promise<Site
     catch { return UNAVAILABLE; }
   }
   if (type === "item") return itemCard(id);
+  const card = await worldCard(type, id);
+  if (card.status !== 200) return card;
+  // What the page's header leads with, above what the embeddable card says; a failed read is a 503, never a card without it.
+  const lead = await leadLines(type, id);
+  if (lead === null) return UNAVAILABLE;
+  // The quest's level is in the lead line now.
+  const rest = type === "quest" && lead.length ? card.body.lines.filter((l) => !/^Level \d+$/.test(l)) : card.body.lines;
+  return { status: 200, body: { ...card.body, lines: [...lead, ...rest] } };
+}
+
+/** `UnitClassification` and the reaction in words, as the NPC page shows them. */
+const RANK_LABELS: Record<NpcRank, string> = { normal: "Normal", elite: "Elite", rare: "Rare", rare_elite: "Rare elite", boss: "Boss" };
+const REACTION_LABELS: Record<NpcReaction, string> = { friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" };
+const dotted = (parts: (string | null | undefined | false | 0)[]) => kept(parts).join(PAIR) || null;
+
+/**
+ * The facts an NPC, quest or object page's header leads with, each under the page's own rule (3 installs agree): an
+ * NPC's level, rank (unless normal), type, reaction and zone; a quest's level, side, type, category and its giver's
+ * zone; an object's kind, zones and the skill players had. Null when the facts could not be read.
+ */
+async function leadLines(type: TooltipType, id: number): Promise<string[] | null> {
+  if (type === "object") {
+    const facts = await loadObjectFacts();
+    if (facts.unreachable) return null;
+    const traits = objectTraits(facts, id).get(id);
+    if (!traits) return [];
+    return kept([
+      dotted([traits.kind && OBJECT_KIND_LABELS[traits.kind], traits.zones.map((z) => z.name).join(", ")]),
+      traits.skill && `Players' skill: ${skillRangeText(traits.skill)}`,
+    ]);
+  }
+  const facts = await loadWorldFacts();
+  if (facts.unreachable) return null;
+  if (type === "npc") {
+    const traits = agreedNpc(id, facts) ?? npcTraits([]);
+    const pin = npcPage(id, facts).pins[0];
+    const zone = pin ? zoneByMapId(pin.mapId) : undefined;
+    return kept([
+      dotted([traits.level !== null && `Level ${traits.level}`, traits.rank && traits.rank !== "normal" && RANK_LABELS[traits.rank], traits.creatureType]),
+      dotted([traits.reaction && REACTION_LABELS[traits.reaction], zone?.name]),
+    ]);
+  }
+  if (type === "quest") {
+    const page = questPage(id, facts);
+    const traits = questTraits(facts.quests.filter((r) => r.questId === id && r.installId.trim()), facts);
+    const pin = page.giverNpcId === null ? undefined : npcPage(page.giverNpcId, facts).pins.find((p) => pinLink(p.mapId, p.x, p.y));
+    const zone = pin ? zoneByMapId(pin.mapId) : undefined;
+    return kept([
+      dotted([page.level !== null && `Level ${page.level}`, traits.side && SIDE_LABEL[traits.side], questTypeLabel(traits), traits.category]),
+      zone && `Zone: ${zone.name}`,
+    ]);
+  }
+  return [];
+}
+
+/** An NPC, quest or object card: what the embeddable card says, with the page's names where players agree on none. */
+async function worldCard(type: TooltipType, id: number): Promise<SiteCardResult> {
   const result = await loadTooltip(type, id);
   // Storage down: the players' facts are unread, so no wiki title stands in for them.
   if (result.status === 503) return result;
@@ -121,11 +186,22 @@ async function spellCard(id: number): Promise<SiteCardResult> {
     (edge.fromKind === "spell" && edge.fromId === id) || (edge.toKind === "spell" && edge.toId === id));
   if (names !== null && name === undefined && !tip && !related && !talents.get(id)?.length) return { status: 404, error: NOT_FOUND };
   const title = name ?? tip?.name ?? `Spell ${id}`;
+  // As the spell page's box: the rank, cost and range, cast time and cooldown, the text, then school and duration.
+  const numbers = spellNumbers(id);
+  const ranks = spellRanks(id);
+  const schools = schoolNames(numbers?.school);
+  const duration = durationText(numbers?.durationMs);
   return {
     status: 200,
     body: {
       type: "spell", id, title, quality: null, color: null, icon: assets?.spellIcons.get(id) ?? null,
-      lines: [tip?.text || "No text for this spell in the client files."],
+      lines: kept([
+        ranks.length > 1 && `Rank ${ranks.indexOf(id) + 1}`,
+        ...(numbers ? tooltipRows(numbers).map((r) => kept([r.left, r.right]).join(PAIR)) : []),
+        tip?.text || "No text for this spell in the client files.",
+        schools.length > 0 && `School: ${schools.join(", ")}`,
+        duration && `Duration: ${duration}`,
+      ]),
       foot: join([!names?.names.get(id) && !tip?.name && wiki?.names.has(id) ? NAME_FROM.wiki : null, tipLabel(assets!)]),
     },
   };
@@ -213,11 +289,19 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
         const entry = listed?.confirmed ? listed : null;
         const points = entry?.points ?? files?.points ?? null;
         const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;
+        // The page's category path (a category players reported wins, the files' path only while it ends there), its
+        // side, the files' text where its box shows it (an unconfirmed entry), then points and criteria; its header's icon.
+        const filesPath = categoryPath(files?.category);
+        const path = !entry || filesPath.at(-1)?.name === entry.category ? filesPath.map((s) => s.name) : [];
+        const icon = files ? await art((a) => a.achievementIcons?.get(id)) : null;
+        if (failed(icon)) return icon;
         return card(listed?.name ?? files!.title, kept([
-          entry ? entry.category : files?.description,
+          path.length ? path.join(" › ") : entry?.category,
+          files?.faction && `${files.faction} only`,
+          !entry && files?.description,
           points !== null && plural(points, "point"),
           criteria !== null && criteria > 0 && plural(criteria, "criterion", "criteria"),
-        ]), filesFoot(Boolean(entry)));
+        ]), filesFoot(Boolean(entry)), icon);
       }
       if (type === "faction") {
         const entry = catalog.factions.find((f) => f.factionId === id);
@@ -240,11 +324,17 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
       // Released zones only: a held-back zone has no page.
       const zone = zoneByMapId(id);
       if (!zone) return NO_CARD;
+      // The creature levels 3 installs agree on, as the zone page's header gives them, from the cron's stored view.
+      const set = await loadStoredAggregates({ strict: true });
+      if (!set) return UNAVAILABLE;
+      const levels = creatureLevels((zoneContents(set.world).get(id)?.npcs ?? []).filter((n) => !n.vendor));
       const places = zonePlaces(id);
       const named = places ? places.pois.length + places.subzones.length : 0;
       const entrances = placedEntrances(WORLD_MAP).filter((e) => e.zone?.mapId === id).length;
       return card(zone.name, kept([
         `Zone in ${zone.continentName}`,
+        zone.faction && TERRITORY[zone.faction],
+        levels && `Creatures ${levels.min === levels.max ? levels.min : `${levels.min}–${levels.max}`} (agreed NPC levels)`,
         named > 0 && `${plural(named, "named place")} in the game files`,
         entrances > 0 && plural(entrances, "dungeon or raid entrance", "dungeon and raid entrances"),
       ]), null);

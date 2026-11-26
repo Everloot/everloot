@@ -24,7 +24,8 @@ export type Metal = "gold" | "silver" | "copper";
 
 /**
  * One tooltip line as the game draws it:
- * - `pair`: two columns, slot left and kind right ("Head" / "Plate"), or damage left and speed right;
+ * - `pair`: two columns, slot left and kind right ("Head" / "Plate"), or damage left and speed right; on a spell card,
+ *   cost left and range right, cast time left and cooldown right;
  * - `effect`: an Equip, Use or Chance on hit line, in the game's green;
  * - `yellow`: the item level, a named set ("Set: Name", or "Name (0/8)" over its pieces) and the quoted flavour text,
  *   in the game's yellow;
@@ -44,6 +45,8 @@ export type TipLine =
 const SLOTS = new Set(Object.values(SLOT));
 const KINDS = new Set([...Object.values(WEAPON), ...Object.values(ARMOR)]);
 const DAMAGE = /^(.+ Damage) · (Speed \d+\.\d\d)$/;
+// A spell card's rows (lib/spell-card.ts tooltipRows): cost left and range right, cast time left and cooldown right.
+const SPELL_RIGHT = /^(?:\d+(?:-\d+)? yd range|Melee Range|\d+(?:\.\d+)? (?:sec|min|hours?) cooldown)$/;
 const EFFECT = /^(?:Equip|Use|Chance on hit): /;
 // "Set: [?]" stands for a set name or set lines nobody has read; it stays neutral, like the other placeholders.
 const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|(?!\[\?\] ).+ \(0\/\d+\)|".+")$/;
@@ -69,7 +72,7 @@ export function tipLine(line: string): TipLine {
   const damage = DAMAGE.exec(line);
   if (damage) return { kind: "pair", left: damage[1], right: damage[2] };
   const halves = line.split(PAIR);
-  if (halves.length === 2 && SLOTS.has(halves[0]) && KINDS.has(halves[1])) return { kind: "pair", left: halves[0], right: halves[1] };
+  if (halves.length === 2 && ((SLOTS.has(halves[0]) && KINDS.has(halves[1])) || SPELL_RIGHT.test(halves[1]))) return { kind: "pair", left: halves[0], right: halves[1] };
   const price = PRICE.exec(line);
   if (price) {
     const coins = ([["gold", price[2]], ["silver", price[3]], ["copper", price[4]]] as const)

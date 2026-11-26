@@ -350,7 +350,8 @@ test.each([
   expect(fetcher).toHaveBeenCalledWith(`/card/${key}`);
 });
 
-test.each(["/database/items/19019-thunderfury", "/database/achievements", "/database/zones/1426-dun-morogh/coverage", "/database/item-sets/1-x", "/database/achievements/0-zero"])(
+// The armory's Blizzard API pages never get a database card: their data stays out of /database cards.
+test.each(["/database/items/19019-thunderfury", "/database/achievements", "/database/zones/1426-dun-morogh/coverage", "/database/item-sets/1-x", "/database/achievements/0-zero", "/armory/eu/realm/character", "/armory/guilds/eu/realm/guild", "/classes/warrior"])(
   "a link to %s is not an entity page with a card", async (href) => {
     container.innerHTML = `<a href="${href}">Not a card</a>`;
     pointer("pointerover", link(href));
