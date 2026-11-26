@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "refreshedAt": "2026-11-24T22:36:10.452Z",
+  "refreshedAt": "2026-11-25T21:50:21.929Z",
   "projects": {
     "everloot": {
       "status": "ok",
-      "fetchedAt": "2026-11-24T22:36:10.452Z",
+      "fetchedAt": "2026-11-25T21:50:21.929Z",
       "stars": 3,
       "archived": false,
       "license": "AGPL-3.0",
-      "lastCommit": "2026-11-24T17:40:57Z",
+      "lastCommit": "2026-11-25T20:14:10Z",
       "release": {
-        "tag": "addon-v0.3.29",
-        "date": "2026-11-21T16:34:49Z",
-        "url": "https://github.com/Everloot/everloot/releases/tag/addon-v0.3.29"
+        "tag": "desktop-v0.1.24",
+        "date": "2026-11-25T04:17:06Z",
+        "url": "https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.24"
       },
-      "commits4w": 758,
+      "commits4w": 742,
       "contributors": 2,
       "openIssues": 24,
       "closedIssues": 191,
@@ -26,29 +26,29 @@
     },
     "polestar": {
       "status": "ok",
-      "fetchedAt": "2026-11-24T22:36:18.939Z",
-      "stars": 360,
+      "fetchedAt": "2026-11-25T21:50:30.254Z",
+      "stars": 368,
       "archived": false,
       "license": null,
-      "lastCommit": "2026-11-24T22:22:21Z",
+      "lastCommit": "2026-11-25T21:35:37Z",
       "release": {
-        "tag": "v0.4.2.2",
-        "date": "2026-11-22T12:49:08Z",
-        "url": "https://github.com/fitzforge/polestar/releases/tag/v0.4.2.2"
+        "tag": "v0.4.3",
+        "date": "2026-11-25T19:42:23Z",
+        "url": "https://github.com/fitzforge/polestar/releases/tag/v0.4.3"
       },
-      "commits4w": 7573,
-      "contributors": 78,
-      "openIssues": 263,
-      "closedIssues": 1853,
+      "commits4w": 7754,
+      "contributors": 81,
+      "openIssues": 274,
+      "closedIssues": 1916,
       "medianFirstResponseHours": null,
-      "responseSample": 0,
+      "responseSample": 2,
       "interfaces": [
         16001
       ]
     },
     "olympus": {
       "status": "ok",
-      "fetchedAt": "2026-11-24T22:36:27.060Z",
+      "fetchedAt": "2026-11-25T21:50:38.739Z",
       "stars": 26,
       "archived": false,
       "license": "MIT",
@@ -60,10 +60,10 @@
       },
       "commits4w": 352,
       "contributors": 8,
-      "openIssues": 12,
+      "openIssues": 14,
       "closedIssues": 22,
-      "medianFirstResponseHours": 178.9,
-      "responseSample": 8,
+      "medianFirstResponseHours": 199.9,
+      "responseSample": 9,
       "interfaces": [
         11509,
         11510,
@@ -80,7 +80,7 @@
     },
     "forever-ref": {
       "status": "ok",
-      "fetchedAt": "2026-11-24T22:36:36.809Z",
+      "fetchedAt": "2026-11-25T21:50:49.351Z",
       "stars": 0,
       "archived": false,
       "license": null,
@@ -97,10 +97,6 @@
   },
   "history": {
     "everloot": [
-      {
-        "at": "2026-10-21T21:49:50.727Z",
-        "stars": 0
-      },
       {
         "at": "2026-10-22T21:45:08.234Z",
         "stars": 0
@@ -236,13 +232,13 @@
       {
         "at": "2026-11-24T22:36:10.452Z",
         "stars": 3
+      },
+      {
+        "at": "2026-11-25T21:50:21.929Z",
+        "stars": 3
       }
     ],
     "polestar": [
-      {
-        "at": "2026-10-21T21:49:50.727Z",
-        "stars": 139
-      },
       {
         "at": "2026-10-22T21:45:08.234Z",
         "stars": 146
@@ -378,13 +374,13 @@
       {
         "at": "2026-11-24T22:36:10.452Z",
         "stars": 360
+      },
+      {
+        "at": "2026-11-25T21:50:21.929Z",
+        "stars": 368
       }
     ],
     "olympus": [
-      {
-        "at": "2026-10-21T21:49:50.727Z",
-        "stars": 20
-      },
       {
         "at": "2026-10-22T21:45:08.234Z",
         "stars": 20
@@ -520,13 +516,13 @@
       {
         "at": "2026-11-24T22:36:10.452Z",
         "stars": 26
+      },
+      {
+        "at": "2026-11-25T21:50:21.929Z",
+        "stars": 26
       }
     ],
     "forever-ref": [
-      {
-        "at": "2026-10-21T21:49:50.727Z",
-        "stars": 0
-      },
       {
         "at": "2026-10-22T21:45:08.234Z",
         "stars": 0
@@ -661,6 +657,10 @@
       },
       {
         "at": "2026-11-24T22:36:10.452Z",
+        "stars": 0
+      },
+      {
+        "at": "2026-11-25T21:50:21.929Z",
         "stars": 0
       }
     ]
