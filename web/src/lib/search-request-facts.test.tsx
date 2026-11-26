@@ -11,6 +11,10 @@ vi.mock("./game-assets", () => ({
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
   unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,
   loadItemTips: reads.tips,
+  readItemTips: async (assets: unknown, ids: number[]) => {
+    const tips = (await reads.tips(assets, ids)) as Map<number, { icon: string }>;
+    return { tips, icons: new Map([...tips].map(([id, t]) => [id, t.icon])), unreachable: false, degraded: false };
+  },
 }));
 vi.mock("./completion-lists", async (original) => ({ ...await original<object>(), loadCatalog: async () => null }));
 vi.mock("./lore", async (original) => ({ ...await original<object>(), searchLore: () => "unavailable" }));

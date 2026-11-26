@@ -138,6 +138,13 @@ describe("Badge", () => {
     expect(text(html)).toBe("Epic");
   });
 
+  test("badge words are sans with tabular figures: mono is for numbers, ids, builds and dates on their own", () => {
+    for (const html of [render(<Badge tone="neutral">Build 71091</Badge>), render(<Badge tone="confirmed" />), render(<Badge tone="quality" quality="rare" />), render(<Badge tone="blizzard" />)]) {
+      expect(html).not.toContain("font-mono");
+      expect(html).toContain("font-medium tabular-nums");
+    }
+  });
+
   test("the blizzard badge marks Blizzard staff in the blue-post colour", () => {
     const html = render(<Badge tone="blizzard" />);
     expect(html).toContain("border-blue-post text-blue-post");
@@ -217,6 +224,13 @@ describe("DataTable", () => {
     expect(html).toMatch(/<td class="[^"]*text-right font-mono tabular-nums[^"]*">12<\/td>/);
   });
 
+  test("the framed table's headers and cells are the dense table's steps: sans 32 px headers, 14 px cells", () => {
+    const html = render(<DataTable caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} />);
+    expect(html.match(/<th scope="col"[^>]*class="[^"]*\bh-th\b[^"]*\btext-th\b/g)).toHaveLength(2);
+    expect(html).not.toMatch(/<th [^>]*font-mono/);
+    expect(html).toContain('<table class="w-full border-collapse text-cell">');
+  });
+
   test("a wide table scrolls inside its frame, and the frame can be scrolled from the keyboard", () => {
     const html = render(<DataTable caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} />);
     expect(html).toMatch(/role="region" aria-label="Items" tabindex="0" class="[^"]*overflow-x-auto/);
@@ -294,6 +308,14 @@ describe("Facts list", () => {
   test("quick facts are one column until a wide screen, so a long value is not squeezed beside another", () => {
     const html = render(<Facts layout="list" items={[{ label: "Reported name", value: "Linen Cloth" }]} />);
     expect(html).toContain('class="columns-1 gap-x-6 text-meta lg:columns-2"');
+  });
+
+  test("labels are sans in every layout and in the reading rail; only a numeric value is mono", () => {
+    const grid = render(<Facts items={[{ label: "Item level", value: 60, numeric: true }]} />);
+    expect(grid).toMatch(/<dt class="text-meta text-muted">Item level<\/dt>/);
+    expect(grid).toMatch(/<dd class="[^"]*font-mono tabular-nums[^"]*">60<\/dd>/);
+    const rail = render(<ReadingLayout items={[{ id: "a", label: "A" }]} meta={<RailFacts items={[{ label: "Published", value: "today" }]} />}>body</ReadingLayout>);
+    expect(rail).not.toMatch(/font-mono text-xs text-muted">(?:Published|On this page)/);
   });
 });
 

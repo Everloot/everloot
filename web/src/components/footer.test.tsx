@@ -95,6 +95,8 @@ test("groups the links under their names: one line each on a wide screen, a disc
     expect(markup).toMatch(new RegExp(`<summary[^>]*>${heading}<svg`));
   }
   expect(markup.match(/<details/g)).toHaveLength(3);
+  // Group names are labels, sans like every other label; mono is for numbers, ids and builds.
+  expect(markup).not.toMatch(/<(?:h2|summary) class="[^"]*font-mono/);
   expect(markup).toContain('<h2 class="sr-only">Legal</h2>');
 });
 
