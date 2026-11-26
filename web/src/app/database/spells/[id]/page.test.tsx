@@ -5,10 +5,11 @@ import { afterEach, expect, test, vi } from "vitest";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 // The game files' spell names and whether upload storage answered; no names file and storage down unless a test sets them.
-const files = vi.hoisted(() => ({ spells: null as { version: string; names: Map<number, string> } | null, unreachable: true, wiki: null as import("@/lib/wiki-entity-names").WikiEntityNames | null }));
+const files = vi.hoisted(() => ({ spells: null as { version: string; names: Map<number, string> } | null, unreachable: true, wiki: null as import("@/lib/wiki-entity-names").WikiEntityNames | null, assets: null as unknown }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSpellNames: async () => files.spells,
+  loadSiteAssets: async () => files.assets,
 }));
 vi.mock("@/lib/edges", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/edges")>();
@@ -20,7 +21,7 @@ import SpellPage, { generateMetadata } from "./page";
 import { CLIENT_EDGES } from "@/lib/edges";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
 
-afterEach(() => { files.spells = null; files.unreachable = true; files.wiki = null; });
+afterEach(() => { files.spells = null; files.unreachable = true; files.wiki = null; files.assets = null; });
 
 const props = (id: string) => ({ params: Promise.resolve({ id }) });
 const render = async (id: string) => renderToStaticMarkup(await SpellPage(props(id)));
@@ -161,4 +162,11 @@ test("an unnamed spell uses the labelled wiki name, while a current file name wi
   expect((await generateMetadata(props(String(taught)))).title).toContain("Wiki spell");
   known([[taught, "Current spell"]]);
   expect(await render(String(taught))).not.toContain('title="Name from the Warcraft Wiki"');
+});
+
+test("a spell page shows the spell's icon in its header when the manifest has one, and no icon when not", async () => {
+  files.assets = { spellIcons: new Map([[taught, "https://a.test/icons/136243.webp"]]), spellTips: new Map() };
+  const header = (page: string) => page.split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+  expect(header(await render(String(taught)))).toContain('src="https://a.test/icons/136243.webp"');
+  expect(header(await render(String(creator)))).not.toContain("data-game-icon");
 });

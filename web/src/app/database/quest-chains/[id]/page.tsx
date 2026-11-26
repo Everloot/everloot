@@ -11,7 +11,7 @@ import { asOfLine, entitySummary } from "@/lib/evidence";
 import { loadNames } from "@/lib/names";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
+import { EntityHeader, EntityLayout, EntitySidebar, EntityTop, LINK, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -71,7 +71,7 @@ export default async function QuestChainPage(props: Props) {
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         {entry && <JsonLd data={entityPageJsonLd({ name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
@@ -90,8 +90,10 @@ export default async function QuestChainPage(props: Props) {
                 />
               }
             />
-            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
+            <EntitySidebar>
+              <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+              <OpenData text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
+            </EntitySidebar>
             {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
             <DataTable
               dense
@@ -110,7 +112,7 @@ export default async function QuestChainPage(props: Props) {
             />
           </>
         ) : <Unreachable />}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

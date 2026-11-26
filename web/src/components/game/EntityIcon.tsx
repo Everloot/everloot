@@ -19,9 +19,10 @@ function Unconfirmed({ children, className = "" }: { children: ReactNode; classN
 /**
  * The header's icon: omitted when game art is unavailable. An item's icon
  * (the page passes the game's question mark where its own is missing) has its quality border and no frame; with no
- * asset files an item has no icon at all.
+ * asset files an item has no icon at all. `cover` crops a picture that is not square (a loading screen, a map) to the
+ * square instead of squeezing it.
  */
-export function EntityIcon({ src, quality, unconfirmed = false, item = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean }) {
+export function EntityIcon({ src, quality, unconfirmed = false, item = false, cover = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean; cover?: boolean }) {
   if (!src) return null;
   if (item) return (
     <span className="shrink-0" data-unconfirmed={unconfirmed || undefined} title={unconfirmed ? UNCONFIRMED_TITLE : undefined}>
@@ -29,6 +30,6 @@ export function EntityIcon({ src, quality, unconfirmed = false, item = false }: 
       {unconfirmed && <span className="sr-only"> unconfirmed</span>}
     </span>
   );
-  const icon = <GameIcon src={src} quality={quality} size={40} rounded="control" />;
+  const icon = <GameIcon src={src} quality={quality} size={40} rounded="control" className={cover ? "object-cover" : ""} />;
   return unconfirmed ? <Unconfirmed className="shrink-0 p-px">{icon}</Unconfirmed> : <span className="shrink-0">{icon}</span>;
 }

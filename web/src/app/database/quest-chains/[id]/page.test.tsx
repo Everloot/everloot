@@ -82,3 +82,11 @@ test("with the player rollup unreadable, a files-only chain says reports could n
   expect(out).not.toContain("not confirmed by three installs yet");
   expect(out).not.toContain("0 of 3");
 });
+
+test("a quest chain page sits in the wide-screen entity layout, In short and Open data in its side column", async () => {
+  const out = await html("900-the-defias");
+  expect(out).toContain('class="entity-layout');
+  const side = out.split("data-entity-sidebar")[1] ?? "";
+  expect(side).toContain("In short");
+  expect(side).toContain("data-open-data");
+});

@@ -131,3 +131,11 @@ test("the game's %s name slot reads <Name> on the page and in the title tag, and
   await expect(html("144-bloodsail-admiral-s")).rejects.toThrow("REDIRECT /database/titles/144-bloodsail-admiral");
   await expect(html("8-s-champion")).rejects.toThrow("REDIRECT /database/titles/8-champion");
 });
+
+test("a title page sits in the wide-screen entity layout, In short and Open data in its side column", async () => {
+  const out = await html("144-bloodsail-admiral");
+  expect(out).toContain('class="entity-layout');
+  const side = out.split("data-entity-sidebar")[1] ?? "";
+  expect(side).toContain("In short");
+  expect(side).toContain("data-open-data");
+});

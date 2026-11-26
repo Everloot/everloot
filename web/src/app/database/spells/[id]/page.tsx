@@ -6,7 +6,8 @@ import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { EMPTY, EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
 import { loadEdges } from "@/lib/edges";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
@@ -147,7 +148,7 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
+  const { edges, assets, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
   if (unknown) notFound();
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
@@ -194,7 +195,7 @@ export default async function SpellPage(props: Props) {
     <Container width="data">
       <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
-        <EntityHeader trail={trail} title={fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
+        <EntityHeader trail={trail} icon={<EntityIcon src={assets?.spellIcons.get(spellId)} />} title={fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
         <EntityTop
           box={
             <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
@@ -223,7 +224,7 @@ export default async function SpellPage(props: Props) {
         </EntitySidebar>
         {tabs.length
           ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
-          : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
+          : <EmptyTab message={EMPTY.files(build)} players={false} action={null} />}
         <EntityScreenshots type="spell" id={spellId} name={title} />
         <EntityComments type="spell" id={spellId} />
       </EntityLayout>

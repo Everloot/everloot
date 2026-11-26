@@ -12,7 +12,7 @@ import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import LoreSection from "@/components/LoreSection";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityHeader, EntityLayout, EntitySidebar, EntityTop, known, LINK, Unreachable } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function TitlePage(props: Props) {
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         {entry && <JsonLd data={entityPageJsonLd({ name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Title", <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
@@ -91,15 +91,17 @@ export default async function TitlePage(props: Props) {
                 />
               }
             />
-            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
+            <EntitySidebar>
+              <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+              <OpenData text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
+            </EntitySidebar>
             <Tabs
               label={`${title}: relations`}
               tabs={[
                 {
                   id: "earned-by", label: "Earned by", count: 0,
                   // The achievement that rewards a title is in none of the game files read so far, and no report carries it: a plain line, no meter.
-                  panel: <EmptyTab players={false} action={null} message="No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it." />,
+                  panel: <EmptyTab players={false} action={null} message={EMPTY.titleRewards} />,
                 },
               ]}
             />
@@ -108,7 +110,7 @@ export default async function TitlePage(props: Props) {
             </div>
           </>
         ) : <Unreachable />}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }
