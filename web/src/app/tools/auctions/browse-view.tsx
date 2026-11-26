@@ -8,7 +8,7 @@ import { uploadStore } from "@/lib/upload-store";
 import { loadMarketBoards } from "@/lib/market-boards";
 import {
   Card, Container, DataTable, DataTitle, Disclosure, EmptyState, FilterBar, LinkTabs, QUALITY_TEXT, ResultStrip, qualityOf as qualityToken,
-  type Column, type FilterControl,
+  stripBelow, type Column, type FilterControl,
 } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -326,7 +326,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <FilterBar label="Auction filters" controls={controls} active={activeFilters(q)} clearHref={clearHref} />
             <div className="mt-2">{body}</div>
             {pending.length > 0 && <PendingRealms realms={pending} href={(realm) => ahHref(realmHref(realm), { region: q.region })} />}
-            {pages > 1 && <div className="mt-2">{strip}</div>}
+            {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
           </div>
         </div>
         <div className="mt-8 space-y-4">

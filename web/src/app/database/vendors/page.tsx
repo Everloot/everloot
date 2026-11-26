@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { npcRows, publicVendors } from "@/lib/world-lists";
 import { LINK } from "../entity";
@@ -81,7 +81,7 @@ export default async function VendorListPage(props: { searchParams?: Promise<Sea
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

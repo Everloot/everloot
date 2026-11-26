@@ -3,7 +3,7 @@ import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "@kb/world-pages";
-import { Badge, Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
+import { Badge, Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@/lib/world-lists";
 import { parseZoneSegment, publicZones, zoneHref, zoneSlug } from "@/lib/zones";
@@ -179,7 +179,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
             empty={empty}
           />
         )}</div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

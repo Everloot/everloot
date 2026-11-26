@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { QuestSide } from "@kb/world-pages";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import GameIcon from "@/components/game/GameIcon";
-import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
+import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames } from "@/lib/names";
@@ -185,7 +185,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
             empty={empty}
           />
         )}</div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

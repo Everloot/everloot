@@ -84,7 +84,7 @@ export async function RealmGuilds({ slug, search }: { slug: string; search: Reco
             <p className="text-sm text-fg-2">Showing the {number(REALM_GUILD_LIMIT)} guilds with the most members seen, plus any known from kills or officer boards.</p>
           )}
           <DataTable dense caption={`Guilds on ${realm}`} columns={columns} rows={rows} rowKey={(g) => g.key} meta={meta} />
-          {pages > 1 && <ResultStrip total={guilds.length} noun={guilds.length === 1 ? "guild" : "guilds"} page={page} perPage={REALM_PAGE} href={href} />}
+          {pages > 1 && <ResultStrip total={guilds.length} noun={guilds.length === 1 ? "guild" : "guilds"} page={page} perPage={REALM_PAGE} href={href} below />}
         </section>
         <p className="mt-6 text-sm text-muted">
           <Link href="/methodology#guilds" className={link}>How guilds are counted</Link> · <Link href="/guilds/hide" className={link}>Hide a guild</Link> · <Link href="/guilds" className={link}>All guilds</Link>

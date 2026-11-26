@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ClientItemSet } from "@kb/client-item-sets";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { loadItemSetNames } from "@/lib/game-assets";
@@ -87,7 +87,7 @@ export default async function ItemSetListPage(props: { searchParams?: Promise<Se
             empty={<NoMatches noun="item sets" chips={chips} clearHref={ITEM_SETS_PATH} />}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import ClassContextChip from "@/components/classes/ClassContextChip";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl, stripBelow } from "@/components/ui";
 import Badge from "@/components/ui/Badge";
 import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
@@ -135,7 +135,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

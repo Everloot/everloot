@@ -240,7 +240,7 @@ export default async function ZonePage(props: Props) {
       : { id: "items", label: "Items", count: items.length, panel: <>
         {items.length > 0 && <div className="px-4 pb-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
         <DataTable dense caption={`Items players looted from confirmed NPCs and objects in ${zone.name}`} columns={itemColumns} rows={shownItems} rowKey={(i) => String(i.itemId)} empty={empty(EMPTY.zoneItems)} />
-        {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
+        {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" below /></div>}
         {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
       </> },
     { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },

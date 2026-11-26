@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { CLIENT_LABEL } from "@kb/edges";
 import { byRank, ListNote, listHref, listMetadata, listQuery, NameCell, nameMatches, nextSort, NoMatches, paged, pageParams, Respelled, sortRows, Unreadable, type ListQuery, type Search } from "./list-parts";
 
@@ -89,7 +89,7 @@ export function CollectibleList<R extends CollectibleRow>({ path, title, noun, r
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );
