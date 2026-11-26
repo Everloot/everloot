@@ -23,6 +23,7 @@ import type { GuildMember, GuildPageData } from "@/lib/guilds";
 import { playerStore } from "@/lib/player-store";
 import { className, classText } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
+import { CENSUS_MEDIA, censusIcons, type CensusIcons } from "@/lib/census-media";
 import { ArmoryCredit, armoryMetadata, day, link, NOT_FOUND_METADATA, RegionChip, Unreachable } from "../../../parts";
 
 /** Read on every request, so a hidden character leaves the roster, and a hidden guild the site, at once. */
@@ -70,6 +71,8 @@ type SortKey = (typeof SORTS)[number];
 /** The direction a column sorts in first: names and ranks from the top, numbers and days highest first. */
 const FIRST_DIRECTION: Record<SortKey, SortDirection> = { rank: "asc", name: "asc", class: "asc", level: "desc", "item-level": "desc", "last-login": "desc" };
 const LEVEL_BANDS = [...CENSUS_LEVEL_BANDS].reverse();
+/** The roster's level menu: at 60, below 60, then each band under 60. */
+const ROSTER_BANDS = [LEVEL_BANDS[0], { id: "below-60", min: 1, max: 59, label: "Below 60" }, ...LEVEL_BANDS.slice(1)] as const;
 const ROSTER_PAGE = 50;
 
 /** Last-login buckets: within 7 days, 8 to 30 days, longer ago; members with no login read are "unknown". */
@@ -86,7 +89,7 @@ function rosterView(search: Search): RosterView {
   const rawDir = one(search.dir);
   const dir: SortDirection = rawDir === "asc" || rawDir === "desc" ? rawDir : FIRST_DIRECTION[sort];
   const cls = one(search.class)?.toLowerCase() ?? null;
-  const level = LEVEL_BANDS.find((b) => b.id === one(search.level))?.id ?? null;
+  const level = ROSTER_BANDS.find((b) => b.id === one(search.level))?.id ?? null;
   const active = ACTIVITY.find((a) => a === one(search.active)) ?? null;
   const page = Number(one(search.p));
   return { sort, dir, cls: cls && /^[a-z]{3,12}$/.test(cls) ? cls : null, level, active, page: Number.isInteger(page) && page > 1 && page <= 1000 ? page : 1 };
@@ -142,7 +145,16 @@ function sortRows(rows: Row[], sort: SortKey, dir: SortDirection): Row[] {
   return [...rows].sort(compare);
 }
 
-function rosterColumns(region: string): Column<Row>[] {
+/** The census's icon key for a Blizzard race id ("NightElf" for 4), when it has one. */
+const RACE_MEDIA = new Map<number, string>(Object.entries(CENSUS_MEDIA).flatMap(([token, [kind, id]]) => (kind === "race" ? [[id, token] as [number, string]] : [])));
+
+/** A small race or class icon beside the names, which carry the meaning; nothing when the media was not read. */
+const smallIcon = (url: string | undefined) =>
+  // The media endpoint owns these URLs (lib/census-media.ts keeps only render.worldofwarcraft.com over https).
+  // eslint-disable-next-line @next/next/no-img-element
+  url ? <img src={url} alt="" width={18} height={18} loading="lazy" className="size-[18px] shrink-0 rounded-control" /> : null;
+
+function rosterColumns(region: string, ranks: RankNames, icons: CensusIcons): Column<Row>[] {
   return [
     {
       key: "name", header: "Character", sortable: true,
@@ -156,8 +168,15 @@ function rosterColumns(region: string): Column<Row>[] {
     { key: "level", header: "Level", numeric: true, sortable: true, cell: ({ m }) => m.level ?? muted(UNKNOWN) },
     {
       key: "class", header: "Race and class", nowrap: true, sortable: true,
-      cell: ({ m, token }) => <span className="text-fg-2">{raceOfId(m.raceId)} {token ? className(token) : muted(UNKNOWN)}</span>,
+      cell: ({ m, token }) => (
+        <span className="inline-flex items-center gap-1.5">
+          {smallIcon(m.raceId === null ? undefined : icons[RACE_MEDIA.get(m.raceId) ?? ""])}
+          {smallIcon(token ? icons[token] : undefined)}
+          <span className="text-fg-2">{raceOfId(m.raceId)} {token ? className(token) : muted(UNKNOWN)}</span>
+        </span>
+      ),
     },
+    { key: "rank", header: "Rank", nowrap: true, sortable: true, cell: ({ m }) => (m.rank === null ? muted(UNKNOWN) : rankName(m.rank, ranks)) },
     { key: "item-level", header: "Item level", numeric: true, sortable: true, cell: ({ m }) => (m.itemLevel === null ? muted("Not read") : metricValue("item-level", m.itemLevel)) },
     {
       key: "last-login", header: "Last login", numeric: true, sortable: true,
@@ -167,22 +186,45 @@ function rosterColumns(region: string): Column<Row>[] {
         return r.seen ? <>{r.seen} <span className="text-cell-2 text-muted">seen</span></> : muted("Not known");
       },
     },
-    { key: "rank", header: "Rank", nowrap: true, sortable: true, cell: ({ m }) => (m.rank === null ? muted(UNKNOWN) : rankName(m.rank)) },
   ];
 }
 
-/** The game's custom rank names are not in the data: 0 is the guild master, the rest go by number. */
-const rankName = (rank: number) => (rank === 0 ? "Guild Master" : `Rank ${rank}`);
+/** Rank names by Blizzard rank number, as the guild's officers published them. */
+type RankNames = ReadonlyMap<number, string>;
 
-/** The phone line under a name: everything the hidden columns say. */
-function rowMeta({ m, token }: Row): string {
-  const login = day(m.lastLogin ?? null);
-  return [
-    `${m.level ?? "?"} ${raceOfId(m.raceId)} ${token ? className(token) : ""}`.trim(),
-    m.itemLevel === null ? null : `item level ${metricValue("item-level", m.itemLevel)}`,
-    login ? `last login ${login}` : null,
-    m.rank === null ? null : rankName(m.rank),
-  ].filter(Boolean).join(" · ");
+/** A rank's name from the officers' roster when it has one; otherwise 0 is the guild master and the rest go by number. */
+const rankName = (rank: number, ranks: RankNames) => ranks.get(rank) ?? (rank === 0 ? "Guild Master" : `Rank ${rank}`);
+
+/** The phone line under a name: level and rank; the other columns show on wider screens. */
+const rowMeta = (ranks: RankNames) => ({ m }: Row): string =>
+  [m.level === null ? null : `Level ${m.level}`, m.rank === null ? null : rankName(m.rank, ranks)].filter(Boolean).join(" · ");
+
+/** First names that are one character on each list, so a match by name is one person. */
+function uniqueNames(roster: readonly ArmoryMember[], addon: readonly GuildMember[]): Set<string> {
+  const count = (names: string[]) => names.reduce((m, n) => m.set(n, (m.get(n) ?? 0) + 1), new Map<string, number>());
+  const onRoster = count(roster.map((m) => m.name.toLowerCase()));
+  const seen = count(addon.map((m) => m.name.toLowerCase()));
+  return new Set([...onRoster].filter(([n, c]) => c === 1 && seen.get(n) === 1).map(([n]) => n));
+}
+
+/**
+ * Rank names from the roster the guild's officers published through the addon: each Blizzard rank number takes the
+ * name its members carry there, joined by first name as the sightings are. A number whose members carry two names
+ * keeps going by number.
+ */
+function rankNamesOf(roster: readonly ArmoryMember[], addon: readonly GuildMember[]): RankNames {
+  const unique = uniqueNames(roster, addon);
+  const named = new Map(addon.filter((m) => m.rank?.trim() && unique.has(m.name.toLowerCase())).map((m) => [m.name.toLowerCase(), m.rank!.trim()]));
+  const out = new Map<number, string>();
+  const clash = new Set<number>();
+  for (const m of roster) {
+    const name = named.get(m.name.toLowerCase());
+    if (m.rank === null || !name) continue;
+    if (out.has(m.rank) && out.get(m.rank) !== name) clash.add(m.rank);
+    else out.set(m.rank, name);
+  }
+  for (const rank of clash) out.delete(rank);
+  return out;
 }
 
 /**
@@ -190,13 +232,11 @@ function rowMeta({ m, token }: Row): string {
  * character in both lists are joined: a first name twice on either side could be two people.
  */
 function sightings(roster: readonly ArmoryMember[], addon: readonly GuildMember[]): Map<string, string> {
-  const count = (names: string[]) => names.reduce((m, n) => m.set(n, (m.get(n) ?? 0) + 1), new Map<string, number>());
-  const onRoster = count(roster.map((m) => m.name.toLowerCase()));
-  const seen = count(addon.map((m) => m.name.toLowerCase()));
+  const unique = uniqueNames(roster, addon);
   const out = new Map<string, string>();
   for (const m of addon) {
     const name = m.name.toLowerCase();
-    if (m.lastSeen && onRoster.get(name) === 1 && seen.get(name) === 1) out.set(name, m.lastSeen);
+    if (m.lastSeen && unique.has(name)) out.set(name, m.lastSeen);
   }
   return out;
 }
@@ -228,11 +268,14 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
   // The progression section reads only the roster: it starts now, beside the addon guild search, instead of after it.
   const progressionRead = loadGuildProgression(roster.map((m) => ({ ...m, region: g.region })));
   progressionRead.catch(() => {});
-  const [addon, crest] = await Promise.all([addonGuildOf(g), GuildCrest({ crest: g.crest, region: g.region, faction: g.faction })]);
+  const [addon, crest, icons] = await Promise.all([
+    addonGuildOf(g), GuildCrest({ crest: g.crest, region: g.region, faction: g.faction }), roster.length ? censusIcons() : Promise.resolve({}),
+  ]);
   const seen = sightings(roster, addon?.members ?? []);
+  const ranks = rankNamesOf(roster, addon?.members ?? []);
   const rows: Row[] = roster.map((m) => ({ m, token: classTokenOfId(m.classId), seen: seen.get(m.name.toLowerCase()) ?? null }));
 
-  const band = LEVEL_BANDS.find((b) => b.id === view.level);
+  const band = ROSTER_BANDS.find((b) => b.id === view.level);
   const now = Date.now();
   const filtered = rows.filter((r) => (!view.cls || r.token?.toLowerCase() === view.cls) && (!band || (r.m.level !== null && r.m.level >= band.min && r.m.level <= band.max))
     && (!view.active || activityOf(r.m, now) === view.active));
@@ -248,7 +291,10 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
     <Container width="data">
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
-        <SummaryStrip guild={g} members={roster} summary={summary} activity={<ActivityStrip members={roster} now={now} href={(active) => href({ active })} />} />
+        <SummaryStrip guild={g} members={roster} summary={summary} activity={<>
+          <LevelStrip members={roster} summary={summary} href={(level) => href({ level })} />
+          <ActivityStrip members={roster} now={now} href={(active) => href({ active })} />
+        </>} />
         <GuildProfile guild={g} profile={profileRead} />
         <TopItemLevels region={g.region} rows={rows} />
 
@@ -262,7 +308,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
                 aside={<span className="text-meta text-muted">{sorted.length.toLocaleString("en-US")} of {roster.length.toLocaleString("en-US")} {roster.length === 1 ? "member" : "members"}</span>}
               />
               <DataTable
-                dense nofollow caption={`Members of ${g.name}`} columns={rosterColumns(g.region)} rows={shown} rowKey={(r) => r.m.characterSlug} meta={rowMeta}
+                dense nofollow caption={`Members of ${g.name}`} columns={rosterColumns(g.region, ranks, icons)} rows={shown} rowKey={(r) => r.m.characterSlug} meta={rowMeta(ranks)}
                 sort={{ key: view.sort, direction: view.dir }}
                 sortHref={(key, next) => {
                   const sort = key as SortKey;
@@ -334,14 +380,21 @@ function rosterFilters(rows: readonly Row[], view: RosterView, href: (over: Part
       type: "menu", key: "level", label: "Level",
       options: [
         { label: "All levels", href: href({ level: null }), on: !view.level, reset: true },
-        ...LEVEL_BANDS.map((b) => ({
+        ...ROSTER_BANDS.map((b) => ({
           label: b.label, href: href({ level: b.id }), on: view.level === b.id,
           count: rows.filter((r) => r.m.level !== null && r.m.level >= b.min && r.m.level <= b.max).length,
         })),
       ],
     },
+    {
+      // The column headers sort too; on a phone only the name column shows, so this is how a phone sorts.
+      type: "menu", key: "sort", label: "Sort",
+      options: SORT_MENU.map(([sort, label]) => ({ label, href: href({ sort, dir: FIRST_DIRECTION[sort] }), on: view.sort === sort })),
+    },
   ];
 }
+
+const SORT_MENU: [SortKey, string][] = [["rank", "Rank"], ["level", "Level"], ["item-level", "Item level"], ["last-login", "Last login"], ["name", "Name"], ["class", "Class"]];
 
 const seenColumns: Column<GuildMember>[] = [
   { key: "name", header: "Name", cell: (m) => (m.path ? <Link href={m.path} className={`${link} font-medium ${classText(m.class)}`}>{m.name}</Link> : <span className={`font-medium ${classText(m.class)}`}>{m.name}</span>) },
@@ -410,18 +463,33 @@ function ActivityStrip({ members, now, href }: { members: readonly ArmoryMember[
   if (members.length === 0) return null;
   const counts = new Map<Activity | null, number>();
   for (const m of members) { const a = activityOf(m, now); counts.set(a, (counts.get(a) ?? 0) + 1); }
-  const rows = ACTIVITY_ROWS.map((r) => ({ ...r, count: counts.get(r.key) ?? 0 }));
+  const rows = ACTIVITY_ROWS.map((r) => ({ label: r.label, colour: r.colour, count: counts.get(r.key) ?? 0, href: r.key ? href(r.key) : null }));
+  return <CountStrip kind="activity" title="Last login" total={members.length} rows={rows} />;
+}
+
+/** Members by level band as one bar, highest band first; each band with members links the roster filtered to it. */
+function LevelStrip({ members, summary, href }: { members: readonly ArmoryMember[]; summary: RosterSummary; href: (level: string) => string }) {
+  // rosterSummary counts the same bands, in the same order.
+  const rows = LEVEL_BANDS
+    .map((b, i) => ({ label: b.label, colour: b.id === "60" ? "bg-accent" : i % 2 ? "bg-fg-2" : "bg-muted", count: summary.levels[i]?.count ?? 0, href: href(b.id) }))
+    .filter((r) => r.count > 0);
+  if (rows.length === 0) return null;
+  return <CountStrip kind="levels" title="Level spread" total={members.length} rows={rows} />;
+}
+
+/** One stacked bar of counts, then each count named beside its colour, linking the roster filtered to it when it can. */
+function CountStrip({ kind, title, total, rows }: { kind: "activity" | "levels"; title: string; total: number; rows: { label: string; colour: string; count: number; href: string | null }[] }) {
   return (
-    <div data-guild-activity className="space-y-2">
-      <div role="img" aria-label={`Last login: ${rows.map((r) => `${r.label.toLowerCase()} ${r.count}`).join(", ")}`} className="flex h-2 overflow-hidden rounded-full bg-panel">
-        {rows.map((r) => (r.count ? <span key={r.label} className={`block h-2 ${r.colour}`} style={{ width: `${share(r.count, members.length)}%` }} /> : null))}
+    <div data-guild-activity={kind === "activity" ? "" : undefined} data-guild-levels={kind === "levels" ? "" : undefined} className="space-y-2">
+      <div role="img" aria-label={`${title}: ${rows.map((r) => `${r.label.toLowerCase()} ${r.count}`).join(", ")}`} className="flex h-2 gap-px overflow-hidden rounded-full bg-panel">
+        {rows.map((r) => (r.count ? <span key={r.label} className={`block h-2 ${r.colour}`} style={{ width: `${share(r.count, total)}%` }} /> : null))}
       </div>
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-meta">
-        <span className="text-muted">Last login</span>
+        <span className="text-muted">{title}</span>
         {rows.map((r) => {
           const body = <><span aria-hidden="true" className={`mr-1.5 inline-block size-2 rounded-full ${r.colour}`} /><span className="font-mono tabular-nums text-fg">{r.count}</span> <span className="text-fg-2">{r.label}</span></>;
-          return r.key
-            ? <Link key={r.label} href={href(r.key)} rel="nofollow" className="underline decoration-edge underline-offset-4 hover:decoration-fg">{body}</Link>
+          return r.href
+            ? <Link key={r.label} href={r.href} rel="nofollow" className="underline decoration-edge underline-offset-4 hover:decoration-fg">{body}</Link>
             : <span key={r.label}>{body}</span>;
         })}
       </p>
