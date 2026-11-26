@@ -3,8 +3,11 @@ import { loadGuildProgression, type ProgressionMember } from "@/lib/progression"
 import ProgressionMatrix from "./ProgressionMatrix";
 
 /** Instances with a counted kill are listed; the ones without fold behind one closed disclosure. */
-export default async function GuildProgression({ members, region }: { members: readonly Omit<ProgressionMember, "region">[]; region: string }) {
-  const progress = await loadGuildProgression(members.map((m) => ({ ...m, region })));
+/** `progress`: the read when the page started it already (beside its other reads); else this reads it. */
+export default async function GuildProgression({ members, region, progress: started }: {
+  members: readonly Omit<ProgressionMember, "region">[]; region: string; progress?: ReturnType<typeof loadGuildProgression>;
+}) {
+  const progress = await (started ?? loadGuildProgression(members.map((m) => ({ ...m, region }))));
   const killed = progress.instances.filter((r) => r.state !== "none");
   const none = progress.instances.filter((r) => r.state === "none");
   return <section aria-labelledby="guild-progression" className="space-y-4">

@@ -22,7 +22,7 @@ import ClassesPage, * as indexRoute from "./page";
 import ClassPage, * as hubRoute from "./[class]/page";
 import UseClassButton, { RememberedClass } from "@/components/classes/UseClassButton";
 import { navItems, phoneGroups } from "@/components/Header";
-import { classesIndexable, classRaces, hubIndexable } from "@/lib/class-hub";
+import { classesIndexable, classRaces, classSpellLevels, hubIndexable } from "@/lib/class-hub";
 import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
 import { RACE_TABLE, RACIAL_NOTES } from "@/lib/race-traits";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
@@ -130,9 +130,9 @@ describe("class hubs", () => {
     expect((await hubMetadata("deathknight")).robots).toEqual({ index: false, follow: true });
   });
 
-  test("with no reviewed guide a hub says so, names no role or talent tree, and is indexed for its racial traits", async () => {
+  test("with no reviewed guide a hub says so, names no role, names its talent trees only as the calculator's, and is indexed for its racial traits", async () => {
     const html = await hub("mage");
-    const page = visible(html);
+    const page = visible(html.replace(section(html, "talents"), ""));
     // The shared empty state (guides-empty.test.tsx holds its words), named for the class.
     expect(visible(section(html, "guides"))).toContain("No Mage guide is reviewed yet.");
     expect(section(html, "guides")).toContain("data-guides-empty");
@@ -271,6 +271,55 @@ describe("class hubs", () => {
     expect(races).not.toContain("critical chance by 2%");
     expect(races).toContain("Increases casting and attack speed by 10% for 15 sec");
     expect(html).toContain(`href="${RACIAL_NOTES.sourceUrl}"`);
+  });
+
+  test("the talent trees section names the catalog's three trees, each linking the calculator, and no role", async () => {
+    for (const slug of ["mage", "warrior"] as const) {
+      const html = section(await hub(slug), "talents");
+      const catalog = await loadCatalog(slug);
+      expect(catalog.trees).toHaveLength(3);
+      for (const tree of catalog.trees) expect(visible(html), tree.name).toContain(tree.name);
+      expect(html.match(new RegExp(`href="/tools/talents/${slug}"`, "g"))?.length ?? 0, slug).toBeGreaterThanOrEqual(3);
+      for (const role of ["tank", "healer", "damage", "dps"]) expect(visible(html).toLowerCase(), role).not.toContain(role);
+      // The starter builds are all drafts in kb/curated/builds.yaml: none is linked until the team publishes one.
+      expect(html, slug).not.toContain("/b/EL1-");
+    }
+  });
+
+  test("weapons and armor are the class's proficiencies in the game files, labelled unconfirmed, each linking its item list for the class", async () => {
+    const warrior = section(await hub("warrior"), "gear");
+    expect(warrior).toContain('href="/database/items/armor/plate?class=warrior"');
+    expect(visible(warrior)).toMatch(/Plate from level 40/);
+    expect(warrior).toContain('data-badge="files"');
+    expect(visible(warrior)).toContain("build 1.60.1.71139");
+    const mage = section(await hub("mage"), "gear");
+    expect(mage).toContain('href="/database/items/armor/cloth?class=mage"');
+    expect(mage).toContain('href="/database/items/weapons/staves?class=mage"');
+    expect(visible(mage)).not.toContain("Plate");
+  });
+
+  test("the spells section counts the class's spells by the level the files give and links the list by level", async () => {
+    const html = section(await hub("mage"), "spells");
+    expect(html).toContain('href="/classes/mage/spells"');
+    const { levels, unleveled } = classSpellLevels("mage");
+    const placed = levels.reduce((n, l) => n + l.spells.length, 0);
+    expect(visible(html)).toContain(`${placed} Mage spells with the level the game files give, from level ${levels[0]!.level} to ${levels.at(-1)!.level}`);
+    expect(visible(html)).toContain(`${unleveled} more have no level in the files`);
+    expect(html).toContain('href="/database/spells?class=mage"');
+  });
+
+  test("the armory board for the class is a link, never a number, since the hub is not an ad-free page", async () => {
+    const html = section(await hub("mage"), "forever");
+    expect(html).toContain('href="/armory/rankings/item-level?class=mage"');
+    expect(visible(html)).toContain("Top Mage characters by item level");
+    expect(visible(html)).not.toMatch(/\d+(\.\d+)? item level/);
+  });
+
+  test("a hub with reviewed guides names their roles under the title; one without names none", async () => {
+    stubGuides(SOME);
+    const header = (html: string) => html.slice(0, html.indexOf("</header>"));
+    expect(visible(header(await hub("warrior")))).toContain("Roles in its reviewed guides: Tank, Damage");
+    expect(visible(header(await hub("priest")))).not.toContain("Roles");
   });
 
   test("no header or Tools menu link points at the class pages yet", () => {
