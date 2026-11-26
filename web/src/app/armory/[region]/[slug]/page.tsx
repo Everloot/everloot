@@ -147,16 +147,16 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm empty:hidden">
           {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
-          <ArmoryCredit at={lastRead} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
         <div className="space-y-3">
           <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
           <RankBadges ranks={rankBadges} />
+          <ArmoryCredit at={lastRead} />
         </div>
 
         <CharacterOverview character={c} />

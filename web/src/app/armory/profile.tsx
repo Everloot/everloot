@@ -144,9 +144,10 @@ export function TalentTrees({ character: c, trees, open = false }: { character: 
   </>;
 }
 
-export function ProfessionList({ rows }: { rows: NonNullable<Details["professions"]>["rows"] }) {
+/** The profession bars; `grid` lays them out two columns wide from small screens up (the character overview). */
+export function ProfessionList({ rows, grid = false }: { rows: NonNullable<Details["professions"]>["rows"]; grid?: boolean }) {
   return <>
-    <ul className="space-y-4">{rows.map((profession) => <li key={profession.name}>
+    <ul {...(grid ? { "data-profession-grid": "" } : {})} className={grid ? "grid gap-x-8 gap-y-4 sm:grid-cols-2" : "space-y-4"}>{rows.map((profession) => <li key={profession.name}>
       <div className="mb-1 flex justify-between gap-3 text-sm"><span className="text-fg">{profession.name}</span><span className="font-mono tabular-nums text-fg-2">{profession.rank} / {profession.max}</span></div>
       <progress className="h-2 w-full accent-accent" value={profession.rank} max={profession.max} aria-label={`${profession.name} skill`} />
     </li>)}</ul>
