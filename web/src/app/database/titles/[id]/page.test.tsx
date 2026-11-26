@@ -140,3 +140,25 @@ test("a title page sits in the wide-screen entity layout, In short and Open data
   expect(side).toContain("In short");
   expect(side).toContain("data-open-data");
 });
+
+test("a title the files place before the name is a prefix, and renders with a sample name in its place", async () => {
+  const out = await html("144-bloodsail-admiral");
+  expect(factOf(out, "Kind")).toBe("Prefix, before the name");
+  expect(factOf(out, "Shown as")).toMatch(/Bloodsail Admiral Kaelen\s*(?:<[^>]*>)*\s*\(a sample name\)/);
+});
+
+test("a title after the name is a suffix; one the files give no name slot claims neither", async () => {
+  const suffix = await html("8-champion");
+  expect(factOf(suffix, "Kind")).toBe("Suffix, after the name");
+  expect(factOf(suffix, "Shown as")).toContain("Kaelen, Champion");
+  game.titles = [{ id: 9, name: "Plain" }];
+  const plain = await html("9-plain");
+  expect(plain).not.toMatch(/>Kind<\/dt>/);
+  expect(plain).not.toMatch(/>Shown as<\/dt>/);
+});
+
+test("a confirmed title whose reported name lacks the slot still takes its kind from the files' name", async () => {
+  const state = foldCompletion(emptyCompletion(), [{ records: agreed(144, "Bloodsail Admiral"), grants: [] }]);
+  store.loadCompletion.mockResolvedValue({ state, dataAsOf: at });
+  expect(factOf(await html("144-bloodsail-admiral"), "Kind")).toBe("Prefix, before the name");
+});

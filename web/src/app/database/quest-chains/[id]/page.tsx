@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { DataTable, TooltipFrame } from "@/components/ui";
 import EntityLink from "@/components/EntityLink";
 import { trailFor } from "@/lib/breadcrumbs";
 import { chainHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { asOfLine, entitySummary } from "@/lib/evidence";
-import { loadNames } from "@/lib/names";
+import { loadNames, npcNames } from "@/lib/names";
+import { loadWorldFacts } from "@/lib/rollup-compute";
+import { chainFacts, levelRange, NO_CHAIN_FACTS } from "@/lib/chain-facts";
+import { questPage } from "@kb/world-pages";
+import { zoneHref } from "@/lib/zones";
+import QuestChainFlow from "@/components/QuestChainFlow";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EntityPage, Unreachable } from "../../entity";
+import { EntityPage, LINK, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -45,6 +51,11 @@ export default async function QuestChainPage(props: Props) {
   const quests = entry ? (await loadNames()).quests : new Map<number, string>();
   const wiki = entry ? await loadQuestNames(CLIENT_LAYER.build.version) : null;
   const nameOf = (id: number) => quests.get(id) ?? wiki?.names.get(id)?.name;
+  // Levels, the first quest's giver and where it stands: each only where three installs agree (lib/chain-facts.ts).
+  const world = entry ? await loadWorldFacts() : null;
+  const known = entry ? chainFacts(entry.questIds, world) : NO_CHAIN_FACTS;
+  const levelOf = (id: number) => (world && !world.unreachable ? questPage(id, world).level : null);
+  const startName = known.startNpcId !== null && world ? npcNames(world).get(known.startNpcId) : undefined;
   // A chain cut at 80 quests has more than it lists.
   const count = entry ? `${entry.questIds.length}${entry.truncated ? "+" : ""}` : "";
   // The page in a few lines: what it is, who reported it and when, and where the name came from. A chain only the
@@ -70,10 +81,13 @@ export default async function QuestChainPage(props: Props) {
     <EntityPage
       name={title}
       jsonLd={entry && { name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` }}
-      header={{ trail, title, meta: ["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      header={{ trail, title, meta: ["Quest chain", entry ? `${count} quests` : null, known.levels ? `Level ${levelRange(known.levels)}` : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
       box={entry && <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{count} quests</p></TooltipFrame>}
       facts={entry && [
         { label: "Quests", value: count, numeric: true },
+        ...(known.levels ? [{ label: "Levels", value: levelRange(known.levels), numeric: true }] : []),
+        ...(known.startNpcId !== null ? [{ label: "Start", value: <EntityLink kind="npc" id={known.startNpcId} name={startName} /> }] : []),
+        ...(known.zone ? [{ label: "Zone", value: <Link href={zoneHref(known.zone.mapId, known.zone.name)} className={LINK}>{known.zone.name}</Link> }] : []),
         ...(entry.truncated ? [{ label: "Length", value: "Longer than the 80 quests listed" }] : []),
         { label: "ID", value: entry.questLineId, numeric: true },
       ]}
@@ -81,6 +95,7 @@ export default async function QuestChainPage(props: Props) {
       summary={entry ? summary : undefined}
       main={entry && <>
         {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
+        <QuestChainFlow questIds={entry.questIds} name={entry.name} href={chainHref(entry.questLineId, entry.name)} nameOf={nameOf} truncated={entry.truncated} />
         <DataTable
           dense
           caption={`Quests in ${entry.name}`}
@@ -90,6 +105,8 @@ export default async function QuestChainPage(props: Props) {
               {!quests.has(questId) && nameOf(questId) && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
             </> },
             { key: "position", header: "Position", numeric: true, cell: ({ position }: { questId: number; position: number }) => position },
+            // The quest's level once three installs agree on it; blank otherwise, never a neighbour's.
+            { key: "level", header: "Level", numeric: true, cell: ({ questId }: { questId: number; position: number }) => levelOf(questId) },
             { key: "name", header: "Name reports", cell: ({ questId }: { questId: number; position: number }) => nameOf(questId) ? null : "Name not reported yet." },
           ]}
           meta={({ questId, position }) => <>Position {position}{!nameOf(questId) && " · Name not reported yet."}</>}

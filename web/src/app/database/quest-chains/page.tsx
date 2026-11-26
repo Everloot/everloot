@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import type { ChainEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { chainHref, loadCatalog, type Listed } from "@/lib/completion-lists";
+import { chainFacts, levelRange } from "@/lib/chain-facts";
+import { npcNames } from "@/lib/names";
+import { loadWorldFacts } from "@/lib/rollup-compute";
+import EntityLink from "@/components/EntityLink";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
@@ -41,9 +45,16 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
 
   // A chain cut at 80 quests has more than it lists.
   const count = (x: ChainEntry) => (x.truncated ? `${x.questIds.length}+` : x.questIds.length);
+  // The agreed levels and start NPC of the chains on this page only (lib/chain-facts.ts); blank where three installs do not agree.
+  const world = shown.length ? await loadWorldFacts() : null;
+  const known = new Map(shown.map((x) => [x.questLineId, chainFacts(x.questIds, world)]));
+  const npcs = world && !world.unreachable ? npcNames(world) : new Map<number, string>();
+  const dash = <span className="text-muted">—</span>;
   const columns: Column<Listed<ChainEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={chainHref(x.questLineId, x.name)}>{x.name}</NameCell> },
     { key: "quests", header: "Quests", numeric: true, sortable: true, cell: count },
+    { key: "levels", header: "Levels", numeric: true, cell: (x) => { const l = known.get(x.questLineId)?.levels; return l ? levelRange(l) : dash; } },
+    { key: "start", header: "Start", cell: (x) => { const id = known.get(x.questLineId)?.startNpcId ?? null; return id === null ? dash : <EntityLink kind="npc" id={id} name={npcs.get(id)} />; } },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questLineId },
   ];

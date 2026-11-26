@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
-import { loadCatalog, titleDisplayName, titleHref, type Listed } from "@/lib/completion-lists";
+import { loadCatalog, titleDisplayName, titleFilesName, titleHref, titlePlacement, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
@@ -41,6 +41,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
 
   const columns: Column<Listed<TitleEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={titleHref(x.titleId, x.name)}>{titleDisplayName(x.name)}</NameCell> },
+    { key: "kind", header: "Kind", cell: (x) => { const p = titlePlacement(x.name.includes("%s") ? x.name : titleFilesName(x.titleId) ?? ""); return p === "prefix" ? "Prefix" : p === "suffix" ? "Suffix" : <span className="text-muted">—</span>; } },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];

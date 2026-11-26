@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Tabs, TooltipFrame } from "@/components/ui";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadCatalog, parseSegment, titleDisplayName, titleHref } from "@/lib/completion-lists";
+import { loadCatalog, parseSegment, titleDisplayName, titleFilesName, titleHref, titlePlacement, titleWithName } from "@/lib/completion-lists";
 import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
@@ -20,6 +20,10 @@ type Props = { params: Promise<{ id: string }> };
 const REPORTED = "3 of 3 installs agree";
 /** The name line of a page whose name is the game files', in the words the item pages use for it. */
 const FILES_NAME = "The name is shown from the game files; players have not reported it yet.";
+
+/** The name the "Shown as" line puts in the title's slot: a sample, said to be one, never a player's. */
+const SAMPLE_NAME = "Kaelen";
+const PLACEMENT = { prefix: "Prefix, before the name", suffix: "Suffix, after the name" } as const;
 
 /** Whether the game files list the title; null when the file could not be read. */
 function titleInFiles(id: number): boolean | null {
@@ -66,15 +70,22 @@ export default async function TitlePage(props: Props) {
   const summary = entry ? [what, observed, inFiles, "No achievement is linked to it yet.", !entry.confirmed && listed ? FILES_NAME : name] : [];
   // The archive files a title under no type of its own, so its page is one of the "other" pages.
   const lore = entry ? await loreFor("title", id, title) : null;
+  // Where the name goes: the slot in the reported name, else in the files' name for the same id; none claimed without one.
+  const slotted = entry ? (entry.name.includes("%s") ? entry.name : titleFilesName(id)) : null;
+  const placement = slotted ? titlePlacement(slotted) : null;
 
   return (
     <EntityPage
       name={title}
       jsonLd={entry && { name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` }}
-      header={{ trail, title, meta: ["Title", <span key="id" className="tabular-nums">ID {id}</span>] }}
+      header={{ trail, title, meta: ["Title", placement ? (placement === "prefix" ? "Prefix" : "Suffix") : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
       box={entry && <TooltipFrame name={title} label={entry.confirmed ? `${title}, as players reported it` : `${title}, ${CLIENT_LABEL.toLowerCase()}`} />}
       facts={entry && [
         // Short of three installs: the meter with how many have reported, never the words "not reported".
+        ...(placement && slotted ? [
+          { label: "Kind", value: PLACEMENT[placement] },
+          { label: "Shown as", value: <>{titleWithName(slotted, SAMPLE_NAME)} <span className="text-muted">(a sample name)</span></> },
+        ] : []),
         { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
         { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
         { label: "ID", value: entry.titleId, numeric: true },
