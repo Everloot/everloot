@@ -12,6 +12,8 @@ import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { agreementLabel, reportedLabel, Badge, DataTable, Tabs, TooltipFrame } from "@/components/ui";
 import { EMPTY, EmptyTab, EntityPage, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
+import EntityMap from "../../EntityMap";
+import { entityMapZones, type MapMark } from "../../entity-map";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -71,7 +73,11 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const npcs = facts.unreachable ? new Map<number, string>() : npcNames(facts);
   const itemFacts = facts.unreachable || page.rewards.length === 0 ? null : await loadItemFacts();
   const items = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const assets = page.rewards.length > 0 ? await loadSiteAssets() : null;
+  // Every position 3 installs agree on for the giver and the turn-in NPC, for the map slot; the Givers table is its text.
+  const marks: MapMark[] = facts.unreachable ? [] : ([["giver", page.giverNpcId], ["turnin", page.turnInNpcId]] as const).flatMap(([kind, npcId]) =>
+    npcId === null ? [] : npcPage(npcId, facts).pins.map((p) => ({ kind, mapId: p.mapId, x: p.x, y: p.y, label: npcs.get(npcId) ?? `NPC ${npcId}`, agreed: true })));
+  const assets = page.rewards.length > 0 || marks.length > 0 ? await loadSiteAssets() : null;
+  const mapZones = entityMapZones(marks, assets?.maps);
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.rewards);
   const lore = !facts.unreachable && page.title ? await loreFor("quest", page.questId, page.title) : null;
   const trail = [...trailFor("/database/quests")!, { name: title, path: `/database/quests/${page.questId}` }];
@@ -148,6 +154,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
       ]}
       summary={summary}
+      map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
       main={<Tabs
         label={`${title}: relations`}
         tabs={[

@@ -116,6 +116,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/vendors/[id]/page.tsx", "web/src/app/database/npcs/[id]/page.tsx", "web/src/app/database/quests/[id]/page.tsx", "web/src/app/changes/page.tsx", "web/src/app/changes/[post]/page.tsx", "web/src/app/lore/page.tsx", "web/src/lib/spell-mentions.ts", "web/src/app/wow-forever/page.tsx", "web/src/app/tools/talents/page.tsx",
   "kb/src/cli.ts", "web/scripts/upload-game-assets.mjs", "web/scripts/game-assets-upload.mjs",
   "web/src/app/database/zones/[zone]/page.tsx",
+  // An object page draws its minimap positions on the zone's map art (database/EntityMap.tsx), as the NPC and zone pages do.
+  "web/src/app/database/objects/[id]/page.tsx",
   // The quest page's social card reads the quest titles under the page's rule. Text only, no art.
   "web/src/app/database/quests/[id]/opengraph-image.tsx",
   // The dungeon and raid list's small loading screens, and the zone list's small map pictures.

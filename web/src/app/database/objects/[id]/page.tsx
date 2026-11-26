@@ -18,6 +18,9 @@ import type { Crumb } from "@/lib/jsonld";
 import { EMPTY, EmptyTab, EntityPage, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { unknownObject } from "../../unknown";
+import { loadSiteAssets } from "@/lib/game-assets";
+import EntityMap from "../../EntityMap";
+import { entityMapZones } from "../../entity-map";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +60,8 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   ];
   const windows = page.zero?.kills ?? page.drops[0]?.kills;
   const pins = facts.unreachable ? [] : page.pins ?? [];
+  // The map slot draws where players saw it on the minimap; the pin table below is its text.
+  const mapZones = pins.length ? entityMapZones(pins.map((p) => ({ kind: "object", mapId: p.mapId, x: p.x, y: p.y, label: title, agreed: true })), (await loadSiteAssets())?.maps) : [];
   // The archive files an object under no type of its own, so its page is one of the "other" pages.
   const lore = !facts.unreachable && page.name ? await loreFor("object", page.objectId, page.name) : null;
   // Reported windows the rates leave out: a count under the drops, never a rate.
@@ -84,6 +89,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         { label: "Map positions", value: known(page.pins?.length || null), numeric: true },
       ]}
       summary={summary}
+      map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
       main={<Tabs
         label={`${title}: relations`}
         tabs={[{
