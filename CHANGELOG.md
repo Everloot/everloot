@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: an armory character's Talents tab draws the class's trees with the character's ranks and opens the build in the talent calculator (#1541).
+- Site: database pages lose the empty block above the tabs: facts sit beside the box, facts nobody has reported fold into one "Not yet reported" row, and quest and boss pages drop the box that only repeated the title (#1542).
 - Site: the home page opens on live data under the hero: the newest facts to reach three installs (with item icons and quality colours), the top of the guild ladder and this week's census class shares with the top movers. Each panel says so on its own when its read fails. Start here is one row of five, and the trust figures' labels are sans.
 - Site: an armory guild page opens on its summary (roster, members read, level 60s, average item level) and a one-row class bar, lists the top five by item level, folds instances with no kills behind one line, and names rank 0 Guild Master.
 - Site: a character page opens on the verdict: a facts strip (item level, Gear Score, honorable kills, achievements, quests, read age), rank badges with their region and ruleset, spec cards and profession bars above the gear; an empty dungeons-and-raids section is one line.
@@ -305,6 +307,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: ranks tell the truth once migration `20261126110000_armory_honest_ranks.sql` is applied: tied characters read "#6 (tied with 9) of 20,943 · top 0.1%" and share their board rank, and the guild gear board counts guilds with at least 5 members read; until then ranks read as before (#1539).
+- Site: the page links under a list have their own name for screen readers, and the list filters are sent once instead of twice, so /database/items loads about a fifth less data (#1540).
 - Site: the "Report a bug" button is a small icon in the corner that shows its words on hover or focus, and the page end keeps room for it, so it no longer covers headings, rows or footer links.
 - Site: item, NPC, zone and instance pages load 12 to 15 kB less compressed script (the switched-off comments and screenshots code no longer rides along), and screen readers get distinct names for search boxes and tables plus map links whose name starts with the words on screen.
 - Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
