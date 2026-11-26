@@ -9,7 +9,7 @@ import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
 import {
   armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
-  metricOfKey, PLAY_HISTORY_METRICS, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
+  metricOfKey, PLAY_HISTORY_METRICS, rankText, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
@@ -56,7 +56,7 @@ function rankFacts(c: ArmoryCharacter, ranks: ArmoryRank[]): Fact[] {
     const metric = metricOfKey(r.metric);
     if (!metric) return [];
     const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
-    return [{ label: `${ARMORY_BOARDS[metric].title} rank`, value: <Link href={href} className={link}>#{r.rank} of {r.of.toLocaleString("en-US")}</Link>, numeric: true }];
+    return [{ label: `${ARMORY_BOARDS[metric].title} rank`, value: <Link href={href} className={link}>{rankText(r)}</Link>, numeric: true }];
   });
 }
 
@@ -108,7 +108,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const historyRanks = ranks.flatMap((r) => {
     const metric = metricOfKey(r.metric);
     return metric && historyKeys.has(r.metric)
-      ? [{ metric, rank: r.rank, of: r.of, href: armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId }) }]
+      ? [{ metric, rank: r.rank, of: r.of, ...(r.tied === undefined ? {} : { tied: r.tied }), href: armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId }) }]
       : [];
   });
   const progression = await loadCharacterProgression(c.region, c.slug);

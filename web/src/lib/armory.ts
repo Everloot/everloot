@@ -204,6 +204,33 @@ const SLOT_LABEL: Record<string, string> = {
 };
 export const slotLabel = (slot: string) => SLOT_LABEL[slot] ?? UNKNOWN;
 
+/**
+ * How a board rank reads (owner decision D5, the benchmark's recommended default, awaiting the owner): the rank, how many
+ * others share its value, and on a large board near the top the share of characters at or above it. Each part is one
+ * constant to change. `tied` is absent before 20261126110000_armory_honest_ranks.sql is applied; the rank then reads
+ * "#n of N" as it always has, since without the tie count the share could not be told honestly.
+ */
+export const RANK_SHOW_TIES = true;
+/** The "top N%" part shows on boards of at least this many characters... */
+export const RANK_TOP_SHARE_MIN_BOARD = 100;
+/** ...and only while the share is at most this many percent. */
+export const RANK_TOP_SHARE_MAX_PERCENT = 25;
+
+/** "top 0.2%" below one percent (rounded up to a tenth), "top 2%" above (rounded up): never better than the truth. */
+function topShare(percent: number): string {
+  return percent < 1 ? `top ${(Math.ceil(percent * 10) / 10).toFixed(1)}%` : `top ${Math.ceil(percent)}%`;
+}
+
+/** "#6 (tied with 9) of 20,943 · top 0.1%", "#2 of 40", or "#1 of 20,943" when the database gives no tie count. */
+export function rankText(r: { rank: number; of: number; tied?: number | null }): string {
+  const base = (tie: string) => `#${r.rank.toLocaleString("en-US")}${tie} of ${r.of.toLocaleString("en-US")}`;
+  if (r.tied === undefined || r.tied === null) return base("");
+  const tie = RANK_SHOW_TIES && r.tied > 0 ? ` (tied with ${r.tied.toLocaleString("en-US")})` : "";
+  // Everyone above, plus the character and everyone on its value.
+  const percent = ((r.rank + r.tied) / r.of) * 100;
+  return r.of >= RANK_TOP_SHARE_MIN_BOARD && percent <= RANK_TOP_SHARE_MAX_PERCENT ? `${base(tie)} · ${topShare(percent)}` : base(tie);
+}
+
 /** "Read 2026-11-09 14:05 UTC": when the crawler last read the row, or that it is unrecorded. */
 export function readLine(at: string | null | undefined): string {
   const label = dataAgeLabel(at);
