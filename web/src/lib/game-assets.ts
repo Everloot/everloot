@@ -219,7 +219,15 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
  * Reads one JSON file from the private bucket by its path: null when there is no such file, PRIVATE_UNREACHABLE
  * when the bucket could not be read (an error, a timeout, an answer other than 200 or 404).
  */
-export interface PrivateStore { read(path: string): Promise<unknown | null> }
+export interface PrivateStore {
+  read(path: string): Promise<unknown | null>;
+  /**
+   * `read` through `parse`, for a file every reader parses the same way (a names file): the store keeps what `parse`
+   * returned instead of the file, so an instance does not hold a names file beside the Map built from it. `parse` runs
+   * once per read of the file, on the file as read. Optional: a store without it is read with `read` (`readParsed`).
+   */
+  readParsed?<T>(path: string, parse: (raw: unknown) => T): Promise<T | null | typeof PRIVATE_UNREACHABLE>;
+}
 /** A private read that failed, as opposed to a file that is not there. Readers that only want the file see a non-object. */
 export const PRIVATE_UNREACHABLE: unique symbol = Symbol("private bucket unreachable");
 /** A present names file that does not match its schema. */
@@ -229,8 +237,10 @@ export const PRIVATE_MALFORMED: unique symbol = Symbol("private names malformed"
 const kept = new Map<string, { at: number; value: unknown | null }>();
 // The read of each file in progress. Pages that ask for a file while it is being read wait on that read, so a burst of
 // item pages on a new instance downloads and parses the 1.3 MB names file once instead of once per page (20 copies at
-// once ran the isolate out of memory). The parsed value is then the same object, and the parses keyed on it run once.
+// once ran the isolate out of memory). The value is then the same object, and a names file is parsed once.
+// A file read through `readParsed` is kept, and read, under its URL with PARSED after it.
 const reading = new Map<string, Promise<unknown | null>>();
+const PARSED = "#parsed";
 /** For tests: forget what the private bucket returned. */
 export const forgetPrivateReads = () => { kept.clear(); reading.clear(); };
 
@@ -255,38 +265,48 @@ export function privateStoreFromEnv(env: Record<string, string | undefined> = pr
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey || !/^https?:\/\//.test(endpoint)) return null;
   const client = new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: env.GAME_DATA_REGION?.trim() || "auto" });
   const root = `${endpoint.replace(/\/+$/, "")}/${encodeURIComponent(bucket)}`;
-  return {
-    async read(path) {
-      const url = `${root}/${path}`;
-      const hit = kept.get(url);
-      // A miss or a failed read is kept a minute, so a missing file is not asked for on every page view.
-      const short = hit?.value === null || hit?.value === PRIVATE_UNREACHABLE;
-      if (hit && Date.now() - hit.at < (short ? 60_000 : REVALIDATE_SECONDS * 1000)) return hit.value;
-      const other = reading.get(url);
-      if (other) {
-        const value = await waitAtMost(other, FETCH_TIMEOUT_MS);
-        if (value !== WAITED_TOO_LONG) return value;
+  async function get(path: string, parse?: (raw: unknown) => unknown): Promise<unknown | null> {
+    const url = `${root}/${path}`;
+    const key = parse ? `${url}${PARSED}` : url;
+    const hit = kept.get(key);
+    // A miss or a failed read is kept a minute, so a missing file is not asked for on every page view.
+    const short = hit?.value === null || hit?.value === PRIVATE_UNREACHABLE;
+    if (hit && Date.now() - hit.at < (short ? 60_000 : REVALIDATE_SECONDS * 1000)) return hit.value;
+    const other = reading.get(key);
+    if (other) {
+      const value = await waitAtMost(other, FETCH_TIMEOUT_MS);
+      if (value !== WAITED_TOO_LONG) return value;
+    }
+    const read: Promise<unknown | null> = (async () => {
+      let value: unknown | null = null;
+      // Timed by file kind only (`items`, `item-names`): the build and shard numbers are left out.
+      const done = timeRead(`r2-${(path.split("/")[1] ?? path).replace(/\.json$/, "").replace(/-?\d+$/, "")}`);
+      try {
+        const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
+        const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
+        value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
+      } catch {
+        value = PRIVATE_UNREACHABLE;
+      } finally {
+        done();
       }
-      const read: Promise<unknown | null> = (async () => {
-        let value: unknown | null = null;
-        // Timed by file kind only (`items`, `item-names`): the build and shard numbers are left out.
-        const done = timeRead(`r2-${(path.split("/")[1] ?? path).replace(/\.json$/, "").replace(/-?\d+$/, "")}`);
-        try {
-          const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
-          const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
-          value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
-        } catch {
-          value = PRIVATE_UNREACHABLE;
-        } finally {
-          done();
-        }
-        kept.set(url, { at: Date.now(), value });
-        return value;
-      })().finally(() => { if (reading.get(url) === read) reading.delete(url); });
-      reading.set(url, read);
-      return read;
-    },
+      if (parse && value !== null && value !== PRIVATE_UNREACHABLE) value = parse(value);
+      kept.set(key, { at: Date.now(), value });
+      return value;
+    })().finally(() => { if (reading.get(key) === read) reading.delete(key); });
+    reading.set(key, read);
+    return read;
+  }
+  return {
+    read: (path) => get(path),
+    readParsed: <T>(path: string, parse: (raw: unknown) => T) => get(path, parse) as Promise<T | null | typeof PRIVATE_UNREACHABLE>,
   };
+}
+
+/** A file through `parse`: kept parsed by a store that can (privateStoreFromEnv), else parsed here on every read. */
+function readParsed<T>(store: PrivateStore, path: string, parse: (raw: unknown) => T): Promise<T | null | typeof PRIVATE_UNREACHABLE> {
+  if (store.readParsed) return store.readParsed(path, parse);
+  return store.read(path).then((raw) => (raw === null || raw === PRIVATE_UNREACHABLE ? raw : parse(raw)));
 }
 
 const ItemIndexSchema = z.object({
@@ -437,9 +457,6 @@ export interface ItemNames {
   names: Map<number, MatchedName>;
 }
 
-// The same file object comes back while the private store keeps it, so it is parsed once per read.
-const parsedNames = new WeakMap<object, ItemNames | null>();
-
 /**
  * The names the site may show for items players have not named yet (docs/DATA_POLICY.md, "Item names from the
  * game files and the Warcraft Wiki"): one file, `<build folder>/item-names.json` in the private bucket, read
@@ -450,22 +467,23 @@ const parsedNames = new WeakMap<object, ItemNames | null>();
 export async function loadItemNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<ItemNames | null | typeof PRIVATE_UNREACHABLE> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
-  const raw = await store.read(`${folder}/item-names.json`);
-  if (raw === PRIVATE_UNREACHABLE) return raw;
-  if (!raw || typeof raw !== "object") return null;
-  if (!parsedNames.has(raw)) {
-    const f = ItemNamesSchema.safeParse(raw);
-    parsedNames.set(raw, f.success ? {
-      version: f.data.build.version,
-      wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
-      // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
-      names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
-        name: x.n, color: qualityColor(x.q ?? 1), ...(x.q === undefined ? {} : { quality: x.q }), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
-      } satisfies MatchedName])),
-    } : null);
-  }
-  const names = parsedNames.get(raw) ?? null;
-  return names && names.version === version ? names : null;
+  const names = await readParsed(store, `${folder}/item-names.json`, parseItemNames);
+  if (names === PRIVATE_UNREACHABLE) return names;
+  return names && names !== PRIVATE_MALFORMED && names.version === version ? names : null;
+}
+
+/** The item names file as the pages use it; PRIVATE_MALFORMED for a file of another shape (the pages then show none). */
+function parseItemNames(raw: unknown): ItemNames | typeof PRIVATE_MALFORMED {
+  if (!raw || typeof raw !== "object") return PRIVATE_MALFORMED;
+  const f = ItemNamesSchema.safeParse(raw);
+  return f.success ? {
+    version: f.data.build.version,
+    wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
+    // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
+    names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
+      name: x.n, color: qualityColor(x.q ?? 1), ...(x.q === undefined ? {} : { quality: x.q }), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
+    } satisfies MatchedName])),
+  } : PRIVATE_MALFORMED;
 }
 
 /* ---------- Quest titles, item set names and spell names ---------- */
@@ -492,9 +510,6 @@ export interface QuestNames {
 /** Item set or spell names from the game files alone, by id. */
 export interface FileNames { version: string; names: Map<number, string> }
 
-// Like parsedNames: one parse per file object the private store returns, kept with the file name it was read as.
-const parsedGameNames = new WeakMap<object, { file: string; names: { version: string } | null }>();
-
 async function loadNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null> {
   const names = await readNamesFile(file, version, base, store, parse);
   return names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED ? null : names;
@@ -504,13 +519,9 @@ async function loadNamesFile<T extends { version: string }>(file: string, versio
 export async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE | typeof PRIVATE_MALFORMED> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
-  const raw = await store.read(`${folder}/${file}`);
-  if (raw === PRIVATE_UNREACHABLE) return raw;
-  if (raw === null) return null;
-  if (typeof raw !== "object") return PRIVATE_MALFORMED;
-  if (parsedGameNames.get(raw)?.file !== file) parsedGameNames.set(raw, { file, names: parse(raw) });
-  const names = parsedGameNames.get(raw)!.names as T | null;
-  if (!names) return PRIVATE_MALFORMED;
+  // Kept parsed (`readParsed`): `parse` must be the same for every reader of `file`, as each file has one reader.
+  const names = await readParsed(store, `${folder}/${file}`, (raw) => (typeof raw === "object" ? parse(raw) : null) ?? PRIVATE_MALFORMED);
+  if (names === null || names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED) return names;
   return names.version === version ? names : null;
 }
 

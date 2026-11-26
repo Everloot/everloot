@@ -1,3 +1,5 @@
+import v8 from "node:v8";
+import vm from "node:vm";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { CLIENT_BAGS } from "@/data/game-data/client-bags";
@@ -199,6 +201,36 @@ test("pages that ask for one private file while it is being read share that read
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(reads[0]).not.toBe(PRIVATE_UNREACHABLE);
   for (const read of reads) expect(read).toBe(reads[0]);
+});
+
+test("a names file is kept as its parsed names, not beside them as the file it was read from", async () => {
+  v8.setFlagsFromString("--expose-gc");
+  const gc = vm.runInNewContext("gc") as () => void;
+  const env = { GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "everloot-game-data", GAME_DATA_ACCESS_KEY_ID: "id", GAME_DATA_SECRET_ACCESS_KEY: "secret" };
+  const files: Record<string, object | null> = { "item-names.json": structuredClone(namesFile), "spell-names.json": structuredClone(spellFile) };
+  const read = Object.fromEntries(Object.entries(files).map(([k, v]) => [k, new WeakRef(v!)]));
+  let calls = 0;
+  // Hands each file over once and keeps no reference to it (a vi.fn would keep its results).
+  const fetcher = async (request: Request) => {
+    calls++;
+    const name = request.url.slice(request.url.lastIndexOf("/") + 1);
+    const body = files[name];
+    files[name] = null;
+    return Object.assign(new Response("{}"), { json: async () => body });
+  };
+  const store = () => privateStoreFromEnv(env, fetcher as unknown as typeof fetch);
+  const items = await loadItemNames("1.60.1.70450", BASE, store());
+  const spells = await readSpellNames("1.60.1.70450", BASE, store());
+  expect((items as ItemNames).names.get(2589)?.name).toBe("Linen Cloth");
+  expect(spells !== PRIVATE_UNREACHABLE && spells !== PRIVATE_MALFORMED && spells?.names.get(3275)).toBe("Linen Bandage");
+  await new Promise((r) => setTimeout(r, 0));
+  gc();
+  expect(read["item-names.json"].deref()).toBeUndefined();
+  expect(read["spell-names.json"].deref()).toBeUndefined();
+  // The parsed names stay kept: the next page reads no file and gets the same names.
+  expect(await loadItemNames("1.60.1.70450", BASE, store())).toBe(items);
+  expect(await readSpellNames("1.60.1.70450", BASE, store())).toBe(spells);
+  expect(calls).toBe(2);
 });
 
 test("a reader waits at most FETCH_TIMEOUT_MS on another page's read, then reads the file itself", async () => {
