@@ -43,7 +43,7 @@ import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
 import { EntityIcon } from "@/components/game/EntityIcon";
-import { ItemSourcesPanel } from "../../loot-tables";
+import { ItemSourcesPanel, lootPage } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
 import EntityComments from "@/components/comments/EntityComments";
@@ -150,7 +150,9 @@ export default async function ItemPage(props: Props) {
 
   // Beside each row, what the site already holds for it: the zone 3 installs measured a vendor in, and a recipe's
   // reagents and skill ranks from the game files (client-recipes.json). A column shows only where some row has a value.
-  const vendorZones = (e: Edge) => (e.rel === "sold_by" ? edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === e.toId) : []);
+  const npcZones = (npcId: number) => edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === npcId);
+  const vendorZones = (e: Edge) => (e.rel === "sold_by" ? npcZones(e.toId) : []);
+  const zoneLinks = (zones: Edge[]) => <span className="inline-flex flex-wrap gap-x-2">{zones.map((z) => <span key={z.toId}><RelationTarget edge={z} rel={z.rel} client={edges.client} /></span>)}</span>;
   const recipeOf = (e: Edge) => (e.toKind === "spell" && (e.rel === "created_by" || e.rel === "reagent_for") ? recipeBySpell(e.toId) : undefined);
   // Icons only for reagents whose tooltip shows under the item name rule; none reads nothing.
   const reagentIds = [...new Set(rel("created_by").flatMap((e) => recipeOf(e)?.reagents.map((x) => x.itemId) ?? []))].filter(showsTip);
@@ -162,7 +164,7 @@ export default async function ItemPage(props: Props) {
       ...(rows.some((e) => vendorZones(e).length) ? [{
         key: "zone", header: "Zone", cell: (e: Edge) => {
           const zones = vendorZones(e);
-          return zones.length ? <span className="inline-flex flex-wrap gap-x-2">{zones.map((z) => <span key={z.toId}><RelationTarget edge={z} rel={z.rel} client={edges.client} /></span>)}</span> : <span className="text-muted">—</span>;
+          return zones.length ? zoneLinks(zones) : <span className="text-muted">—</span>;
         },
       }] : []),
       ...(rows.some((e) => e.rel === "created_by") && recipes.some((r) => r?.reagents.length) ? [{
@@ -232,6 +234,8 @@ export default async function ItemPage(props: Props) {
             sources={sources}
             title={title}
             dataAsOf={loot.dataAsOf}
+            zone={(d) => { const zones = d.sourceNpcId !== undefined ? npcZones(d.sourceNpcId) : []; return zones.length ? zoneLinks(zones) : null; }}
+            pages={{ page: lootPage((await props.searchParams)?.drops), href: (p) => `/database/items/${itemId}${p === 1 ? "" : `?drops=${p}`}#dropped-by` }}
             source={(d) => (d.sourceNpcId !== undefined
               ? <EntityLink kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
               : <EntityLink kind="object" id={d.sourceObjectId!} name={dropNames.objects.get(d.sourceObjectId!)?.name} />)}

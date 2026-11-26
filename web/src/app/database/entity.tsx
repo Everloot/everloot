@@ -1,4 +1,4 @@
-import { Fragment, isValidElement, type ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
@@ -70,8 +70,9 @@ export const known = (value: ReactNode, reported = 0) =>
 const unreported = (value: ReactNode) => isValidElement<{ count?: number }>(value) && value.type === AgreementMeter && !value.props.count;
 
 /**
- * The quick facts with every unreported one folded into a last "Not yet reported" row: their labels and one empty
- * meter, instead of a row of hollow diamonds each. A fact some installs have reported keeps its row and its count.
+ * The quick facts with every unreported one folded into a last "Not yet reported" row: one empty meter and their
+ * labels as small chips under the row's label, instead of a row of hollow diamonds each. A fact some installs have
+ * reported keeps its row and its count.
  */
 function foldUnreported(facts: Fact[]): Fact[] {
   const missing = facts.filter((f) => unreported(f.value));
@@ -80,7 +81,15 @@ function foldUnreported(facts: Fact[]): Fact[] {
     ...facts.filter((f) => !unreported(f.value)),
     {
       label: "Not yet reported",
-      value: <><AgreementMeter count={0} /><span className="ml-2">{missing.map((f, i) => <Fragment key={i}>{i > 0 && " · "}{f.label}</Fragment>)}</span></>,
+      stacked: true,
+      value: (
+        <div className="flex items-start gap-2">
+          <span className="inline-flex h-6 shrink-0 items-center"><AgreementMeter count={0} /></span>
+          <ul className="flex min-w-0 flex-wrap gap-1.5">
+            {missing.map((f, i) => <li key={i} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 text-xs text-fg-2">{f.label}</li>)}
+          </ul>
+        </div>
+      ),
     },
   ];
 }
