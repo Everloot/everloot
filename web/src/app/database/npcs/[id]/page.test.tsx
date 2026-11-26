@@ -180,7 +180,8 @@ test("vendor page keeps the same goods table after sharing it with NPC pages", a
   const out = renderToStaticMarkup(await VendorPage({ params: Promise.resolve({ id: "1125" }) }));
   expect(out).toContain('href="/database/items/117"');
   expect(out).toContain("1 gold 23 silver 45 copper");
-  expect(out).toContain("Installs");
+  // The vendor page now shows each offer's evidence, as the NPC page's Sells tab does.
+  expect(out).toContain("3 of 3 installs agree");
 });
 
 test("short meters count agreement on one offer or relation, not unrelated reports", async () => {

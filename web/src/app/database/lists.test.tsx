@@ -322,7 +322,8 @@ const heads = (page: string) => [...(page.split("<thead>")[1]?.split("</thead>")
 test("every list orders its columns the same way: name and kind, key numbers, where, status, id", async () => {
   expect(heads(await html(NpcList(search())))).toEqual(["Name", "Type", "Rank", "Reaction", "Level", "Drops", "Zone", "ID"]);
   expect(heads(await html(QuestList(search())))).toEqual(["Name", "Side", "Group", "Level", "Category", "Giver", "Rewards", "ID"]);
-  expect(heads(await html(VendorList(search())))).toEqual(["Vendor", "Items", "Zone", "ID"]);
+  expect(heads(await html(VendorList(search())))).toEqual(["Vendor", "Reaction", "Items", "Zone", "ID"]);
+  expect(heads(await html(ObjectList(search())))).toEqual(["Object", "Type", "Lowest skill", "Loot windows", "Items seen", "Zone", "Installs"]);
   expect(heads(await html(InstanceList(search())))).toEqual(["Name", "Type", "Level", "Bosses", "Entered from", "Entrance confirmed", "Guide"]);
 });
 

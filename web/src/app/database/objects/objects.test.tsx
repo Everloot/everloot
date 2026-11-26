@@ -139,3 +139,50 @@ test("long name queries retain the full search text when filtering and changing 
   expect(list).not.toContain('href="/database/objects/56"');
   expect(list).toContain(`href="/database/objects?q=${prefix}+Copper&amp;sort=-name"`);
 });
+
+const fact = (out: string, name: string) => new RegExp(`>${name}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1];
+const gathered = (installId: string, objectId: number, kind: string, extra: Record<string, unknown> = {}) => ({
+  ...loot(installId, objectId, [2449]), sourceObjectName: "Peacebloom", gatherKind: kind, mapId: 1429, x: 40, y: 60, ...extra,
+});
+
+test("a herb 3 installs agree on shows its type, the skill players had and its zone; the Contains tab links the items", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    gathered("install-a", 1617, "herb", { gatherSkill: 1 }), gathered("install-b", 1617, "herb", { gatherSkill: 15 }), gathered("install-c", 1617, "herb", { gatherSkill: 30 }),
+  ]));
+  const page = await html(ObjectPage(props("1617")));
+  expect(fact(page, "Type")).toBe("Herb");
+  expect(fact(page, "Players&#x27; skill")).toMatch(/1 lowest · 15 middle · 3 installs/);
+  expect(fact(page, "Zones?")).toContain(`href="/database/zones/1429-elwynn-forest"`);
+  // The header says what it is and where, as an NPC page does.
+  expect(page).toMatch(/<h1[^>]*>Peacebloom<\/h1>/);
+  expect(page).toContain("Herb in Elwynn Forest");
+  expect(page).toMatch(/role="tab"[^>]*>Contains<span[^>]*> \(1\)<\/span>/);
+  expect(page).toContain('href="/database/items/2449"');
+  // Two installs say it is a herb: no type, no skill, no zone.
+  store.loadCorpus.mockResolvedValue(corpus([
+    gathered("install-a", 1617, "herb", { gatherSkill: 1 }), gathered("install-b", 1617, "herb", { gatherSkill: 15 }), loot("install-c", 1617, [2449]),
+  ]));
+  const short = await html(ObjectPage(props("1617")));
+  expect(fact(short, "Type")).not.toBe("Herb");
+  expect(short).not.toContain("Players&#x27; skill");
+  expect(short).not.toContain("/database/zones/1429");
+});
+
+test("a chest has a type and no skill row; the list shows type and zone columns and sorts by type", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...["a", "b", "c"].map((i) => gathered(`install-${i}`, 2843, "chest", { sourceObjectName: "Battered Chest" })),
+    ...["a", "b", "c"].map((i) => gathered(`install-${i}`, 1617, "herb", { gatherSkill: 5 })),
+  ]));
+  const page = await html(ObjectPage(props("2843")));
+  expect(fact(page, "Type")).toBe("Chest");
+  expect(page).not.toContain("Players&#x27; skill");
+  const list = await html(ObjectsPage({}));
+  expect(list).toMatch(/>Type</);
+  expect(list).toMatch(/>Zone</);
+  expect(list).toContain(">Chest<");
+  expect(list).toContain(">Herb<");
+  expect(list).toContain("Elwynn Forest");
+  expect(list).toContain('href="/database/objects?sort=type"');
+  const byType = await html(ObjectsPage({ searchParams: Promise.resolve({ sort: "type" }) }));
+  expect(byType.indexOf('href="/database/objects/2843"')).toBeLessThan(byType.indexOf('href="/database/objects/1617"'));
+});

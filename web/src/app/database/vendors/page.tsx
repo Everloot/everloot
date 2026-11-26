@@ -10,7 +10,7 @@ import { ListNote, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatc
 const META = { title: "WoW Forever Vendor Lookup", description: "Look up a WoW: Forever vendor by id. A price is shown only after three installs agree on the item and the price in copper.", path: "/database/vendors" };
 export const dynamic = "force-dynamic";
 
-const SORTS = ["name", "zone", "items", "id"] as const;
+const SORTS = ["name", "zone", "reaction", "items", "id"] as const;
 type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
@@ -21,7 +21,9 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
   return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per, q?.page);
 }
 
-interface VendorRow { id: number; name: string | null; zone: string | null; items: number }
+interface VendorRow { id: number; name: string | null; zone: string | null; reaction: string | null; items: number }
+
+const REACTION_LABELS = { friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" } as const;
 
 export default async function VendorListPage(props: { searchParams?: Promise<Search> }) {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
@@ -29,19 +31,21 @@ export default async function VendorListPage(props: { searchParams?: Promise<Sea
   const facts = await loadWorldFacts();
   const npcs = new Map((facts.unreachable ? [] : npcRows(facts, [])).map((n) => [n.npcId, n]));
   const all: VendorRow[] = (facts.unreachable ? [] : publicVendors(facts)).map((v) => ({
-    id: v.vendorNpcId, name: npcs.get(v.vendorNpcId)?.name ?? null, zone: npcs.get(v.vendorNpcId)?.zone?.name ?? null, items: new Set(v.offers.map((o) => o.itemId)).size,
+    id: v.vendorNpcId, name: npcs.get(v.vendorNpcId)?.name ?? null, zone: npcs.get(v.vendorNpcId)?.zone?.name ?? null,
+    reaction: (() => { const r = npcs.get(v.vendorNpcId)?.reaction; return r ? REACTION_LABELS[r] : null; })(), items: new Set(v.offers.map((o) => o.itemId)).size,
   }));
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const matched = all.filter((v) => !text || (id !== null ? v.id === id : Boolean(v.name?.toLowerCase().includes(text))));
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = sortRows(matched, (v) => (sort.key === "name" ? v.name?.toLowerCase() ?? null : sort.key === "zone" ? v.zone : sort.key === "items" ? v.items : v.id), sort.desc, (v) => v.id);
+  const rows = sortRows(matched, (v) => (sort.key === "name" ? v.name?.toLowerCase() ?? null : sort.key === "zone" ? v.zone : sort.key === "reaction" ? v.reaction : sort.key === "items" ? v.items : v.id), sort.desc, (v) => v.id);
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
   const columns: Column<VendorRow>[] = [
     { key: "name", header: "Vendor", sortable: true, cell: (v) => <NameCell href={`/database/vendors/${v.id}`}>{v.name ?? `Vendor NPC ${v.id}`}</NameCell> },
+    { key: "reaction", header: "Reaction", sortable: true, cell: (v) => v.reaction ?? dash },
     { key: "items", header: "Items", numeric: true, sortable: true, cell: (v) => v.items },
     { key: "zone", header: "Zone", sortable: true, cell: (v) => v.zone ?? dash },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (v) => v.id },
@@ -77,7 +81,7 @@ export default async function VendorListPage(props: { searchParams?: Promise<Sea
             rowKey={(v) => String(v.id)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(v) => [`${v.items} item${v.items === 1 ? "" : "s"}`, v.zone, `ID ${v.id}`].filter(Boolean).join(" · ")}
+            meta={(v) => [`${v.items} item${v.items === 1 ? "" : "s"}`, v.zone, v.reaction, `ID ${v.id}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

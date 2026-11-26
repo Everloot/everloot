@@ -3,7 +3,9 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { npcPage, vendorPage } from "@kb/world-pages";
+import { agreedNpc, npcPage, vendorPage } from "@kb/world-pages";
+import { zoneByMapId, zoneHref } from "@/lib/zones";
+import { npcRelations } from "../../npcs/relations";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -41,6 +43,8 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
 
 interface Place extends Pin { href: string }
 
+const REACTION_LABELS = { friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" } as const;
+
 export default async function VendorPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
@@ -59,6 +63,14 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const items = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const vendorName = facts.unreachable ? undefined : npcNames(facts).get(page.vendorNpcId);
   const title = vendorName ? `${vendorName} (vendor)` : `Vendor NPC ${page.vendorNpcId}`;
+  // Who sells: the NPC's reaction 3 installs agree on and the released zone it stands in, as on its NPC page.
+  const reaction = facts.unreachable ? null : agreedNpc(page.vendorNpcId, facts)?.reaction ?? null;
+  const zone = places[0] ? zoneByMapId(places[0].mapId) : undefined;
+  const zoneLink = zone ? <Link key="zone" href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : null;
+  // Each offer with the installs and the date behind it, as the NPC page's Sells tab shows them.
+  const { goodsEvidence } = npcRelations(page.vendorNpcId, facts, Date.now());
+  const itemsSold = new Set(page.offers.map((o) => o.itemId)).size;
+  const limited = page.offers.filter((o) => o.limitedStock !== null).length;
   // A vendor is an NPC: its lore page is its NPC's, under the same rule.
   const lore = vendorName ? await loreFor("npc", page.vendorNpcId, vendorName) : null;
   // The map slot draws where the vendor stands; the pin table below is its text.
@@ -85,7 +97,13 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
       header={{
         trail,
         title,
-        meta: ["Vendor", <Link key="npc" href={`/database/npcs/${page.vendorNpcId}`} className={LINK}>{vendorName ? `NPC ${page.vendorNpcId}` : "NPC page"}</Link>],
+        meta: [
+          "Vendor",
+          <Link key="npc" href={`/database/npcs/${page.vendorNpcId}`} className={LINK}>{vendorName ?? "NPC page"}</Link>,
+          reaction ? REACTION_LABELS[reaction] : null,
+          zoneLink,
+          <span key="id" className="tabular-nums">ID {page.vendorNpcId}</span>,
+        ],
       }}
       box={
         <TooltipFrame name={title} label={`${title}, as players saw it`}>
@@ -93,7 +111,11 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         </TooltipFrame>
       }
       facts={!facts.unreachable && [
-        { label: "Goods", value: known(page.offers.length ? `${page.offers.length} prices` : null) },
+        { label: "NPC", value: <Link href={`/database/npcs/${page.vendorNpcId}`} className={LINK}>{vendorName ?? `NPC ${page.vendorNpcId}`}</Link> },
+        { label: "Reaction", value: known(reaction && REACTION_LABELS[reaction]) },
+        { label: "Zone", value: zoneLink ?? known(null) },
+        { label: "Items sold", value: known(itemsSold || null), numeric: true },
+        { label: "Limited stock", value: known(limited || null), numeric: true },
         { label: "Map positions", value: known(places.length || null), numeric: true },
       ]}
       summary={summary}
@@ -102,10 +124,10 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         label={`${title}: relations`}
         tabs={[
           {
-            id: "goods", label: "Goods", count: facts.unreachable ? undefined : page.offers.length,
+            id: "goods", label: "Sells", count: facts.unreachable ? undefined : page.offers.length,
             panel: facts.unreachable ? <Unreachable />
               : page.offers.length ? (
-                <VendorGoods title={title} offers={page.offers} tips={tips} items={items} />
+                <VendorGoods title={title} offers={page.offers} tips={tips} items={items} evidence={goodsEvidence} />
               )
               : <EmptyTab message={EMPTY.goods} />,
           },
