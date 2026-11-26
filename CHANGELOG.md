@@ -15,6 +15,13 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: /armory/compare puts two armory characters side by side: talent split, rank badges, the main numbers and all 19 gear slots with item level differences; "Compare with…" on every character page (#1543).
+- Site: boss pages link the previous and next boss in the instance's order, show the instance's loading screen when it is uploaded, and give the first synced kill day on the Kills tab (counts only) (#1544).
+- Site: item pages say when this build's game files carry no stats for the item and show its sell price (#1545).
+- Site: zone pages read like a zone guide: territory side and the agreed creature level range under the name, dungeons, flight masters and counts in the facts, quests first with side colours and NPCs with rank badges (#1548).
+- Site: spell pages show a game-style tooltip box (cost, range, cast time, cooldown, school, duration), quick facts, other ranks where the game files link them, and what uses the spell: items, item sets, mounts and companions (#1552).
+- Site: guild pages count members by last login (7 days, 30 days, longer, not known), each count filtering the roster, and phone roster rows show the rank (#1553).
+- Site: achievement pages show the icon, the category path, a faction limit and the rewards, and the list opens with a by-category overview with counts and points (#1556).
 - Site: an armory character's Talents tab draws the class's trees with the character's ranks and opens the build in the talent calculator (#1541).
 - Site: database pages lose the empty block above the tabs: facts sit beside the box, facts nobody has reported fold into one "Not yet reported" row, and quest and boss pages drop the box that only repeated the title (#1542).
 - Site: the home page opens on live data under the hero: the newest facts to reach three installs (with item icons and quality colours), the top of the guild ladder and this week's census class shares with the top movers. Each panel says so on its own when its read fails. Start here is one row of five, and the trust figures' labels are sans.
@@ -307,6 +314,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: the character overview puts the Blizzard credit under the facts strip and stacks the specs and professions, so no empty band or blank area is left (#1547).
+- Site: armory character pages load about twice as fast: the reads run side by side, the facts are read once, and tabs other than Talents load when first opened (#1550).
+- Site: spell facts leave out empty counts, and page summaries say where a name comes from instead of always "Players agree on the name" (#1555).
 - Site: ranks tell the truth once migration `20261126110000_armory_honest_ranks.sql` is applied: tied characters read "#6 (tied with 9) of 20,943 · top 0.1%" and share their board rank, and the guild gear board counts guilds with at least 5 members read; until then ranks read as before (#1539).
 - Site: the page links under a list have their own name for screen readers, and the list filters are sent once instead of twice, so /database/items loads about a fifth less data (#1540).
 - Site: the "Report a bug" button is a small icon in the corner that shows its words on hover or focus, and the page end keeps room for it, so it no longer covers headings, rows or footer links.
