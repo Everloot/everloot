@@ -83,7 +83,9 @@ const raidColumns: Column<RankedRow>[] = [
 /** Guilds by gear (the armory) and by raid progress (members' uploads), side by side; either may be off. */
 export function GuildBoards({ gear, raids, region, progression }: { gear: GuildGear | null; raids: RaidProgress | null; region: ArmoryRegion | null; progression?: GuildProgressionRank[] }) {
   const note = [
-    gear && "Gear is the average item level of the members the armory has read.",
+    gear && (gear.state === "ready" && gear.minRead !== undefined
+      ? `Gear is the average item level of the members the armory has read, for guilds with at least ${gear.minRead} members read.`
+      : "Gear is the average item level of the members the armory has read."),
     raids && "Raid progress counts the bosses two members' installs report killed, in the newest raid; the ladder is by realm, so every region is in it.",
   ].filter(Boolean).join(" ");
   return (
@@ -103,7 +105,7 @@ export function GuildBoards({ gear, raids, region, progression }: { gear: GuildG
                   rows={gear.rows}
                   rowKey={(g) => `${g.region}/${g.slug}`}
                   meta={(g) => <span className="flex flex-wrap items-center gap-2"><span>{regionLabel(g.region)} · {number(g.membersRead)} read</span><GuildItemLevel guild={g} /></span>}
-                  empty={<p className="px-4 py-3 text-cell text-fg-2">No guild with a member read here yet.</p>}
+                  empty={<p className="px-4 py-3 text-cell text-fg-2">{gear.minRead === undefined ? "No guild with a member read here yet." : `No guild with ${gear.minRead} members read here yet.`}</p>}
                   toolbar={<h4 aria-hidden="true" className="px-4 pt-3 text-h2-sm text-fg">Gear</h4>}
                   footer={<Link href={guildDirectoryHref({ region, sort: "item-level" })} className={link}>Every guild by average item level</Link>}
                 />

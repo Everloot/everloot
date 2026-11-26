@@ -130,7 +130,8 @@ export const DISBANDED_GUILD_NAME = "DELETED";
 export const isDisbandedGuild = (name: string) => name === DISBANDED_GUILD_NAME;
 
 export type GuildDirectory =
-  | { state: "ready"; rows: ArmoryGuildRow[]; total: number }
+  /** `minRead`: the minimum of members read the database applied, when one was asked for and it could. */
+  | { state: "ready"; rows: ArmoryGuildRow[]; total: number; minRead?: number }
   /** The migration is not applied: the guilds whose name starts with the search, without counts. */
   | { state: "not-ready"; rows: ArmoryGuildRow[] }
   | { state: "unreachable" };
@@ -140,7 +141,7 @@ export type GuildDirectory =
  * listed, as /guilds lists none). A row it covers is dropped here too, so the development store, which knows no
  * hides, follows the same rule as the SQL.
  */
-export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null): Promise<GuildDirectory> {
+export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null, minRead?: number): Promise<GuildDirectory> {
   if (hidden === null) return { state: "unreachable" };
   const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !isDisbandedGuild(r.name) && !armoryGuildHidden(hidden, r.region, r.name));
   const store = armoryStore();
@@ -148,14 +149,16 @@ export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: Readonl
     const sort = GUILD_SORTS.find((s) => s.slug === d.sort)!.key;
     const page = await store.guildDirectory({
       prefix: d.prefix, region: d.region, rulesetId: d.ruleset, sort, limit: GUILD_DIRECTORY_PAGE, offset: (d.page - 1) * GUILD_DIRECTORY_PAGE,
+      ...(minRead === undefined ? {} : { minRead }),
     });
     if (page) {
       const rows = shown(page.rows);
+      const applied = page.minRead === undefined ? {} : { minRead: page.minRead };
       // A profile migration still awaiting application must not take the directory down.
       try {
         const recruiting = await guildProfileStore().recruiting(rows);
-        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total: page.total };
-      } catch { return { state: "ready", rows, total: page.total }; }
+        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total: page.total, ...applied };
+      } catch { return { state: "ready", rows, total: page.total, ...applied }; }
     }
     if (!d.prefix) return { state: "not-ready", rows: [] };
     // Before the migration: the name search the armory already has, filtered here, with no counts to sort by.

@@ -55,7 +55,11 @@ export interface SitePeople { armory: (Omit<ArmoryHit, "race" | "guildName"> & {
 
 /** How the guild directory sorts: characters read, their average item level, or how many of them are level 60. */
 export type ArmoryGuildSort = "members" | "item_level" | "level_60";
-export interface ArmoryGuildFilter { prefix: string | null; region: string | null; rulesetId: number | null; sort: ArmoryGuildSort; limit: number; offset: number }
+export interface ArmoryGuildFilter {
+  prefix: string | null; region: string | null; rulesetId: number | null; sort: ArmoryGuildSort; limit: number; offset: number;
+  /** Leave out guilds with fewer members read (20261126110000_armory_honest_ranks.sql); absent lists every guild. */
+  minRead?: number;
+}
 /** One guild in the directory: its roster size from Blizzard, and what the armory has read of its characters. */
 export interface ArmoryGuildRow {
   recruiting?: boolean;
@@ -63,7 +67,11 @@ export interface ArmoryGuildRow {
   membersRead: number; averageItemLevel: number | null; level60: number; fetchedAt: string;
 }
 /** One page of the directory and how many guilds the filters match. */
-export interface ArmoryGuildPage { rows: ArmoryGuildRow[]; total: number }
+export interface ArmoryGuildPage {
+  rows: ArmoryGuildRow[]; total: number;
+  /** The minimum of members read the database applied; absent when none was asked for or the database cannot apply one yet. */
+  minRead?: number;
+}
 
 export interface ArmoryBoardRow {
   rank: number; region: string; slug: string; name: string; surname: string; level: number; class: string; race: string;
@@ -71,7 +79,8 @@ export interface ArmoryBoardRow {
 }
 
 /** A character's place on one board, within its own region and ruleset. */
-export interface ArmoryRank { metric: ArmoryMetricKey; rank: number; of: number }
+/** `tied`: how many others on the board share the value; absent before 20261126110000_armory_honest_ranks.sql. */
+export interface ArmoryRank { metric: ArmoryMetricKey; rank: number; of: number; tied?: number }
 export interface ArmoryCount { region: string; rulesetId: number; ruleset: string; characters: number; guilds: number; newest: string | null }
 
 export interface ArmoryStore {
@@ -214,7 +223,8 @@ const BoardRow = z.object({
   faction: r.faction, ruleset: r.ruleset, rulesetId: r.ruleset_id, guildName: r.guild_name, guildSlug: r.guild_slug ?? null, value: r.value, fetchedAt: r.fetched_at,
 }));
 
-const RankRow = z.object({ metric: z.string(), rank: num, of: num });
+const RankRow = z.object({ metric: z.string(), rank: num, of: num, tied: num.optional() })
+  .transform(({ tied, ...r }) => (tied === undefined ? r : { ...r, tied }));
 const METRIC_KEYS = new Set<string>(ARMORY_METRICS.map((m) => ARMORY_BOARDS[m].key));
 /** Every rank the database gives for a board this site knows; one for a board it does not know is left out, not fatal. */
 const RankRows = z.array(RankRow).transform((rows) => rows.filter((r): r is ArmoryRank => METRIC_KEYS.has(r.metric)));
@@ -260,16 +270,25 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
     },
     async guildDirectory(f) {
       let rows: z.output<typeof DirectoryRow>[];
+      const args = { p_prefix: f.prefix, p_region: f.region, p_ruleset_id: f.rulesetId, p_sort: f.sort, p_limit: f.limit, p_offset: f.offset };
+      // PostgREST answers 404 PGRST202 (or 42883) for a function the database does not have yet.
+      const missing = (err: unknown) => err instanceof StorageError && err.status === 404 && (err.code === "PGRST202" || err.code === "42883");
+      let minRead = f.minRead;
       try {
-        rows = await rpc("armory_guild_directory", {
-          p_prefix: f.prefix, p_region: f.region, p_ruleset_id: f.rulesetId, p_sort: f.sort, p_limit: f.limit, p_offset: f.offset,
-        }, z.array(DirectoryRow));
+        try {
+          rows = await rpc("armory_guild_directory", minRead === undefined ? args : { ...args, p_min_read: minRead }, z.array(DirectoryRow));
+        } catch (err) {
+          // The seven-argument form not applied yet: the six-argument one lists every guild, as before.
+          if (minRead === undefined || !missing(err)) throw err;
+          minRead = undefined;
+          rows = await rpc("armory_guild_directory", args, z.array(DirectoryRow));
+        }
       } catch (err) {
-        // PostgREST answers 404 PGRST202 (or 42883) for a function the database does not have yet.
-        if (err instanceof StorageError && err.status === 404 && (err.code === "PGRST202" || err.code === "42883")) return null;
+        if (missing(err)) return null;
         throw err;
       }
       return {
+        ...(minRead === undefined ? {} : { minRead }),
         total: rows[0]?.total ?? 0,
         rows: rows.map((r) => ({
           region: r.region, slug: r.slug, name: r.name, faction: r.faction, rulesetId: r.ruleset_id, ruleset: r.ruleset, memberCount: r.member_count,
@@ -418,7 +437,8 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
         });
       const value = (r: ArmoryGuildRow) => (f.sort === "item_level" ? r.averageItemLevel : f.sort === "level_60" ? r.level60 : r.membersRead);
       rows.sort((a, b) => (value(b) ?? -Infinity) - (value(a) ?? -Infinity) || b.membersRead - a.membersRead || a.name.localeCompare(b.name) || a.region.localeCompare(b.region));
-      return { rows: rows.slice(f.offset, f.offset + Math.min(f.limit, 100)), total: rows.length };
+      const kept = f.minRead === undefined ? rows : rows.filter((r) => r.membersRead >= f.minRead!);
+      return { rows: kept.slice(f.offset, f.offset + Math.min(f.limit, 100)), total: kept.length, ...(f.minRead === undefined ? {} : { minRead: f.minRead }) };
     },
     async board(metric, region, rulesetId, limit) {
       return ranked(metric, (c) => (region === null || c.region === region) && (rulesetId === null || c.rulesetId === rulesetId)).slice(0, limit).map((c, i) => ({
@@ -443,8 +463,10 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       if (!me) return [];
       return ARMORY_METRICS.map((m) => ARMORY_BOARDS[m].key).flatMap((metric) => {
         const list = ranked(metric, (c) => c.region === me.region && c.rulesetId === me.rulesetId);
-        const at = list.indexOf(me);
-        return at < 0 ? [] : [{ metric, rank: at + 1, of: list.length }];
+        if (!list.includes(me)) return [];
+        // As the SQL: one more than those strictly above, and the others on the same value.
+        const mine = valueOf(me, metric);
+        return [{ metric, rank: 1 + list.filter((c) => valueOf(c, metric)! > mine!).length, of: list.length, tied: list.filter((c) => c !== me && valueOf(c, metric) === mine).length }];
       });
     },
     async counts() {

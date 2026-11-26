@@ -5,7 +5,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
-import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, slotLabel, type ArmoryMetric } from "@/lib/armory";
+import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, rankText, slotLabel, type ArmoryMetric } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import type { PlayHistoryRankedKey } from "@kb/armory/details";
@@ -159,7 +159,7 @@ const HISTORY_COUNT: Record<string, PlayHistoryRankedKey> = {
   "quests-completed": "quests", "creatures-killed": "creatures", "fish-caught": "fish", "flight-paths": "flights", "dungeons-entered": "dungeons", deaths: "deaths",
 };
 /** A board rank shown beside its count: the character's place within its region and ruleset, linking to that board. */
-export interface HistoryRank { metric: ArmoryMetric; rank: number; of: number; href: string }
+export interface HistoryRank { metric: ArmoryMetric; rank: number; of: number; tied?: number; href: string }
 
 /**
  * Blizzard's play history: the six ranked counts first, each with its rank when the character has one, then every
@@ -174,7 +174,7 @@ export function PlayHistoryView({ history, ranks = [] }: { history: NonNullable<
         return <div key={m}>
           <dt className="text-meta text-muted">{ARMORY_BOARDS[m].title}</dt>
           <dd className="font-mono text-lg tabular-nums text-fg">{value === undefined ? <span className="text-fg-2">Not read</span> : metricValue(m, value)}</dd>
-          {rank && <dd className="text-sm"><Link href={rank.href} className={link}>#{rank.rank} of {rank.of.toLocaleString("en-US")}</Link></dd>}
+          {rank && <dd className="text-sm"><Link href={rank.href} className={link}>{rankText(rank)}</Link></dd>}
         </div>;
       })}
     </dl>

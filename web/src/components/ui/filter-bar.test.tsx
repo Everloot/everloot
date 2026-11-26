@@ -253,3 +253,11 @@ test("a choice that matches nothing is left out unless selected, and a menu with
   const empty = { ...side(null), options: side(null).options.map((o) => (o.reset ? o : { ...o, count: 0 })) };
   expect(html([empty])).not.toContain('data-filter="side"');
 });
+
+test("the name box is a search landmark named for what it searches, apart from the site's own search", () => {
+  const html = renderToStaticMarkup(<FilterBar {...props} />);
+  // The bar sends its controls once (phone sheet and desktop row share them), so there is one search form.
+  expect(html.match(/<form [^>]*role="search"[^>]*>/g)).toEqual([
+    expect.stringContaining('aria-label="Search items"'),
+  ]);
+});
