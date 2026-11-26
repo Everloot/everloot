@@ -57,6 +57,7 @@ const OVERVIEW_LIMIT = 5;
 const LIST_OF: Record<ResultScope, string> = {
   item: "/database/items", npc: "/database/npcs", quest: "/database/quests", object: "/database/objects", zone: "/database/zones", instance: "/database/instances",
   achievement: "/database/achievements", faction: "/database/factions", title: "/database/titles", chain: "/database/quest-chains",
+  mount: "/database/mounts", pet: "/database/pets", currency: "/database/currencies",
   holiday: "/database/holidays", family: "/database/pet-families",
 };
 const listHrefFor = (type: SearchType, q: string): string | undefined => {

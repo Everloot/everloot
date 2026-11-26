@@ -33,12 +33,14 @@ afterEach(async () => {
 const toolsButton = () => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Tools")!;
 const menu = () => container.querySelector("#tools-menu:not([hidden])");
 
-test("the menu keeps both build links reachable below the desktop build chip breakpoint", async () => {
+test("the menu keeps both build links reachable while the bar is hidden (the footer has them at every width)", async () => {
   const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
-  expect(toggle.className).toContain("2xl:hidden");
+  expect(toggle.className).toContain("xl:hidden");
+  expect(toggle.className).not.toContain("2xl:hidden");
   await act(async () => toggle.click());
   const nav = container.querySelector("#site-navigation")!;
-  expect(nav.className).toContain("2xl:hidden");
+  expect(nav.className).toContain("xl:hidden");
+  expect(nav.className).not.toContain("2xl:hidden");
   expect(nav.querySelector('a[href^="/changes?show=builds"]')).not.toBeNull();
   expect(nav.querySelector('a[title^="The newest WoW"]')).not.toBeNull();
 });
@@ -68,7 +70,7 @@ test("a page change closes the open menu, so a suggestion picked in it never lea
 test("Tools opens its menu and says so; opening another menu closes it", async () => {
   await act(async () => toolsButton().click());
   expect(toolsButton().getAttribute("aria-expanded")).toBe("true");
-  expect(Array.from(menu()!.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
+  expect(Array.from(menu()!.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/tools/auctions", "/tools/bags", "/tools/disenchanting", "/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
   const profile = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Profile")!;
   await act(async () => profile.click());
   expect(menu()).toBeNull();
@@ -146,8 +148,8 @@ test("ArrowRight and ArrowLeft move along the bar's items, wrapping, and close t
   expect(menu()).toBeNull();
   await key(top("Guides"), "ArrowRight");
   expect(document.activeElement).toBe(top("Chat"));
-  top("Rankings").focus();
-  await key(top("Rankings"), "ArrowLeft");
+  top("Community").focus();
+  await key(top("Community"), "ArrowLeft");
   expect(document.activeElement).toBe(top("Profile"));
   // Inside a panel the keys leave the links alone.
   await act(async () => toolsButton().click());
@@ -178,7 +180,7 @@ test("the phone menu lists the same places", async () => {
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
 });
 
-test("the phone menu shows both builds, which the bar shows inline from 1536 px", async () => {
+test("the phone menu shows both builds, which the bar shows inline from 1280 px", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const links = Array.from(container.querySelector("#site-navigation")!.querySelectorAll("a")).map((a) => a.textContent ?? "");
@@ -251,6 +253,7 @@ test("on a phone each group shows three links and More… for the rest; the open
   expect(Array.from(guides.querySelectorAll("li")).every((li) => !li.className.includes("hidden"))).toBe(true);
   expect(Array.from(guides.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(false);
   // Opening one group leaves the others folded.
-  const tools = container.querySelector("#tools-menu-phone")!;
-  expect(Array.from(tools.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(true);
+  // (Tools holds this page, /tools/raid, past its third link, so it opened by itself; Database does not.)
+  const database = container.querySelector("#database-menu-phone")!;
+  expect(Array.from(database.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(true);
 });

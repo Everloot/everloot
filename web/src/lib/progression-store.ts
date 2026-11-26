@@ -2,15 +2,23 @@ import { unstable_cache } from "next/cache";
 import { z } from "zod";
 import { authQuery } from "./supabase/server";
 
-const Kill = z.object({ encounterId: z.number().int().positive(), instanceMapId: z.number().int().positive(), lastKillAt: z.string().datetime({ offset: true }) });
+// The stored rows also carry the first kill and the kill count, which the dungeons and raids section shows.
+const Kill = z.object({
+  encounterId: z.number().int().positive(), instanceMapId: z.number().int().positive(), lastKillAt: z.string().datetime({ offset: true }),
+  firstKillAt: z.string().datetime({ offset: true }).optional(), killCount: z.number().int().positive().optional(),
+});
 const History = z.object({ region: z.string(), slug: z.string(), kills: z.array(Kill) });
 const GuildHistory = History.extend({ guild_slug: z.string(), guild_name: z.string() });
+const InstanceHistory = History.extend({ name: z.string(), surname: z.string() });
 export type PublicHistory = z.infer<typeof History>;
 export type PublicGuildHistory = z.infer<typeof GuildHistory>;
+export type PublicInstanceHistory = z.infer<typeof InstanceHistory>;
 type CharacterIdentity = { region: string; slug: string } | { ruleset: string; realm: string; name: string };
 export interface ProgressionStore {
   characters(characters: readonly CharacterIdentity[]): Promise<PublicHistory[]>;
   region(region: string | null): Promise<PublicGuildHistory[]>;
+  /** Up to 500 public histories with a kill in one instance, newest kill first, holding only that instance's kills. */
+  instance(mapId: number): Promise<PublicInstanceHistory[]>;
 }
 type Query = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -21,12 +29,13 @@ export function createCloudProgressionStore(query: Query = authQuery): Progressi
   return {
     characters: (characters) => rpc("public_boss_kills", { p_characters: characters }, z.array(History)),
     region: (region) => rpc("public_boss_kill_characters", { p_region: region }, z.array(GuildHistory)),
+    instance: (mapId) => rpc("public_instance_clears", { p_map: mapId }, z.array(InstanceHistory)),
   };
 }
 
 export function createUnavailableProgressionStore(): ProgressionStore {
   const fail = async (): Promise<never> => { throw new Error("Progression storage is unavailable"); };
-  return { characters: fail, region: fail };
+  return { characters: fail, region: fail, instance: fail };
 }
 
 // Five minutes, like the armory boards. Character and guild hides invalidate these same tags.
@@ -34,6 +43,8 @@ const cachedCharacters = unstable_cache(async (characters: CharacterIdentity[]) 
   createCloudProgressionStore().characters(characters), ["public-boss-kills"], { revalidate: 300, tags: ["players", "guilds"] });
 const cachedRegion = unstable_cache(async (region: string | null) =>
   createCloudProgressionStore().region(region), ["public-boss-kill-region"], { revalidate: 300, tags: ["players", "guilds"] });
+const cachedInstance = unstable_cache(async (mapId: number) =>
+  createCloudProgressionStore().instance(mapId), ["public-instance-clears"], { revalidate: 300, tags: ["players", "guilds"] });
 
 export async function progressionByLink(identity: { ruleset: string; realm: string; name: string }) {
   try {
@@ -44,5 +55,5 @@ export async function progressionByLink(identity: { ruleset: string; realm: stri
 
 export function progressionStore(env: Record<string, string | undefined> = process.env): ProgressionStore {
   if (!env.SUPABASE_URL?.trim() || !env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return createUnavailableProgressionStore();
-  return { characters: (characters) => cachedCharacters([...characters]), region: cachedRegion };
+  return { characters: (characters) => cachedCharacters([...characters]), region: cachedRegion, instance: cachedInstance };
 }

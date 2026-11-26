@@ -3,9 +3,10 @@ import { itemPage } from "@kb/item-page";
 import { objectPage } from "@kb/object-page";
 import { agreedNpcsOf, npcPage, questPage, vendorPage } from "@kb/world-pages";
 import { loadEdges } from "./edges";
-import { loadSpellNames } from "./game-assets";
+import { loadItemSetNames, loadSpellNames } from "./game-assets";
 import { itemIndexable, npcIndexable, objectIndexable, questIndexable, spellIndexable, vendorIndexable } from "./indexable";
 import { instanceHref, instanceRows } from "./instances";
+import { itemSetHref, ITEM_SETS } from "./item-sets";
 import { CLIENT_LAYER, shownItemName } from "./items";
 import { loadObjectFacts } from "./objects";
 import { loadWorldFacts } from "./rollup-compute";
@@ -54,14 +55,14 @@ export function spellIds(
 }
 
 /**
- * Every item, NPC, quest, object, vendor and related spell page that asks to be indexed, by the same function its
+ * Every item, NPC, quest, object, vendor, related spell and named item set page that asks to be indexed, by the same function its
  * robots metadata calls (lib/indexable.ts). Each page is built from only its own rows, which gives the page the
  * whole page would: every builder reads only the rows about its id. Null when upload storage cannot be
  * read, so the sitemap answers 503 instead of a short list.
  */
 export async function databasePaths(): Promise<string[] | null> {
-  const [{ facts, agreed, matched }, world, objects, edges, spellNames, talents] = await Promise.all([
-    loadShownNames(), loadWorldFacts(), loadObjectFacts(), loadEdges(), loadSpellNames(CLIENT_LAYER.build.version), loadSpellTalents(),
+  const [{ facts, agreed, matched }, world, objects, edges, spellNames, talents, setNames] = await Promise.all([
+    loadShownNames(), loadWorldFacts(), loadObjectFacts(), loadEdges(), loadSpellNames(CLIENT_LAYER.build.version), loadSpellTalents(), loadItemSetNames(CLIENT_LAYER.build.version),
   ]);
   if (facts.unreachable || world.unreachable || objects.unreachable || edges.unreachable) return null;
 
@@ -101,6 +102,8 @@ export async function databasePaths(): Promise<string[] | null> {
     ...objectIds.map((id) => `/database/objects/${id}`),
     ...vendors.map((id) => `/database/vendors/${id}`),
     ...spellIds([...edges.observed, ...edges.client], { has: (id: number) => Boolean(spellNames?.names.has(id) || spellWiki?.names.has(id)) }, talents).map((id) => `/database/spells/${id}`),
+    // A set the item set file lists, once the names file names it, as its page's robots ask.
+    ...ITEM_SETS.filter((s) => setNames?.names.has(s.id)).map((s) => itemSetHref(s.id)),
   ];
 }
 

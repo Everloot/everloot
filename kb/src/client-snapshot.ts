@@ -209,6 +209,9 @@ export const CLIENT_TABLES = {
   // Loading screens (Map.LoadingScreenID names a row; the row names its picture files), for the page
   // banners. ChrRaces above also gives the race names for the race emblems.
   LoadingScreens: 1266541,
+  // Model pictures (client-renders): the texture file of an item's own model
+  // (ItemDisplayInfo.ModelMaterialResourcesID -> MaterialResourcesID -> FileDataID).
+  TextureFileData: 982459,
 } as const;
 export type ClientTableName = keyof typeof CLIENT_TABLES;
 
