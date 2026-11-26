@@ -171,6 +171,20 @@ describe("player directory", () => {
     }
   });
 
+  // A screen reader's landmark list names each region; the results table's scroll box is the region named for the
+  // list, so the section around it must not take the same name.
+  test("the results' regions each have a name of their own", async () => {
+    armory.putCharacter(armoryCharacter());
+    const html = await page();
+    const ids = new Map([...html.matchAll(/<h2 id="([^"]+)"[^>]*>(.*?)<\/h2>/g)].map((m) => [m[1], m[2]]));
+    const names = [
+      ...[...html.matchAll(/<section aria-labelledby="([^"]+)"/g)].map((m) => ids.get(m[1])),
+      ...[...html.matchAll(/role="region" aria-label="([^"]+)"/g)].map((m) => m[1]),
+    ];
+    expect(names).toContain("Blizzard profiles");
+    expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+  });
+
   test("an empty answer says why and offers the one thing to do", async () => {
     const none = await page({ class: "MAGE" });
     expect(none).toContain("No character matches these filters yet.");

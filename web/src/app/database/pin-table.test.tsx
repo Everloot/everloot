@@ -24,7 +24,9 @@ test("the columns are the zone, the position, the installs and the map link, in 
   expect(cells(head)).toEqual(["Map", "Position", "Installs", '<span class="sr-only">Map link</span>']);
   expect(out).toContain('<span title="UiMap 1429">Elwynn Forest</span>');
   expect(out).toContain("40, 60");
-  expect(out).toContain('aria-label="Show Elwynn Forest at 40, 60 on the map"');
+  // The words on screen start the link's name (WCAG 2.5.3, label in name); the place follows for screen readers.
+  expect(out).toContain('>Show on the map<span class="sr-only">: Elwynn Forest at 40, 60</span></a>');
+  expect(out).not.toContain("aria-label=\"Show Elwynn");
   expect(out).toContain(">3</td>");
 });
 

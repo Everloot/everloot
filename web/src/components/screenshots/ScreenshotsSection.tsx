@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- screenshots are WebPs the server already sized; next/image would only add an optimizer hop and a second copy. */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
-import { SectionHeading } from "@/components/ui";
+import SectionHeading from "@/components/ui/SectionHeading";
 import { signInPath } from "@/lib/auth/return-to";
 import {
   OWN_SCREENSHOTS_ROUTE, SCREENSHOTS_ROUTE, SCREENSHOT_ACCEPT, SCREENSHOT_LIMITS, screenshotFileHref, screenshotReviewHref,
