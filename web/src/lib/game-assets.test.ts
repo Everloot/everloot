@@ -190,6 +190,34 @@ test("the private bucket needs all four server-only variables, signs its reads, 
   expect(await failing.read(`${FOLDER}/other.json`)).toBe(PRIVATE_UNREACHABLE);
 });
 
+test("pages that ask for one private file while it is being read share that read and its one parse", async () => {
+  const env = { GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "everloot-game-data", GAME_DATA_ACCESS_KEY_ID: "id", GAME_DATA_SECRET_ACCESS_KEY: "secret" };
+  const names = { schema: "everloot.item-names/1", build: { version: "1.60.1.70450" }, wiki: { name: "Warcraft Wiki", url: "https://warcraft.wiki.gg", licence: "CC-BY-SA-4.0" }, names: { "9": { n: "Hearthstone", q: 1 } } };
+  const fetcher = vi.fn(async () => { await new Promise((r) => setTimeout(r, 5)); return Response.json(names); });
+  // Each page builds its own store, as the item page does; the file is the same.
+  const reads = await Promise.all(Array.from({ length: 20 }, () => loadItemNames("1.60.1.70450", BASE, privateStoreFromEnv(env, fetcher as unknown as typeof fetch))));
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(reads[0]).not.toBe(PRIVATE_UNREACHABLE);
+  for (const read of reads) expect(read).toBe(reads[0]);
+});
+
+test("a reader waits at most FETCH_TIMEOUT_MS on another page's read, then reads the file itself", async () => {
+  vi.useFakeTimers();
+  try {
+    const env = { GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "everloot-game-data", GAME_DATA_ACCESS_KEY_ID: "id", GAME_DATA_SECRET_ACCESS_KEY: "secret" };
+    // A Worker drops the work of a request that was canceled: the first read never settles.
+    const stuck = privateStoreFromEnv(env, vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch)!;
+    void stuck.read(`${FOLDER}/items.json`);
+    const fetcher = vi.fn(async () => Response.json(itemIndex));
+    const read = privateStoreFromEnv(env, fetcher as unknown as typeof fetch)!.read(`${FOLDER}/items.json`);
+    await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS);
+    expect(await read).toEqual(itemIndex);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test("a file that is not there is null; a bucket that cannot be read (an error, a timeout, a 5xx) says so", async () => {
   const env = { GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "everloot-game-data", GAME_DATA_ACCESS_KEY_ID: "id", GAME_DATA_SECRET_ACCESS_KEY: "secret" };
   const answer = (status: number) => privateStoreFromEnv(env, vi.fn(async () => new Response("<Error/>", { status })) as unknown as typeof fetch)!;

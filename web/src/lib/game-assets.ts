@@ -227,8 +227,23 @@ export const PRIVATE_MALFORMED: unique symbol = Symbol("private names malformed"
 
 // Signed requests differ every time, so the fetch cache cannot keep them; this does, per server instance.
 const kept = new Map<string, { at: number; value: unknown | null }>();
+// The read of each file in progress. Pages that ask for a file while it is being read wait on that read, so a burst of
+// item pages on a new instance downloads and parses the 1.3 MB names file once instead of once per page (20 copies at
+// once ran the isolate out of memory). The parsed value is then the same object, and the parses keyed on it run once.
+const reading = new Map<string, Promise<unknown | null>>();
 /** For tests: forget what the private bucket returned. */
-export const forgetPrivateReads = () => kept.clear();
+export const forgetPrivateReads = () => { kept.clear(); reading.clear(); };
+
+const WAITED_TOO_LONG = Symbol("waited too long");
+/**
+ * Another page's read, or WAITED_TOO_LONG after `ms`: a Worker drops the work of a request that was canceled, so a read
+ * that page started may never settle, and the waiting page then reads the file itself.
+ */
+async function waitAtMost<T>(read: Promise<T>, ms: number): Promise<T | typeof WAITED_TOO_LONG> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([read, new Promise<typeof WAITED_TOO_LONG>((resolve) => { timer = setTimeout(() => resolve(WAITED_TOO_LONG), ms); })])
+    .finally(() => clearTimeout(timer));
+}
 
 /**
  * The private bucket from GAME_DATA_S3_ENDPOINT, GAME_DATA_BUCKET, GAME_DATA_ACCESS_KEY_ID and
@@ -247,20 +262,29 @@ export function privateStoreFromEnv(env: Record<string, string | undefined> = pr
       // A miss or a failed read is kept a minute, so a missing file is not asked for on every page view.
       const short = hit?.value === null || hit?.value === PRIVATE_UNREACHABLE;
       if (hit && Date.now() - hit.at < (short ? 60_000 : REVALIDATE_SECONDS * 1000)) return hit.value;
-      let value: unknown | null = null;
-      // Timed by file kind only (`items`, `item-names`): the build and shard numbers are left out.
-      const done = timeRead(`r2-${(path.split("/")[1] ?? path).replace(/\.json$/, "").replace(/-?\d+$/, "")}`);
-      try {
-        const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
-        const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
-        value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
-      } catch {
-        value = PRIVATE_UNREACHABLE;
-      } finally {
-        done();
+      const other = reading.get(url);
+      if (other) {
+        const value = await waitAtMost(other, FETCH_TIMEOUT_MS);
+        if (value !== WAITED_TOO_LONG) return value;
       }
-      kept.set(url, { at: Date.now(), value });
-      return value;
+      const read: Promise<unknown | null> = (async () => {
+        let value: unknown | null = null;
+        // Timed by file kind only (`items`, `item-names`): the build and shard numbers are left out.
+        const done = timeRead(`r2-${(path.split("/")[1] ?? path).replace(/\.json$/, "").replace(/-?\d+$/, "")}`);
+        try {
+          const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
+          const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
+          value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
+        } catch {
+          value = PRIVATE_UNREACHABLE;
+        } finally {
+          done();
+        }
+        kept.set(url, { at: Date.now(), value });
+        return value;
+      })().finally(() => { if (reading.get(url) === read) reading.delete(url); });
+      reading.set(url, read);
+      return read;
     },
   };
 }
