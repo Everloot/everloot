@@ -73,6 +73,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: `${zone.name} – WoW Forever Zone: Quests, NPCs and Map`,
       description: `${zone.name} in WoW: Forever (${zone.continentName}): the map, the dungeon and raid entrances, and the NPCs, vendors and quests players have confirmed.`,
       path: zoneHref(zone.mapId, zone.name),
+      image: `${zoneHref(zone.mapId, zone.name)}/opengraph-image`,
     }),
     robots: { index: indexable, follow: true },
   };
@@ -305,7 +306,7 @@ export default async function ZonePage(props: Props) {
           </div>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
           {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
-          <OpenData className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+          <OpenData report={{ type: "Zone", id: zone.mapId, path: canonical }} className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
         </EntitySidebar>
 
         <div className="space-y-6">

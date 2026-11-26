@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: entity pages share one layout: spell, instance, zone and Alliance/Horde faction pages show their game art in the header, instance sections are tabs, achievement, faction, title and quest chain pages get the wide-screen side column, and empty tabs read from one wording table.
+- Site: every database page has its own link preview card (the name, its type and a few of the page's facts), and a Report wrong data link that opens the Wrong data issue form with the page, its type, id and game build filled in.
 - Site: item and NPC pages show the model picture from the game files beside the quick facts, where the page already names the item or NPC.
 - Site: zone pages gain a Places tab with the subzones and the points of interest the game files name, each point linked to its spot on the map, and the achievement list groups by the categories the game files name; labelled found in game files, unconfirmed.
 - Site: the database lists holidays and world events (when each starts and how long it lasts) and hunter pet families (icon and the spells on each family's skill line) from the game files, each with its own page, in search and the sitemap; labelled found in game files, unconfirmed.

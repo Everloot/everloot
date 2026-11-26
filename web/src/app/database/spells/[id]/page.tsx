@@ -1,4 +1,3 @@
-import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
 import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
@@ -9,17 +8,16 @@ import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, typ
 import { EMPTY, EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
-import { loadEdges } from "@/lib/edges";
-import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
-import { edgesFrom, edgesTo, type Edge, type Rel } from "@kb/edges";
+import type { Edge, Rel } from "@kb/edges";
 import { entityLabel } from "@kb/edges";
 import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
-import { loadSpellTalents, type SpellTalent } from "@/lib/talents/spell-talents";
+import type { SpellTalent } from "@/lib/talents/spell-talents";
 import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import { loadSpell } from "./load-spell";
 
 /**
  * A spell page. The spell is the game's own data: its name, its text and its relations all come
@@ -88,31 +86,6 @@ function TalentFacts({ talent, title }: { talent: SpellTalent; title: string }) 
 }
 
 /**
- * What the page reads about one spell. The spell is unknown, a 404 rather than an empty page, when the game
- * files' spell names are loaded and do not hold it, it has no tooltip and no relation points from or to it.
- * Without the names file, or with upload storage out of reach, nothing can be ruled out.
- */
-async function loadSpell(spellId: number) {
-  const [edges, assets, spellNames, talentIndex] = await Promise.all([
-    loadEdges(),
-    loadSiteAssets(),
-    loadSpellNames(CLIENT_LAYER.build.version),
-    loadSpellTalents(),
-  ]);
-  const both = [...edges.observed, ...edges.client];
-  // Both directions: the files store what a spell creates and what it costs on the item (item -> created_by
-  // or reagent_for -> spell), and what teaches it on the spell (spell -> in_skill_line -> skill).
-  const all = [...edgesFrom(both, "spell", spellId), ...edgesTo(both, "spell", spellId)];
-  const wiki = await loadWikiEntityNames("spell");
-  const shownName = shownEntityName(spellId, spellNames?.names.get(spellId) || assets?.spellTips.get(spellId)?.name, wiki);
-  const name = shownName.name;
-  const tip = assets?.spellTips.get(spellId);
-  const talents = talentIndex.get(spellId) ?? [];
-  const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length && !talents.length;
-  return { edges, assets, all, name, tip, talents, unknown, fromWiki: shownName.fromWiki };
-}
-
-/**
  * The description from the name the files give, cut at a word when a long name leaves no room; the shape the other
  * database pages take (the lead sentence, what the page holds, the id). Without a name it says where the id comes from.
  */
@@ -139,6 +112,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: shown ? `${shown} – WoW Forever spell` : `Spell ${params.id}`,
       description: spellDescription(shown, Number(params.id)),
       path: `/database/spells/${params.id}`,
+      image: `${`/database/spells/${params.id}`}/opengraph-image`,
     }),
     robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length, talents: talents.length }), follow: true },
   };
@@ -218,7 +192,7 @@ export default async function SpellPage(props: Props) {
         />
         <EntitySidebar>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
+          <OpenData report={{ type: "Spell", id: spellId, path: `/database/spells/${spellId}`, build }}
             text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
           />
         </EntitySidebar>

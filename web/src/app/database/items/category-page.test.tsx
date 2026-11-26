@@ -165,7 +165,8 @@ test("an item page shows its category path, slot and quality, with no source lin
   expect(page).toContain("Epic");
   expect(page).not.toContain("data-source-line");
   expect(page).not.toMatch(/game files, unconfirmed/i);
-  expect(page).not.toContain(CLIENT_LAYER.build.version);
+  // No build on the page; the Report wrong data link names it only inside the form's prefilled title.
+  expect(page.replace(/href="https:\/\/github\.com\/Everloot\/everloot\/issues\/new\?[^"]*"/g, "")).not.toContain(CLIENT_LAYER.build.version);
   // Without the asset files the header has no icon, so no icon frame either (the marker is on the icon: item-quality.test.tsx).
   expect(page).not.toContain("data-game-icon");
   // No breadcrumb on screen; the trail stays as JSON-LD.

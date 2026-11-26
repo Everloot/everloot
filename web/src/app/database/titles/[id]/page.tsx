@@ -36,7 +36,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (!entry) return { robots: { index: false, follow: true } };
   const name = titleDisplayName(entry.name);
   return {
-    ...pageMetadata({ title: `${name} (title)`, description: `The ${name} title in WoW: Forever${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: titleHref(entry.titleId, entry.name) }),
+    ...pageMetadata({ title: `${name} (title)`, description: `The ${name} title in WoW: Forever${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: titleHref(entry.titleId, entry.name), image: `${titleHref(entry.titleId, entry.name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -93,7 +93,7 @@ export default async function TitlePage(props: Props) {
             />
             <EntitySidebar>
               <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-              <OpenData text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
+              <OpenData report={{ type: "Title", id, path: titleHref(entry.titleId, entry.name) }} text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
             </EntitySidebar>
             <Tabs
               label={`${title}: relations`}

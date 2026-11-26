@@ -3,11 +3,11 @@
  "label": "found in game files, unconfirmed",
  "build": {
   "product": "wowf",
-  "buildId": 71091,
-  "version": "1.60.1.71091",
-  "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
-  "definitions": "3783c908726e",
-  "extractedAt": "2026-11-24T18:12:10.461Z"
+  "buildId": 71139,
+  "version": "1.60.1.71139",
+  "buildConfig": "7a16decda3672d84db0d34d0784fda98",
+  "definitions": "8308f39154b5",
+  "extractedAt": "2026-11-25T21:58:41.560Z"
  },
  "classId": 11,
  "className": "Druid",

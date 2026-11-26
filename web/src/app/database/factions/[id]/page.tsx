@@ -32,7 +32,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: entityTitle(entry.name, "faction"), description: `The ${entry.name} reputation faction in WoW: Forever${entry.header ? `, under ${entry.header}` : ""}${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: factionHref(entry.factionId, entry.name) }),
+    ...pageMetadata({ title: entityTitle(entry.name, "faction"), description: `The ${entry.name} reputation faction in WoW: Forever${entry.header ? `, under ${entry.header}` : ""}${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: factionHref(entry.factionId, entry.name), image: `${factionHref(entry.factionId, entry.name)}/opengraph-image` }),
     // A header the files list with no standing of its own is a thin page: noindex, and out of the sitemap.
     robots: { index: !factionHeaderOnly(entry), follow: true },
   };
@@ -106,7 +106,7 @@ export default async function FactionPage(props: Props) {
             />
             <EntitySidebar>
               <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-              <OpenData text={[`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n")} />
+              <OpenData report={{ type: "Faction", id, path: factionHref(entry.factionId, entry.name) }} text={[`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n")} />
             </EntitySidebar>
             <Tabs
               label={`${entry.name}: relations`}

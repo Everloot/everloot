@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 71091,
-  "version": "1.60.1.71091",
-  "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
-  "definitions": "3783c908726e",
-  "extractedAt": "2026-11-24T18:12:10.461Z"
+  "buildId": 71139,
+  "version": "1.60.1.71139",
+  "buildConfig": "7a16decda3672d84db0d34d0784fda98",
+  "definitions": "8308f39154b5",
+  "extractedAt": "2026-11-25T21:58:41.560Z"
  },
  "note": "ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored",
  "professions": [
@@ -1090,6 +1090,7 @@
    [1292974,273937,1,320,330,[[274030,3],[15407,2],[248825,18],[14341,8]]],
    [1292975,273938,1,320,330,[[274030,3],[15407,2],[248825,18],[14341,8]]],
    [1292976,273939,1,320,330,[[274030,3],[15407,2],[248825,18],[14341,8]]],
+   [1294289,274490,1,170,180,[[4304,12],[8343,2]]],
    [1297126,275610,1,290,295,[[8170,12],[12810,3],[7082,3],[14341,6]]],
    [1297127,275611,1,295,300,[[8170,18],[12810,3],[7082,3],[14341,6]]],
    [1297128,275612,1,295,300,[[8170,15],[12810,3],[7082,3],[14341,6]]],

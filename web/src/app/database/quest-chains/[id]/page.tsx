@@ -27,7 +27,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name) }),
+    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name), image: `${chainHref(entry.questLineId, entry.name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -92,7 +92,7 @@ export default async function QuestChainPage(props: Props) {
             />
             <EntitySidebar>
               <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-              <OpenData text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
+              <OpenData report={{ type: "Quest chain", id, path: chainHref(entry.questLineId, entry.name) }} text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
             </EntitySidebar>
             {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
             <DataTable

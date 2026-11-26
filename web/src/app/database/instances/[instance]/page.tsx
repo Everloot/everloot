@@ -66,6 +66,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: entityTitle(title, row.raid === null ? "instance" : row.raid ? "raid" : "dungeon"),
       description: instanceDescription(row),
       path: instanceHref(row.instanceMapId, row.name),
+      image: `${instanceHref(row.instanceMapId, row.name)}/opengraph-image`,
     }),
     // Storage down: noindex rather than cache a page without its player reports.
     robots: { index: !unreachable, follow: true },
@@ -351,7 +352,7 @@ export default async function InstancePage(props: Props) {
         <EntitySidebar>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
           {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
-          <OpenData className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+          <OpenData report={{ type: "Instance", id: row.instanceMapId, path: canonical }} className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
         </EntitySidebar>
 
         <div className="space-y-6">
