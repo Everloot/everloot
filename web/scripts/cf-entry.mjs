@@ -11,7 +11,8 @@ import { cachedResponse } from "../src/lib/cf-edge-cache.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { installServerTiming, withServerTiming } from "../src/lib/server-timing.ts";
 
-// The armory character and guild pages get a Server-Timing header: each storage read's name and duration.
+// The armory character and guild pages get a Server-Timing header: each storage read's name and duration, and how many
+// requests this isolate has served.
 installServerTiming(new AsyncLocalStorage());
 
 export { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./worker.js";

@@ -1,7 +1,6 @@
-import { categoryOf } from "@kb/item-taxonomy";
 import { privateStoreFromEnv, readItemTips, type ItemTip, type PrivateStore, type SiteAssets } from "./game-assets";
+import { itemCategoryOf } from "./item-categories";
 import { qualityColor } from "./item-names";
-import { CLIENT_TAXONOMY } from "./items";
 
 const QUALITY_NAMES = ["Poor", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Artifact", "Heirloom"];
 
@@ -19,7 +18,7 @@ export async function loadEquippedTips(assets: SiteAssets | null, items: readonl
     const icon = read.icons.get(item.itemId);
     if (tips.has(item.itemId) || !icon) continue;
     const q = QUALITY_NAMES.findIndex((n) => n.toLowerCase() === item.quality?.toLowerCase());
-    const category = categoryOf(CLIENT_TAXONOMY, item.itemId);
+    const category = itemCategoryOf(item.itemId);
     tips.set(item.itemId, {
       name: item.name, color: qualityColor(q < 0 ? 1 : q), quality: QUALITY_NAMES[q < 0 ? 1 : q], icon,
       lines: [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l)),

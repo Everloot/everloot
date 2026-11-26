@@ -27,6 +27,7 @@ describe("game versions", () => {
     const stamps: [string, { product?: string; version?: string }][] = [];
     for (const file of ["client-layer.json", "client-digests.json", "spell-values.json", "client-spells.json"]) stamps.push([file, read(file).build]);
     stamps.push(["build-version.json", read("build-version.json")]);
+    stamps.push(["item-categories.json", read("item-categories.json").build]);
     stamps.push(["map.json", read("map.json").source]);
     for (const file of readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json"))) stamps.push([`talents/${file}`, read(`talents/${file}`).build]);
     expect(stamps.length).toBeGreaterThan(10);
