@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import { emptyMarket, foldMarket } from "@kb/market";
@@ -115,6 +115,33 @@ test("with the movers filter on and an explicit sort, the change default is not 
   const html = await hub({ moved: "1", sort: "-units" });
   // The change column is now the one to ask for: change, most first, is the moved default and needs no parameter.
   expect(headerQuery(html, "7 days").has("sort")).toBe(false);
+});
+
+/** Every element under `node`, through children and element-valued props (not into components' own output). */
+function elements(node: unknown, out: ReactElement[] = []): ReactElement[] {
+  if (Array.isArray(node)) node.forEach((n) => elements(n, out));
+  else if (isValidElement(node)) {
+    out.push(node);
+    for (const value of Object.values(node.props as Record<string, unknown>)) elements(value, out);
+  }
+  return out;
+}
+
+test("a result row hands its prices to the client as amounts, so the page's flight data does not carry each coin's markup", async () => {
+  const { default: ClientCoins } = await import("./ClientCoins");
+  const { CoinText } = await import("@/components/ui/Coins");
+  const table = elements(await AuctionHousePage({ searchParams: Promise.resolve({ house: "horde" }) }))
+    .find((el) => (el.props as { meta?: unknown; columns?: unknown }).columns && typeof (el.props as { meta?: unknown }).meta === "function") as ReactElement<{ columns: { key: string; cell: (row: unknown) => ReactNode }[]; rows: unknown[]; meta: (row: unknown) => ReactNode }>;
+  const row = table.props.rows.find((r) => (r as { row: { value: { itemId: number } } }).row.value.itemId === 2589)!;
+  const cell = (key: string) => elements(table.props.columns.find((c) => c.key === key)!.cell(row));
+  for (const parts of [cell("market"), cell("min"), elements(table.props.meta(row))]) {
+    expect(parts.filter((el) => el.type === ClientCoins).map((el) => typeof (el.props as { copper: unknown }).copper)).toEqual(["number"]);
+    expect(parts.some((el) => el.type === CoinText)).toBe(false);
+  }
+  // The server HTML is the same coins as before: the spoken price and the sprite's references.
+  const html = await hub({ house: "horde" });
+  // 2589's minimum buyout today is 200 copper.
+  expect(html).toContain('<span class="sr-only">2 silver 0 copper</span><span aria-hidden="true"><span>2<svg aria-hidden="true" class="coin"><use href="#coin-s"></use></svg></span><span> 0<svg aria-hidden="true" class="coin"><use href="#coin-c"></use></svg></span></span>');
 });
 
 test("a result row's item link loads on click, not all at once as the page opens", async () => {

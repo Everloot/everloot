@@ -95,6 +95,7 @@ test("on a phone the recipe tables scroll sideways instead of hiding what a reci
   const recipes = html.slice(html.indexOf('data-skill-group="1"'));
   expect(recipes).toContain("overflow-x-auto");
   expect(recipes).not.toContain("hidden sm:table-cell");
+  expect(recipes).not.toContain("dt-fold");
 });
 
 test("an unknown profession is a 404", async () => {

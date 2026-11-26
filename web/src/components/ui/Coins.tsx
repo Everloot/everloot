@@ -1,16 +1,25 @@
 import { tipLine, type Metal } from "@/lib/tip-line";
 
-const COLOUR: Record<Metal, string> = { gold: "text-coin-gold", silver: "text-coin-silver", copper: "text-coin-copper" };
+const METALS: Metal[] = ["gold", "silver", "copper"];
 
 /**
- * Flat coin artwork for the three metals (the served asset manifest has no currency art). Each coin carries its
- * metal's letter (g, s, c), so the metal reads without the colour.
+ * Flat coin artwork for the three metals (the served asset manifest has no currency art), drawn once per page by
+ * the root layout. Each coin carries its metal's letter (g, s, c), so the metal reads without the colour.
  */
-export function Coin({ metal }: { metal: Metal }) {
-  return <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" className={`ml-0.5 inline-block align-[-1px] ${COLOUR[metal]}`}>
-    <circle cx="6" cy="6" r="5.5" fill="currentColor" />
-    <text x="6" y="8.6" textAnchor="middle" fontSize="8" fontWeight="700" fill="currentColor" className="text-tooltip">{metal[0]}</text>
+export function CoinSprite() {
+  return <svg aria-hidden="true" width="0" height="0" style={{ position: "absolute", overflow: "hidden" }}>
+    {METALS.map((metal) => (
+      <symbol key={metal} id={`coin-${metal[0]}`} viewBox="0 0 12 12">
+        <circle cx="6" cy="6" r="5.5" style={{ fill: `rgb(var(--coin-${metal}))` }} />
+        <text x="6" y="8.6" textAnchor="middle" fontSize="8" fontWeight="700" style={{ fill: "rgb(var(--tooltip))" }}>{metal[0]}</text>
+      </symbol>
+    ))}
   </svg>;
+}
+
+/** One coin: a reference to the sprite's drawing, so a table of prices does not repeat the artwork in every cell. */
+export function Coin({ metal }: { metal: Metal }) {
+  return <svg aria-hidden="true" className="coin"><use href={`#coin-${metal[0]}`} /></svg>;
 }
 
 /** A formatted price keeps its text for assistive technology and uses coins visually. */

@@ -174,9 +174,10 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
             ) : rows.map((row) => (
               <tr key={rowKey(row)} className="border-b border-line hover:bg-panel">
                 {columns.map((col, i) => (
+                  // One short class per cell (globals.css): a 50-row table repeated the full list some 650 times.
                   <td
                     key={col.key}
-                    className={`h-row-sm px-3 py-1 align-middle text-fg sm:h-row ${col.numeric ? "text-right font-mono tabular-nums" : "text-left"} ${col.nowrap || col.numeric ? "whitespace-nowrap" : ""} ${phoneHidden(i)}`}
+                    className={`dt-td${col.numeric ? " dt-num" : col.nowrap ? " dt-nowrap" : ""}${folds && i > 0 ? " dt-fold" : ""}`}
                   >
                     {col.cell(row)}
                     {folds && i === 0 && <div className="text-cell-2 text-muted sm:hidden">{meta!(row)}</div>}
