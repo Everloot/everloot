@@ -150,9 +150,12 @@ function rosterColumns(region: string): Column<Row>[] {
         return r.seen ? <>{r.seen} <span className="text-cell-2 text-muted">seen</span></> : muted("Not known");
       },
     },
-    { key: "rank", header: "Rank", numeric: true, sortable: true, cell: ({ m }) => m.rank ?? muted(UNKNOWN) },
+    { key: "rank", header: "Rank", nowrap: true, sortable: true, cell: ({ m }) => (m.rank === null ? muted(UNKNOWN) : rankName(m.rank)) },
   ];
 }
+
+/** The game's custom rank names are not in the data: 0 is the guild master, the rest go by number. */
+const rankName = (rank: number) => (rank === 0 ? "Guild Master" : `Rank ${rank}`);
 
 /** The phone line under a name: everything the hidden columns say. */
 function rowMeta({ m, token }: Row): string {
@@ -211,12 +214,15 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
   const shown = sorted.slice((page - 1) * ROSTER_PAGE, page * ROSTER_PAGE);
   const href = (over: Partial<RosterView>) => rosterHref(path, { ...view, page: 1, ...over });
   const filters = rosterFilters(rows, view, href);
+  const summary = rosterSummary(roster);
 
   return (
     <Container width="data">
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
+        <SummaryStrip guild={g} members={roster} summary={summary} />
         <GuildProfile guild={g} />
+        <TopItemLevels region={g.region} rows={rows} />
 
         <section aria-labelledby="armory-roster" className="space-y-3">
           <SectionHeading id="armory-roster" note="Item level and last login show once the character itself has been read.">Roster</SectionHeading>
@@ -243,7 +249,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
 
         <GuildProgression members={roster} region={g.region} />
         {addon && <AddonSection addon={addon} />}
-        <Summary guild={g} members={roster} summary={rosterSummary(roster)} />
+        <Summary members={roster} summary={summary} />
 
         <footer className="space-y-3 text-sm">
           {guildReadDue(g.checkedAt)
@@ -342,16 +348,12 @@ function AddonSection({ addon }: { addon: GuildPageData }) {
   );
 }
 
-/** Roster size, members read, average item level and last read, then the class mix and the level spread. */
-function Summary({ guild: g, members, summary: s }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary }) {
+/** The guild at a glance, under its header: roster size, members read, level 60s, average item level, roster read, and the class mix as one bar. */
+function SummaryStrip({ guild: g, members, summary: s }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary }) {
   const read = members.filter((m) => m.stored).length;
   return (
-    <section aria-labelledby="armory-summary" className="space-y-4">
-      <SectionHeading id="armory-summary" note="From the roster as Blizzard lists it. Item level comes from the members the armory has read; hidden characters are left out.">
-        Summary
-      </SectionHeading>
+    <section data-guild-summary aria-label="Guild summary" className="space-y-3">
       <Facts items={[
-        { label: "Region", value: <span className="inline-flex items-center gap-1.5"><RegionChip region={g.region} />{g.ruleset}</span> },
         { label: "On the roster", value: members.length.toLocaleString("en-US"), numeric: true },
         { label: "Members read", value: read.toLocaleString("en-US"), numeric: true },
         { label: "Level 60", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
@@ -362,6 +364,57 @@ function Summary({ guild: g, members, summary: s }: { guild: ArmoryGuild; member
         },
         { label: "Roster read", value: day(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
+      {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}
+    </section>
+  );
+}
+
+const share = (count: number, total: number) => (total ? Math.round(count / total * 1000) / 10 : 0);
+
+/** The class mix in one row: a stacked bar, then each class named in its colour with its count. */
+function ClassBar({ total, classes }: { total: number; classes: RosterSummary["classes"] }) {
+  const label = `Class mix: ${classes.map((c) => `${className(c.token)} ${c.count}`).join(", ")}`;
+  return (
+    <div className="space-y-2">
+      <div data-class-bar role="img" aria-label={label} className="flex h-2 overflow-hidden rounded-full bg-panel">
+        {classes.map((c) => <span key={c.token} className={`block h-2 ${classColour(CLASS_BG, c.token)}`} style={{ width: `${share(c.count, total)}%` }} />)}
+      </div>
+      <p aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1 text-meta">
+        {classes.map((c) => <span key={c.token}><span className={classText(c.token)}>{className(c.token)}</span> <span className="font-mono tabular-nums text-fg-2">{c.count}</span></span>)}
+      </p>
+    </div>
+  );
+}
+
+/** The five members with the highest item level read, each linking to their character. */
+function TopItemLevels({ region, rows }: { region: string; rows: readonly Row[] }) {
+  const top = rows
+    .filter((r) => r.m.stored && r.m.itemLevel !== null)
+    .sort((a, b) => b.m.itemLevel! - a.m.itemLevel! || byName(a, b))
+    .slice(0, 5);
+  if (top.length === 0) return null;
+  return (
+    <section aria-labelledby="guild-top" className="space-y-3">
+      <SectionHeading id="guild-top" note="Among the members the armory has read.">Top item levels</SectionHeading>
+      <ol className="grid gap-x-6 gap-y-1 text-cell sm:grid-cols-2 lg:grid-cols-5">
+        {top.map(({ m, token }) => (
+          <li key={m.characterSlug} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-line py-2">
+            <Link href={armoryCharacterPath(region, m.characterSlug)} className={`${token ? classText(token) : "text-fg"} truncate font-medium underline decoration-edge underline-offset-4 hover:decoration-fg`}>{fullName(m)}</Link>
+            <span className="font-mono tabular-nums text-fg">{metricValue("item-level", m.itemLevel!)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** The class mix, level spread and item-level spread in full, below the roster. */
+function Summary({ members, summary: s }: { members: ArmoryMember[]; summary: RosterSummary }) {
+  return (
+    <section aria-labelledby="armory-summary" className="space-y-4">
+      <SectionHeading id="armory-summary" note="From the roster as Blizzard lists it. Item level comes from the members the armory has read; hidden characters are left out.">
+        Class and level spread
+      </SectionHeading>
       <div className="grid gap-6 lg:grid-cols-3">
         <PopulationBars kind="classes" title="Class mix" total={members.length} rows={s.classes.map((c) => ({ label: className(c.token), count: c.count, colour: classColour(CLASS_BG, c.token) }))} />
         <div className="space-y-2">
@@ -385,13 +438,13 @@ function PopulationBars({ kind, title, total, rows }: { kind: string; title: str
       {rows.length === 0 ? <p className="mt-2 text-sm text-muted">{kind === "classes" ? "No class listed." : "No item levels read."}</p> : (
         <dl className="mt-3 space-y-3 text-cell">
           {rows.map((row) => {
-            const share = total ? Math.round(row.count / total * 1000) / 10 : 0;
+            const pct = share(row.count, total);
             return (
               <div key={row.label} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
                 <dt className="text-fg">{row.label}</dt>
-                <dd className="font-mono tabular-nums text-fg">{row.count} ({share}%)</dd>
+                <dd className="font-mono tabular-nums text-fg">{row.count} ({pct}%)</dd>
                 <dd aria-hidden="true" className="col-span-2 h-2 rounded-full bg-panel">
-                  <span className={`block h-2 rounded-full ${row.colour ?? "bg-fg-2"}`} style={{ width: `${share}%` }} />
+                  <span className={`block h-2 rounded-full ${row.colour ?? "bg-fg-2"}`} style={{ width: `${pct}%` }} />
                 </dd>
               </div>
             );
