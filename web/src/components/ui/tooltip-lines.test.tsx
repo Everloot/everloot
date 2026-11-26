@@ -108,4 +108,13 @@ describe("item tooltip lines", () => {
     expect(tipLine("Off Hand · Shield")).toEqual({ kind: "pair", left: "Off Hand", right: "Shield" });
     expect(tipLine("10 - 20 Fire Damage · Speed 1.80")).toEqual({ kind: "pair", left: "10 - 20 Fire Damage", right: "Speed 1.80" });
   });
+
+  test("a spell card's cost and range, and cast time and cooldown, sit in two columns as the game draws them", () => {
+    expect(tipLine("320 Mana · 30 yd range")).toEqual({ kind: "pair", left: "320 Mana", right: "30 yd range" });
+    expect(tipLine("35 Rage · Melee Range")).toEqual({ kind: "pair", left: "35 Rage", right: "Melee Range" });
+    expect(tipLine("1.5 sec cast · 8 sec cooldown")).toEqual({ kind: "pair", left: "1.5 sec cast", right: "8 sec cooldown" });
+    expect(tipLine("Instant · 5-30 yd range")).toEqual({ kind: "pair", left: "Instant", right: "5-30 yd range" });
+    // An NPC's reaction and zone stay one line.
+    expect(tipLine("Hostile · Durotar")).toEqual({ kind: "plain", text: "Hostile · Durotar" });
+  });
 });

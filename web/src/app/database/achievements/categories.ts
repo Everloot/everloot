@@ -1,25 +1,12 @@
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
+import { categoryPath, type CategoryStep } from "@/lib/achievement-categories";
 import { listHref } from "../list-parts";
 
 // The achievement categories as the game files nest them (`Achievement_Category`, found in game files, unconfirmed),
 // for the list's grouping and an achievement page's category path. A category is named in the list's URL by its name,
 // as the list's Category filter already names it.
 
-export interface CategoryStep { id: number; name: string }
-
-/** The category and the ones above it, top first; empty for an id the files do not name. */
-export function categoryPath(id: number | undefined): CategoryStep[] {
-  const out: CategoryStep[] = [];
-  const seen = new Set<number>();
-  for (let at = id; at !== undefined && !seen.has(at); ) {
-    seen.add(at);
-    const c = CLIENT_ACHIEVEMENTS.categories?.[String(at)];
-    if (!c) break;
-    out.unshift({ id: at, name: c.name });
-    at = c.parent;
-  }
-  return out;
-}
+export { categoryPath, type CategoryStep };
 
 /** The files' category path of an achievement, when the files carry it; none while the file cannot be read. */
 export function pathOfAchievement(achievementId: number): CategoryStep[] {

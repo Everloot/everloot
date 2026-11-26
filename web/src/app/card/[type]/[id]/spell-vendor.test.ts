@@ -35,7 +35,8 @@ test.each(["spell", "vendor"])("a complete %s card is cached and identical with 
   const signedIn = await GET(new Request(`https://everloot.app/card/${type}/10`, { headers: { cookie: "session=private", authorization: "Bearer private" } }), { params: Promise.resolve({ type, id: "10" }) });
   expect(await signedIn.json()).toEqual(body);
   expect(mocks.corpus).not.toHaveBeenCalled();
-  if (type === "spell") expect(body.card).toMatchObject({ type, title: "Blizzard", icon: "https://assets.everloot.app/b/icons/10.webp", lines: ["Deals [?] damage."], foot: "Found in game files, unconfirmed · build 70450" });
+  // The spell page's box: cost and range, cast time, the text, then its school and duration (spell 10 in the committed files).
+  if (type === "spell") expect(body.card).toMatchObject({ type, title: "Blizzard", icon: "https://assets.everloot.app/b/icons/10.webp", lines: ["320 Mana · 30 yd range", "Channeled", "Deals [?] damage.", "School: Frost", "Duration: 8 sec"], foot: "Found in game files, unconfirmed · build 70450" });
   else {
     expect(body.card).toMatchObject({ type, title: "Vendor", lines: ["Seen on 1 map, agreed by 3 or more installs.", "1 price, agreed by 3 or more installs."] });
     expect(mocks.stored).toHaveBeenCalledWith({ strict: true });
@@ -82,6 +83,12 @@ test("goods without three agreeing installs never increase the vendor count", as
 test("a named NPC without vendor rows has no vendor card", async () => {
   (await mocks.stored()).world.vendors = [];
   expect((await call("vendor")).status).toBe(404);
+});
+
+test("a spell with ranks says which rank it is first, as its page's box does (284 is rank 2 of 78's chain)", async () => {
+  (await mocks.assets()).spellTips.set(284, { name: "Heroic Strike", text: "A strong attack.", partial: false });
+  const { card } = await (await call("spell", "284")).json();
+  expect(card.lines).toEqual(["Rank 2", "15 Rage · Melee Range", "Instant", "A strong attack.", "School: Physical"]);
 });
 
 test("an absent spell names file falls back to the tooltip name", async () => {

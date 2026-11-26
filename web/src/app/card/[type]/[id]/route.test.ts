@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: mocks.wiki }));
 vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
-vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
+vi.mock("@/lib/objects", async (original) => ({ ...await original<typeof import("@/lib/objects")>(), loadObjectFacts: mocks.objects }));
 vi.mock("@/lib/game-assets", () => ({
   loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests, readQuestNames: mocks.quests, loadItemNames: mocks.names,
   // With a private folder set (mocks.store), the real reader reads it; else the stubbed tips.
@@ -108,6 +108,7 @@ test("an id no page shows (unreported, unreleased) is a 404, without reading the
 });
 
 test("a quest shows the title players agree on, else the Warcraft Wiki's with its source", async () => {
+  // The giver's agreed spot is on map 1, which no released zone is: no zone line.
   expect((await (await call("quest", "9")).json()).card).toMatchObject({ title: "Cutting Teeth", lines: ["Level 1", "Starts with Thrall"], foot: null });
   expect((await (await call("quest", "176")).json()).card).toMatchObject({ title: "Wanted: Hogger", lines: [], foot: "Name from the Warcraft Wiki" });
   expect((await call("quest", "177")).status).toBe(404);
@@ -115,6 +116,42 @@ test("a quest shows the title players agree on, else the Warcraft Wiki's with it
 
 test("NPCs say what the embeddable card says", async () => {
   expect((await (await call("npc", "6")).json()).card).toMatchObject({ title: "Thrall", lines: ["Seen on 1 map, agreed by 3 or more installs."], quality: null });
+});
+
+test("an NPC card leads with what its page's header says: level, rank, type, then reaction and zone, each once 3 installs agree", async () => {
+  const thrall = { npcId: 6, name: "Thrall", positionKind: "npc", mapId: 1411, x: 40, y: 50, level: 63, rank: "boss", creatureType: "Humanoid", reaction: "friendly" };
+  mocks.world.mockResolvedValue({ unreachable: false, vendors: [], quests: [], npcs: three((installId) => ({ installId, ...thrall })) });
+  expect((await (await call("npc", "6")).json()).card.lines).toEqual(["Level 63 · Boss · Humanoid", "Friendly · Durotar", "Seen on 1 map, agreed by 3 or more installs."]);
+  // A normal rank is no news, as on the page; a trait only two installs report is not shown.
+  mocks.world.mockResolvedValue({ unreachable: false, vendors: [], quests: [], npcs: [
+    ...three((installId) => ({ installId, ...thrall, rank: "normal", creatureType: undefined })),
+    { installId: "d", npcId: 6, name: "Thrall", positionKind: "npc", mapId: 1411, x: 40, y: 50, creatureType: "Humanoid" },
+  ] });
+  expect((await (await call("npc", "6")).json()).card.lines.slice(0, 2)).toEqual(["Level 63", "Friendly · Durotar"]);
+});
+
+test("a quest card leads with level, side, type and category, then the zone its giver stands in", async () => {
+  mocks.world.mockResolvedValue({
+    unreachable: false, vendors: [],
+    npcs: three((installId) => ({ installId, npcId: 6, name: "Thrall", positionKind: "npc", mapId: 1411, x: 40, y: 50 })),
+    quests: three((installId) => ({ installId, questId: 9, title: "Cutting Teeth", level: 1, giverNpcId: 6, rewardItemIds: [], faction: "horde", category: "Valley of Trials", tag: "group", suggestedGroup: 3 })),
+  });
+  expect((await (await call("quest", "9")).json()).card.lines).toEqual(["Level 1 · Horde · Group, 3 players · Valley of Trials", "Zone: Durotar", "Starts with Thrall"]);
+  // A category that is the zone's own name is not said twice.
+  const world = await mocks.world();
+  world.quests = world.quests.map((q: object) => ({ ...q, category: "Durotar" }));
+  mocks.world.mockResolvedValue(world);
+  expect((await (await call("quest", "9")).json()).card.lines.slice(0, 2)).toEqual(["Level 1 · Horde · Group, 3 players · Durotar", "Starts with Thrall"]);
+});
+
+test("an object card leads with its kind and the zones 3 installs placed it in", async () => {
+  // Three installs looted a herb on Durotar: kind and zone agree; the count line stays as the embeddable card says it.
+  const looted = three((installId) => ({ installId, objectId: 1617, name: "Silverleaf", gatherKind: "herb", mapId: 1411, x: 40, y: 50, gatherSkill: 10 }));
+  mocks.objects.mockResolvedValue({ rates: [{ sourceObjectId: 1617, itemId: 765, kills: 3, drops: 3, rate: 1, reporters: 3, objectName: "Silverleaf" }], names: [], unreachable: false, dataAsOf: null, measuredZeros: [], objects: looted });
+  const res = await call("object", "1617");
+  expect(res.status).toBe(200);
+  // The skill players had, as the page's "Players' skill" fact words it: never what the game requires.
+  expect((await res.json()).card.lines.slice(0, 2)).toEqual(["Herb · Durotar", "Players' skill: 10 lowest · 10 middle · 3 installs"]);
 });
 
 test("it is the site's own route: no CORS, never indexed; storage down is a 503 that is not cached", async () => {
