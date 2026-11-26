@@ -10,6 +10,7 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { readClientMeta, readClientRows, readClientTables } from "./client-snapshot.js";
+import { isDevelopmentItemName } from "./dev-item-names.js";
 import { CLIENT_LABEL } from "./edges.js";
 
 export const ACHIEVEMENTS_SCHEMA = "everloot.client-achievements/1";
@@ -65,6 +66,26 @@ export const ClientAchievements = z.object({
 export type ClientAchievements = z.infer<typeof ClientAchievements>;
 export type ClientAchievement = z.infer<typeof ClientAchievement>;
 export type ClientCriterion = z.infer<typeof CriterionSchema>;
+
+/**
+ * Whether an achievement is a development leftover, which no list, search, sitemap, page or MCP answer shows: a name
+ * the item lists' rule marks ([DNT], UNUSED, ...), a "<Hidden>" name, or one the files file under their
+ * "Do Not Display" category (or a category beneath it).
+ */
+export function isDevelopmentAchievement(
+  files: Pick<ClientAchievements, "achievements" | "categories">, id: number, name: string | null | undefined,
+): boolean {
+  if (isDevelopmentItemName(name) || name?.startsWith("<Hidden>")) return true;
+  const seen = new Set<number>();
+  for (let at = files.achievements[String(id)]?.category; at !== undefined && !seen.has(at); ) {
+    seen.add(at);
+    const c = files.categories?.[String(at)];
+    if (!c) break;
+    if (c.name === "Do Not Display") return true;
+    at = c.parent;
+  }
+  return false;
+}
 
 /** criteria.json-style one achievement per line, so a new build's file reads as a line diff in review. */
 export function serializeClientAchievements(table: ClientAchievements): string {

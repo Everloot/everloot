@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { agreedCatalog } from "@kb/completion-rollup";
 import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "@kb/completion";
+import { isDevelopmentAchievement as isDevelopmentFileAchievement } from "@kb/client-achievements";
 import { slugify } from "@kb/lore-slug";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
@@ -24,6 +25,16 @@ export type Listed<T> = T & { confirmed: boolean; reporters: number };
  * rollup was read: when false, no entry is known to be confirmed or unconfirmed, so a list must say "unrecorded".
  */
 export interface CompletionCatalog { achievements: Listed<AchievementEntry>[]; factions: Listed<FactionEntry>[]; titles: Listed<TitleEntry>[]; chains: Listed<ChainEntry>[]; dataAsOf: string | null; base: boolean; confirmations: boolean }
+
+/** Whether an achievement is a development leftover (kb's rule, on the committed files), which nothing on the site shows. */
+export function isDevelopmentAchievement(id: number, name: string | null | undefined): boolean {
+  try {
+    return isDevelopmentFileAchievement(CLIENT_ACHIEVEMENTS, id, name);
+  } catch {
+    // The files cannot be read: only the name decides.
+    return isDevelopmentFileAchievement({ achievements: {}, categories: {} }, id, name);
+  }
+}
 
 /** Whether a game-file wrapper could be read; a file that is there but holds no eligible entry still counts. */
 function readable(file: () => unknown): boolean {
@@ -90,7 +101,7 @@ export const loadCatalog = cache(async (): Promise<CompletionCatalog | null> => 
   if (!read.state && !base.available) return null;
   const agreed = read.state ? agreedCatalog(read.state) : null;
   return {
-    achievements: merge(base.achievements, agreed?.achievements ?? new Map(), read.state?.catalog.a),
+    achievements: merge(base.achievements, agreed?.achievements ?? new Map(), read.state?.catalog.a).filter((a) => !isDevelopmentAchievement(a.achievementId, a.name)),
     factions: merge(base.factions, agreed?.factions ?? new Map(), read.state?.catalog.f),
     titles: merge(base.titles, agreed?.titles ?? new Map(), read.state?.catalog.t),
     chains: merge(base.chains, agreed?.chains ?? new Map(), read.state?.catalog.q),

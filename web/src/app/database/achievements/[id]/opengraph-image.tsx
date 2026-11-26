@@ -22,6 +22,6 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   return shareImage({
     type: "Achievement",
     title: listed?.name ?? files?.title ?? `Achievement ${id}`,
-    facts: [points ? `${points} points` : null, listed || files ? provenance(Boolean(entry)) : null],
+    facts: [points ? `${points} ${points === 1 ? "point" : "points"}` : null, listed || files ? provenance(Boolean(entry)) : null],
   });
 }

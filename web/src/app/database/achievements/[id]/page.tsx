@@ -8,7 +8,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Badge, DataTable, TooltipFrame } from "@/components/ui";
 import { qualityNamed } from "@/components/ui/quality";
 import { trailFor } from "@/lib/breadcrumbs";
-import { achievementHref, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
+import { achievementHref, isDevelopmentAchievement, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { asOfLine } from "@/lib/evidence";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
@@ -47,6 +47,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const listed = id === null ? undefined : (await loadCatalog())?.achievements.find((a) => a.achievementId === id);
   const entry = listed?.confirmed ? listed : undefined;
   const files = id === null ? null : fromFiles(id);
+  if (id !== null && isDevelopmentAchievement(id, files?.title ?? listed?.name)) return { robots: { index: false, follow: true } };
   // A page exists for an id three players reported, or for one the game files carry.
   if (!listed && !files) return { robots: { index: false, follow: true } };
   const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
@@ -66,6 +67,8 @@ export default async function AchievementPage(props: Props) {
   // A base entry is the game files' own, so it keeps the file-only presentation; only a confirmed one is a player report.
   const entry = listed?.confirmed ? listed : null;
   const files = fromFiles(id);
+  // A development leftover has no page, as in the list (the catalog already drops it).
+  if (isDevelopmentAchievement(id, files?.title ?? listed?.name)) notFound();
   if (catalog && !listed && !files) notFound();
   const title = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const canonical = achievementHref(id, title);
@@ -128,12 +131,12 @@ export default async function AchievementPage(props: Props) {
       box={entry ? (
         <TooltipFrame name={title} label={`${title}, as players reported it`}>
           <p>{entry.category}</p>
-          <p>{entry.points} points</p>
+          <p>{entry.points} {entry.points === 1 ? "point" : "points"}</p>
         </TooltipFrame>
       ) : files && (
         <TooltipFrame name={title} label={`${title}, from the game files`}>
           <p aria-hidden={!files.description} className={files.description ? "" : "text-muted"}>{files.description ?? "The game files give no text for it"}</p>
-          <p>{files.points} points</p>
+          <p>{files.points} {files.points === 1 ? "point" : "points"}</p>
         </TooltipFrame>
       )}
       facts={(entry || files) && facts}

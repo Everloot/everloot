@@ -12,7 +12,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
 type FileAchievement = { title: string; points: number; description?: string; criteria: { text: string; amount?: number }[]; category?: number; icon?: number; faction?: "Horde" | "Alliance"; reward?: string; rewardItem?: number; statistic?: true };
 const game = vi.hoisted(() => ({ achievements: {} as Record<string, FileAchievement> }));
 // Adventure holds Eastern Kingdoms, as the files nest them.
-const CATEGORIES = { "15596": { name: "Adventure" }, "14777": { name: "Eastern Kingdoms", parent: 15596 } };
+const CATEGORIES = { "15596": { name: "Adventure" }, "14777": { name: "Eastern Kingdoms", parent: 15596 }, "15425": { name: "Do Not Display" } };
 vi.mock("@/data/game-data/client-achievements", () => ({ get CLIENT_ACHIEVEMENTS() { return { build: { version: "1.15.8.70862" }, achievements: game.achievements, categories: CATEGORIES }; } }));
 // The asset manifest lists one achievement's icon; the reward item has a tooltip.
 const art = vi.hoisted(() => ({ assets: null as unknown, tips: new Map<number, unknown>() }));
@@ -185,4 +185,19 @@ test("an achievement with no reward in the files has no Rewards section", async 
   const out = await html("50-loremaster");
   expect(out).not.toMatch(/>Rewards<\/h2>/);
   expect(factOf(out, "Faction")).toBe("");
+});
+
+test("development leftovers have no page: the files' Do Not Display category and [DNT], UNUSED and <Hidden> titles", async () => {
+  game.achievements["20133"] = { title: "[DNT] Self-Found Soul (Level 1)", points: 0, criteria: [] };
+  game.achievements["19563"] = { title: "UNUSED Bael'Gar Defeated (Daily)", points: 0, criteria: [] };
+  game.achievements["15578"] = { title: "<Hidden> Adventure Awaits", points: 0, criteria: [] };
+  game.achievements["41008"] = { title: "Rune Learned - Shared Acquisition", points: 0, criteria: [], category: 15425 };
+  for (const id of ["20133", "19563", "15578", "41008"]) await expect(html(id)).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("one point reads as one point, in the box and in short", async () => {
+  game.achievements["900"] = { title: "Lone Step", points: 1, criteria: [] };
+  const out = await html("900-lone-step");
+  expect(out).toMatch(/<p>1 point<\/p>/);
+  expect(out).toContain("An achievement, 1 point, 0 criteria.");
 });
