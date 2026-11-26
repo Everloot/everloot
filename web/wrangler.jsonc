@@ -17,6 +17,9 @@
   // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds this list, wrangler.cron.jsonc's and that file's equal).
   // The cron Worker (wrangler.cron.jsonc) carries the same triggers; EVERLOOT_CRON_WORKER below says which one runs them.
   "triggers": { "crons": ["*/10 * * * *", "23 * * * *", "7,37 * * * *"] },
+  // Wrangler 4.165 uploads source maps by default; ours passed Cloudflare's 60 MiB cap on 2026-11-26 (deploy
+  // 45818284592: 62,920 KiB, error 10021) and every deploy failed. Before 4.165 none were uploaded.
+  "upload_source_maps": false,
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
