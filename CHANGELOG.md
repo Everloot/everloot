@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: object pages show the type, the skill players had, the zone and what the object contains; vendor pages show the NPC, reaction, zone, items sold and a full Sells table (#1560).
+- Site: class pages are class hubs: talent trees, weapon and armour types by level, a spells-by-level page and links to the class's armory board (#1562).
+- Site: /search opens on the best match, groups results by type with "See all", colours names and helps when nothing matches (#1563).
+- Site: /database opens on a grid of every entity type with icons, counts and notes, plus recently confirmed facts and the game build (#1564).
 - Site: /armory/compare puts two armory characters side by side: talent split, rank badges, the main numbers and all 19 gear slots with item level differences; "Compare with…" on every character page (#1543).
 - Site: boss pages link the previous and next boss in the instance's order, show the instance's loading screen when it is uploaded, and give the first synced kill day on the Kills tab (counts only) (#1544).
 - Site: item pages say when this build's game files carry no stats for the item and show its sell price (#1545).
@@ -314,6 +318,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: achievements no longer list the game files' development rows, points read "1 point", and the category overview folds on phones (#1558).
+- Site: armory character and guild pages send a Server-Timing header with each read's duration, and start every address-keyed read with the first one (#1559, #1561).
 - Site: the character overview puts the Blizzard credit under the facts strip and stacks the specs and professions, so no empty band or blank area is left (#1547).
 - Site: armory character pages load about twice as fast: the reads run side by side, the facts are read once, and tabs other than Talents load when first opened (#1550).
 - Site: spell facts leave out empty counts, and page summaries say where a name comes from instead of always "Players agree on the name" (#1555).
