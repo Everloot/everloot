@@ -70,6 +70,8 @@ afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
 test("with the armory on, the hub leads with the character boards and the guild gear board, each row linking its page and each board its full list", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1");
+  // The gear board needs five members read; the fixture guild has one, so four more join it.
+  for (const n of ["ash", "bry", "cole", "dena"]) (holder.store as ReturnType<typeof createMemoryArmoryStore>).putCharacter(armoryCharacter({ slug: `${n}-wardens`, name: n, surname: "Wardens", itemLevel: 20, gearScore: null, honorableKills: null }));
   const html = await hub();
   const me = armoryCharacter();
   const characters = section(html, "characters");
@@ -90,6 +92,37 @@ test("with the armory on, the hub leads with the character boards and the guild 
   expect(html).toContain(BLIZZARD_CREDIT);
   // The census rankings stay below, under their own heading.
   expect(html.indexOf('aria-labelledby="characters"')).toBeLessThan(html.indexOf("Who plays"));
+});
+
+test("the guild gear board keeps guilds with five members read or more, and says so", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const mem = holder.store as ReturnType<typeof createMemoryArmoryStore>;
+  // Ember Wardens (the fixture) has one member read; Reed Few has five.
+  const reed = ["tova", "ulma", "vann", "wren", "yoss"].map((n) => armoryCharacter({ slug: `${n}-reed`, name: n, surname: "Reed", itemLevel: 50, guildSlug: "reed-few", guildName: "Reed Few" }));
+  for (const c of reed) mem.putCharacter(c);
+  mem.putGuild(armoryGuild({ slug: "reed-few", name: "Reed Few" }), []);
+  const guilds = section(await hub(), "guilds");
+  expect(guilds).toContain('href="/armory/eu/guilds/reed-few"');
+  expect(guilds).not.toContain(`href="/armory/eu/guilds/${armoryGuild().slug}"`);
+  expect(guilds).toContain("guilds with at least 5 members read");
+});
+
+test("before the database takes a minimum, the guild gear board lists what the directory gives and does not claim one", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const mem = holder.store as ReturnType<typeof createMemoryArmoryStore>;
+  holder.store = { ...mem, guildDirectory: async (f) => { const page = await mem.guildDirectory({ ...f, minRead: undefined }); return page && { rows: page.rows, total: page.total }; } };
+  const guilds = section(await hub(), "guilds");
+  expect(guilds).toContain(`href="/armory/eu/guilds/${armoryGuild().slug}"`);
+  expect(guilds).not.toContain("at least 5 members read");
+});
+
+test("tied characters on a board share their rank", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const mem = holder.store as ReturnType<typeof createMemoryArmoryStore>;
+  mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, itemLevel: armoryCharacter().itemLevel, gearScore: null, honorableKills: 5 }));
+  const eu = section(await hub(), "characters");
+  const ranks = [...eu.slice(eu.indexOf('aria-labelledby="board-eu"')).matchAll(/w-6 shrink-0 font-mono tabular-nums text-muted">(\d+)</g)].map((m) => m[1]);
+  expect(ranks).toEqual(["1", "1"]);
 });
 
 test("a region tab narrows the boards and rides on their full-list links", async () => {

@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   HUB_PREVIEW_METRICS, isArmoryMetric, metricOfKey, PLAY_HISTORY_METRICS,
   armoryBoardHref, armoryBoardQuery, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
-  metricValue, namesFromSlug, raceOfId, readLine, slotLabel, slugFromSegment, validArmorySlug,
+  metricValue, namesFromSlug, raceOfId, rankText, readLine, slotLabel, slugFromSegment, validArmorySlug,
 } from "./armory";
 
 test("the switch is on only for EVERLOOT_ARMORY=1", () => {
@@ -79,4 +79,21 @@ test("six play history boards rank whole counts, after the three gear and PvP bo
   expect(metricOfKey("quests_completed")).toBe("quests-completed");
   expect(metricValue("quests-completed", 1234)).toBe("1,234");
   expect(metricValue("deaths", 56.4)).toBe("56");
+});
+
+test("a rank says how many share it and, on a large board near the top, the share at or above it", () => {
+  // Ten characters on one value: each is #6 and tied with nine others; 15 of 20,943 stand at or above it.
+  expect(rankText({ rank: 6, of: 20943, tied: 9 })).toBe("#6 (tied with 9) of 20,943 · top 0.1%");
+  expect(rankText({ rank: 1, of: 20943, tied: 29 })).toBe("#1 (tied with 29) of 20,943 · top 0.2%");
+  expect(rankText({ rank: 1, of: 20943, tied: 1 })).toBe("#1 (tied with 1) of 20,943 · top 0.1%");
+  expect(rankText({ rank: 300, of: 20943, tied: 0 })).toBe("#300 of 20,943 · top 2%");
+  // Past the top quarter, or on a small board, the share says nothing useful and is left out.
+  expect(rankText({ rank: 9000, of: 20943, tied: 0 })).toBe("#9,000 of 20,943");
+  expect(rankText({ rank: 2, of: 40, tied: 0 })).toBe("#2 of 40");
+  expect(rankText({ rank: 2, of: 40, tied: 3 })).toBe("#2 (tied with 3) of 40");
+});
+
+test("a rank read before the database counts ties reads as it always has", () => {
+  expect(rankText({ rank: 1, of: 20943 })).toBe("#1 of 20,943");
+  expect(rankText({ rank: 1, of: 20943, tied: null })).toBe("#1 of 20,943");
 });

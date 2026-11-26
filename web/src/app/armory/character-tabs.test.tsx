@@ -93,14 +93,14 @@ test("an achievements read with nothing completed says so, not that it was missi
 });
 
 test("play history shows the six ranked counts, an unread one as Not read, then every group with its notes", () => {
-  const panel = characterTabs(full, { historyRanks: [{ metric: "fish-caught", rank: 2, of: 40, href: "/armory/rankings/fish-caught?ruleset=2&region=eu" }] })
+  const panel = characterTabs(full, { historyRanks: [{ metric: "fish-caught", rank: 2, of: 40, tied: 3, href: "/armory/rankings/fish-caught?ruleset=2&region=eu" }] })
     .find((t) => t.id === "history")!;
   const html = renderToStaticMarkup(<>{panel.panel}</>);
   for (const text of ["Quests completed", "791", "Fish caught", "1,993", "Dungeons entered", "Character · Consumables", "Bandage used most", "Triage Bandage"]) expect(html, text).toContain(text);
   // No deaths count was read: the headline says so instead of a 0.
   expect(html).toMatch(/Deaths<\/dt><dd[^>]*>(<span[^>]*>)?Not read/);
   expect(html).toContain('href="/armory/rankings/fish-caught?ruleset=2&amp;region=eu"');
-  expect(html).toContain("#2 of 40");
+  expect(html).toContain("#2 (tied with 3) of 40");
 });
 
 test("a character read before play history, or with none to read, has the tab saying it was not read", () => {

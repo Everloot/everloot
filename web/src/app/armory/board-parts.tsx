@@ -37,14 +37,27 @@ export function BoardValue({ row, metric, top }: { row: ArmoryBoardRow; metric: 
 /** The rank sits in the name cell: on a phone a dense table keeps its first column only. */
 const rankMark = (rank: number) => <span className="w-6 shrink-0 font-mono tabular-nums text-muted">{rank}</span>;
 
+/**
+ * The rank each row shows: a row on the same value as the one above it shares that row's rank, as the character page's
+ * rank does ("#1 (tied with 9)"), rather than the board's running count. `rows` are highest first.
+ */
+export function sharedRanks(rows: readonly ArmoryBoardRow[]): Map<ArmoryBoardRow, number> {
+  const out = new Map<ArmoryBoardRow, number>();
+  rows.forEach((r, i) => {
+    const above = rows[i - 1];
+    out.set(r, above && above.value === r.value ? out.get(above)! : r.rank);
+  });
+  return out;
+}
+
 /** A leaderboard row: the rank, the name in its class colour with the class and faction, the guild, the value. */
-function regionColumns(metric: ArmoryMetric, top: number): Column<ArmoryBoardRow>[] {
+function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoardRow, number>): Column<ArmoryBoardRow>[] {
   return [
     {
       key: "name", header: "Character",
       cell: (r) => (
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          {rankMark(r.rank)}
+          {rankMark(ranks.get(r) ?? r.rank)}
           <Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(r.class.toUpperCase())} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{r.name} {r.surname}</Link>
           <BoardClass row={r} />
         </span>
@@ -68,7 +81,7 @@ export function RegionBoard({ metric, region, rows, footer }: { metric: ArmoryMe
         <DataTable
           dense
           caption={`${title}, ${regionLabel(region)}, top ${rows.length}`}
-          columns={regionColumns(metric, rows[0]?.value ?? 0)}
+          columns={regionColumns(metric, rows[0]?.value ?? 0, sharedRanks(rows))}
           rows={rows}
           rowKey={(r) => `${r.region}/${r.slug}`}
           meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>}
