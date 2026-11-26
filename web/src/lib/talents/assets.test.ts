@@ -149,6 +149,8 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
   "web/src/lib/showcase-gear-art.ts",
+  // Gear Blizzard's armory reports equipped: its tooltips, or the armory's name with the files' icon (docs/DATA_POLICY.md).
+  "web/src/lib/equipped-item-tips.ts",
   // Blizzard's equipment on a linked character's page and its owner's preview: item tips as the armory page draws them.
   "web/src/app/characters/armory-part.tsx", "web/src/app/characters/[ruleset]/[realm]/[name]/page.tsx",
   "web/src/app/me/characters/links/[id]/page.tsx",

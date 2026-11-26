@@ -12,7 +12,8 @@ import {
   metricOfKey, metricValue, PLAY_HISTORY_METRICS, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
-import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
+import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
+import { loadEquippedTips } from "@/lib/equipped-item-tips";
 import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
 import { readTimes } from "../../profile";
@@ -81,7 +82,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const associated = await publicArmoryLink(c.region, c.slug).catch(() => null);
   const addon = associated?.sharesData ? await addonProfile(associated.identity).catch(() => null) : null;
   const assets = await loadSiteAssets().catch(() => null);
-  const tips = await loadItemTips(assets, c.equipment.map((item) => item.itemId)).catch(() => new Map());
+  const tips = await loadEquippedTips(assets, c.equipment);
   // Achievement category names come from player reports only (the game files carry the id); none read leaves "Other".
   const categories = c.details?.achievements?.rows.length
     ? await loadCatalog().then((cat) => new Map((cat?.achievements ?? []).flatMap((a) => (a.category ? [[a.achievementId, a.category] as const] : [])))).catch(() => new Map<number, string>())
