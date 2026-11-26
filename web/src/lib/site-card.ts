@@ -144,7 +144,8 @@ async function leadLines(type: TooltipType, id: number): Promise<string[] | null
     const zone = pin ? zoneByMapId(pin.mapId) : undefined;
     return kept([
       dotted([page.level !== null && `Level ${page.level}`, traits.side && SIDE_LABEL[traits.side], questTypeLabel(traits), traits.category]),
-      zone && `Zone: ${zone.name}`,
+      // A category that is the zone's name already says where.
+      zone && zone.name !== traits.category && `Zone: ${zone.name}`,
     ]);
   }
   return [];

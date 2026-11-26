@@ -137,6 +137,11 @@ test("a quest card leads with level, side, type and category, then the zone its 
     quests: three((installId) => ({ installId, questId: 9, title: "Cutting Teeth", level: 1, giverNpcId: 6, rewardItemIds: [], faction: "horde", category: "Valley of Trials", tag: "group", suggestedGroup: 3 })),
   });
   expect((await (await call("quest", "9")).json()).card.lines).toEqual(["Level 1 · Horde · Group, 3 players · Valley of Trials", "Zone: Durotar", "Starts with Thrall"]);
+  // A category that is the zone's own name is not said twice.
+  const world = await mocks.world();
+  world.quests = world.quests.map((q: object) => ({ ...q, category: "Durotar" }));
+  mocks.world.mockResolvedValue(world);
+  expect((await (await call("quest", "9")).json()).card.lines.slice(0, 2)).toEqual(["Level 1 · Horde · Group, 3 players · Durotar", "Starts with Thrall"]);
 });
 
 test("an object card leads with its kind and the zones 3 installs placed it in", async () => {
