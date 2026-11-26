@@ -127,3 +127,16 @@ test("a page keeps the file five minutes, sends its ETag after, keeps the same m
   fetcher.mockImplementation(async () => { throw new Error("down"); });
   expect(await loadStoredSearchNames(deps)).toBeNull();
 });
+
+test("the file holds the vendors /database/vendors lists; a file written before the list reads with none", () => {
+  const records = [...rows(), ...INSTALLS.map((installId, i) => ({ installId, eventId: `vendor-${i}`, capturedAt: AS_OF, kind: "vendor", vendorNpcId: 300, items: [{ itemId: 1003, priceCopper: 10 }] }))] as unknown as IntakeRecord[];
+  const withVendor = buildAggregates({ uploads: INSTALLS.length, records, dataAsOf: AS_OF });
+  const file = buildSearchNames(withVendor, AS_OF);
+  expect(file.vendorIds).toEqual([300]);
+  expect(buildSearchNames(set(), AS_OF).vendorIds).toEqual([]);
+  expect(parseSearchNames(encodeSearchNames(file))!.vendorIds).toEqual(new Set([300]));
+  const { vendorIds: _gone, ...older } = file;
+  expect(parseSearchNames(JSON.stringify(older))!.vendorIds).toBeUndefined();
+  expect(parseSearchNames(JSON.stringify({ ...file, vendorIds: ["x"] }))).toBeNull();
+  expect(SEARCH_NAMES_REVISION).toBe("names-2");
+});

@@ -10,10 +10,12 @@ const mocks = vi.hoisted(() => ({
   stored: null as unknown,
   itemFile: null as { names: Map<number, { name: string; color: string; wikiPage: string }> } | null,
   reads: { names: 0, world: 0 },
+  spellFile: null as { version: string; names: Map<number, string> } | null,
+  setFile: null as { version: string; names: Map<number, string> } | null,
 }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => { mocks.reads.names++; return mocks.agreed; } }));
 vi.mock("@/lib/shown-item-names", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/shown-item-names")>(), loadShownNames: async () => ({ matched: null, showsTip: () => false }) }));
-vi.mock("@/lib/game-assets", () => ({ loadQuestNames: async () => null, loadItemNames: async () => mocks.itemFile, PRIVATE_UNREACHABLE: Symbol("private bucket unreachable") }));
+vi.mock("@/lib/game-assets", () => ({ loadQuestNames: async () => null, loadItemNames: async () => mocks.itemFile, loadSpellNames: async () => mocks.spellFile, loadItemSetNames: async () => mocks.setFile, PRIVATE_UNREACHABLE: Symbol("private bucket unreachable") }));
 vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => { mocks.reads.world++; return mocks.world; } }));
 vi.mock("@/lib/search-names-store", () => ({ loadStoredSearchNames: async () => mocks.stored }));
 vi.mock("@/lib/wiki-entity-names", () => ({ loadWikiEntityNames: async (kind: string) => (kind === "npc" ? mocks.wiki : null) }));
@@ -29,6 +31,8 @@ beforeEach(() => {
   mocks.wiki = null;
   mocks.stored = null;
   mocks.itemFile = null;
+  mocks.spellFile = null;
+  mocks.setFile = null;
   mocks.reads = { names: 0, world: 0 };
 });
 
@@ -99,4 +103,26 @@ test("without the stored file a search reads the aggregates as before", async ()
   expect(shown.showsTip(100)).toBe(false);
   expect(shown.objects).toBeUndefined();
   expect(mocks.reads.names).toBe(1);
+});
+
+test("the site's own search gets the spell and item set names the pages show, and the vendor ids the vendor list shows", async () => {
+  mocks.spellFile = { version: "x", names: new Map([[133, "Fireball"]]) };
+  mocks.setFile = { version: "x", names: new Map([[1, "Ironfeather Armor"]]) };
+  // Stored file with the vendor list: no aggregate read.
+  mocks.stored = {
+    generatedAt: "2026-11-19T06:00:00.000Z", dataAsOf: null, names: { items: new Map(), npcs: new Map(), objects: new Map(), quests: new Map() },
+    candidates: new Map(), dropped: new Set(), objectIds: new Set(), vendorIds: new Set([300]),
+  };
+  const shown = await loadSearchShown();
+  expect(shown.spells).toBe(mocks.spellFile.names);
+  expect(shown.itemSets).toBe(mocks.setFile.names);
+  expect(shown.vendors).toEqual(new Set([300]));
+  expect(mocks.reads).toEqual({ names: 0, world: 0 });
+  // Without the stored file, the vendors come from the same world facts the vendor list reads.
+  mocks.stored = null;
+  mocks.world.vendors = ["a", "b", "c"].map((installId) => ({ installId, vendorNpcId: 301, itemId: 5, priceCopper: 10 }));
+  expect((await loadSearchShown()).vendors).toEqual(new Set([301]));
+  // An unreadable names file leaves its group out rather than failing the search.
+  mocks.spellFile = null;
+  expect((await loadSearchShown()).spells).toBeUndefined();
 });

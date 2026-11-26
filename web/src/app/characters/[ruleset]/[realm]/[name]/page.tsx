@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import ShowcaseSections, { showcaseContents, ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, Facts, PageHeader, ReadingLayout, RailFacts, SectionHeading, type TocItem } from "@/components/ui";
@@ -10,7 +10,8 @@ import { classLabel, contextLinks, MAX_LEVEL, type ClassSlug } from "@/lib/class
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildPath, guildsOn } from "@/lib/guilds";
 import { publicCharacterArmory } from "@/lib/character-armory";
-import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadSiteAssets } from "@/lib/game-assets";
+import { loadEquippedTips } from "@/lib/equipped-item-tips";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { withGearArt } from "@/lib/showcase-gear-art";
@@ -22,6 +23,7 @@ import { ArmoryPart, armoryHeading } from "@/app/characters/armory-part";
 import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
 import { armoryCharacterPath } from "@/lib/armory";
 import { loadLinkedDungeonProgress } from "@/lib/progression";
+import { armoryMatch } from "@/lib/character-match";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -89,7 +91,7 @@ function OwnerPart({ showcase }: { showcase: Showcase }) {
 }
 
 /** The sighting part: what another player's addon last saw, as the players table holds it, and nothing more. */
-function SightingPart({ seen }: { seen: Player }) {
+function SightingPart({ seen, guildHref }: { seen: Player; guildHref?: string }) {
   // Derived from the race, not reported: a race on both sides (Skyborne) names no faction.
   const faction = raceFaction(seen.race);
   return (
@@ -104,7 +106,7 @@ function SightingPart({ seen }: { seen: Player }) {
             ...(faction ? [{ label: "Faction", value: faction }] : []),
             { label: "Level", value: seen.level, numeric: true },
             // With the guild pages on, the guild names its page; the page 404s for a hidden guild.
-            { label: "Guild", value: seen.guild ? (guildsOn() ? <Link href={guildPath(seen.realm, seen.guild)} className={link}>{seen.guild}</Link> : seen.guild) : "None seen" },
+            { label: "Guild", value: seen.guild ? (guildsOn() ? <Link href={guildHref ?? guildPath(seen.realm, seen.guild)} className={link}>{seen.guild}</Link> : seen.guild) : "None seen" },
             { label: "Realm", value: seen.realm },
             { label: "Last seen", value: seen.lastSeen, numeric: true },
           ]}
@@ -213,6 +215,12 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
       </Container>
     );
   }
+  // One page per character: a sighting the armory certainly has (lib/character-match.ts) lives on the armory page, which
+  // shows what the addon saw. An owner's own page keeps its address; so does a sighting when the owner's row could not be read.
+  if (owner === null && found(seen)) {
+    const match = await armoryMatch(seen);
+    if (match) permanentRedirect(armoryCharacterPath(match.region, match.slug));
+  }
   const now = new Date();
   const built = found(owner) ? characterShowcase(owner, now, await plannedBuilds(owner), await publishedFacts(owner)) : null;
   // Item names and icons under the item lists' rule, read only when there is gear to show.
@@ -223,7 +231,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const c = showcase?.input;
   const armory = found(owner) ? await publicCharacterArmory(owner.ruleset, owner.character.realm, owner.character.name) : null;
   const tips = armory?.shown.gear
-    ? await loadSiteAssets().then((assets) => loadItemTips(assets, armory.character.equipment.map((item) => item.itemId))).catch(() => new Map())
+    ? await loadSiteAssets().then((assets) => loadEquippedTips(assets, armory.character.equipment)).catch(() => new Map())
     : new Map();
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
@@ -262,7 +270,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
           {progress && <DungeonProgressSummary progress={progress.summary} href={`${armoryCharacterPath(progress.region, progress.slug)}#progress`} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {armory && <ArmoryPart armory={armory} tips={tips} />}
-          {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
+          {sighted ? <SightingPart seen={sighted} guildHref={guild?.path} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}
           {classSlug && <PlanPart classSlug={classSlug} level={level} />}
           {playerPagesOn() && (

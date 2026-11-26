@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Badge, Container, DataTable, Facts, InShort, OpenData, TooltipFrame } from "@/components/ui";
+import { Badge, DataTable, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
@@ -14,7 +12,7 @@ import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
-import { EmptyTab, EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, LINK, Unreachable } from "../../entity";
 import { confirmedCell } from "../../list-parts";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +46,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const criteria = entry?.criteria ? "reported criteria" : files?.criteria.length ? "the criteria from the game files" : "criteria count";
   return {
-    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
+    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name), image: `${achievementHref(id!, name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -104,37 +102,25 @@ export default async function AchievementPage(props: Props) {
   ] : [];
 
   return (
-    <Container width="data">
-      <article>
-        <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `achievement:${id}` })} />
-        <EntityHeader trail={trail} title={title} meta={["Achievement", entry ? entry.category : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
-        {entry ? (
-          <EntityTop
-            box={
-              <TooltipFrame name={title} label={`${title}, as players reported it`}>
-                <p>{entry.category}</p>
-                <p>{entry.points} points</p>
-              </TooltipFrame>
-            }
-            facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />}
-          />
-        ) : files ? (
-          <EntityTop
-            box={
-              <TooltipFrame name={title} label={`${title}, from the game files`}>
-                <p aria-hidden={!files.description} className={files.description ? "" : "text-muted"}>{files.description ?? "The game files give no text for it"}</p>
-                <p>{files.points} points</p>
-              </TooltipFrame>
-            }
-            facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />}
-          />
-        ) : <Unreachable />}
-        {summary.length > 0 && (
-          <>
-            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${title} (achievement ${id})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
-          </>
-        )}
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: canonical, identifier: `achievement:${id}` }}
+      header={{ trail, title, meta: ["Achievement", entry ? entry.category : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      box={entry ? (
+        <TooltipFrame name={title} label={`${title}, as players reported it`}>
+          <p>{entry.category}</p>
+          <p>{entry.points} points</p>
+        </TooltipFrame>
+      ) : files && (
+        <TooltipFrame name={title} label={`${title}, from the game files`}>
+          <p aria-hidden={!files.description} className={files.description ? "" : "text-muted"}>{files.description ?? "The game files give no text for it"}</p>
+          <p>{files.points} points</p>
+        </TooltipFrame>
+      )}
+      facts={(entry || files) && facts}
+      notices={!entry && !files && <Unreachable />}
+      summary={summary}
+      main={<>
         {fileCriteria.length > 0 && (
           <DataTable
             dense
@@ -154,16 +140,15 @@ export default async function AchievementPage(props: Props) {
           <p className="mt-2 text-meta text-muted">Criteria read from the client&apos;s own files of build {fileVersion} (found in game files, unconfirmed). They show as players reported them once three installs send the same list.</p>
         )}
         {entry && !entry.criteria && entry.criteriaCount > 0 && fileCriteria.length === 0 ? (
-          <EmptyTab players={false} action={null} message="The criteria show once three installs report the same full list." />
+          <EmptyTab players={false} action={null} message={EMPTY.criteria} />
         ) : null}
         {summary.length > 0 && <p data-confirmed-line className="mt-2 text-meta text-fg-2">{confirmedLine(state, listed?.reporters ?? 0)}</p>}
         {!entry && files && (
           <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria and text are the game files&apos;; the category and the count of installs that earned it appear once three installs agree.</p>
         )}
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-        </div>
-      </article>
-    </Container>
+      </>}
+      related={<LoreSection match={lore} />}
+      openData={summary.length > 0 && { report: { type: "Achievement", id, path: canonical }, text: [`${title} (achievement ${id})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n") }}
+    />
   );
 }

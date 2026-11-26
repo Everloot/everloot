@@ -1,9 +1,6 @@
 import { loadDropSourceNames } from "@/lib/names";
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import JsonLd from "@/components/JsonLd";
-import EdgeDegraded from "@/components/EdgeDegraded";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -19,7 +16,7 @@ import { loadDisenchant } from "@/lib/disenchant";
 import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, filledTabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
@@ -39,11 +36,15 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "@kb/pending-loot";
 import { itemDropSources } from "@kb/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
+import { loadRenders } from "@/lib/game-renders";
 import { EntityIcon } from "@/components/game/EntityIcon";
+import { loadItemIcons } from "@/lib/item-icons";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 
@@ -100,6 +101,10 @@ export default async function ItemPage(props: Props) {
   const spellLinked = edges.client.some((e) => e.fromKind === "item" && e.fromId === itemId && e.toKind === "spell");
   const assets = tipped || spellLinked ? await loadSiteAssets() : null;
   const filesTip = tipped ? (await loadItemTips(assets, [itemId])).get(itemId) : undefined;
+  // An item the files give only an icon for (no ItemSparse row: the server sends it) shows that icon, unconfirmed.
+  const filesIcon = tipped && !filesTip ? (await loadItemIcons(assets, [itemId])).get(itemId) : undefined;
+  // The model picture under the same rule as the icon and tooltip, and only beside a shown name.
+  const picture = tipped && name ? (await loadRenders())?.items.get(itemId) : undefined;
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
   const reported = await loadReportedItemFacts(itemId);
   const tip = filesTip && withReported(filesTip, reported);
@@ -286,35 +291,32 @@ export default async function ItemPage(props: Props) {
   ];
 
   return (
-    <Container width="data">
-      <EdgeDegraded when={degraded || itemSeen.unreachable || edges.unreachable || reported.unreachable} />
-      <JsonLd data={entityPageJsonLd({ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` })} />
-      <EntityLayout>
-        <EntityHeader
-          trail={trail}
-          title={title}
-          quality={shownQuality}
-          icon={<EntityIcon item src={tip?.icon ?? (assets ? unknownItemIcon(assets.base) : null)} quality={shownQuality} unconfirmed={!confirmed} />}
-          meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
-        />
+    <EntityPage
+      name={title}
+      degraded={degraded || itemSeen.unreachable || edges.unreachable || reported.unreachable}
+      jsonLd={{ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` }}
+      header={{
+        trail, title, quality: shownQuality,
+        icon: <EntityIcon item src={tip?.icon ?? filesIcon ?? (assets ? unknownItemIcon(assets.base) : null)} quality={shownQuality} unconfirmed={!confirmed} />,
+        meta: [category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null],
+      }}
+      box={
+        <>
+          <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
+            <TooltipLines lines={boxLines} />
+          </TooltipFrame>
+          {boxNotes.length > 0 && (
+            <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
+              {boxNotes.map((note) => <p key={note}>{note}</p>)}
+            </div>
+          )}
+        </>
+      }
+      facts={quickFacts}
+      notices={(isDevelopmentItemName(name?.name) || (!reported.unreachable && Boolean(reported.progress?.length))) && <>
         {isDevelopmentItemName(name?.name) && (
           <p className="mt-2 text-meta text-fg-2">The game files mark this as a development item: a test, placeholder or retired entry. The item lists leave it out unless asked.</p>
         )}
-        <EntityTop
-          box={
-            <>
-              <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
-                <TooltipLines lines={boxLines} />
-              </TooltipFrame>
-              {boxNotes.length > 0 && (
-                <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
-                  {boxNotes.map((note) => <p key={note}>{note}</p>)}
-                </div>
-              )}
-            </>
-          }
-          facts={<Facts layout="list" label={`${title}: quick facts`} items={quickFacts} />}
-        />
         {!reported.unreachable && Boolean(reported.progress?.length) && (
           <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
             <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
@@ -323,19 +325,11 @@ export default async function ItemPage(props: Props) {
             </ul>
           </section>
         )}
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
-            text={[
-              `${title} (item ${itemId})`,
-              ...tooltipLines,
-              ...summary,
-              `Source: https://everloot.app/database/items/${itemId}`,
-            ].join("\n")}
-            jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
-          />
-        </EntitySidebar>
-        <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
+      </>}
+      media={picture && <ModelPicture picture={picture} name={title} />}
+      summary={summary}
+      main={<>
+        <Tabs label={`${title}: relations`} tabs={tabs} />
         <DarkmoonItemNote name={name?.name} />
         {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
         <MarketBox itemId={itemId} rows={auctions} />
@@ -345,11 +339,23 @@ export default async function ItemPage(props: Props) {
         <p className="mt-2 mb-6 text-meta">
           <a href={`/blizzard-auctions/${itemId}`} className={LINK}>Blizzard auction house data for this item</a>
         </p>
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-          {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
-        </div>
-      </EntityLayout>
-    </Container>
+      </>}
+      related={<>
+        <LoreSection match={lore} />
+        {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
+      </>}
+      screenshots={<EntityScreenshots type="item" id={itemId} name={title} />}
+      comments={<EntityComments type="item" id={itemId} />}
+      openData={{
+        report: { type: "Item", id: itemId, path: `/database/items/${itemId}` },
+        text: [
+          `${title} (item ${itemId})`,
+          ...tooltipLines,
+          ...summary,
+          `Source: https://everloot.app/database/items/${itemId}`,
+        ].join("\n"),
+        jsonHref: !facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined,
+      }}
+    />
   );
 }

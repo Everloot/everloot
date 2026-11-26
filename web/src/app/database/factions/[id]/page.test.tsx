@@ -30,6 +30,13 @@ vi.mock("@/lib/lore", async (importOriginal) => ({
   loreForEntity: async (type: string, name: string) => { lore.asked.push([type, name]); return lore.match; },
 }));
 
+// The asset manifest: the two faction emblems, unless a test clears it.
+const art = vi.hoisted(() => ({ assets: null as unknown }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/game-assets")>()),
+  loadSiteAssets: async () => art.assets,
+}));
+
 import FactionPage, { generateMetadata } from "./page";
 import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
@@ -150,4 +157,27 @@ test("an id nothing lists is a 404 and a wrong slug redirects", async () => {
   await expect(html("999")).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html("21-wrong")).rejects.toThrow("REDIRECT /database/factions/21-booty-bay");
   expect((await meta("999")).robots).toMatchObject({ index: false, follow: true });
+});
+
+test("a faction page sits in the wide-screen entity layout, In short and Open data in its side column", async () => {
+  const out = await html("21-booty-bay");
+  expect(out).toContain('class="entity-layout');
+  const side = out.split("data-entity-sidebar")[1] ?? "";
+  expect(side).toContain("In short");
+  expect(side).toContain("data-open-data");
+});
+
+test("the Alliance and Horde pages show their emblem in the header; other factions, and a manifest without one, show no icon", async () => {
+  game.factions.push({ id: 469, name: "Alliance", shown: true }, { id: 67, name: "Horde", shown: true });
+  const header = (out: string) => out.split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+  art.assets = { factions: new Map([["alliance", "https://a.test/emblems/alliance.webp"], ["horde", "https://a.test/emblems/horde.webp"]]) };
+  try {
+    expect(header(await html("469-alliance"))).toContain('src="https://a.test/emblems/alliance.webp"');
+    expect(header(await html("67-horde"))).toContain('src="https://a.test/emblems/horde.webp"');
+    expect(header(await html("21-booty-bay"))).not.toContain("data-game-icon");
+    art.assets = { factions: new Map() };
+    expect(header(await html("469-alliance"))).not.toContain("data-game-icon");
+  } finally {
+    art.assets = null;
+  }
 });

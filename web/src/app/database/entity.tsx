@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
-import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
+import { AgreementMeter, Container, DataTable, Facts, GET_THE_ADDON, InShort, OpenData, QUALITY_TEXT, type Column, type Fact, type Quality } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
+import type { ModelPicture as ModelPictureFile } from "@/lib/game-renders";
+import { breadcrumbJsonLd, entityPageJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 
@@ -25,7 +27,7 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
   const emitJsonLd = trail.length > 1 && page && !trailFor(page.path);
   const parts = meta.filter((m) => m !== null && m !== undefined && m !== false && m !== "");
   return (
-    <header data-page-header data-entity-header className={`mb-4 flex min-w-0 items-center gap-3 ${aside ? "flex-wrap" : ""}`.trim()}>
+    <header data-slot="header" data-page-header data-entity-header className={`mb-4 flex min-w-0 items-center gap-3 ${aside ? "flex-wrap" : ""}`.trim()}>
       {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
       {icon}
       <div className={aside ? "min-w-0 flex-[1_1_16rem]" : "min-w-0"}>
@@ -47,9 +49,9 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
  * show) leaves the facts alone at the same width.
  */
 export function EntityTop({ box, facts, railMap = false }: { box: ReactNode; facts: ReactNode; railMap?: boolean }) {
-  if (!box) return facts ? <section aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
+  if (!box) return facts ? <section data-slot="top" aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
   return (
-    <div className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
+    <div data-slot="top" className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
       <div className="entity-box min-w-0">{box}</div>
       <section aria-label="Quick facts" className="min-w-0">{facts}</section>
     </div>
@@ -78,8 +80,9 @@ export function EmptyTab({ message, reported = 0, players = true, action = GET_T
 }
 
 /**
- * What an empty player-data tab says on the NPC, vendor, quest and object pages: what is missing, then the 3-install
- * rule that would fill it, so no tab stops at "yet." without saying why. One table, so the pages word it alike.
+ * What an empty tab says on every entity page: what is missing, then the 3-install rule that would fill it (or, for
+ * what only the game files could give, that they give nothing), so no tab stops at "yet." without saying why. One
+ * table, shown through EmptyTab, so the pages word it alike.
  */
 export const EMPTY = {
   position: "No agreed position yet. A pin needs 3 installs at the same spot.",
@@ -90,6 +93,29 @@ export const EMPTY = {
   /** `what` is "this NPC", "this object", or "this" for an item's sources. */
   drops: (what: string) => `Nobody has looted ${what} in Forever yet. Rates show from one install, with reported, verified or confirmed labels.`,
   queued: "Observed, not yet public: fewer than 3 installs so far.",
+  // Zone lists: what players place in a zone.
+  zoneNpcs: "No agreed NPC position here yet. A pin needs 3 installs at the same spot.",
+  zoneVendors: "No vendor here has prices 3 installs agree on yet.",
+  zoneQuests: "No agreed giver or turn-in here yet. Each shows once 3 installs report it.",
+  zoneItems: "No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.",
+  zoneTreasures: "No agreed treasure position here yet. A pin needs 3 installs at the same spot.",
+  // Instance tabs.
+  bosses: "No boss has 3 installs reporting it here yet, and the game files list none.",
+  bossLoot: "No loot to show yet: no boss is known here. Loot shows per boss once 3 installs report the boss and the creature they fought.",
+  /** `reported` is the installs that zoned in so far. */
+  entrance: (reported: number) => (reported > 0
+    ? `No entrance is confirmed yet. ${reported} ${reported === 1 ? "install has" : "installs have"} zoned in, and 3 installs must agree on the place.`
+    : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place."),
+  /** `name` is the instance's name in the quest log; null when it has none. */
+  instanceQuests: (name: string | null) => (name === null
+    ? "Not reported yet: this instance has no name to match the quest log by."
+    : `Not reported yet: no quest has 3 installs filing it under ${name} in the quest log.`),
+  // Relations only the game files could fill: a plain line with no meter (EmptyTab players={false}).
+  /** `build` is the client build that was read. */
+  files: (build: string) => `The game files list nothing here (build ${build}).`,
+  criteria: "The criteria show once three installs report the same full list.",
+  factionQuests: "No quest is linked to this faction yet. A quest shows once 3 installs report it, and the reputation it gives is in none of the game files read so far.",
+  titleRewards: "No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it.",
 } as const;
 
 /** What a player-data tab says when storage cannot be read: unrecorded, never zero. */
@@ -140,6 +166,37 @@ export function PinTable<P extends Pin>({ caption, rows, rowKey, lead = [] }: { 
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />;
 }
 
+/**
+ * An item's or NPC's model picture (docs/ASSETS.md, "Model pictures"), first in the side column: the rail on a wide
+ * screen, under the quick facts on a phone. Nothing without one, no empty box. The credit is the site footer's, as for
+ * the icons.
+ */
+export function ModelPicture({ picture, name }: { picture: ModelPictureFile | null | undefined; name: string }) {
+  if (!picture) return null;
+  return (
+    <div data-model-picture className="w-full sm:max-w-tip">
+      {/* The picture from the asset bucket as it is; next/image would only proxy it. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={picture.url} alt={`Model of ${name}`} width={picture.size} height={picture.size} loading="lazy" decoding="async" className="block aspect-square h-auto w-full rounded-control border border-line bg-panel object-contain" />
+    </div>
+  );
+}
+
+/**
+ * The top band's picture for a page with no tooltip of its own (an instance's loading screen): the game's art as it
+ * is, at the tooltip box's width, cropped to 16:9 like the wiki's dungeon pages. The page passes it only when the
+ * upload has the art, so there is never an empty frame.
+ */
+export function EntityArt({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+  return (
+    <figure data-entity-art className="w-full sm:max-w-tip">
+      {/* The picture from the asset bucket as it is; next/image would only proxy it. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} width={width} height={height} decoding="async" className="block aspect-video h-auto w-full rounded-control border border-line bg-panel object-cover" />
+    </figure>
+  );
+}
+
 /** A CSS-only wide rail; its tracks exist on the first server render. */
 export function EntityLayout({ children }: { children: ReactNode }) {
   return <article className="entity-layout xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-x-8">{children}</article>;
@@ -147,5 +204,76 @@ export function EntityLayout({ children }: { children: ReactNode }) {
 
 /** Existing page blocks keep their DOM order below xl, without duplicate maps or links. */
 export function EntitySidebar({ children }: { children: ReactNode }) {
-  return <div data-entity-sidebar className="entity-sidebar contents xl:block xl:min-w-0 xl:[overflow-wrap:anywhere]">{children}</div>;
+  return <div data-slot="side" data-entity-sidebar className="entity-sidebar contents xl:block xl:min-w-0 xl:[overflow-wrap:anywhere]">{children}</div>;
+}
+
+/**
+ * The slots of an entity page, in the order every page renders them (each one a `data-slot`). `side` holds `media`
+ * then `summary`: the xl rail, inline under the top band below xl. A slot with nothing in it renders nothing.
+ */
+export const ENTITY_SLOTS = ["header", "top", "notices", "side", "media", "summary", "main", "related", "map", "changes", "screenshots", "comments", "footer"] as const;
+
+/**
+ * The one template every database entity page fills, so they all read alike: the header (icon, name, type line), the
+ * top band (tooltip box or art, and the quick facts), any notices about them, the side column (a model picture or map,
+ * then In short), the main tabs, related (lore, more sections), map, changes, screenshots, comments, and last the
+ * open-data row with its Report wrong data link and any credit line. Pages pass what they have; they never reorder.
+ */
+export function EntityPage({
+  name, degraded, jsonLd, header, box, railMap, facts, notices, media, summary, main, related, map, changes, screenshots, comments, openData, credit,
+}: {
+  /** The plain name, for the quick facts' label. */
+  name: string;
+  /** Marks the render for the short edge cache when a read failed (EdgeDegraded). */
+  degraded?: boolean;
+  jsonLd?: Parameters<typeof entityPageJsonLd>[0] | null;
+  header: Parameters<typeof EntityHeader>[0];
+  box?: ReactNode;
+  railMap?: boolean;
+  facts?: Fact[] | null | false;
+  notices?: ReactNode;
+  media?: ReactNode;
+  /** The In short lines. */
+  summary?: readonly string[];
+  main?: ReactNode;
+  related?: ReactNode;
+  map?: ReactNode;
+  /** This entity's changes across builds: a later lane fills it. */
+  changes?: ReactNode;
+  screenshots?: ReactNode;
+  comments?: ReactNode;
+  openData?: Parameters<typeof OpenData>[0] | null | false;
+  credit?: ReactNode;
+}) {
+  const inShort = summary && summary.length > 0;
+  return (
+    <Container width="data">
+      {degraded !== undefined && <EdgeDegraded when={degraded} />}
+      {jsonLd && <JsonLd data={entityPageJsonLd(jsonLd)} />}
+      <EntityLayout>
+        <EntityHeader {...header} />
+        <EntityTop box={box} railMap={railMap} facts={facts && <Facts layout="list" label={`${name}: quick facts`} items={facts} />} />
+        {notices && <div data-slot="notices">{notices}</div>}
+        {(media || inShort) && (
+          <EntitySidebar>
+            {media && <div data-slot="media">{media}</div>}
+            {inShort && <div data-slot="summary"><InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} /></div>}
+          </EntitySidebar>
+        )}
+        {main && <div data-slot="main" className="mt-6">{main}</div>}
+        {related && <div data-slot="related" className="mt-6 space-y-6 empty:hidden">{related}</div>}
+        {map && <div data-slot="map">{map}</div>}
+        {changes && <div data-slot="changes">{changes}</div>}
+        {screenshots && <div data-slot="screenshots">{screenshots}</div>}
+        {comments && <div data-slot="comments">{comments}</div>}
+        {(openData || credit) && (
+          // flow-root: OpenData's own top margin adds to this one in the grid and in the flow alike.
+          <div data-slot="footer" className="mt-3 flow-root">
+            {openData && <OpenData {...openData} />}
+            {credit}
+          </div>
+        )}
+      </EntityLayout>
+    </Container>
+  );
 }

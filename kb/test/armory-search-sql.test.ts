@@ -18,6 +18,7 @@ async function database(): Promise<PGlite> {
   for (const migration of [
     "20261021130000_players", "20261109120000_armory", "20261109130000_armory_touch_members", "20261112190000_armory_profiles",
     "20261117120000_armory_progress", "20261117140000_armory_full_name_search", "20261117160000_armory_discovery",
+    "20261125110000_armory_roster_last_login",
   ]) await db.exec(read(`migrations/${migration}.sql`));
   return db;
 }

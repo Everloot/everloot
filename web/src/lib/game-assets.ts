@@ -47,6 +47,8 @@ const site = z.object({
   professions: z.record(z.string(), z.object({ name: z.string(), icon: assetPath.nullable() })).default({}),
   spellIcons: z.record(z.string(), assetPath).default({}),
   familyIcons: z.record(z.string(), assetPath).default({}),
+  currencyIcons: z.record(z.string(), assetPath).default({}),
+  petIcons: z.record(z.string(), assetPath).default({}),
   maps: z.record(z.string(), z.object({
     file: assetPath, small: z.object({ file: assetPath }).nullable().default(null),
     kind: z.enum(["continent", "zone"]), name: z.string(), continentId: z.number().int(), heldBack: z.boolean(), rect: Rect,
@@ -85,6 +87,10 @@ export interface SiteAssets {
   spellIcons: Map<number, string>;
   /** Pet family id -> icon URL. */
   familyIcons: Map<number, string>;
+  /** Currency id -> icon URL. */
+  currencyIcons: Map<number, string>;
+  /** Companion pet species id -> icon URL. */
+  petIcons: Map<number, string>;
   maps: MapArt[];
   /** Raid buff spell id -> name and tooltip text. */
   spellTips: Map<number, SpellText>;
@@ -152,6 +158,7 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
     base, version: m.build.version, label: m.label,
     classes: new Map(Object.entries(m.classes).map(([key, c]) => [key.toLowerCase(), { name: c.name, icon: icon(c.icon), trees: c.trees.map((t) => ({ name: t.name, icon: icon(t.icon) })) }])),
     professions, spellIcons, familyIcons,
+    currencyIcons: byId(m.currencyIcons, (name) => iconUrl(base, name)), petIcons: byId(m.petIcons, (name) => iconUrl(base, name)),
     maps: Object.entries(m.maps).filter(([id]) => /^\d+$/.test(id)).map(([id, a]) => ({
       uiMapId: Number(id), kind: a.kind, name: a.name, continentId: a.continentId, heldBack: a.heldBack,
       url: assetUrl(base, a.file), smallUrl: a.small ? assetUrl(base, a.small.file) : null, rect: a.rect,
@@ -262,6 +269,12 @@ const ItemRecordSchema = z.object({
   cr: z.array(z.string()).optional(), rq: z.array(z.string()).optional(), fx: z.array(z.string()).optional(),
 });
 
+/**
+ * An item the Item table lists with no named ItemSparse row (Forever's server sends those while the game runs): the
+ * files give its icon only (kb/src/assets/items.ts, `iconOnly`).
+ */
+const IconOnlySchema = z.object({ i: z.number().int().positive() }).strict();
+
 /** What an item link shows: plain, serialisable data for the tooltip. */
 export interface ItemTip {
   name: string;
@@ -306,10 +319,12 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
  * keep a partial answer, such as the edge-cached hover card, can tell a failure from an item with no tooltip.
  * `degraded` is a broken folder rather than a failed read: a shard the index lists that is not there or is not a
  * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
+ * `icons` is every asked-for item's icon the files give: a tooltip's, and the icon of an item the files give nothing
+ * else for (no name, so no tooltip). Which items a page may draw it for is the caller's rule, as with the tips.
  */
-export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean }> {
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; icons: Map<number, string>; unreachable: boolean; degraded: boolean }> {
   const out = new Map<number, ItemTip>();
-  const result = { tips: out, unreachable: false, degraded: false };
+  const result = { tips: out, icons: new Map<number, string>(), unreachable: false, degraded: false };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
   if (!assets || !store || !folder || !wanted.length) return result;
@@ -333,7 +348,14 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
       const raw = body.data[String(id)];
       if (raw === undefined) continue;
       const r = ItemRecordSchema.safeParse(raw);
-      if (r.success) out.set(id, itemTip(r.data, assets, id));
+      if (r.success) {
+        const tip = itemTip(r.data, assets, id);
+        out.set(id, tip);
+        if (tip.icon) result.icons.set(id, tip.icon);
+        continue;
+      }
+      const iconOnly = IconOnlySchema.safeParse(raw);
+      if (iconOnly.success) result.icons.set(id, itemIconUrl(assets.base, iconOnly.data.i));
       else result.degraded = true;
     }
   }));
@@ -489,6 +511,10 @@ export const loadItemSetNames = (version: string, base: string | null = assetsBa
   loadNamesFile("item-set-names.json", version, base, store, fileNames(SetNamesSchema, mayShowSetName));
 export const loadSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
   loadNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
+
+/** Item set names, distinguishing failed reads and malformed files from an absent or wrong-build catalog. */
+export const readItemSetNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
+  readNamesFile("item-set-names.json", version, base, store, fileNames(SetNamesSchema, mayShowSetName));
 
 /** Spell names, distinguishing failed reads and malformed files from an absent or wrong-build catalog. */
 export const readSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>

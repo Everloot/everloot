@@ -35,6 +35,8 @@ test("only prices the selected recipe's reagents and copies missing materials", 
     await act(async () => root.render(<RecipeShopping recipe={recipe} initialCrafts={2} />));
     expect(fetcher).not.toHaveBeenCalled();
     expect(host.textContent).toContain("6 × Coarse Thread");
+    // Each reagent links its item page, so the site's hover card shows on it.
+    expect(host.querySelector('a[href="/database/items/2320"]')?.textContent).toBe("Coarse Thread");
     await act(async () => button("Load auction prices").click());
     await choose("Realm", "Forever PvP");
     await choose("Auction house", "Horde");

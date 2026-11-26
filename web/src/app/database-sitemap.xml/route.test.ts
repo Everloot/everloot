@@ -7,13 +7,14 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
 // Source-backed item names and the game files' spell names; none unless a test sets them.
-const names = vi.hoisted(() => ({ wiki: null as unknown, matched: null as unknown, spells: null as { version: string; names: Map<number, string> } | null }));
+const names = vi.hoisted(() => ({ wiki: null as unknown, matched: null as unknown, spells: null as { version: string; names: Map<number, string> } | null, sets: null as { version: string; names: Map<number, string> } | null }));
 vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: async (kind: string) => kind === "npc" ? names.wiki : null }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadItemNames: async () => names.matched,
   loadQuestNames: async () => null,
   loadSpellNames: async () => names.spells,
+  loadItemSetNames: async () => names.sets,
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); }, permanentRedirect: () => {} }));
 
@@ -51,7 +52,7 @@ const records = [
 ];
 
 beforeEach(() => { store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-09T00:00:00.000Z" }); });
-afterEach(() => { names.wiki = null; names.matched = null; names.spells = null; });
+afterEach(() => { names.wiki = null; names.matched = null; names.spells = null; names.sets = null; });
 
 const urls = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
 const chunkAt = (n: string) => chunk(new Request("https://everloot.app/"), { params: Promise.resolve({ n }) });
@@ -165,4 +166,14 @@ test("a named spell only the talent trees hold is listed, and its page asks to b
   expect(listed).toContain("/database/spells/12042");
   const { generateMetadata } = await import("../database/spells/[id]/page");
   expect((await generateMetadata({ params: Promise.resolve({ id: "12042" }) })).robots).toMatchObject({ index: true });
+});
+
+test("an item set is listed, after the spells, once the set names file names it; its page asks to be indexed", async () => {
+  const listed = async () => urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname).filter((p) => p.startsWith("/database/item-sets/"));
+  // Without the names file no set is listed: its page says noindex.
+  expect(await listed()).toEqual([]);
+  names.sets = { version: "1.60.1.71091", names: new Map([[1, "The Gladiator"], [999_999, "Not In The File"]]) };
+  expect(await listed()).toEqual(["/database/item-sets/1"]);
+  const { generateMetadata } = await import("../database/item-sets/[id]/page");
+  expect((await generateMetadata({ params: Promise.resolve({ id: "1" }) })).robots).toMatchObject({ index: true });
 });

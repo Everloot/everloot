@@ -22,6 +22,7 @@ function locate(classes: TrimmedClass[]): Map<number, Located> {
 
 const where = (l: Located, spoiler: boolean) => ({
   classId: l.cls.classId, className: l.cls.className, tree: l.tree, nodeId: l.node.id, name: nameOf(l.node), spoiler,
+  spellIds: l.node.entries.map((e) => e.spellId),
 });
 const position = (l: Located) => ({ tree: l.tree, x: l.node.x, y: l.node.y, row: l.node.row, col: l.node.col });
 const sortPrereqs = (p: Node["prereqs"]) => [...p].sort((a, b) => a.nodeId - b.nodeId || a.rule.localeCompare(b.rule));

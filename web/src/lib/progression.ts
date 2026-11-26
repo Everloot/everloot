@@ -4,7 +4,8 @@ import { characterProgression, dungeonProgress, progressionCatalogue, rosterProg
 import { armoryOn, isArmoryRegion, validArmorySlug } from "./armory";
 import type { ArmoryMember } from "./armory-store";
 import { progressionByLink, progressionStore, type PublicHistory } from "./progression-store";
-import { bossKillSyncOn } from "./boss-kill-sync";
+import { bossKillSyncOn, instanceClearsOn } from "./boss-kill-sync";
+import { dungeonsAndRaids, instanceClears } from "./dungeon-clears";
 import { instanceHref, instanceRows } from "./instances";
 import { loadInstanceFacts } from "./rollup-compute";
 
@@ -35,7 +36,14 @@ async function histories(characters: readonly { region: string; slug: string }[]
 export async function loadCharacterProgression(region: string, slug: string) {
   const [{ catalogue, links }, kills] = await Promise.all([catalogueData(), histories([{ region, slug }])]);
   const history = kills.get(`${region}/${slug}`) ?? null;
-  return { instances: characterProgression(catalogue, history), links, summary: dungeonProgress(history) };
+  const instances = characterProgression(catalogue, history);
+  return { instances, links, summary: dungeonProgress(history), dungeons: dungeonsAndRaids(instances, history, links) };
+}
+
+/** Public clears of one instance; null while the switch is off or storage does not answer, so the page leaves the section out. */
+export async function loadInstanceClears(mapId: number) {
+  if (!armoryOn() || !instanceClearsOn()) return null;
+  try { return instanceClears(mapId, await progressionStore().instance(mapId)); } catch { return null; }
 }
 
 export async function loadLinkedDungeonProgress(ruleset: string, realm: string, name: string) {

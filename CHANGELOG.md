@@ -15,9 +15,24 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
-- Addon: select a recipe in WoW's Professions window to see its materials cost and estimated profit per craft. Details shows reagent prices, the auction-house cut and each quote's source. A recent full scan of the same house can update the estimate and show units listed and lowest buyout.
-- Addon: Collection shows faction standing names beside reputation progress.
-- Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
+- Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.
+- Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.
+- Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).
+- Site: entity pages share one layout: spell, instance, zone and Alliance/Horde faction pages show their game art in the header, instance sections are tabs, achievement, faction, title and quest chain pages get the wide-screen side column, and empty tabs read from one wording table.
+- Site: every database page has its own link preview card (the name, its type and a few of the page's facts), and a Report wrong data link that opens the Wrong data issue form with the page, its type, id and game build filled in.
+- Site: item and NPC pages show the model picture from the game files beside the quick facts, where the page already names the item or NPC.
+- Site: zone pages gain a Places tab with the subzones and the points of interest the game files name, each point linked to its spot on the map, and the achievement list groups by the categories the game files name; labelled found in game files, unconfirmed.
+- Site: the database lists holidays and world events (when each starts and how long it lasts) and hunter pet families (icon and the spells on each family's skill line) from the game files, each with its own page, in search and the sitemap; labelled found in game files, unconfirmed.
+- Site: instance pages show how many linked characters killed each boss and cleared the instance, and /armory/clears/<instance> lists recent clears (migration `20261125120000_instance_clears.sql` applied 2026-11-25).
+- Site: model pictures, kb side: `npm run kb -- client-renders` draws a still picture of each creature display and item model the site's gates list (NPCs on the NPC list, items 3 installs reported) from unencrypted game files, names each by a hash of its inputs so a new build reuses unchanged ones, and writes `renders.json`; `upload-game-assets.mjs --renders` uploads only the pictures the bucket lacks. Pages show them in a later change.
+- Site: players can upload screenshots for item, quest, NPC, spell, zone and instance pages; a moderator approves each before it shows (off until `EVERLOOT_SCREENSHOTS=1`).
+- Site: the header has six items instead of nine: Community (players, guilds, rankings, census, addons), Database, Tools (market tools and planners), Guides, Chat and Profile, with Menu only below 1280 px; labels, badges and table headers are sans, the header's pills share one small button size, and docs/design/direction.md sets the site's type, colour and component rules.
+- Site: comments at the bottom of item, quest, NPC, spell, zone and instance pages, for signed-in players with a handle: a little markup, spoiler tags, links only to everloot.app and well-known WoW sites, a 15-minute edit window, delete, report, and a moderation page for any number of moderators. Off until `EVERLOOT_COMMENTS=1`; site only, not in the open data, API or MCP.
+- Site: armory character pages are a character sheet: a header with portrait, class-coloured name, faction, region and guild; the gear around a summary of item level, Gear Score, ranks and key stats, in quality borders with item levels, collapsing to one list on a phone; the dungeon progress line in its own slot. A character the addon saw that the armory certainly has (same first name, realm in its region, guilds agreeing, one of each) now has one page: `/characters/forever/<realm>/<name>` redirects there permanently, the armory page shows what the addon last saw, and the site search links it.
+- Site: a character's armory page shows its dungeons and raids: each instance with a synced kill, every boss killed or not, kill counts and first and last kill days. Instance pages count linked characters' clears and boss kills, and `/armory/clears/<instance>` lists who cleared it (after `20261125120000_instance_clears.sql` and `EVERLOOT_INSTANCE_CLEARS`).
+- Site: a guild page is the guild's home: its crest (or a faction emblem), faction, region and ruleset, members and founding day on top, then a roster you can sort by any column, filter by class and level and page through, with names in class colours, item level and last login; progression, what the addon saw of the guild and the charts follow. A /guilds address for a guild the armory has now redirects there for good, and search and character pages link to it (#1272).
+- Site: item set pages at /database/item-sets, from the game files: each set's pieces with their icons, its bonuses with the pieces each needs and the bonus spells, the class its pieces are for and the profession a crafted set needs, marked found in game files, unconfirmed. The item page's Part of set row now links the set
+- Site: the database lists mounts, companion pets, toys and currencies from the game files, with a page for each mount, pet and currency (icon, riding skill or cap, the spell that teaches or summons it), in search and the sitemap; labelled found in game files, unconfirmed.
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: profession pages draw the AH Ledger crafting margins on the server, with each recipe's icon and skill, sorting on every money column, skill, sales-per-day and priced-only filters, 25 to 200 rows a page, all kept in the link, and the time AH Ledger last scanned the prices.
@@ -264,7 +279,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
-- Addon: Crafting Costs highlights the selected recipe and shopping result, auction lists show price caps, and Settings previews tooltip choices. Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
+- Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
+- Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
 
 ### Changed
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
@@ -278,6 +294,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
@@ -679,6 +696,22 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - Refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
+
+## [0.3.31] - 2026-11-26
+
+Select a recipe in WoW: Forever's Professions window to see its materials cost and estimated profit per craft. Open Details for reagent quotes, expected output and the auction-house cut.
+
+### Added
+
+- A full scan from the same auction house can refresh the recipe estimate while it is open. Details identifies the source and age of the quotes and shows the finished item's listed units and lowest buyout when the scan includes it.
+- Collection shows faction standing names beside reputation progress.
+
+### Changed
+
+- Everloot's Crafting Costs screen highlights the selected recipe and shopping-list result. Auction shopping lists show price caps, and Settings previews tooltip choices.
+- Updates the bundled game data for WoW: Forever build 1.60.1.71139.
+
+Recipes with missing prices show which quote is unavailable. The estimate uses asking prices and expected output, with the auction-house cut deducted from the finished item's value.
 
 ## [0.3.30] - 2026-11-24
 

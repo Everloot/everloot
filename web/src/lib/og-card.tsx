@@ -104,19 +104,29 @@ export async function renderCard(card: { label: string; title: string; subtitle:
 }
 
 /**
- * A database entity page's card (an item, NPC or quest): the name as the title, its type and the page's own
- * "N of 3 installs agree" line under it. An existing game icon is allowed (owner decision 2026-11-10);
+ * A database entity page's card: the name as the title, its type and the page's own "N of 3 installs agree" line
+ * under it (items, NPCs and quests), or the type and a few of the page's facts (every other type, through
+ * app/database/share-image.ts). An existing game icon is allowed (owner decision 2026-11-10);
  * unavailable or disabled art stays text-only. The
  * installs line is left off while upload storage is out of reach, as the page leaves its meter off. The count
  * changes as players report, so the card is kept as long as the site's own hover card, not for a year as the
  * other cards are.
  */
-export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean; icon?: string | null }): Promise<ImageResponse> {
-  const subtitle = card.installs === null || (card.omitZero && card.installs === 0) ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
+export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean; icon?: string | null; facts?: readonly string[] }): Promise<ImageResponse> {
+  const subtitle = entityCardSubtitle(card);
   const icon = await fetchCardIcon(card.icon);
   const image = await renderCard({ icon, label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : undefined, fit: true });
   image.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
   return image;
+}
+
+/**
+ * The line under an entity card's title: the type, the installs line when the page shows a meter, then up to three
+ * facts the page states (a riding skill, a level range, "Found in game files, unconfirmed").
+ */
+export function entityCardSubtitle(card: { type: string; installs: number | null; omitZero?: boolean; facts?: readonly string[] }): string {
+  const head = card.installs === null || (card.omitZero && card.installs === 0) ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
+  return [head, ...(card.facts ?? []).slice(0, 3)].join(" · ");
 }
 
 /** The two share card sizes: the link preview, and the square one for Discord and social posts. */

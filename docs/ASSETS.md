@@ -19,6 +19,21 @@ cannot be read in 2.5 seconds, every page shows the text it always had, with no 
 image box and no credit line (the credit is there only when the art is). Without the private bucket
 variables (`GAME_DATA_*`), item links stay plain while the other art still shows.
 
+**Model pictures.** Approved on 2026-11-25 (DATA_POLICY, "Fourth extension"). A still picture of a creature or
+of an item's own model (weapon, shield, off-hand, helmet, shoulders, cloak), drawn by our own renderer from
+the model, skin and texture files of the public client. The files are fetched from Blizzard's CDN like the icons, by
+the file data ids that `CreatureDisplayInfo`, `CreatureModelData`, `ItemDisplayInfo`, `ModelFileData` and
+`TextureFileData` give. No key is loaded and no listfile is used. A display with an encrypted or missing
+file is counted in the manifest and gets no picture. Nothing is drawn in its place. One WebP per display id,
+512 px, posed in its standing pose against a transparent background, with no added scenery, text or
+effects. The pictures follow every rule above: asset storage with a build stamp, never in git, credited on
+every page that shows them, pages only (never the API, the MCP server or the data downloads), removed on
+Blizzard's request. Only what is live is drawn: an item 3 installs reported, and the display of an NPC the
+site lists (the same gates the pages use; see "Model pictures" below). An item's picture shows only where its
+page may already show the item; a creature's only on a page for an NPC the site already lists. The model,
+skin and texture files themselves are never stored or served. Dressed humanoid NPCs, armour shown on a
+character and an interactive 3D view are not part of this and would each need their own decision.
+
 Item social previews may also show the same item icon as the page (approved 2026-11-10). They
 respect the asset configuration and item visibility rule, embed one fetched icon, and keep the
 text card when art is disabled, missing or unreadable. Other share cards stay text-only.
@@ -126,8 +141,12 @@ How it works, and what it will not do:
   9, top-level lines only); the raid buff list's spells from `SpellMisc`.
 - **Relation spell and pet family icons.** `spellIcons` also holds the icon of every spell the
   committed client layer (`web/src/data/game-data/client-layer.json`) says an item is created by or
-  used in, for the `/database` item pages; `familyIcons` holds `CreatureFamily.IconFileID` by pet
-  family id. Spells and families are not items, so these are not gated on reports.
+  used in, for the `/database` item pages, and of every spell that teaches a mount (`Mount.SourceSpellID`), for
+  the mount pages; `familyIcons` holds `CreatureFamily.IconFileID` by pet family id. Spells and families are not
+  items, so these are not gated on reports.
+- **Currency and companion pet icons.** `currencyIcons` holds `CurrencyTypes.InventoryIconFileID` by currency id
+  and `petIcons` `BattlePetSpecies.IconFileDataID` by species id, for the currency and companion pet pages. A
+  page shows one only when the manifest lists it, so a build uploaded before these keys shows none.
 - **Map pictures.** `UiMapXMapArt` names each map's art, `UiMapArtTile` its tiles by row and column,
   `UiMapArtStyleLayer` the tile and picture size. The tiles of the base zoom layer are laid on their
   grid and cut to the picture, which covers exactly the rectangle `UiMapAssignment` gives the map, so
@@ -173,6 +192,91 @@ How it works, and what it will not do:
   loaded and no listfile is used. A talent or item without an icon file shows without one.
 - **Sizes.** Icons and map pictures are lossy WebP (quality 90 and 82); frame pieces stay lossless.
 - Every record is labelled *found in game files, unconfirmed* and stamped with the build.
+
+## Model pictures
+
+A maintainer run, like `client-assets`, on a snapshot of the build the CDN serves (it needs the
+`TextureFileData` table, read since 2026-11-25; extract again with `--refresh` if the snapshot is older):
+
+```
+cd web
+npx tsx --tsconfig tsconfig.scripts.json scripts/render-ids.mts ../kb/data/render-ids   # the site's gates, as id lists
+cd ../kb
+npm run kb -- client-renders data/client/<product>-<build>-<config>.sqlite --npcs data/render-ids/npcs.txt --items data/render-ids/items.txt
+```
+
+**The gates.** `render-ids.mts` calls the site's own functions on the corpus, so the lists are exactly what the
+pages show: `npcs.txt` holds every NPC on the NPC list (`npcRows`, `/database/npcs`), and `items.txt` every item
+3 installs reported (`loadItemSeen`, the item lists' "Seen by players" set). It reads the live store with the R2
+and Supabase variables set, else the upload files in `web/data/uploads`. `client-renders` draws nothing without
+a list, and reads no file for an id that is not on one.
+
+**What it draws.**
+
+- **Creatures.** The display the client links to the NPC (`Creature.DisplayID`, else the first
+  `CreatureXDisplayInfo` row). Most world NPCs have no such link in the client: the server sends it. So
+  only a few NPCs get a picture for now, mostly companion pets. A display with `ExtendedDisplayInfoID` (a dressed
+  humanoid) is left for later and counted. The model is `CreatureModelData.FileDataID`, the skins are
+  `TextureVariationFileDataID` (texture types 11 to 13), and `CreatureDisplayInfoGeosetData` picks the geosets.
+- **Items.** The base appearance (`ItemModifiedAppearance` with modifier 0) leads to `ItemDisplayInfo`. A display
+  without `ModelResourcesID` is armour worn on the body; it is left for later and counted. The model is the
+  first `ModelFileData` file of the resource (for a helmet made per race and gender, one for any race, else the
+  human male one), and its texture is the `TextureFileData` file of `ModelMaterialResourcesID`.
+- **Pose and look.** The model's skin (`.skin`, the first `SFID` file) gives the triangles. The bones are posed at
+  the first frame of the stand animation, read from the M2 or its `.anim` file (`AFID`), so a model stored in a
+  T-pose stands as in the game. Geoset 0 and each group's first variant show unless the display picks another.
+  Opaque, alpha-key and alpha-blend batches are drawn. Additive glows, particles and ribbons are left out, and so is
+  a batch whose transparency is zero at that frame. Our own software renderer (`kb/src/renders/`) draws at
+  1024 px with a fixed camera (turned 35 degrees to the model's right, 10 degrees above) and simple light. Pillow scales the
+  picture to 512 px and saves lossy WebP, quality 90, with a transparent background.
+- **Encrypted or missing files.** If the model, its skin, its `.anim` file or a texture it uses is encrypted or not
+  in the build, the display is counted and gets no picture. No key is loaded and no listfile is used.
+
+**What it writes.** Under `--out` (default `kb/data/renders/`, gitignored):
+
+```
+renders/<hash>.webp               one picture per display, shared by every build
+<product>-<build>-<config>/
+  renders.json                    build stamp, renderer version, display id -> picture for creatures and items,
+                                  NPC id -> display id and item id -> display id for the gated ids that got one,
+                                  counts, and the first 200 skip reasons
+  checksums.json                  size and sha256 of each picture renders.json names; not uploaded
+```
+
+A picture's name is the hash of everything that went into it: the content keys of its files, the texture and
+geoset choice, the renderer version and the size. A new build whose files did not change reuses the picture
+instead of drawing it again (`reused` in the counts), and the upload skips it. Bump `RENDERER_VERSION` in
+`kb/src/client-renders.ts` when the same files would draw differently.
+
+**Upload.** From `web/`, with the upload key in the environment as in step 6 below:
+
+```
+node scripts/upload-game-assets.mjs --renders ../kb/data/renders/<product>-<build>-<config> --dry-run
+node scripts/upload-game-assets.mjs --renders ../kb/data/renders/<product>-<build>-<config>
+```
+
+It checks the folder against `checksums.json` and refuses anything but hash-named WebP files. It then asks the
+public bucket which pictures it already holds, sends the others to `renders/` with a one-year immutable cache, and
+sends `renders.json` to the build folder last. If the live folder is a re-extract (`-2`), add
+`--folder=<that folder>`. The script refuses a folder of another build.
+
+**On the site.** The item and NPC pages read `renders.json` from the build folder at the end of
+`NEXT_PUBLIC_GAME_ASSETS_URL` (`web/src/lib/game-renders.ts`, kept an hour, a miss a minute) and take the picture
+from `renders/` one level up. The picture is first in the side column, lazy-loaded, with the alt text "Model of
+<name>". An item's shows only where the page shows the item's name and its icon; an NPC's only where the page
+names the NPC. No picture, no `renders.json`, or one that cannot be read: nothing shows in its place. The
+credit is the site footer's, as for the icons. The social cards do not use the pictures.
+
+**Next build.** Run `render-ids.mts` again (the gates grow as players report), then `client-renders`, and
+compare the counts with the last run. A jump in `encrypted` or `failed` means Blizzard changed something.
+## Player screenshots
+
+Player screenshots (`docs/DATA_POLICY.md`, "Screenshots"; off until `EVERLOOT_SCREENSHOTS=1`) are pictures of the game
+that players upload, not files our extractor reads, so none of the steps above apply to them. They contain Blizzard's
+art all the same. *Decided 2026-11-25 by Carlos:* they are shown under the same fan-site terms as the other game art on
+this page: on the site's pages only, never in the API, the MCP server or the data downloads, and credited. The gallery
+names the uploader by handle, and under the pictures says the game art is Blizzard's, shown as fan-site use, and that
+Everloot is not affiliated with Blizzard; the footer's "Game data and art © Blizzard Entertainment" is on those pages too. They live in their own private bucket (`SCREENSHOTS`), never in the asset bucket and never in git.
 
 ## Game versions: Live, PTR and Beta
 

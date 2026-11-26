@@ -5,12 +5,18 @@ const reads = vi.hoisted(() => ({ items: vi.fn(), world: vi.fn(), tips: vi.fn() 
 vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world, computeRollups: async () => ({ rates: [], measuredZeros: [], rejected: [], stats: { uploads: 0, lootWindows: 0, records: 0, unreachable: false, dataAsOf: null } }) }));
 vi.mock("./objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 vi.mock("./game-assets", () => ({
+  // No spell or item set names file here: the search has no spell or item set group.
+  loadSpellNames: async () => null, loadItemSetNames: async () => null,
   loadItemNames: async () => null,
   PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadQuestNames: async () => null,
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
   unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,
   loadItemTips: reads.tips,
+  readItemTips: async (assets: unknown, ids: number[]) => {
+    const tips = (await reads.tips(assets, ids)) as Map<number, { icon: string }>;
+    return { tips, icons: new Map([...tips].map(([id, t]) => [id, t.icon])), unreachable: false, degraded: false };
+  },
 }));
 vi.mock("./completion-lists", async (original) => ({ ...await original<object>(), loadCatalog: async () => null }));
 vi.mock("./lore", async (original) => ({ ...await original<object>(), searchLore: () => "unavailable" }));

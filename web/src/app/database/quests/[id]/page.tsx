@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
-import EdgeDegraded from "@/components/EdgeDegraded";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { dayLabel } from "@/lib/report-labels";
 import AdSlot from "@/components/AdSlot";
@@ -13,8 +10,8 @@ import { agreedNpc, npcPage, questPage } from "@kb/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
-import { agreementLabel, reportedLabel, Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
+import { agreementLabel, reportedLabel, Badge, DataTable, Tabs, TooltipFrame } from "@/components/ui";
+import { EMPTY, EmptyTab, EntityPage, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -30,6 +27,8 @@ import { entityTitle, questDescription } from "@/lib/entity-meta";
 import { chainHref, loadCatalog } from "@/lib/completion-lists";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -110,102 +109,93 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   });
 
   return (
-    <Container width="data">
-      <EdgeDegraded when={facts.unreachable || !catalog?.confirmations} />
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quests/${page.questId}`, identifier: `quest:${page.questId}` })} />
-        <EntityHeader
-          trail={trail}
-          title={title}
-          meta={[
-            "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
-            // A title from the wiki carries the quiet unconfirmed marker; its source is a tooltip, never a printed label.
-            wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
-          ]}
-        />
-        <EntityTop
-          // No box without an agreed level: the quick facts' Level row carries its meter, and a frame with only the
-          // title would repeat the heading.
-          box={!facts.unreachable && page.level !== null && (
-            <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
-              <p>Level {page.level}</p>
-            </TooltipFrame>
-          )}
-          facts={!facts.unreachable && (
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Reported title", value: known(page.title) },
-                { label: "Level", value: known(page.level), numeric: true },
-                { label: "Chain", value: chain ? <>
-                  <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
-                  {chains.length > 1 && <span> (also in {chains.length - 1} other {chains.length === 2 ? "chain" : "chains"})</span>}
-                  <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? reportedLabel(chain.reporters) : "player reports could not be read just now"} · {dayLabel(chainDate)}</span>
-                </> : !catalog?.confirmations ? STORAGE_UNREACHABLE : <>Not reported yet {known(null)}</> },
-                ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} name={questName(previous)} /> }] : []),
-                ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} name={questName(next)} /> }] : []),
-                { label: "Zone", value: zone ? <>
-                  <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
-                  <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
-                </> : <>Not reported yet {known(null)}</> },
-                { label: "Giver", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
-                { label: "Turn-in", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
-                { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
-              ]}
-            />
-          )}
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
-            text={[`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n")}
-            jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
-          />
-        </EntitySidebar>
-        <Tabs
-          className="mt-6"
-          label={`${title}: relations`}
-          tabs={[
-            {
-              id: "rewards", label: "Rewards", count: facts.unreachable ? undefined : page.rewards.length,
-              panel: facts.unreachable ? <Unreachable />
-                : page.rewards.length ? (
-                  <DataTable
-                    dense
-                    caption={`Rewards of ${title}`}
-                    columns={[{ key: "item", header: "Item", cell: (itemId: number) => <EntityLink kind="item" id={itemId} name={items.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} /> }]}
-                    rows={page.rewards}
-                    rowKey={String}
-                  />
-                )
-                : <EmptyTab message={EMPTY.rewards} />,
-            },
-            {
-              id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
-              panel: facts.unreachable ? <Unreachable />
-                : people.length ? (
-                  <DataTable
-                    dense
-                    caption={`Who gives and takes ${title}`}
-                    columns={[
-                      { key: "role", header: "Role", nowrap: true, cell: (p: Person) => p.role },
-                      { key: "npc", header: "NPC", cell: (p: Person) => npcLink(p.npcId) },
-                      { key: "map", header: MAP_LINK_HEADER, cell: (p: Person) => (p.map ? <ShowOnMap {...p.map} /> : null) },
-                    ]}
-                    rows={people}
-                    rowKey={(p) => p.role}
-                  />
-                )
-                : <EmptyTab message={EMPTY.givers} />,
-            },
-          ]}
-        />
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-          {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
-        </div>
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      degraded={facts.unreachable || !catalog?.confirmations}
+      jsonLd={{ name: title, path: `/database/quests/${page.questId}`, identifier: `quest:${page.questId}` }}
+      header={{
+        trail,
+        title,
+        meta: [
+          "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
+          // A title from the wiki carries the quiet unconfirmed marker; its source is a tooltip, never a printed label.
+          wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
+        ],
+      }}
+      // No box without an agreed level: the quick facts' Level row carries its meter, and a frame with only the
+      // title would repeat the heading.
+      box={!facts.unreachable && page.level !== null && (
+        <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
+          <p>Level {page.level}</p>
+        </TooltipFrame>
+      )}
+      facts={!facts.unreachable && [
+        { label: "Reported title", value: known(page.title) },
+        { label: "Level", value: known(page.level), numeric: true },
+        { label: "Chain", value: chain ? <>
+          <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
+          {chains.length > 1 && <span> (also in {chains.length - 1} other {chains.length === 2 ? "chain" : "chains"})</span>}
+          <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? reportedLabel(chain.reporters) : "player reports could not be read just now"} · {dayLabel(chainDate)}</span>
+        </> : !catalog?.confirmations ? STORAGE_UNREACHABLE : <>Not reported yet {known(null)}</> },
+        ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} name={questName(previous)} /> }] : []),
+        ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} name={questName(next)} /> }] : []),
+        { label: "Zone", value: zone ? <>
+          <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
+          <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
+        </> : <>Not reported yet {known(null)}</> },
+        { label: "Giver", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
+        { label: "Turn-in", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
+        { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
+      ]}
+      summary={summary}
+      main={<Tabs
+        label={`${title}: relations`}
+        tabs={[
+          {
+            id: "rewards", label: "Rewards", count: facts.unreachable ? undefined : page.rewards.length,
+            panel: facts.unreachable ? <Unreachable />
+              : page.rewards.length ? (
+                <DataTable
+                  dense
+                  caption={`Rewards of ${title}`}
+                  columns={[{ key: "item", header: "Item", cell: (itemId: number) => <EntityLink kind="item" id={itemId} name={items.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} /> }]}
+                  rows={page.rewards}
+                  rowKey={String}
+                />
+              )
+              : <EmptyTab message={EMPTY.rewards} />,
+          },
+          {
+            id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
+            panel: facts.unreachable ? <Unreachable />
+              : people.length ? (
+                <DataTable
+                  dense
+                  caption={`Who gives and takes ${title}`}
+                  columns={[
+                    { key: "role", header: "Role", nowrap: true, cell: (p: Person) => p.role },
+                    { key: "npc", header: "NPC", cell: (p: Person) => npcLink(p.npcId) },
+                    { key: "map", header: MAP_LINK_HEADER, cell: (p: Person) => (p.map ? <ShowOnMap {...p.map} /> : null) },
+                  ]}
+                  rows={people}
+                  rowKey={(p) => p.role}
+                />
+              )
+              : <EmptyTab message={EMPTY.givers} />,
+          },
+        ]}
+      />}
+      related={<>
+        <LoreSection match={lore} />
+        {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
+      </>}
+      screenshots={<EntityScreenshots type="quest" id={page.questId} name={title} />}
+      comments={<EntityComments type="quest" id={page.questId} />}
+      openData={{
+        report: { type: "Quest", id: page.questId, path: `/database/quests/${page.questId}` },
+        text: [`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n"),
+        jsonHref: !facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined,
+      }}
+    />
   );
 }

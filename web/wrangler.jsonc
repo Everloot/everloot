@@ -97,6 +97,7 @@
     "EVERLOOT_PRIVATE_SYNC": "1",
     "EVERLOOT_BOSS_KILL_SYNC": "1",
     "EVERLOOT_DUNGEON_PROGRESS": "1",
+    "EVERLOOT_INSTANCE_CLEARS": "1",
     // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
     "EVERLOOT_LEADERBOARDS": "1",
     // The cron Worker (wrangler.cron.jsonc) runs the scheduled jobs since 2026-11-20: this Worker's triggers run only

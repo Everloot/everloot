@@ -196,7 +196,15 @@ export interface ItemSet {
   records: Map<number, ItemRecord>;
   /** Icon file data id per item, from Item.IconFileDataID, for every record that has one. */
   iconOf: Map<number, number>;
+  /**
+   * Icon file data id per item the Item table lists with no named ItemSparse row: Forever's server sends those rows
+   * while the game runs, so the files give the item's icon and nothing else. Kept apart from `records`.
+   */
+  iconOnly: Map<number, number>;
 }
+
+/** A shard entry for an item the files give only an icon for (`ItemSet.iconOnly`). */
+export interface IconOnlyRecord { i: number }
 
 /**
  * The item records, for every ItemSparse row (or only for `only`, when given) that has a name. Without `describe`
@@ -245,16 +253,25 @@ export function buildItemSet(get: TableReader, only?: ReadonlySet<number>, descr
     const icon = base ? num(base.IconFileDataID) : 0;
     if (icon > 0) iconOf.set(id, icon);
   }
-  return { records, iconOf };
+  const iconOnly = new Map<number, number>();
+  for (const row of list(item)) {
+    const id = num(row.ID), icon = num(row.IconFileDataID);
+    if (id > 0 && icon > 0 && !records.has(id) && (!only || only.has(id))) iconOnly.set(id, icon);
+  }
+  return { records, iconOf, iconOnly: new Map([...iconOnly].sort((a, b) => a[0] - b[0])) };
 }
 
-/** Records grouped into shards, each as `{ "<item id>": record }`, ordered by id. */
-export function shardRecords(records: ReadonlyMap<number, ItemRecord>): Map<number, Record<string, ItemRecord>> {
-  const out = new Map<number, Record<string, ItemRecord>>();
-  for (const id of [...records.keys()].sort((a, b) => a - b)) {
+/**
+ * Records grouped into shards, each as `{ "<item id>": record }`, ordered by id. `icons` adds `{ i }` entries for
+ * items the files give only an icon for (an id that also has a record keeps the record).
+ */
+export function shardRecords(records: ReadonlyMap<number, ItemRecord>, icons: ReadonlyMap<number, number> = new Map()): Map<number, Record<string, ItemRecord | IconOnlyRecord>> {
+  const out = new Map<number, Record<string, ItemRecord | IconOnlyRecord>>();
+  const ids = [...new Set([...records.keys(), ...icons.keys()])].sort((a, b) => a - b);
+  for (const id of ids) {
     const shard = shardOf(id);
     const into = out.get(shard) ?? {};
-    into[String(id)] = records.get(id)!;
+    into[String(id)] = records.get(id) ?? { i: icons.get(id)! };
     out.set(shard, into);
   }
   return out;

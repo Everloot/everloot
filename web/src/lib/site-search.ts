@@ -4,7 +4,10 @@ import { entityHref } from "@/components/EntityLink";
 import { describe } from "@kb/item-taxonomy";
 import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
+import { currencyEntries, currencyHref, mountEntries, mountHref, petEntries, petHref } from "./collectibles";
+import { holidayEntries, holidayHref, petFamilyEntries, petFamilyHref } from "./world-events";
 import { CLIENT_TAXONOMY } from "./items";
+import { itemSet, itemSetHref } from "./item-sets";
 import type { SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
@@ -25,7 +28,7 @@ export { byTypo, editDistance } from "./name-match";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "vendor" | "quest" | "object" | "spell" | "achievement" | "faction" | "title" | "chain" | "item-set" | "mount" | "pet" | "currency" | "holiday" | "family" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
 /**
  * `total` counts every match; `results` holds the first `limit` of them. `respelled` is how the typo fallback read the
  * query ("linen cloth" for "lnen clth"), on every group when it fired.
@@ -35,17 +38,17 @@ export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  class: "Classes", item: "Items", npc: "NPCs", quest: "Quests", object: "Objects", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", vendor: "Vendors", quest: "Quests", object: "Objects", spell: "Spells", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", "item-set": "Item sets", mount: "Mounts", pet: "Companion pets", currency: "Currencies", holiday: "Holidays and world events", family: "Hunter pet families", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
 /** The lore group's heading when its pages hold only some of the asked words. */
 export const LORE_SOME_WORDS = "Lore archive, some of your words";
-const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achievement", "faction", "title", "chain", "zone", "instance", "guide", "lore", "tool", "doc"];
+const ORDER: SearchType[] = ["class", "item", "npc", "vendor", "quest", "object", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance", "guide", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
 export const isScope = (v: unknown): v is Scope => (SCOPES as readonly unknown[]).includes(v);
 /** These groups keep search's matching rules and page within search rather than a database list. */
-export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "zone", "instance"] as const;
+export const PAGED_SCOPES = ["vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance"] as const;
 export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
 export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
 export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
@@ -138,6 +141,47 @@ function zoneHits(match: Match): { id: number; label: string; href: string; exac
     .map(({ entry, exact, r }) => ({ id: entry.id, label: entry.name, href: zoneHref(entry.id, entry.name), exact, r }));
 }
 
+/** A game-file list's hits by name, with an exact id first; none when the file could not be read. */
+function fileHits(rows: { id: number; name: string }[] | null, match: Match, id: number | null, href: (id: number, name: string) => string): (SearchResult & { r: number })[] {
+  if (!rows) return [];
+  const out: (SearchResult & { r: number })[] = [];
+  const exact = id === null ? undefined : rows.find((x) => x.id === id);
+  if (exact) out.push({ label: exact.name, href: href(exact.id, exact.name), note: `id ${exact.id}`, exact: true, id: exact.id, r: -1 });
+  for (const { entry, exact: same, r } of byName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: href(entry.id, entry.name), note: `id ${entry.id}`, exact: same, id: entry.id, r });
+  return out;
+}
+
+/**
+ * A name map's hits (the spell or item set names a page passes in), an exact id first. `known` says whether an id with
+ * no name still has a page (an item set the game files list); its row then carries `unnamed(id)`.
+ */
+function namedHits(names: Map<number, string>, match: Match, id: number | null, href: (id: number) => string, unnamed?: { known: (id: number) => boolean; label: (id: number) => string }): (SearchResult & { r: number })[] {
+  const out: (SearchResult & { r: number })[] = [];
+  const label = id === null ? undefined : names.get(id) ?? (unnamed?.known(id) ? unnamed.label(id) : undefined);
+  if (id !== null && label !== undefined) out.push({ label, href: href(id), note: `id ${id}`, exact: true, id, r: -1 });
+  for (const { entry, exact, r } of bySortedName(sortedNames(names), match)) if (entry.id !== id) out.push({ label: entry.name, href: href(entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
+  return out;
+}
+
+const vendorRowsMemo = new WeakMap<Map<number, string>, WeakMap<Set<number>, NamedRow[]>>();
+/**
+ * The vendors /database/vendors lists (`ids`, passed in by the page), by the NPC names it shows, an exact id first; an
+ * unnamed vendor keeps the list's label and is found by its id only. The rows are built once per name map and id set.
+ */
+function vendorHits(ids: Set<number>, npcs: Map<number, string>, match: Match, id: number | null): (SearchResult & { r: number })[] {
+  let byIds = vendorRowsMemo.get(npcs);
+  if (!byIds) { byIds = new WeakMap(); vendorRowsMemo.set(npcs, byIds); }
+  let rows = byIds.get(ids);
+  if (!rows) { rows = sortedNames(npcs).filter((row) => ids.has(row.id)); byIds.set(ids, rows); }
+  const out: (SearchResult & { r: number })[] = [];
+  if (id !== null && ids.has(id)) out.push({ label: npcs.get(id) ?? `Vendor NPC ${id}`, href: entityHref("vendor", id), note: `id ${id}`, exact: true, id, r: -1 });
+  for (const { entry, exact, r } of bySortedName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: entityHref("vendor", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
+  return out;
+}
+
+const spellHref = (id: number) => entityHref("spell", id);
+const UNNAMED_SET = { known: (id: number) => itemSet(id) !== undefined, label: (id: number) => `Item set ${id}` };
+
 type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
 const publicObjects = new WeakMap<object, WeakMap<object, Set<number>>>();
 const namedObjects = new WeakMap<Map<number, string>, WeakMap<Set<number>, NamedRow[]>>();
@@ -179,6 +223,17 @@ async function objectHits(match: Match, id: number | null, names: Map<number, st
   return out;
 }
 
+/**
+ * What only the site's own pages pass in, read by them from the private name files and the stored views: the spell
+ * names the spell list shows, the item set names the set pages show, and the vendor ids /database/vendors lists. The
+ * API's callers pass none, so its search has no spell, item set or vendor group.
+ */
+export interface PageNames {
+  spells?: Map<number, string> | Promise<Map<number, string> | undefined>;
+  itemSets?: Map<number, string> | Promise<Map<number, string> | undefined>;
+  vendors?: Set<number> | Promise<Set<number> | undefined>;
+}
+
 /** The lore archive's hits, and its some-words hits when no page has every word; null when the archive is out of reach. */
 async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: SearchHit[] | null } | null> {
   const lore = await searchLore(text, 1);
@@ -196,7 +251,9 @@ async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: Search
  * `objects` is the ids /database/objects lists when the caller already holds them (the stored search names file): the
  * object group then reads no facts.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given, objects }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names>; objects?: Set<number> | Promise<Set<number> | undefined> } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given, objects, spells: spellsRead, itemSets: setsRead, vendors: vendorsRead }: {
+  only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names>; objects?: Set<number> | Promise<Set<number> | undefined>;
+} & PageNames = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -215,7 +272,9 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
   // A failed name read rejects the search before these are awaited; their own failure must not go unhandled then.
   if (objectsRead instanceof Promise) objectsRead.catch(() => {});
   loreRead?.catch(() => {});
-  const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
+  const [names, catalog, spells, itemSets, vendors] = await Promise.all([
+    given ?? loadNames(), only && !paged ? null : loadCatalog(), want("spell") ? spellsRead : undefined, want("item-set") ? setsRead : undefined, want("vendor") ? vendorsRead : undefined,
+  ]);
   // The things a player meets in the game, by every typed word in any order; when none matches and no id was typed, by
   // the same words within a typo or two, and the groups say how the fallback read the query.
   const game = async (match: Match) => {
@@ -228,6 +287,17 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
     if (!only || paged) {
       if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
       if (want("instance")) hits.set("instance", instanceHits(match));
+      // Mounts, companion pets and currencies the game files list, by name or id.
+      if (want("mount")) hits.set("mount", fileHits(mountEntries(), match, id, mountHref));
+      if (want("pet")) hits.set("pet", fileHits(petEntries(), match, id, petHref));
+      if (want("currency")) hits.set("currency", fileHits(currencyEntries(), match, id, currencyHref));
+      // Holidays and hunter pet families the game files list, by name or id.
+      if (want("holiday")) hits.set("holiday", fileHits(holidayEntries(), match, id, holidayHref));
+      if (want("family")) hits.set("family", fileHits(petFamilyEntries(), match, id, petFamilyHref));
+      // Spells, item sets and vendors by the names their lists show, which only a page passes in (never the API).
+      if (spells) hits.set("spell", namedHits(spells, match, id, spellHref));
+      if (itemSets) hits.set("item-set", namedHits(itemSets, match, id, itemSetHref, UNNAMED_SET));
+      if (vendors) hits.set("vendor", vendorHits(vendors, names.npcs, match, id));
     }
     return hits;
   };
@@ -330,7 +400,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
 
 /** The things a player meets in the game: their groups lead the page. */
 const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone", "instance"]);
-const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievement", "faction", "title", "chain", "guide"]);
+const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "guide"]);
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,
@@ -352,10 +422,10 @@ function strip(result: SearchResult & { r?: number }): SearchResult {
 }
 
 /**
- * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a zone page, or
- * a dungeon or raid page whose `note` says which and its level ("Dungeon, level 16").
+ * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a zone page, a
+ * dungeon or raid page whose `note` says which and its level ("Dungeon, level 16"), or a spell or vendor page.
  */
-export interface Suggestion { type: Scope | "zone" | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
+export interface Suggestion { type: Scope | "zone" | "instance" | "spell" | "vendor"; id: number; label: string; href: string; quality?: number | null; note?: string }
 export const SUGGEST_LIMIT = 8;
 
 /**
@@ -364,9 +434,10 @@ export const SUGGEST_LIMIT = 8;
  * and raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
  * same rows as /search; no lore or tools, so it stays cheap per keystroke. `tolerant` (the site's own boxes) also
  * matches the words in any order and, when nothing matches and no id was typed, within a typo or two, as /search
- * does; without it (/api/suggest) the text matches as one phrase, as it always has. `objects` as for siteSearch.
+ * does; without it (/api/suggest) the text matches as one phrase, as it always has. `objects` as for siteSearch;
+ * `spells` and `vendors` (unscoped only) are the names and ids the site's own boxes pass in, as siteSearch's.
  */
-export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false, objects }: { tolerant?: boolean; objects?: Set<number> } = {}): Promise<Suggestion[]> {
+export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false, objects, spells, vendors }: { tolerant?: boolean; objects?: Set<number>; spells?: Map<number, string>; vendors?: Set<number> } = {}): Promise<Suggestion[]> {
   const q = raw.trim().slice(0, MAX_QUERY).toLowerCase();
   if (!q) return [];
   const id = exactId(q);
@@ -389,6 +460,12 @@ export async function suggest(raw: string, scope?: Scope, names?: Names, { toler
       }
       for (const x of instanceHits(match).slice(0, SUGGEST_LIMIT)) {
         ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length + 1 });
+      }
+      if (vendors) for (const x of vendorHits(vendors, all.npcs, match, id).slice(0, SUGGEST_LIMIT)) {
+        ranked.push({ s: { type: "vendor", id: x.id!, label: x.label, href: x.href }, r: x.r, t: order.length + 2 });
+      }
+      if (spells) for (const x of namedHits(spells, match, id, spellHref).slice(0, SUGGEST_LIMIT)) {
+        ranked.push({ s: { type: "spell", id: x.id!, label: x.label, href: x.href }, r: x.r, t: order.length + 3 });
       }
     }
     return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);

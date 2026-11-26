@@ -107,6 +107,8 @@ const SHOWS_ART = new Set([
   // Approved entity share icons use the same page art switch and item visibility rule.
   "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
+  // Model pictures for the item and NPC pages (docs/ASSETS.md, "Model pictures").
+  "web/src/lib/game-renders.ts",
   "web/src/app/tools/raid/RaidBuilder.tsx",
   "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/app/tools/raid/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
   "web/src/app/tools/professions/page.tsx", "web/src/app/tools/professions/[profession]/page.tsx", "web/src/app/tools/professions/[profession]/gathering/page.tsx", "web/src/app/database/drops/page.tsx", "web/src/app/database/items/[id]/page.tsx", "web/src/app/database/items/category-page.tsx",
@@ -122,8 +124,20 @@ const SHOWS_ART = new Set([
   "web/src/app/database/instances/[instance]/page.tsx",
   // The terrain page: the item names and icons of the gear bound to each terrain type, as the zone pages show them.
   "web/src/app/database/terrain/page.tsx",
-  // The spell page: the spell's icon and its text come from the same manifest as the item's.
-  "web/src/app/database/spells/[id]/page.tsx",
+  // An item set page: its pieces' names and icons under the item name rule, and the set and bonus spell names and
+  // icons, as the item and spell pages show them. The set list reads the set names only, no art.
+  "web/src/app/database/item-sets/[id]/page.tsx", "web/src/app/database/item-sets/page.tsx",
+  // The spell page: the spell's icon and its text come from the same manifest as the item's (read in load-spell.ts,
+  // which the page's text-only social card shares for the name and the 404).
+  "web/src/app/database/spells/[id]/page.tsx", "web/src/app/database/spells/[id]/load-spell.ts",
+  // The item set page's social card reads the set names under the page's rule. Text only, no art.
+  "web/src/app/database/item-sets/[id]/opengraph-image.tsx",
+  // The mount, companion pet and currency pages: their icon, by id, from the same manifest.
+  "web/src/app/database/mounts/[id]/page.tsx", "web/src/app/database/pets/[id]/page.tsx", "web/src/app/database/currencies/[id]/page.tsx",
+  // The hunter pet family list and pages: the family icons and the icons and names of the spells on its skill line.
+  "web/src/app/database/pet-families/page.tsx", "web/src/app/database/pet-families/[id]/page.tsx",
+  // The Alliance and Horde faction pages: the faction emblem in the header, as the race and class table shows it.
+  "web/src/app/database/factions/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
@@ -140,7 +154,7 @@ const SHOWS_ART = new Set([
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
   "web/src/lib/shown-item-names.ts", "web/src/lib/site-sitemap.ts", "web/scripts/upload-item-names.mjs",
-  // The spell names, read by the database sitemap only to know whether a spell's page is named: ids out, no names.
+  // The spell and item set names, read by the database sitemap only to know whether a page is named: ids out, no names.
   "web/src/lib/database-sitemap.ts",
   // The same names and the quest titles for the site's own search (/search and /search/suggest), never /api/suggest.
   "web/src/lib/shown-search-names.ts",
@@ -149,6 +163,8 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
   "web/src/lib/showcase-gear-art.ts",
+  // Gear Blizzard's armory reports equipped: its tooltips, or the armory's name with the files' icon (docs/DATA_POLICY.md).
+  "web/src/lib/equipped-item-tips.ts",
   // Blizzard's equipment on a linked character's page and its owner's preview: item tips as the armory page draws them.
   "web/src/app/characters/armory-part.tsx", "web/src/app/characters/[ruleset]/[realm]/[name]/page.tsx",
   "web/src/app/me/characters/links/[id]/page.tsx",
@@ -186,7 +202,7 @@ test("nothing outside the pages that show the art can read the asset URL or the 
     join(root, "web/src/lib/bulk-export.ts"), join(root, "web/scripts/export-bulk.ts"), ...sources(join(root, "kb/src")).filter((p) => /mcp|exporters/.test(p)),
   ];
   // site-search.ts serves /api/suggest too: the shown names reach it only as an argument from a page.
-  for (const p of [...api, join(root, "web/src/lib/site-search.ts")]) expect(readFileSync(p, "utf8"), p).not.toMatch(/talents\/(assets|catalogs)|GAME_ASSETS|GAME_DATA_(S3|BUCKET|ACCESS|SECRET|REGION)|game-assets|components\/game\/|shown-item-names|shown-search-names|src\/item-names|loadItemNames|loadShownNames|src\/game-names|loadQuestNames|loadItemSetNames|loadSpellNames/);
+  for (const p of [...api, join(root, "web/src/lib/site-search.ts")]) expect(readFileSync(p, "utf8"), p).not.toMatch(/talents\/(assets|catalogs)|GAME_ASSETS|GAME_DATA_(S3|BUCKET|ACCESS|SECRET|REGION)|game-assets|game-renders|components\/game\/|shown-item-names|shown-search-names|src\/item-names|loadItemNames|loadShownNames|src\/game-names|loadQuestNames|loadItemSetNames|loadSpellNames/);
 });
 
 let release = "";

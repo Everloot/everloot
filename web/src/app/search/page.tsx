@@ -56,7 +56,10 @@ const OVERVIEW_LIMIT = 5;
  */
 const LIST_OF: Record<ResultScope, string> = {
   item: "/database/items", npc: "/database/npcs", quest: "/database/quests", object: "/database/objects", zone: "/database/zones", instance: "/database/instances",
+  vendor: "/database/vendors", spell: "/database/spells", "item-set": "/database/item-sets",
   achievement: "/database/achievements", faction: "/database/factions", title: "/database/titles", chain: "/database/quest-chains",
+  mount: "/database/mounts", pet: "/database/pets", currency: "/database/currencies",
+  holiday: "/database/holidays", family: "/database/pet-families",
 };
 const listHrefFor = (type: SearchType, q: string): string | undefined => {
   if (!isResultScope(type)) return undefined;
@@ -140,7 +143,10 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   // same read which item rows show an icon; the next request rechecks publication.
   const shown = q ? loadSearchShown() : undefined;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { limit: OVERVIEW_LIMIT, names: shown!.then((s) => s.names), objects: shown!.then((s) => s.objects) }) : null;
+  const groups = q ? await siteSearch(q, {
+    limit: OVERVIEW_LIMIT, names: shown!.then((s) => s.names), objects: shown!.then((s) => s.objects),
+    spells: shown!.then((s) => s.spells), itemSets: shown!.then((s) => s.itemSets), vendors: shown!.then((s) => s.vendors),
+  }) : null;
   // The game icon beside each item hit, where its page shows one, and the facts beside each quest and NPC hit.
   const [{ icons, unknown }, facts] = await Promise.all([
     shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown),

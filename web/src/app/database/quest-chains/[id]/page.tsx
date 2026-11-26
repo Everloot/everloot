@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
-import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Container, DataTable, Facts, InShort, OpenData, TooltipFrame } from "@/components/ui";
+import { DataTable, TooltipFrame } from "@/components/ui";
 import EntityLink from "@/components/EntityLink";
 import { trailFor } from "@/lib/breadcrumbs";
 import { chainHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
@@ -11,7 +8,7 @@ import { asOfLine, entitySummary } from "@/lib/evidence";
 import { loadNames } from "@/lib/names";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
+import { EntityPage, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -27,7 +24,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name) }),
+    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name), image: `${chainHref(entry.questLineId, entry.name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -70,47 +67,37 @@ export default async function QuestChainPage(props: Props) {
   const summary = entry ? [what, observed, entry.confirmed ? name : filesName] : [];
 
   return (
-    <Container width="data">
-      <article>
-        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` })} />}
-        <EntityHeader trail={trail} title={title} meta={["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
-        {entry ? (
-          <>
-            <EntityTop
-              box={<TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{count} quests</p></TooltipFrame>}
-              facts={
-                <Facts
-                  layout="list"
-                  label={`${entry.name}: quick facts`}
-                  items={[
-                    { label: "Quests", value: count, numeric: true },
-                    ...(entry.truncated ? [{ label: "Length", value: "Longer than the 80 quests listed" }] : []),
-                    { label: "ID", value: entry.questLineId, numeric: true },
-                  ]}
-                />
-              }
-            />
-            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
-            {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
-            <DataTable
-              dense
-              caption={`Quests in ${entry.name}`}
-              columns={[
-                { key: "quest", header: "Quest", cell: ({ questId }: { questId: number; position: number }) => <>
-                  <EntityLink kind="quest" id={questId} name={nameOf(questId)} />
-                  {!quests.has(questId) && nameOf(questId) && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
-                </> },
-                { key: "position", header: "Position", numeric: true, cell: ({ position }: { questId: number; position: number }) => position },
-                { key: "name", header: "Name reports", cell: ({ questId }: { questId: number; position: number }) => nameOf(questId) ? null : "Name not reported yet." },
-              ]}
-              meta={({ questId, position }) => <>Position {position}{!nameOf(questId) && " · Name not reported yet."}</>}
-              rows={entry.questIds.map((questId, index) => ({ questId, position: index + 1 }))}
-              rowKey={({ questId }) => String(questId)}
-            />
-          </>
-        ) : <Unreachable />}
-      </article>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={entry && { name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` }}
+      header={{ trail, title, meta: ["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      box={entry && <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{count} quests</p></TooltipFrame>}
+      facts={entry && [
+        { label: "Quests", value: count, numeric: true },
+        ...(entry.truncated ? [{ label: "Length", value: "Longer than the 80 quests listed" }] : []),
+        { label: "ID", value: entry.questLineId, numeric: true },
+      ]}
+      notices={!entry && <Unreachable />}
+      summary={entry ? summary : undefined}
+      main={entry && <>
+        {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
+        <DataTable
+          dense
+          caption={`Quests in ${entry.name}`}
+          columns={[
+            { key: "quest", header: "Quest", cell: ({ questId }: { questId: number; position: number }) => <>
+              <EntityLink kind="quest" id={questId} name={nameOf(questId)} />
+              {!quests.has(questId) && nameOf(questId) && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
+            </> },
+            { key: "position", header: "Position", numeric: true, cell: ({ position }: { questId: number; position: number }) => position },
+            { key: "name", header: "Name reports", cell: ({ questId }: { questId: number; position: number }) => nameOf(questId) ? null : "Name not reported yet." },
+          ]}
+          meta={({ questId, position }) => <>Position {position}{!nameOf(questId) && " · Name not reported yet."}</>}
+          rows={entry.questIds.map((questId, index) => ({ questId, position: index + 1 }))}
+          rowKey={({ questId }) => String(questId)}
+        />
+      </>}
+      openData={entry && { report: { type: "Quest chain", id, path: chainHref(entry.questLineId, entry.name) }, text: [`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n") }}
+    />
   );
 }

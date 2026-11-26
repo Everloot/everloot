@@ -49,7 +49,8 @@ ChangeEntry {
   talents          null when initial; otherwise lists of
                      classesAdded, classesRemoved (classId, className, spoiler), added, removed, moved, ranks, gates, prereqs,
                      replaced, spellValues, pointLevels
-                   each item: classId, className, tree, nodeId, name, spoiler, and the before/after
+                   each item: classId, className, tree, nodeId, name, spoiler, spellIds (the spells the node
+                   holds; absent before 2026-11-26), and the before/after
   raidBuffs        { comparedTo (version of the raid file compared with),
                      scopeChanges: [{ id, label, before, after, beforeRanks, afterRanks, spoiler }],
                      spellChanges: [{ id, label, spellId, name, change, spoiler }] }
@@ -63,6 +64,13 @@ ChangeEntry {
   warnings
 }
 ```
+
+## Entity pages
+
+Spell and zone pages show their own lines from these entries in a "Changes across builds" section
+(`kb/src/build-watch/entity-changes.ts`): spell values and talent nodes by spell id, raid buff spells, and
+zone map changes by map id. A non-live entry and any item marked `spoiler` give no line. The tooltip
+text hash is never shown, only that the text changed.
 
 A hotfix that changes no build does not change the game files, so it never appears here. The blue
 tracker covers hotfixes.

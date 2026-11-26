@@ -1,22 +1,22 @@
-import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
 import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { DataTable, Facts, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
+import { EMPTY, EmptyTab, EntityPage, LINK } from "../../entity";
+import EntityChanges, { changesFor } from "../../entity-changes";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
-import { loadEdges } from "@/lib/edges";
-import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
-import { edgesFrom, edgesTo, type Edge, type Rel } from "@kb/edges";
+import type { Edge, Rel } from "@kb/edges";
 import { entityLabel } from "@kb/edges";
 import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
-import { loadSpellTalents, type SpellTalent } from "@/lib/talents/spell-talents";
+import type { SpellTalent } from "@/lib/talents/spell-talents";
 import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import { loadSpell } from "./load-spell";
 
 /**
  * A spell page. The spell is the game's own data: its name, its text and its relations all come
@@ -85,31 +85,6 @@ function TalentFacts({ talent, title }: { talent: SpellTalent; title: string }) 
 }
 
 /**
- * What the page reads about one spell. The spell is unknown, a 404 rather than an empty page, when the game
- * files' spell names are loaded and do not hold it, it has no tooltip and no relation points from or to it.
- * Without the names file, or with upload storage out of reach, nothing can be ruled out.
- */
-async function loadSpell(spellId: number) {
-  const [edges, assets, spellNames, talentIndex] = await Promise.all([
-    loadEdges(),
-    loadSiteAssets(),
-    loadSpellNames(CLIENT_LAYER.build.version),
-    loadSpellTalents(),
-  ]);
-  const both = [...edges.observed, ...edges.client];
-  // Both directions: the files store what a spell creates and what it costs on the item (item -> created_by
-  // or reagent_for -> spell), and what teaches it on the spell (spell -> in_skill_line -> skill).
-  const all = [...edgesFrom(both, "spell", spellId), ...edgesTo(both, "spell", spellId)];
-  const wiki = await loadWikiEntityNames("spell");
-  const shownName = shownEntityName(spellId, spellNames?.names.get(spellId) || assets?.spellTips.get(spellId)?.name, wiki);
-  const name = shownName.name;
-  const tip = assets?.spellTips.get(spellId);
-  const talents = talentIndex.get(spellId) ?? [];
-  const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length && !talents.length;
-  return { edges, assets, all, name, tip, talents, unknown, fromWiki: shownName.fromWiki };
-}
-
-/**
  * The description from the name the files give, cut at a word when a long name leaves no room; the shape the other
  * database pages take (the lead sentence, what the page holds, the id). Without a name it says where the id comes from.
  */
@@ -136,6 +111,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: shown ? `${shown} – WoW Forever spell` : `Spell ${params.id}`,
       description: spellDescription(shown, Number(params.id)),
       path: `/database/spells/${params.id}`,
+      image: `${`/database/spells/${params.id}`}/opengraph-image`,
     }),
     robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length, talents: talents.length }), follow: true },
   };
@@ -145,7 +121,7 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
+  const { edges, assets, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
   if (unknown) notFound();
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
@@ -187,42 +163,42 @@ export default async function SpellPage(props: Props) {
   ].filter((t): t is TabItem => t !== null);
 
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
+  // What the build watch recorded about this spell, build by build; the slot stays out when it never changed.
+  const changes = changesFor({ kind: "spell", id: spellId });
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
-        <EntityHeader trail={trail} title={fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
-        <EntityTop
-          box={
-            <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
-              {tip?.text ? <p>{tip.text}</p> : <p>No text for this spell in the client files.</p>}
-            </TooltipFrame>
-          }
-          facts={
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
-                { label: "Build", value: build },
-                // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
-                { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
-                { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
-              ]}
-            />
-          }
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
-            text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
-          />
-        </EntitySidebar>
-        {tabs.length
-          ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
-          : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` }}
+      header={{
+        trail,
+        icon: <EntityIcon src={assets?.spellIcons.get(spellId)} />,
+        title: fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title,
+        meta: ["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>],
+      }}
+      box={
+        <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
+          {tip?.text ? <p>{tip.text}</p> : <p>No text for this spell in the client files.</p>}
+        </TooltipFrame>
+      }
+      facts={[
+        { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
+        { label: "Build", value: build },
+        // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
+        { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
+        { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
+      ]}
+      summary={summary}
+      main={tabs.length
+        ? <Tabs label={`${title}: relations`} tabs={tabs} />
+        : <EmptyTab message={EMPTY.files(build)} players={false} action={null} />}
+      changes={changes.length ? <EntityChanges changes={changes} name={title} /> : undefined}
+      screenshots={<EntityScreenshots type="spell" id={spellId} name={title} />}
+      comments={<EntityComments type="spell" id={spellId} />}
+      openData={{
+        report: { type: "Spell", id: spellId, path: `/database/spells/${spellId}`, build },
+        text: [`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n"),
+      }}
+    />
   );
 }
