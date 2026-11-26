@@ -13,7 +13,7 @@ counted, never decrypted. Column names come from [WoWDBDefs](https://github.com/
 
 The build watch writes no folder of its own. A new build's pull request replaces the files the site reads
 (see [../README.md](../README.md)): `talents/<class>.json`, `raid-<build>.json` (and removes the old one),
-`map.json`, `addon/modules/raid_data.lua`, and the import in `raid.ts`. It also writes three files of its own:
+`map.json`, `addon/modules/raid_data.lua`, and the import in `raid.ts`. It also writes four files of its own:
 
 ```
 web/src/data/game-data/
@@ -21,6 +21,8 @@ web/src/data/game-data/
                                      (everloot.spell-values/1; one spell per line; no tooltip text)
   client-digests.json                rows and a content hash per client table the extractor reads
                                      (everloot.client-digests/1; one table per line; counts and hashes only)
+  item-digests.json                  a 4-hex-digit hash per part of each item the site reads
+                                     (everloot.item-digests/1; one item per line; hashes only)
   changes/<product>-<buildId>.json   one changelog entry per build
 ```
 
@@ -61,6 +63,12 @@ ChangeEntry {
                      changedTables [{ table, rowsBefore, rowsAfter, changed }],
                      layoutChanged (the WoWDBDefs commit differs, so a layout change may read as a table change)
                    counts, names and hash differences only; never rows or values
+  items            absent before 2026-11-27; null when no item digests were committed to compare with;
+                   otherwise { spoiler, comparedTo (build id of the digests compared with),
+                     added [item id], removed [item id], changed [{ id, fields }] }
+                   fields name the parts that changed (item-digests.ts ITEM_PARTS, or tooltip-added /
+                   tooltip-removed when the ItemSparse row came or went); ids and part names only.
+                   Backfilled from local snapshots for 71091 (vs 71037) and 71139 (vs 71091)
   warnings
 }
 ```
@@ -69,7 +77,9 @@ ChangeEntry {
 
 Spell and zone pages show their own lines from these entries in a "Changes across builds" section
 (`kb/src/build-watch/entity-changes.ts`): spell values and talent nodes by spell id, raid buff spells, and
-zone map changes by map id. A non-live entry and any item marked `spoiler` give no line. The tooltip
+zone map changes by map id. Item pages show "Added in build" (the oldest live build whose
+`items.added` lists the item) and the parts each build changed, only for items whose tooltip they may
+show. A non-live entry and any item marked `spoiler` give no line. The tooltip
 text hash is never shown, only that the text changed.
 
 A hotfix that changes no build does not change the game files, so it never appears here. The blue

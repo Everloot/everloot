@@ -86,14 +86,16 @@ describe("classTalentChanges", () => {
 
   test("every warning the build watch writes is read: a missing spell number comparison limits the evidence, and so does a warning it does not know", () => {
     const root = join(src, "../..");
-    const producer = ["kb/src/build-watch/diff.ts", "kb/src/build-watch/client-digests.ts"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+    const producer = ["kb/src/build-watch/diff.ts", "kb/src/build-watch/client-digests.ts", "kb/src/build-watch/item-digests.ts"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
     const written = [...producer.matchAll(/warnings\.push\((`[^`]*`|"[^"]*")\)/g)].map((m) => m[1].slice(1, -1).replace(/\$\{[^}]*\}/g, "x"));
     const limits = (warning: string) => classTalentChanges([record("1.0.0.5", "1.0.0.1", {}, { warnings: [warning] })], 8).steps[0].limits;
     expect(written.map((w) => [w, limits(w)])).toEqual([
       ["table definitions differ (WoWDBDefs x vs x): a change may come from the layouts, not the game", []],
       ["no committed spell values to compare with, so spell number changes are not listed", ["spellValues"]],
       ["no committed client digests to compare with, so client table changes are not listed", []],
+      ["no committed item digests to compare with, so new and changed items are not listed", []],
       ["client table x was read before and is absent from this build (x), so it is not counted as removed", []],
+      ["the item tables skip a different number of encrypted blocks than before (x), so new and changed items are not listed", []],
     ]);
     expect(limits("Mage: 3 nodes have no entries")).toEqual(["unknown"]);
   });

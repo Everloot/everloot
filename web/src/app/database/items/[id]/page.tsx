@@ -46,6 +46,7 @@ import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import EntityChanges, { buildHref, changesFor, itemAddedFor } from "../../entity-changes";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 /** How the files' tooltip prints the vendor price (lib/item-names.ts). */
@@ -288,6 +289,10 @@ export default async function ItemPage(props: Props) {
     lastSeen: newestSeen,
     now,
   });
+  // When the build watch first found the item and what later builds changed, under the tooltip's rule: an item the
+  // page may not show a tooltip for may be unreleased. Builds before the first compared one prove nothing, so no fact.
+  const added = tipped ? itemAddedFor(itemId) : null;
+  const changes = tipped ? changesFor({ kind: "item", id: itemId }) : [];
   const quickFacts: Fact[] = [
     ...(category ? [
       { label: "Class", value: category.class ? <Link href={itemsHref(category.class.slug)} className={LINK}>{category.class.label}</Link> : known(null) },
@@ -296,6 +301,7 @@ export default async function ItemPage(props: Props) {
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
     ...(sellPrice ? [{ label: "Sell price", value: sellPrice, numeric: true }] : []),
+    ...(added ? [{ label: "Added in build", value: <Link href={buildHref(added.build)} className={`${LINK} font-mono tabular-nums`}>{added.build}</Link> }] : []),
     ...(getFrom.length ? [{ label: "Get it from", value: <span className="inline-flex flex-col gap-1">{getFrom}</span> }] : []),
     ...(facts.unreachable ? [] : [
       { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
@@ -351,6 +357,7 @@ export default async function ItemPage(props: Props) {
         <LoreSection match={lore} />
         {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
       </>}
+      changes={changes.length ? <EntityChanges changes={changes} name={title} /> : undefined}
       screenshots={<EntityScreenshots type="item" id={itemId} name={title} />}
       comments={<EntityComments type="item" id={itemId} />}
       openData={{

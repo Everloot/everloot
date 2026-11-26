@@ -24,11 +24,12 @@ import { compareGameBuilds, type BuildStep, type ClassTalentChanges, type Limit,
  *  its record to the folder; list it here in the same pull request (freshness.test.ts fails until it is). */
 export const PUBLISHED_CHANGES: readonly unknown[] = [beta70532, wowf70630, wowf70634, wowf70658, wowf70685, wowf70707, wowf70790, wowf70862, wowf70888, wowf70938, wowf70959, wowf71037, wowf71091, wowf71139];
 
-// The warnings the build watch writes (kb/src/build-watch/diff.ts and client-digests.ts). Three leave the talent
-// comparison whole: differing table layouts say where a listed change may come from, and the client digests and
-// tables are the read set. One says the spell numbers were not compared. Any other warning is read as a comparison
+// The warnings the build watch writes (kb/src/build-watch/diff.ts, client-digests.ts and item-digests.ts). Five leave
+// the talent comparison whole: differing table layouts say where a listed change may come from, the client digests and
+// tables are the read set, and the item digests are about items. One says the spell numbers were not compared. Any other warning is read as a comparison
 // that may be missing, so a new one can never let a record say nothing changed.
-const WHOLE = [/^table definitions differ \(/, /^no committed client digests to compare with\b/, /^client table \S+ was read before and is absent from this build\b/];
+const WHOLE = [/^table definitions differ \(/, /^no committed client digests to compare with\b/, /^client table \S+ was read before and is absent from this build\b/,
+  /^no committed item digests to compare with\b/, /^the item tables skip a different number of encrypted blocks than before\b/];
 const NO_SPELL_VALUES = /^no committed spell values to compare with\b/;
 
 function limitsOf(warnings: string[]): Limit[] {

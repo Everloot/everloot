@@ -93,6 +93,21 @@ export const ReadSet = z.object({
 });
 export type ReadSet = z.infer<typeof ReadSet>;
 
+/**
+ * Items the build added to or removed from the client's item tables, and the items whose site record changed, by id
+ * and the names of the parts that changed (item-digests.ts ITEM_PARTS, or `tooltip-added` / `tooltip-removed` when the
+ * ItemSparse row came or went). Ids and part names only, never values. `comparedTo` is the build id of the committed
+ * item digests.
+ */
+export const ItemChanges = z.object({
+  spoiler: z.boolean(),
+  comparedTo: z.number().int(),
+  added: z.array(z.number().int()),
+  removed: z.array(z.number().int()),
+  changed: z.array(z.object({ id: z.number().int(), fields: z.array(z.string()) })),
+});
+export type ItemChanges = z.infer<typeof ItemChanges>;
+
 export const ChangeEntry = z.object({
   schema: z.union([z.literal(LEGACY_CHANGE_SCHEMA), z.literal(CHANGE_SCHEMA)]),
   label: z.literal(LABEL),
@@ -119,6 +134,9 @@ export const ChangeEntry = z.object({
   mapChanges: MapChanges.nullable(),
   /** The client read set; null for a baseline or when there is no committed digest file to compare with. */
   readSet: ReadSet.nullable().optional(),
+  /** Item changes; null when there is nothing to compare with. Absent in entries written before 2026-11-27, an
+   *  optional addition, so the schema string stays. */
+  items: ItemChanges.nullable().optional(),
   warnings: z.array(z.string()),
 }).refine((e) => e.schema !== CHANGE_SCHEMA || e.readSet !== undefined, {
   message: "a /2 entry carries readSet (null when there is nothing to compare with)",
@@ -135,5 +153,7 @@ export function hasChanges(entry: ChangeEntry): boolean {
     + t.gates.length + t.prereqs.length + t.replaced.length + t.spellValues.length + t.pointLevels.length : 0;
   const r = entry.readSet;
   const readSetCount = r ? r.addedTables.length + r.removedTables.length + r.changedTables.length : 0;
-  return talentCount + (entry.raidBuffs ? entry.raidBuffs.scopeChanges.length + entry.raidBuffs.spellChanges.length : 0) + (entry.mapChanges?.length ?? 0) + readSetCount > 0;
+  const it = entry.items;
+  const itemCount = it ? it.added.length + it.removed.length + it.changed.length : 0;
+  return talentCount + (entry.raidBuffs ? entry.raidBuffs.scopeChanges.length + entry.raidBuffs.spellChanges.length : 0) + (entry.mapChanges?.length ?? 0) + readSetCount + itemCount > 0;
 }

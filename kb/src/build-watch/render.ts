@@ -51,6 +51,13 @@ function sections(entry: ChangeEntry): { title: string; items: string[] }[] {
     ];
     out.push({ title: "Client data", items });
   }
+  const it = entry.items;
+  if (it) {
+    const mark = it.spoiler ? "[spoiler] " : "";
+    out.push({ title: "Items added", items: it.added.map((id) => `${mark}item ${id}`) });
+    out.push({ title: "Items removed", items: it.removed.map((id) => `${mark}item ${id}`) });
+    out.push({ title: "Items changed", items: it.changed.map((c) => `${mark}item ${c.id}: ${c.fields.map(clean).join(", ")}`) });
+  }
   return out;
 }
 
@@ -61,7 +68,7 @@ function describe(entry: ChangeEntry): string[] {
   const lines: string[] = [];
   const found = sections(entry).filter((s) => s.items.length);
   if (entry.initial) lines.push("First data for this product: nothing to compare with, so this entry records a baseline.");
-  else if (!found.length) lines.push("No differences in the talents, spell numbers, raid buffs, map or client tables.");
+  else if (!found.length) lines.push("No differences in the talents, spell numbers, raid buffs, map, client tables or items.");
   for (const s of found) {
     lines.push("", `### ${s.title} (${s.items.length})`, "");
     for (const item of s.items.slice(0, CAP)) lines.push(`- ${item}`);
@@ -107,9 +114,9 @@ export function prBody(entry: ChangeEntry, ctx: BodyContext): string {
     "### Review",
     "",
     "- [ ] The changes above look like the game, not a parsing problem (check any mass removal or warning).",
-    "- [ ] Only the files the site reads changed (`web/src/data/game-data/`: talents, raid file, map, spell values, client digests, one changelog entry; `addon/modules/raid_data.lua`; the import line in `raid.ts`; `kb/curated/recheck.json` when a zone or entrance moved).",
+    "- [ ] Only the files the site reads changed (`web/src/data/game-data/`: talents, raid file, map, spell values, client digests, item digests, one changelog entry; `addon/modules/raid_data.lua`; the import line in `raid.ts`; `kb/curated/recheck.json` when a zone or entrance moved).",
     "- [ ] For a changed `QuestV2` or `UiMap`, run `npm run kb -- client-diff` between the two local snapshots and `npm run kb -- recheck-scopes` on its output, so the rows it changed are rechecked.",
-    "- [ ] `client-digests.json` is the next build's baseline; it is written, not edited by hand.",
+    "- [ ] `client-digests.json` and `item-digests.json` are the next build's baseline; they are written, not edited by hand.",
     "- [ ] The web tests still pass: some hard-code the build number in sample raid codes.",
     "- [ ] Spoiler flags are right for a build players cannot play yet.",
     "- [ ] Before merging: this build's asset folder and name files are uploaded and the site's asset URL setting points at it. The site reads item, quest, set and spell names only for the client layer's build, so merging first leaves production without names (see `docs/BUILD_WATCH.md`).",

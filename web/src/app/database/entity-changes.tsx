@@ -1,26 +1,30 @@
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui";
 import { ChangeEntry } from "@kb/build-watch/changes";
-import { entityChanges, type EntityBuildChanges, type EntityRef } from "@kb/build-watch/entity-changes";
+import { entityChanges, itemAddedIn, type EntityBuildChanges, type EntityRef } from "@kb/build-watch/entity-changes";
 import { PUBLISHED_CHANGES } from "@/lib/talents/freshness-records";
 import { LINK } from "./entity";
 
 let parsed: ChangeEntry[] | null = null;
+
+const records = () => (parsed ??= PUBLISHED_CHANGES.flatMap((raw) => {
+  const r = ChangeEntry.safeParse(raw);
+  return r.success ? [r.data] : [];
+}));
 
 /**
  * One entity's changes across builds, from the build watch's committed records (web/src/data/game-data/changes/).
  * A record that does not read is skipped: the talent pages already flag it, and a page must not fail over it.
  */
 export function changesFor(ref: EntityRef): EntityBuildChanges[] {
-  parsed ??= PUBLISHED_CHANGES.flatMap((raw) => {
-    const r = ChangeEntry.safeParse(raw);
-    return r.success ? [r.data] : [];
-  });
-  return entityChanges(parsed, ref);
+  return entityChanges(records(), ref);
 }
 
+/** The build a compared build added the item in; null when none did (it may have been there from the first). */
+export const itemAddedFor = (itemId: number) => itemAddedIn(records(), itemId);
+
 /** The build on the /changes timeline, filtered to builds and to that version. */
-const buildHref = (version: string) => `/changes?show=builds&q=${encodeURIComponent(version)}`;
+export const buildHref = (version: string) => `/changes?show=builds&q=${encodeURIComponent(version)}`;
 
 /**
  * The Changes slot of an entity page: what each build changed about this entity, newest first. Nothing at all when it

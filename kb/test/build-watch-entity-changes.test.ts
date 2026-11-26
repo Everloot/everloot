@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildChangeEntry, diffTalents } from "../src/build-watch/diff.js";
 import { ChangeEntry } from "../src/build-watch/changes.js";
-import { entityChanges } from "../src/build-watch/entity-changes.js";
+import { entityChanges, itemAddedIn } from "../src/build-watch/entity-changes.js";
 import type { SiteData } from "../src/build-watch/site-data.js";
 import { node, raid, spellValues, stamp, trimmed, worldMap } from "./build-watch-fixtures.js";
 
@@ -71,5 +71,45 @@ describe("entityChanges", () => {
       { talents: classes(base), map: worldMap(204, [{ id: 1411, name: "Durotar", left: 10 }, { id: 1412, name: "Mulgore" }]) });
     expect(entityChanges([z], { kind: "zone", id: 1412 })[0]!.rows).toEqual([{ label: "Zone added to the map", before: null, after: null }]);
     expect(entityChanges([z], { kind: "zone", id: 1411 })[0]!.rows).toMatchObject([{ label: "Map bounds" }]);
+  });
+});
+
+describe("item changes", () => {
+  const base = [node(1, "Mutilate")];
+  /** An entry carrying an item section, as the build watch writes it from two item digest files. */
+  const withItems = (buildId: number, items: NonNullable<ChangeEntry["items"]> | null, live = true): ChangeEntry =>
+    ({ ...entry(buildId, { talents: classes(base) }, { talents: classes(base) }, live), items });
+  const section = (buildId: number, over: Partial<NonNullable<ChangeEntry["items"]>> = {}) =>
+    ({ spoiler: false, comparedTo: buildId - 1, added: [], removed: [], changed: [], ...over });
+
+  it("gives the oldest build players can play that added the item", () => {
+    const entries = [withItems(302, section(302, { added: [7] })), withItems(301, section(301, { added: [7] }))];
+    expect(itemAddedIn(entries, 7)).toEqual({ id: "wowf-301", build: "1.60.1.301" });
+  });
+
+  it("gives nothing for an item no compared build added: it was there when the digests were first taken", () => {
+    const entries = [withItems(300, null), withItems(301, section(301, { added: [8] })), entry(299, { talents: classes(base) }, { talents: classes(base) })];
+    expect(itemAddedIn(entries, 7)).toBeNull();
+  });
+
+  it("never says so from a build players cannot play, or a section marked as a spoiler", () => {
+    expect(itemAddedIn([withItems(301, section(301, { added: [7] }), false)], 7)).toBeNull();
+    expect(itemAddedIn([withItems(301, section(301, { added: [7], spoiler: true }))], 7)).toBeNull();
+    expect(entityChanges([withItems(301, section(301, { changed: [{ id: 7, fields: ["name"] }], spoiler: true }))], { kind: "item", id: 7 })).toEqual([]);
+  });
+
+  it("words the parts that changed, newest build first, and an item removed from the files", () => {
+    const entries = [
+      withItems(301, section(301, { changed: [{ id: 7, fields: ["sellPrice", "tooltip-added", "somethingNew"] }] })),
+      withItems(302, section(302, { removed: [7], changed: [{ id: 9, fields: ["name"] }] })),
+    ];
+    expect(entityChanges(entries, { kind: "item", id: 7 })).toEqual([
+      { id: "wowf-302", build: "1.60.1.302", rows: [{ label: "Removed from the game files", before: null, after: null }] },
+      { id: "wowf-301", build: "1.60.1.301", rows: [
+        { label: "Sell price changed", before: null, after: null },
+        { label: "Tooltip added to the game files", before: null, after: null },
+        { label: "somethingNew changed", before: null, after: null },
+      ] },
+    ]);
   });
 });

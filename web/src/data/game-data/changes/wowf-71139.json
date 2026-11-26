@@ -495,6 +495,222 @@
     ],
     "layoutChanged": true
   },
+  "items": {
+    "spoiler": false,
+    "comparedTo": 71091,
+    "added": [
+      291869
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "id": 2892,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 2893,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 3775,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 3776,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 5237,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 5530,
+        "fields": [
+          "binding"
+        ]
+      },
+      {
+        "id": 6947,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 6949,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 6950,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 6951,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 8926,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 8927,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 8928,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 8984,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 8985,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 9186,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 10918,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 10920,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 10921,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 10922,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 11422,
+        "fields": [
+          "tooltip-added"
+        ]
+      },
+      {
+        "id": 11423,
+        "fields": [
+          "tooltip-added"
+        ]
+      },
+      {
+        "id": 20844,
+        "fields": [
+          "binding",
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 226374,
+        "fields": [
+          "binding"
+        ]
+      },
+      {
+        "id": 234444,
+        "fields": [
+          "binding"
+        ]
+      },
+      {
+        "id": 252027,
+        "fields": [
+          "sellPrice"
+        ]
+      },
+      {
+        "id": 272432,
+        "fields": [
+          "name"
+        ]
+      },
+      {
+        "id": 278487,
+        "fields": [
+          "icon"
+        ]
+      },
+      {
+        "id": 278917,
+        "fields": [
+          "icon"
+        ]
+      },
+      {
+        "id": 278956,
+        "fields": [
+          "icon"
+        ]
+      },
+      {
+        "id": 278973,
+        "fields": [
+          "icon"
+        ]
+      }
+    ]
+  },
   "warnings": [
     "table definitions differ (WoWDBDefs 3783c908726e vs 8308f39154b5): a change may come from the layouts, not the game"
   ]

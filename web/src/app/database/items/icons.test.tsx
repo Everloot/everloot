@@ -171,6 +171,31 @@ test("a covered item: no line about missing stats, and its sell price as a fact 
   expect(await html(ItemPage(props("7230")))).not.toContain("Sell price");
 });
 
+// The build watch's records list 291874 as new in 1.60.1.71091 and 2892's binding and sell price as changed in 71139
+// (web/src/data/game-data/changes/). Items already in 71037, the first build compared, have no such fact.
+test("an item a compared build added says which build in its facts; one that was there all along says nothing", async () => {
+  state.assets = assets;
+  state.matched = matchedNames([291874, 7230]);
+  expect(await html(ItemPage(props("291874")))).toMatch(/Added in build<\/dt><dd[^>]*>(?:<[^>]*>)*1\.60\.1\.71091</);
+  expect(await html(ItemPage(props("7230")))).not.toContain("Added in build");
+});
+
+test("an item that shows no tooltip says nothing about the builds that added or changed it", async () => {
+  state.assets = assets;
+  const page = await html(ItemPage(props("2892")));
+  expect(page).not.toContain("Added in build");
+  expect(page).not.toContain("Changes across builds");
+});
+
+test("an item's changes across builds list the parts each build changed, never the values", async () => {
+  state.assets = assets;
+  state.matched = matchedNames([2892]);
+  const page = await html(ItemPage(props("2892")));
+  expect(page).toMatch(/data-slot="changes"[\s\S]*Changed in build (?:<[^>]*>)*1\.60\.1\.71139</);
+  expect(page).toMatch(/<li>Binding changed<\/li><li>Sell price changed<\/li>/);
+  expect(page).not.toContain("Added in build");
+});
+
 test("a category row without an icon shows the question mark from the same asset folder", async () => {
   state.assets = assets;
   const ids = clothIds();

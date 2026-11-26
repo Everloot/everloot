@@ -39,6 +39,7 @@ import { readTerrainAreas } from "../terrain-area.js";
 import { ClassCatalog } from "../talents/catalog.js";
 import { writeWorldMapData } from "../world-map-data.js";
 import { clientDigestsOf } from "./client-digests.js";
+import { itemDigestsOf } from "./item-digests.js";
 import { DISENCHANT_LUA, FLIGHT_LUA, GAME_DATA_DIR, spellValuesOf } from "./site-data.js";
 import { snapshotFlightLua } from "../flight-lua.js";
 import type { Extracted } from "./watch.js";
@@ -69,6 +70,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
       .filter((f) => f !== "index.json")
       .map((f) => ClassCatalog.parse(JSON.parse(readFileSync(join(run.dir, "talents", f), "utf8"))));
     const meta = readClientMeta(snapshot);
+    const blocksOf = (table: string) => manifest.tables.find((t) => t.table === table)?.encryptedBlocks ?? 0;
     const web = (script: string, ...args: string[]) =>
       execFileSync(process.execPath, [...(script.endsWith(".ts") ? [tsx] : []), join(webDir, "scripts", script), ...args], { cwd: webDir, stdio: ["ignore", "ignore", "inherit"], timeout: 300_000 });
     return {
@@ -79,6 +81,12 @@ export async function extractFromCdn(product: string, region: string, curatedPat
       clientDigests: clientDigestsOf(
         { product, buildId: build.buildId, version: build.version, buildConfig: build.buildConfig, definitions: pinned, extractedAt },
         tables.filter((t) => t.table in CLIENT_TABLES),
+      ),
+      // Every item the site reads, hashed part by part, so the next build can say which items are new or changed.
+      itemDigests: itemDigestsOf(
+        { product, buildId: build.buildId, version: build.version, buildConfig: build.buildConfig, definitions: pinned, extractedAt },
+        (name) => tables.find((t) => t.table === name)?.rows,
+        { Item: blocksOf("Item"), ItemSparse: blocksOf("ItemSparse") },
       ),
       missingTables: missing,
       generate(root: string) {

@@ -1,7 +1,8 @@
 /**
  * One entity's changes across builds, read from the build watch's change entries (changes.ts): the rows a database
  * page shows in its Changes section. The entries already hold id-level rows for what the pages read (spell values by
- * spell id, talent nodes with the spells they hold, map zones by map id), so this only picks and words them.
+ * spell id, talent nodes with the spells they hold, map zones by map id, items by item id), so this only picks and words
+ * them. An item's parts are compared by hash, so a row only says which part changed, never from what to what.
  *
  * Spoilers stay out: an entry from a build players cannot play yet, and any item marked as a spoiler, gives no row.
  * The pages have no spoiler switch of their own, so this is the default the /changes timeline shows. Tooltip text is
@@ -9,7 +10,7 @@
  */
 import type { ChangeEntry } from "./changes.js";
 
-export type EntityRef = { kind: "spell"; id: number } | { kind: "zone"; id: number };
+export type EntityRef = { kind: "spell"; id: number } | { kind: "zone"; id: number } | { kind: "item"; id: number };
 
 /** A row: `label` alone is the whole sentence; with `before`/`after` it names the field that went from one to the other. */
 export interface EntityChangeRow { label: string; before: string | null; after: string | null }
@@ -71,11 +72,38 @@ function zoneRows(e: ChangeEntry, id: number): EntityChangeRow[] {
   });
 }
 
+/** What changed about an item, in words; the item tables give hashes only, so a part is only said to have changed. */
+const ITEM_PART_WORDS: Record<string, string> = {
+  "tooltip-added": "Tooltip added to the game files", "tooltip-removed": "Tooltip removed from the game files",
+  name: "Name changed", quality: "Quality changed", itemLevel: "Item level changed", requiredLevel: "Required level changed",
+  binding: "Binding changed", category: "Class, subclass or slot changed", stats: "Stat kinds changed",
+  weapon: "Weapon speed or damage changed", sellPrice: "Sell price changed", lines: "Other tooltip lines changed", icon: "Icon changed",
+};
+
+function itemRows(e: ChangeEntry, id: number): EntityChangeRow[] {
+  const it = e.items;
+  if (!it || it.spoiler) return [];
+  if (it.removed.includes(id)) return [said("Removed from the game files")];
+  return (it.changed.find((c) => c.id === id)?.fields ?? []).map((f) => said(ITEM_PART_WORDS[f] ?? `${f} changed`));
+}
+
+const shown = (entries: readonly ChangeEntry[]) => entries.filter((e) => e.live && !e.spoiler);
+
+/**
+ * The build an item first appeared in: the oldest build players can play whose entry lists it as added. Null when no
+ * compared build added it, which includes every item already in the first build the item digests were taken from:
+ * when those were added is not known.
+ */
+export function itemAddedIn(entries: readonly ChangeEntry[], id: number): { id: string; build: string } | null {
+  const hit = shown(entries).filter((e) => e.items && !e.items.spoiler && e.items.added.includes(id)).sort((a, b) => a.build.buildId - b.build.buildId)[0];
+  return hit ? { id: hit.id, build: hit.build.version } : null;
+}
+
 /** The entity's changes, newest build first; empty when it never changed in a build players can play. */
 export function entityChanges(entries: readonly ChangeEntry[], ref: EntityRef): EntityBuildChanges[] {
-  return entries
-    .filter((e) => e.live && !e.spoiler)
-    .map((e) => ({ id: e.id, build: e.build.version, buildId: e.build.buildId, rows: ref.kind === "spell" ? spellRows(e, ref.id) : zoneRows(e, ref.id) }))
+  const rows = ref.kind === "spell" ? spellRows : ref.kind === "zone" ? zoneRows : itemRows;
+  return shown(entries)
+    .map((e) => ({ id: e.id, build: e.build.version, buildId: e.build.buildId, rows: rows(e, ref.id) }))
     .filter((b) => b.rows.length)
     .sort((a, b) => b.buildId - a.buildId)
     .map(({ id, build, rows }) => ({ id, build, rows }));
