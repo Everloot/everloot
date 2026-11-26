@@ -13,9 +13,9 @@ const count = (value: number) => value.toLocaleString("en-US");
  */
 export default function HomeTrust({ summary }: { summary: CoverageSummary | null }) {
   const figures = [
-    { id: "installs", label: summary?.installs === 1 ? "install that uploaded" : "installs that uploaded", value: summary?.installs, note: "Overall: every install that uploaded, in any zone." },
-    { id: "confirmed", label: "confirmed facts", value: summary?.confirmed, note: "In released zones: facts that 3 or more installs agree on." },
-    { id: "waiting", label: "facts waiting", value: summary?.waiting, note: "In released zones: seen by 1 or 2 installs; each needs 1 or 2 more to agree." },
+    { id: "installs", label: summary?.installs === 1 ? "Install that uploaded" : "Installs that uploaded", value: summary?.installs, note: "Overall: every install that uploaded, in any zone." },
+    { id: "confirmed", label: "Confirmed facts", value: summary?.confirmed, note: "In released zones: facts that 3 or more installs agree on." },
+    { id: "waiting", label: "Facts waiting", value: summary?.waiting, note: "In released zones: seen by 1 or 2 installs; each needs 1 or 2 more to agree." },
   ];
   return (
     <section aria-labelledby="promise" data-home-trust>
@@ -30,7 +30,7 @@ export default function HomeTrust({ summary }: { summary: CoverageSummary | null
         <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-3">
           {figures.map((f) => (
             <div key={f.id} data-figure={f.id}>
-              <dt className="font-mono text-xs text-muted">{f.label}</dt>
+              <dt className="text-meta text-muted">{f.label}</dt>
               <dd className={f.value === undefined ? "mt-1 text-2xl font-semibold text-fg-2" : "mt-1 text-4xl font-bold tabular-nums tracking-tight text-fg"}>
                 {f.value === undefined ? "unrecorded" : count(f.value)}
               </dd>

@@ -191,6 +191,8 @@ const SHOWS_ART = new Set([
   // The Auction House boards' stored view: the shown name of each item with a public auction value, under the same rule
   // as the Auction House pages (tools/auctions/art.ts), read from the tooltips in the cron instead of on each page.
   "web/src/lib/market-boards.ts",
+  // The landing page's newest facts: the icon and quality of items that just reached three installs, as /database/recent lists them.
+  "web/src/lib/home-live.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

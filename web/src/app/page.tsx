@@ -17,6 +17,8 @@ import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
 import { FEED } from "@/lib/seo";
 import { launchArt, loadSiteAssets } from "@/lib/game-assets";
 import { BannerArt } from "@/components/game/PageBanner";
+import LivePanels from "@/components/home/LivePanels";
+import { loadHomeLadder, loadHomeNewest, loadHomeWeek } from "@/lib/home-live";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
@@ -40,7 +42,9 @@ export default async function Home() {
   // What's new: the newest entries the site's own timeline holds, newest first.
   // One line per announcement: loadTimeline already folds the regional copies together.
   const newest = (await loadTimeline()).slice(0, 4);
-  const coverage = await loadCoverageSummary();
+  // The live row: addon and game-file data only, never the armory's (this page may carry an ad slot). Each panel
+  // has its own read and says so on its own when that read fails.
+  const [coverage, newestFacts, ladder, week] = await Promise.all([loadCoverageSummary(), loadHomeNewest(), loadHomeLadder(), loadHomeWeek()]);
 
   return (
     <div className="space-y-18">
@@ -74,7 +78,9 @@ export default async function Home() {
         </Banner>
       </section>
 
-      <StartHere />
+      <LivePanels newest={newestFacts} ladder={ladder} week={week} />
+
+      <StartHere limit={5} />
 
       {/* The promise with its live numbers, from the stored coverage score. */}
       <HomeTrust summary={coverage} />
