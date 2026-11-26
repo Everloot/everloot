@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { QuestSide, QuestTag } from "@kb/world-pages";
+import type { QuestSide } from "@kb/world-pages";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
@@ -10,7 +10,7 @@ import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames } from "@/lib/names";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { bareQuestRow, publicQuests, SIDE_LABEL, type QuestRow } from "@/lib/world-lists";
+import { bareQuestRow, publicQuests, questTypeLabel, SIDE_LABEL, SIDE_TONE, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
@@ -25,10 +25,6 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const SIDES: Record<string, QuestSide> = { alliance: "alliance", horde: "horde", both: "both" };
-const TAG_LABEL: Record<QuestTag, string> = { group: "Group", dungeon: "Dungeon", raid: "Raid", pvp: "PvP" };
-/** A side is a faction fact: Alliance and Horde wear their colour, a quest for both sides stays plain. */
-const SIDE_TONE: Record<QuestSide, string> = { alliance: "text-faction-alliance", horde: "text-faction-horde", both: "text-fg" };
-const groupLabel = (x: QuestRow) => [x.tag && TAG_LABEL[x.tag], x.suggestedGroup !== null && `${x.suggestedGroup} players`].filter(Boolean).join(", ");
 
 interface QuestQuery extends ListQuery<Sort> { level?: { min: number; max: number }; rewards?: boolean; category?: string; side?: string }
 
@@ -103,7 +99,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
     } },
     // What kind of quest (side, group), its level, where it is and who gives it, what it pays, its id.
     { key: "side", header: "Side", sortable: true, cell: (x) => (x.side ? <span className={SIDE_TONE[x.side]}>{SIDE_LABEL[x.side]}</span> : dash), blank: (x) => !x.side },
-    { key: "group", header: "Group", sortable: true, cell: (x) => groupLabel(x) || dash, blank: (x) => !groupLabel(x) },
+    { key: "group", header: "Group", sortable: true, cell: (x) => questTypeLabel(x) || dash, blank: (x) => !questTypeLabel(x) },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (x) => x.level ?? dash, blank: (x) => x.level === null },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category ?? dash, blank: (x) => x.category === null },
     { key: "giver", header: "Giver", sortable: true, cell: (x) => npc(x.giverNpcId), blank: (x) => x.giverNpcId === null },
