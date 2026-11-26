@@ -191,3 +191,27 @@ describe("item tooltip, as the card and the page box draw it", () => {
     expect(hidden.links).toEqual({});
   });
 });
+
+// A covered item in the shape of 19019's record (made-up numbers): its box must not change when the uncovered-item line lands.
+const COVERED: ItemRecord = { ...base, n: "Synthetic Blessed Blade", q: 5, l: 80, r: 60, b: 1, s: 13, c: 2, sc: 7, d: 1900, sp: 615_24, st: [3], fx: ["Chance on hit: Synthetic lightning."] };
+const LEATHER_HEAD = { class: { id: 4, name: "Armor", label: "Armor", slug: "armor" }, subclass: { id: 2, name: "Leather", slug: "leather" }, slot: { inventoryType: 1, name: "Head", slug: "head" }, quality: null };
+
+describe("what the files lack", () => {
+  test("a covered item's box is unchanged, whatever the page says about uncovered ones", () => {
+    const t = itemTooltip(input(COVERED, { id: 19019 }));
+    expect(t.card).toMatchSnapshot();
+    expect(drawn(t, true).innerHTML).toMatchSnapshot();
+    expect(itemTooltip(input(COVERED, { id: 19019, filesLack: "71139" }))).toEqual(t);
+  });
+
+  test("a shown item the files hold no record for says so in one muted line inside the box, with the build read", () => {
+    const t = itemTooltip({ id: 12587, tip: undefined, name: { name: "Eye of Rend", source: "wiki", color: "#ffffff", wikiPage: null }, category: LEATHER_HEAD, filesLack: "71139" });
+    expect(t.card.lines).toEqual(["Leather", "Head"]);
+    expect(t.card.missing).toBe("The game files read so far carry no stats for this item (build 71139)");
+    const line = drawn(t, true).querySelector("[data-tooltip-frame] [data-card-missing]");
+    expect(line?.textContent).toBe(t.card.missing);
+    expect(line?.className).toContain("text-muted");
+    // Without a read of the files (or a gated tooltip) the box claims nothing about them.
+    expect(itemTooltip({ id: 12587, tip: undefined, name: null, category: LEATHER_HEAD }).card.missing).toBeUndefined();
+  });
+});

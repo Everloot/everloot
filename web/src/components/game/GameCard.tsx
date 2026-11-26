@@ -22,6 +22,8 @@ export interface CardContent {
   notes?: string[];
   /** The players' numbers in one line, each number's installs, date and build behind it (lib/item-tooltip.ts). */
   evidence?: { summary: string; lines: string[] };
+  /** What the files lack for the item, in one muted line inside the box (lib/item-tooltip.ts). */
+  missing?: string;
   foot: string | null;
 }
 
@@ -54,6 +56,7 @@ export function GameCard({ card, links, label }: { card: CardContent; links?: Re
             <ul className="mt-0.5 space-y-0.5">{card.evidence.lines.map((line, i) => <li key={i}>{line}</li>)}</ul>
           </details>
         )}
+        {card.missing && <p data-card-missing className="text-xs text-muted">{card.missing}</p>}
       </TooltipFrame>
       {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
     </div>
