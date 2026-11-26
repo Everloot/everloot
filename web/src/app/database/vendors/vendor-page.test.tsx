@@ -51,7 +51,10 @@ test("the Sells tab is the NPC page's table: item links, prices in coins, stock 
   const sells = panel(out, "goods");
   expect(sells).toMatch(/href="\/database\/items\/117"[^>]*>(?:<[^>]*>)*Tough Jerky/);
   expect(sells).toContain("1 gold 23 silver 45 copper");
-  expect(sells).toContain("stock 5");
+  // Stock reads as words with only its number in mono, not a whole cell of mono letters.
+  expect(sells).toMatch(/stock (?:<!-- -->)?<span class="font-mono tabular-nums">5<\/span>/);
+  expect(sells).toMatch(/<td class="dt-td dt-nowrap[^"]*">not limited<\/td>/);
+  expect(sells).not.toMatch(/<td class="dt-td dt-num[^"]*">not limited/);
   expect(sells).toContain("3 of 3 installs agree");
   expect(sells).not.toContain(">Installs<");
 });

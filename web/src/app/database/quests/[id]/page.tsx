@@ -125,6 +125,10 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
       [page.rewards.length ? `${page.rewards.length} ${page.rewards.length === 1 ? "reward" : "rewards"}` : null],
       null,
       Date.now(),
+      facts.unreachable ? [] : ([
+        [page.level !== null, "level"], [traits.side !== null, "side"], [Boolean(typeLabel), "type"], [traits.category !== null, "category"],
+        [page.giverNpcId !== null, "giver"], [page.turnInNpcId !== null, "turn-in"],
+      ] as const).filter(([on]) => on).map(([, word]) => word),
     ),
     nameFrom,
   });

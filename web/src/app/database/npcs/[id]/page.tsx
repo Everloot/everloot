@@ -11,7 +11,8 @@ import { pendingLine } from "@kb/pending-loot";
 import { npcLootTable } from "@kb/loot-tables";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
-import { zoneByMapId, zoneHref } from "@/lib/zones";
+import { publicZones, zoneByMapId, zoneHref } from "@/lib/zones";
+import { killZones } from "@/lib/farming";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Badge, DataTable, Tabs, TooltipFrame, type SortDirection } from "@/components/ui";
 import { qualityNamed } from "@/components/ui/quality";
@@ -118,6 +119,11 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
   const dropped = rollup.rates.filter((row) => row.reporters > 0 && row.sourceNpcId === npcId);
   const firstPin = unreachable ? undefined : page.pins[0];
   const zone = firstPin ? zoneByMapId(firstPin.mapId) : undefined;
+  // With no agreed position, the zones where 3 installs looted its kills (the farming routes' rule).
+  const killedIn = zone || unreachable ? [] : killZones((facts.kills ?? []).filter((k) => k.npcId === npcId), publicZones()).get(npcId) ?? [];
+  const zoneLinks = (zones: { mapId: number; name: string }[]) => zones.map((z, i) => (
+    <span key={z.mapId}>{i > 0 && ", "}<Link href={zoneHref(z.mapId, z.name)} className={LINK}>{z.name}</Link></span>
+  ));
   // Item names (and icons, when the game files have them) for the drop and goods lists; an item nobody named stays "Item N".
   const itemFacts = unreachable || (dropped.length === 0 && goods.length === 0) ? null : await loadItemFacts();
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
@@ -153,13 +159,17 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
   const summary = entitySummary({
     identity: zone
       ? `Seen in ${zone.name}`
-      : firstPin
+      : killedIn.length
+        ? `Killed in ${killedIn.map((z) => z.name).join(", ")}`
+        : firstPin
         ? `Seen at map ${firstPin.mapId}, ${firstPin.x}, ${firstPin.y}`
         : "No position has been reported yet",
     observed: observedLine(
-      [dropped.length ? `${dropped.length} ${dropped.length === 1 ? "item drops" : "item drops"}` : null, page.pins.length ? `${page.pins.length} ${page.pins.length === 1 ? "map position" : "map positions"}` : null, goods.length ? `${goods.length} goods` : null, quests.length ? `${new Set(quests.map((q) => q.questId)).size} quests` : null],
+      [dropped.length ? `${dropped.length} ${dropped.length === 1 ? "item drop" : "item drops"}` : null, page.pins.length ? `${page.pins.length} ${page.pins.length === 1 ? "map position" : "map positions"}` : null, goods.length ? `${goods.length} goods` : null, quests.length ? ((n) => `${n} ${n === 1 ? "quest" : "quests"}`)(new Set(quests.map((q) => q.questId)).size) : null],
       null,
       now,
+      unreachable ? [] : ([[traits.level !== null, "level"], [traits.creatureType !== null, "type"], [traits.reaction !== null, "reaction"], [traits.rank !== null, "rank"]] as const)
+        .filter(([on]) => on).map(([, word]) => word),
     ),
     nameFrom: shown.fromWiki ? "wiki" : page.name ? "players" : "none",
   });
@@ -178,7 +188,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
           !unreachable && traits.rank && traits.rank !== "normal" ? <Badge key="rank" tone="neutral">{RANK_LABELS[traits.rank]}</Badge> : null,
           !unreachable ? traits.creatureType : null,
           !unreachable && traits.reaction ? REACTION_LABELS[traits.reaction] : null,
-          zone ? <Link key="zone" href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : null,
+          zone ? <Link key="zone" href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : killedIn.length ? <span key="zone">{zoneLinks(killedIn)}</span> : null,
           named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null,
         ],
       }}
@@ -198,7 +208,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
         ...(bosses.length ? [{ label: "Boss", value: <span>{bosses.map((b, i) => (
           <span key={b.id}>{i > 0 && "; "}<Link href={bossHref(b.id, b.row.name)} className={LINK}>{b.name}</Link> in <Link href={instanceHref(b.instance.instanceMapId, b.instance.name)} className={LINK}>{instanceTitle(b.instance)}</Link></span>
         ))}</span> }] : []),
-        { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
+        { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
+          : killedIn.length ? <>{zoneLinks(killedIn)}<span className="block text-muted">Player reports: where 3 installs looted its kills</span></>
+          : known(null) },
         { label: "Map positions", value: known(page.pins.length || null), numeric: true },
         // Drop rows show from one install; their table labels the agreement tier.
         { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },

@@ -83,11 +83,18 @@ export function itemSummary(i: ItemSummaryInput): string[] {
 }
 
 /** The line that says what players reported, with the count and the date, or that nobody has. */
-export function observedLine(parts: (string | null)[], lastSeen: string | null, now: number): string {
+export function observedLine(parts: (string | null)[], lastSeen: string | null, now: number, agreed: readonly string[] = []): string {
   const said = parts.filter((p): p is string => Boolean(p));
-  if (!said.length) return "No player has reported it yet.";
+  // Facts 3 installs agree on (a level, a side) are reports too: a page that shows them never says nobody reported it.
+  const facts = agreed.length ? `agree on its ${wordList(agreed)}.` : "";
+  if (!said.length) return facts ? `Players ${facts}` : "No player has reported it yet.";
   const when = lastSeen ? `, last seen ${timeAgo(Date.parse(lastSeen), now)}` : "";
-  return `Players reported ${said.join(" and ")}${when}.`;
+  return `Players reported ${wordList(said)}${when}.${facts ? ` They ${facts}` : ""}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+function wordList(words: readonly string[]): string {
+  return words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 }
 
 /**

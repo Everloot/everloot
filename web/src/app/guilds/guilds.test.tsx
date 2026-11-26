@@ -287,6 +287,16 @@ test("the guild directory sorts from its headers, reads well on a phone and keep
   } finally { directory.recruiting = false; }
 });
 
+test("the guild directory's sort menu names the chosen order once", async () => {
+  on(); vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const menu = (html: string) => html.slice(html.indexOf('data-filter="sort"'), html.indexOf("</summary>", html.indexOf('data-filter="sort"')));
+  const chosen = menu(await hub({ sort: "item-level" }));
+  expect(chosen).toMatch(/>Sort(?:<!-- -->)?: (?:<!-- -->)?<span class="text-fg">Average item level<\/span>/);
+  expect(chosen).not.toContain("Average item level: ");
+  // The default order is a reset choice the menu does not repeat, so the label names it.
+  expect(menu(await hub())).toMatch(/>Sort: Members read/);
+});
+
 test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {
   on();
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");

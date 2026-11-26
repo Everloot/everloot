@@ -96,6 +96,16 @@ describe("the lines the other entity pages carry", () => {
     expect(observedLine([null, null], null, NOW)).toBe("No player has reported it yet.");
   });
 
+  test("three or more counts read as one list", () => {
+    expect(observedLine(["2 item drops", "1 map position", "4 goods"], null, NOW)).toBe("Players reported 2 item drops, 1 map position and 4 goods.");
+  });
+
+  test("facts players agree on are reported too, never 'nobody reported it'", () => {
+    expect(observedLine([null], null, NOW, ["level", "type", "rank"])).toBe("Players agree on its level, type and rank.");
+    expect(observedLine(["1 map position"], null, NOW, ["level"])).toBe("Players reported 1 map position. They agree on its level.");
+    expect(observedLine([null], null, NOW, [])).toBe("No player has reported it yet.");
+  });
+
   test("the date rides along when there is one", () => {
     expect(observedLine(["1 map position"], "2026-10-20T09:00:00.000Z", NOW)).toBe("Players reported 1 map position, last seen 3 h ago.");
   });

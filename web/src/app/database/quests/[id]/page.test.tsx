@@ -142,6 +142,16 @@ test("the header names the side in its faction colour, the type and the category
   expect(fact(two, "Category")).not.toContain("href");
 });
 
+test("the summary counts the facts players agree on, and never says nobody reported a quest it shows them for", async () => {
+  data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { faction: "alliance", category: "Westfall", giverNpcId: 10 }));
+  const out = await html();
+  expect(out).not.toContain("No player has reported it yet.");
+  expect(out).toContain("Players agree on its level, side, category and giver.");
+  // With nothing agreed beyond the title, the line stays as it was.
+  data.facts.quests = ["a", "b"].map((id) => sighting(id, {}));
+  expect(await html()).toContain("No player has reported it yet.");
+});
+
 test("the start and end NPCs are labelled Start and End", async () => {
   data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { giverNpcId: 10, turnInNpcId: 11 }));
   const out = await html();

@@ -145,6 +145,14 @@ describe("player directory", () => {
     expect(body.length / 50).toBeLessThan(760);
   });
 
+  test("the sort menu names the chosen order once", async () => {
+    const menu = (html: string) => html.slice(html.indexOf('data-filter="sort"'), html.indexOf("</summary>", html.indexOf('data-filter="sort"')));
+    const chosen = menu(await page({ sort: "level" }));
+    expect(chosen).toMatch(/>Sort(?:<!-- -->)?: (?:<!-- -->)?<span class="text-fg">Level<\/span>/);
+    expect(chosen).not.toContain("Level: ");
+    expect(menu(await page())).toMatch(/>Sort: Gear score/);
+  });
+
   test("parses filters for the store and keeps all of them in paging and menu links", async () => {
     const directory = vi.spyOn(armory, "directory").mockResolvedValue({ rows: [armoryCharacter()], total: 160 });
     const html = await page({ q: ["Vel", "other"], class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: "Ember", sort: "item-level", page: "2" });

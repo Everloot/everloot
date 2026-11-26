@@ -123,7 +123,8 @@ function directoryControls(d: GuildDirectoryQuery): FilterControl[] {
   const href = (over: Partial<GuildDirectoryQuery>) => guildDirectoryHref({ ...d, page: 1, ...over });
   return [
     {
-      type: "menu", key: "sort", label: `Sort: ${GUILD_SORTS.find((s) => s.slug === d.sort)!.label}`,
+      // The menu adds a chosen order after the label; the default is a reset choice it leaves out, so the label names it.
+      type: "menu", key: "sort", label: d.sort === "members" ? `Sort: ${GUILD_SORTS[0].label}` : "Sort",
       options: GUILD_SORTS.map((s) => ({ label: s.label, href: href({ sort: s.slug }), on: d.sort === s.slug, reset: s.slug === "members" })),
     },
     {

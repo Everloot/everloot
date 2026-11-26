@@ -148,7 +148,8 @@ function filterControls(d: PlayerDirectoryQuery): FilterControl[] {
     },
     {
       // The headers sort too; on a phone, where only the name column shows, this is the way.
-      type: "menu", key: "sort", label: `Sort: ${sort.label}`,
+      // The menu adds a chosen order after the label; the default is a reset choice it leaves out, so the label names it.
+      type: "menu", key: "sort", label: d.sort === "gear_score" ? `Sort: ${sort.label}` : "Sort",
       options: PLAYER_SORTS.map((s) => ({ label: s.label, href: href({ sort: s.value }), on: d.sort === s.value, reset: s.value === "gear_score" })),
     },
   ];
