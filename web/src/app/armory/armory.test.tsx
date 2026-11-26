@@ -243,6 +243,24 @@ describe("the character page", () => {
       expect(out).toMatch(/aria-selected="true"[^>]*>Talents</);
     });
 
+    test("the credit line sits under the facts strip, not in a band of its own below the header", async () => {
+      mem.putCharacter(detailed());
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const credit = out.indexOf("data-armory-credit");
+      expect(credit).toBeGreaterThan(out.indexOf("data-character-facts"));
+      expect(credit).toBeLessThan(out.indexOf("data-character-overview"));
+      expect(out).toContain(BLIZZARD_CREDIT);
+    });
+
+    test("the overview stacks: spec cards as a compact row, then the professions in a two-column grid", async () => {
+      mem.putCharacter(detailed());
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      expect(overview).toMatch(/data-character-overview="stacked"/);
+      expect(overview).not.toContain("lg:grid-cols-2");
+      expect(overview).toMatch(/<ul data-profession-grid="" class="[^"]*sm:grid-cols-2/);
+    });
+
     test("synced kills still get the full dungeons and raids list", async () => {
       const { DungeonRaidSlot } = await import("./[region]/[slug]/sheet");
       const data = { synced: true, summary: { cleared: 1, total: 20 }, instances: [{
