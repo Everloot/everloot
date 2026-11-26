@@ -20,7 +20,8 @@ import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, quality
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
-import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { FACT_WORD, withReported } from "@/lib/item-names";
 import { itemTooltip } from "@/lib/item-tooltip";
 import { itemSetOf } from "@/lib/item-sets";

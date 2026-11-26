@@ -14,7 +14,7 @@ import {
 import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { zoneCoverageHref } from "@/lib/coverage-view";
 import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";

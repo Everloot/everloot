@@ -1,6 +1,6 @@
 import { parseCoverageExpected, type CoverageExpected, type CoverageInput } from "@kb/coverage";
 import { buildFolder, privateStoreFromEnv, type PrivateStore } from "./game-assets";
-import { CLIENT_LAYER } from "./items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { assetsBaseUrl } from "./talents/assets";
 import type { Corpus } from "./upload-store";
 import { WORLD_MAP } from "./world-map";

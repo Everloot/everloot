@@ -16,7 +16,7 @@ import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
 import { EntityPage, LINK, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 
 export const dynamic = "force-dynamic";

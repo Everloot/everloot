@@ -15,7 +15,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { NavPendingBar } from "@/components/NavPending";
 import HoverCards from "@/components/game/HoverCards";
 import { analyticsConfig } from "@/lib/analytics/config";
-import { authV2Enabled } from "@/lib/auth/auth";
+import { authV2Enabled } from "@/lib/auth/flag";
 import { profilesOn } from "@/lib/profiles";
 import { savedBuildsOn } from "@/lib/saved-builds";
 import { FEED } from "@/lib/seo";

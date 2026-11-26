@@ -1,6 +1,6 @@
 import { loadItemSetNames } from "@/lib/game-assets";
 import { itemSet } from "@/lib/item-sets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CARD_SIZE } from "@/lib/og-card";
 import { count, provenance, shareImage } from "../../share-image";
 

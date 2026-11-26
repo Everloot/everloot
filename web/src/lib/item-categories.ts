@@ -1,5 +1,5 @@
 import file from "@/data/game-data/item-categories.json";
-import { describe, type ItemCategory, type ItemClass, type ItemSubclass, type Taxonomy } from "@kb/item-taxonomy";
+import { describe, type ItemCategory, type ItemClass, type ItemRow, type ItemSubclass, type Taxonomy } from "@kb/item-taxonomy";
 
 /** [classId, subclassId, inventoryType, quality or null, the item ids with them]. */
 type Group = [number, number, number, number | null, number[]];
@@ -16,4 +16,16 @@ export function itemCategoryOf(itemId: number): ItemCategory | null {
     if (ids.includes(itemId)) return describe(names, [itemId, classId, subclassId, inventoryType, quality]);
   }
   return null;
+}
+
+/**
+ * The client layer's taxonomy (`readLayerTaxonomy`), rebuilt from the same cut: its classes, subclasses and every item
+ * row, in item id order as the layer lists them. Builds a new copy on each call.
+ */
+export function itemTaxonomy(): Taxonomy {
+  const items: ItemRow[] = [];
+  for (const [classId, subclassId, inventoryType, quality, ids] of data.groups) {
+    for (const id of ids) items.push([id, classId, subclassId, inventoryType, quality]);
+  }
+  return { classes: data.classes, subclasses: data.subclasses, items: items.sort((a, b) => a[0] - b[0]) };
 }

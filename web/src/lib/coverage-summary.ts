@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "@kb/coverage";
 import type { PlateauReport } from "@kb/plateau";
-import { CLIENT_LAYER } from "./items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { keep } from "./kept";
 import { r2Config, type R2Config } from "./upload-store";
 
@@ -171,7 +171,7 @@ export async function loadCoverageForPages(deps: Deps = {}): Promise<{ report: C
 
 async function readKept(deps: Deps): Promise<Read | null> {
   const now = (deps.now ?? Date.now)();
-  const build = deps.build ?? CLIENT_LAYER.build.version;
+  const build = deps.build ?? gameBuild.version;
   const hit = stored.fresh(now);
   if (hit?.value.build === build) return hit.value;
   let cloud: R2Config | null;

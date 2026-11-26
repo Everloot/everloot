@@ -3,7 +3,7 @@ import { loadItemNames, PRIVATE_UNREACHABLE } from "./game-assets";
 import type { ItemSeen } from "./item-seen";
 import { loadItemSeen } from "./item-seen";
 import { loadItemView } from "./item-view-store";
-import { CLIENT_LAYER } from "./items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { loadReportedItemFacts } from "./rollup-compute";
 import { loadShownNames, type ShownNames } from "./shown-item-names";
 
@@ -22,7 +22,7 @@ export type ListNames = Omit<ShownNames, "facts"> & {
  * as `loadShownNames` without the corpus. Falls back to `loadShownNames` when there is no view.
  */
 export async function loadListNames(): Promise<ListNames> {
-  const [stored, read] = await Promise.all([loadItemView(), loadItemNames(CLIENT_LAYER.build.version)]);
+  const [stored, read] = await Promise.all([loadItemView(), loadItemNames(gameBuild.version)]);
   if (!stored) {
     const { facts, ...rest } = await loadShownNames();
     return { ...rest, unreachable: facts.unreachable };

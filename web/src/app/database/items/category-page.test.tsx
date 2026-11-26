@@ -24,7 +24,8 @@ vi.mock("next/navigation", () => ({
 import ItemPage, { generateMetadata } from "./[id]/page";
 import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subclass]/page";
 import ItemsPage from "./page";
-import { CLIENT_LAYER, CLIENT_TAXONOMY } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import { CLIENT_TAXONOMY } from "@/lib/items";
 import { PER_PAGE } from "../list-parts";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
 

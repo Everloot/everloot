@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { privateStoreFromEnv, readNamesFile, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE } from "./game-assets";
 import { assetsBaseUrl } from "./talents/assets";
-import { CLIENT_LAYER } from "./items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { npcPage, npcReportedName, type WorldFacts } from "@kb/world-pages";
 
 export interface WikiEntityNames { version: string; names: Map<number | string, { name: string; wikiPage: string }> }
@@ -15,7 +15,7 @@ export async function loadWikiEntityNames(kind: "npc" | "spell"): Promise<WikiEn
     wiki: z.object({ licence: z.literal("CC-BY-SA-4.0") }),
     names: z.record(kind === "npc" ? z.string().min(1) : z.string().regex(/^[1-9]\d*$/), z.object({ n: z.string().min(1), w: z.string().regex(/^[^\s"<>]+$/) })),
   });
-  const result = await readNamesFile(`wiki-${kind}-names.json`, CLIENT_LAYER.build.version, base, privateStoreFromEnv(), (raw) => {
+  const result = await readNamesFile(`wiki-${kind}-names.json`, gameBuild.version, base, privateStoreFromEnv(), (raw) => {
     const parsed = schema.safeParse(raw);
     return parsed.success ? { version: parsed.data.build.version, names: new Map<string | number, { name: string; wikiPage: string }>(Object.entries(parsed.data.names).map(([id, n]) =>
       [kind === "npc" ? id : Number(id), { name: n.n, wikiPage: `https://warcraft.wiki.gg/wiki/${n.w}` }])) } : null;

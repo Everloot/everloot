@@ -9,10 +9,9 @@ import { battlenetProvider, isPlaceholderEmail } from "./battlenet";
 import { authPool, pgRateLimitStore, withAuthDatabase, type RateLimitStore } from "./db";
 import { emailConfigured, resetText, sendEmail, verificationText } from "./email";
 import { configuredSocialProviders } from "./social";
+import { authV2Enabled } from "./flag";
 
-export function authV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.EVERLOOT_AUTH_V2 === "1";
-}
+export { authV2Enabled };
 
 /** Which sign-in buttons the pages show. Email needs the Better Auth flag and a mail sender. */
 export function signInMethods(env: Record<string, string | undefined> = process.env) {

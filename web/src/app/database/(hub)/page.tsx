@@ -24,7 +24,7 @@ import { loadHomeNewest } from "@/lib/home-live";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { asOfLine, EVIDENCE_KEY } from "@/lib/evidence";
 import { loadSiteAssets, loadSpellNames, type SiteAssets } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { ITEM_SETS } from "@/lib/item-sets";
 import { datasetJsonLd } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
@@ -96,7 +96,7 @@ function TypeCard({ card, count, assets }: { card: DatabaseCard; count?: ReactNo
 
 export default async function DatabasePage() {
   const [{ rates, measuredZeros, stats }, world, catalog, spellNames, assets, newest] = await Promise.all([
-    computeRollups(), loadWorldFacts(), loadCatalog(), loadSpellNames(CLIENT_LAYER.build.version),
+    computeRollups(), loadWorldFacts(), loadCatalog(), loadSpellNames(gameBuild.version),
     // The manifest the item and spell pages already read, for the cards' icons; the newest facts are the home page's cached read.
     loadSiteAssets(), loadHomeNewest(),
   ]);
@@ -156,7 +156,7 @@ export default async function DatabasePage() {
           title="Database"
           meta={[
             `${n(T.items.length)} items in the game files`,
-            `game build ${CLIENT_LAYER.build.version}`,
+            `game build ${gameBuild.version}`,
             "NPCs, quests and objects seen by players",
             asOfLine(stats.unreachable ? null : stats.dataAsOf, Date.now()),
           ].filter(Boolean).join(" · ")}

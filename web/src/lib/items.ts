@@ -1,10 +1,16 @@
-import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "@kb/client-layer-file";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
-import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "@kb/item-taxonomy";
+import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow, type Taxonomy } from "@kb/item-taxonomy";
+import facetsFile from "@/data/game-data/item-facets.json";
 import { byRank, nameMatches, PER_PAGE } from "@/app/database/list-parts";
+import { itemTaxonomy } from "@/lib/item-categories";
 import { parsePer, perParam } from "@/lib/page-size";
 
-export { CLIENT_LAYER, CLIENT_TAXONOMY };
+/**
+ * The client layer's item taxonomy, equal to `CLIENT_TAXONOMY` from `@kb/client-layer-file` but read from the 0.2 MB
+ * item-categories cut: the item lists and search load this module, and the whole layer is 2.9 MB of JSON and about
+ * 20 MB of a Worker isolate's 128 MB. Pages that need the layer's relations import `@kb/client-layer-file` themselves.
+ */
+export const CLIENT_TAXONOMY: Taxonomy = itemTaxonomy();
 
 /**
  * A page of a category stays out of search (noindex, and out of the sitemap) until at least this share of the
@@ -105,24 +111,16 @@ export interface Profession { id: number; name: string; slug: string }
 interface Facets { crafted: Set<number>; reagent: Set<number>; set: Set<number>; bySkill: Map<number, Set<number>>; professions: Profession[] }
 
 let facets: Facets | null = null;
-/** Read once from the committed client layer: items a spell creates, items a spell uses, set pieces, and the profession of those spells. */
+/**
+ * Read once from data/game-data/item-facets.json, the cut of the committed client layer's relations that
+ * scripts/item-categories.mjs makes: items a spell creates, items a spell uses, set pieces, and the profession of those spells.
+ */
 export function itemFacets(): Facets {
   if (facets) return facets;
-  const skillOfSpell = new Map<number, number>();
-  for (const e of CLIENT_EDGES) if (e.rel === "in_skill_line") skillOfSpell.set(e.fromId, e.toId);
-  const crafted = new Set<number>(), reagent = new Set<number>(), set = new Set<number>();
-  const bySkill = new Map<number, Set<number>>();
-  for (const e of CLIENT_EDGES) {
-    if (e.fromKind !== "item") continue;
-    if (e.rel === "part_of_set") set.add(e.fromId);
-    if (e.rel !== "created_by" && e.rel !== "reagent_for") continue;
-    (e.rel === "created_by" ? crafted : reagent).add(e.fromId);
-    const skill = skillOfSpell.get(e.toId);
-    if (skill !== undefined) bySkill.set(skill, (bySkill.get(skill) ?? new Set()).add(e.fromId));
-  }
-  const professions = [...CLIENT_SKILLS].filter(([id]) => bySkill.has(id)).map(([id, name]) => ({ id, name, slug: slugify(name) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  facets = { crafted, reagent, set, bySkill, professions };
+  const file = facetsFile as unknown as { crafted: number[]; reagent: number[]; set: number[]; skills: [number, string, number[]][] };
+  const bySkill = new Map(file.skills.map(([id, , ids]) => [id, new Set(ids)]));
+  const professions = file.skills.map(([id, name]) => ({ id, name, slug: slugify(name) })).sort((a, b) => a.name.localeCompare(b.name));
+  facets = { crafted: new Set(file.crafted), reagent: new Set(file.reagent), set: new Set(file.set), bySkill, professions };
   return facets;
 }
 

@@ -7,7 +7,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { classLabel } from "@/lib/class-context";
 import { classSpellLevels } from "@/lib/class-hub";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { pageMetadata } from "@/lib/seo";
 import { SPELLS_BUILD } from "@/lib/spell-card";
 import { isTalentClass } from "@/lib/talents/catalogs";

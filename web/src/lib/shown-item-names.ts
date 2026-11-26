@@ -2,7 +2,8 @@ import { cache } from "react";
 import { agreedItemNames } from "@kb/item-page";
 import { agreedNpcsOf, type WorldFacts } from "@kb/world-pages";
 import { loadItemNames, PRIVATE_UNREACHABLE, type ItemNames, type QuestNames } from "@/lib/game-assets";
-import { CLIENT_LAYER, shownItemName } from "@/lib/items";
+import gameBuild from "@/data/game-data/build-version.json";
+import { shownItemName } from "@/lib/items";
 import { npcNames, questTitles, type Names } from "@/lib/names";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import type { WikiEntityNames } from "@/lib/wiki-entity-names";
@@ -32,7 +33,7 @@ export interface ShownNames {
 
 /** The item names the item pages may show, read once per request (React `cache`) for the page, its metadata and the sitemap. */
 export const loadShownNames = cache(async (): Promise<ShownNames> => {
-  const [facts, read] = await Promise.all([loadItemFacts(), loadItemNames(CLIENT_LAYER.build.version)]);
+  const [facts, read] = await Promise.all([loadItemFacts(), loadItemNames(gameBuild.version)]);
   const matched = read === PRIVATE_UNREACHABLE ? null : read;
   const agreed = facts.unreachable ? new Map<number, string>() : agreedItemNames(facts);
   // The same test as itemPage's name, drops and pins (pins come only with a drop), in one pass.

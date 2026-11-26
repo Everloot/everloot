@@ -20,7 +20,7 @@ import { npcLootTable } from "@kb/loot-tables";
 import EntityLink from "@/components/EntityLink";
 import { loadingArt, loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { EntityIcon } from "@/components/game/EntityIcon";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { gearFor, instanceTerrain, TERRAIN_BUILD, TERRAIN_PATH } from "@/lib/terrain";
 import TerrainGearTable from "@/components/TerrainGearTable";
 import { itemNames, npcNames } from "@/lib/names";

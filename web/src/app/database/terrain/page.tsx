@@ -5,7 +5,7 @@ import { Container, DataTitle, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { instanceHref, instanceRows } from "@/lib/instances";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { itemNames } from "@/lib/names";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
