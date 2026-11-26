@@ -114,42 +114,45 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const lastRead = newest(readTimes(c));
   const rankBadges = badgesOf(c, ranks);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
+  const addonSeenLately = playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000;
 
   return (
     <Container width="data">
       <article className="space-y-8">
-        <div className="flex items-start gap-4">
-          <Portrait src={portrait} name={c.name} />
-          <div className="min-w-0 flex-1">
-            <PageHeader
-              trail={[...trailFor("/armory")!, { name: fullName, path }]}
-              title={<span className={classText(classTokenOfName(c.class))}>{fullName}</span>}
-              lede={`Level ${c.level} ${c.race} ${c.class}`}
-              meta={<>
-                <Badge tone="neutral">{c.faction}</Badge>
-                <RegionRuleset region={c.region} ruleset={c.ruleset} />
-                {c.guildName && <span>{c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</span>}
-                {lastLogin && <span>Last login <span className="font-mono tabular-nums">{lastLogin}</span></span>}
-              </>}
-              actions={<>
-                <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-sm">Update character</button></form>
-                <Link href={compareHref({ region: c.region, slug: c.slug })} className={`text-sm ${link}`}>Compare with…</Link>
-                <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={`text-sm ${link}`}>Blizzard armory</a>
-              </>}
-            />
+        {/* The header and the facts under it read as one block: the header's own margin is the gap between them. */}
+        <div data-character-head>
+          <div className="flex items-start gap-4">
+            <Portrait src={portrait} name={c.name} />
+            <div className="min-w-0 flex-1">
+              <PageHeader
+                trail={[...trailFor("/armory")!, { name: fullName, path }]}
+                title={<span className={classText(classTokenOfName(c.class))}>{fullName}</span>}
+                lede={`Level ${c.level} ${c.race} ${c.class}`}
+                meta={<>
+                  <Badge tone="neutral">{c.faction}</Badge>
+                  <RegionRuleset region={c.region} ruleset={c.ruleset} />
+                  {c.guildName && <span>{c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</span>}
+                  {lastLogin && <span>Last login <span className="font-mono tabular-nums">{lastLogin}</span></span>}
+                </>}
+                actions={<>
+                  <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-sm">Update character</button></form>
+                  <Link href={compareHref({ region: c.region, slug: c.slug })} className={`text-sm ${link}`}>Compare with…</Link>
+                  <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={`text-sm ${link}`}>Blizzard armory</a>
+                </>}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm empty:hidden">
-          {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
-          {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
-        </div>
-        {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
-
-        <div className="space-y-3">
-          <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
-          <RankBadges ranks={rankBadges} />
-          <ArmoryCredit at={lastRead} />
+          <div className="space-y-3">
+            {(associated || addonSeenLately) && <div data-character-links className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
+              {addonSeenLately && <span className="text-meta text-muted">Seen in addon uploads <span className="font-mono tabular-nums">{c.addonSeen}</span></span>}
+            </div>}
+            {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
+            <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
+            <RankBadges ranks={rankBadges} />
+            <ArmoryCredit at={lastRead} />
+          </div>
         </div>
 
         <CharacterOverview character={c} />

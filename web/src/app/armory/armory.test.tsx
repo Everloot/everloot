@@ -254,7 +254,7 @@ describe("the character page", () => {
       expect(out.indexOf("data-character-overview")).toBeGreaterThan(-1);
       const cards = [...overview.matchAll(/data-spec-card="([^"]+)"[^>]*><p class="([^"]*)"/g)].map((m) => [m[1], m[2].includes("text-fg-2") ? "fg-2" : "fg"]);
       expect(cards).toEqual([["Marksmanship", "fg"], ["Beast Mastery", "fg-2"], ["Survival", "fg-2"]]);
-      expect(overview).toContain("31 points");
+      expect(overview).toMatch(/>31<\/span> points</);
       expect(overview).toContain('href="#talents"');
       expect(overview).toContain("265 / 300");
       expect(overview).toMatch(/<progress[^>]*value="265" max="300"/);
@@ -271,13 +271,46 @@ describe("the character page", () => {
       expect(out).toContain(BLIZZARD_CREDIT);
     });
 
-    test("the overview stacks: spec cards as a compact row, then the professions in a two-column grid", async () => {
+    test("with both reads the overview puts the spec cards beside the professions on a wide screen, professions in two columns", async () => {
       mem.putCharacter(detailed());
       const out = await html(pages.character("eu", "velkara-duskmantle"));
       const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
-      expect(overview).toMatch(/data-character-overview="stacked"/);
-      expect(overview).not.toContain("lg:grid-cols-2");
+      expect(overview).toMatch(/data-character-overview="side-by-side" class="[^"]*lg:grid-cols-\[/);
       expect(overview).toMatch(/<ul data-profession-grid="" class="[^"]*sm:grid-cols-2/);
+      // One read alone fills the width: no empty column beside it.
+      mem.putCharacter(armoryCharacter({ details: { revision: 1, talents: detailed().details!.talents } }));
+      const alone = await html(pages.character("eu", "velkara-duskmantle"));
+      expect(alone).toMatch(/data-character-overview="single">/);
+    });
+
+    test("numbers in mono, words in sans: spec points and the read age", async () => {
+      mem.putCharacter(detailed());
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      // "31 points": the number is mono with tabular figures, the word is not.
+      expect(overview).toMatch(/<span class="font-mono text-lg tabular-nums">31<\/span> points/);
+      expect(overview).not.toMatch(/class="[^"]*font-mono[^"]*">\d+ points/);
+      // "3 days ago" is words: the Last read value is sans; the counts beside it stay mono.
+      const strip = out.slice(out.indexOf("data-character-facts"), out.indexOf("data-rank-badges"));
+      expect(strip).toMatch(/Last read<\/dt><dd class="(?![^"]*font-mono)[^"]*"><time/);
+      expect(strip).toMatch(/Item level<\/dt><dd class="[^"]*font-mono tabular-nums/);
+    });
+
+    test("the facts strip follows the header in one block, with no empty row between them", async () => {
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const head = out.slice(out.indexOf("data-character-head"), out.indexOf("data-character-facts"));
+      expect(out.indexOf("data-character-head")).toBeGreaterThan(-1);
+      expect(head).toContain("data-page-header");
+      // Neither a linked character nor an addon sighting: the row they share is not drawn at all.
+      expect(head).not.toMatch(/<div[^>]*><\/div>/);
+      expect(out).not.toContain("data-character-links");
+    });
+
+    test("the linked-character row shows when the addon saw the character lately", async () => {
+      vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+      mem.putCharacter(armoryCharacter({ addonSeen: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10) }));
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      expect(out).toMatch(/data-character-links[^>]*>(?:<[^>]*>)*Seen in addon uploads/);
     });
 
     test("synced kills still get the full dungeons and raids list", async () => {

@@ -34,9 +34,10 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
     ...(lastRead ? [["Last read", <time key="read" dateTime={lastRead} title={readLine(lastRead)}>{timeAgo(Date.parse(lastRead), now)}</time>] as [string, ReactNode]] : []),
   ];
   if (items.length === 0) return null;
+  // Counts in mono with tabular figures; the read age is words ("3 days ago"), so it is sans (docs/design/direction.md).
   return (
     <dl data-character-facts aria-label="At a glance" className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-line bg-panel px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
-      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted">{label}</dt><dd className="font-mono text-lg tabular-nums text-fg">{value}</dd></div>)}
+      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted">{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
     </dl>
   );
 }
@@ -56,28 +57,29 @@ export function RankBadges({ ranks }: { ranks: readonly RankBadge[] }) {
 }
 
 /**
- * The overview above the gear, stacked: a compact row of cards per talent tree (the largest first and brightest),
- * then the profession bars, two columns from small screens up so four professions do not outgrow the spec cards.
- * Nothing when the last read brought neither.
+ * The overview above the gear: a card per talent tree (the largest first and brightest) and the profession bars. With
+ * both, the spec cards sit beside the professions from a wide screen up, so neither leaves an empty band beside it;
+ * the professions take two columns from small screens up. One alone fills the width. Nothing when the read brought neither.
  */
 export function CharacterOverview({ character: c }: { character: ArmoryCharacter }) {
   const trees = [...(c.details?.talents?.trees ?? [])].sort((a, b) => b.points - a.points);
   const professions = c.details?.professions?.rows ?? [];
   if (trees.length === 0 && professions.length === 0) return null;
+  const both = trees.length > 0 && professions.length > 0;
   return (
-    <div data-character-overview="stacked" className="space-y-6">
-      {trees.length > 0 && <section aria-labelledby="armory-spec" className="space-y-3">
+    <div data-character-overview={both ? "side-by-side" : "single"} className={both ? "grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8" : undefined}>
+      {trees.length > 0 && <section aria-labelledby="armory-spec" className="min-w-0 space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4">
           <h2 id="armory-spec" className="text-h2 text-fg">Specialization</h2>
           <a href="#talents" className={`text-sm ${link}`}>Talent details</a>
         </div>
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2 lg:grid-cols-[repeat(auto-fill,minmax(10rem,12rem))]">
+        <ul className={`grid gap-2 ${both ? "grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]" : "grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(10rem,12rem))]"}`}>
           {trees.map((tree, i) => <li key={tree.name} data-spec-card={tree.name} className="min-w-0 rounded-card border border-line bg-panel p-3"><p className={`text-sm [overflow-wrap:break-word] ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.name}</p>
-            <p className={`font-mono text-lg tabular-nums ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.points} points</p>
+            <p className={`flex items-baseline gap-1 text-sm ${i === 0 ? "text-fg" : "text-fg-2"}`}><span className="font-mono text-lg tabular-nums">{tree.points}</span> points</p>
           </li>)}
         </ul>
       </section>}
-      {professions.length > 0 && <section aria-labelledby="armory-overview-professions" className="space-y-3">
+      {professions.length > 0 && <section aria-labelledby="armory-overview-professions" className="min-w-0 space-y-3">
         <h2 id="armory-overview-professions" className="text-h2 text-fg">Professions</h2>
         <ProfessionList rows={professions} grid />
       </section>}
