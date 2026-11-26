@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, DataTable, FilterBar, LinkTabs, PageHeader, type Column, type FilterControl } from "@/components/ui";
+import { Container, DataTable, FilterBar, LinkTabs, PageHeader, Pager, ResultStrip, stripBelow, type Column, type FilterControl } from "@/components/ui";
+import { PER_PAGE, parsePer, perParam } from "@/lib/page-size";
 import {
   ARMORY_CLASSES, ARMORY_FACTIONS, ARMORY_BOARDS, ARMORY_METRICS, PLAY_HISTORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
-  armoryCharacterPath, armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion,
+  armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
-import { BoardClass, BoardGuild, BoardMetric, BoardValue, RegionBoard } from "../../board-parts";
+import { BoardClass, BoardGuild, BoardMetric, BoardName, BoardValue, RankMark, RegionBoard, sharedRanks } from "../../board-parts";
 import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 export const revalidate = 1800;
@@ -57,9 +58,9 @@ function controls(metric: ArmoryMetric, q: ArmoryBoardQuery): FilterControl[] {
   ];
 }
 
-function columns(metric: ArmoryMetric, top: number): Column<ArmoryBoardRow>[] {
+function columns(metric: ArmoryMetric, top: number, ranks: ReturnType<typeof sharedRanks>): Column<ArmoryBoardRow>[] {
   return [
-    { key: "name", header: "Rank / character", cell: (r) => <span className="flex items-baseline gap-2"><span className="w-6 shrink-0 font-mono tabular-nums text-muted">{r.rank}</span><Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link></span> },
+    { key: "name", header: "Rank / character", cell: (r) => <span className="flex items-center gap-2"><RankMark rank={ranks.get(r) ?? { rank: r.rank, tied: false }} /><BoardName row={r} /></span> },
     { key: "level", header: "Level", numeric: true, cell: (r) => r.level },
     { key: "class", header: "Class", nowrap: true, cell: (r) => <BoardClass row={r} /> },
     { key: "race", header: "Race", nowrap: true, cell: (r) => r.race },
@@ -69,11 +70,18 @@ function columns(metric: ArmoryMetric, top: number): Column<ArmoryBoardRow>[] {
   ];
 }
 
+/** `?page=2`: a whole number from 1; anything else, or a page past the end, is the first page. */
+function pageOf(raw: string | string[] | undefined, pages: number): number {
+  const n = typeof raw === "string" && /^\d{1,3}$/.test(raw) ? Number(raw) : 1;
+  return n >= 1 && n <= pages ? n : 1;
+}
+
 export default async function ArmoryBoardPage(props: { params: Promise<{ metric: string }>; searchParams?: Promise<Search> }) {
   if (!armoryOn()) notFound();
   const { metric } = await props.params;
   if (!isArmoryMetric(metric)) notFound();
-  const q = armoryBoardQuery((await props.searchParams) ?? {});
+  const search = (await props.searchParams) ?? {};
+  const q = armoryBoardQuery(search);
   if (!q) notFound();
   const def = ARMORY_BOARDS[metric];
   const path = armoryBoardPath(metric);
@@ -85,6 +93,23 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
   const rows = split ? null : await read(q.region);
   const fetched = split ? split.flatMap((s) => s.rows ?? []) : rows ?? [];
   const active = [q.ruleset, q.region, q.class ?? null, q.faction ?? null].filter((v) => v !== null).length;
+  // The top 100 in pages, as the database lists page: 50 a page unless ?per= names another size.
+  const per = parsePer(typeof search.per === "string" ? search.per : undefined) ?? PER_PAGE;
+  const longest = Math.max(0, ...(split ? split.map((s) => s.rows?.length ?? 0) : [rows?.length ?? 0]));
+  const pages = Math.max(1, Math.ceil(longest / per));
+  const page = pageOf(search.page, pages);
+  const shown = [(page - 1) * per, page * per] as const;
+  const at = (over: { page?: number; per?: number }) => {
+    const base = armoryBoardHref(metric, q);
+    const params = new URLSearchParams();
+    if ((over.page ?? 1) > 1) params.set("page", String(over.page));
+    const size = perParam(over.per ?? per);
+    if (size) params.set("per", size);
+    const extra = params.toString();
+    return extra ? `${base}${base.includes("?") ? "&" : "?"}${extra}` : base;
+  };
+  const strip = (total: number) =>
+    <ResultStrip total={total} noun={total === 1 ? "character" : "characters"} page={page} perPage={per} href={(n) => at({ page: n })} sizeHref={(n) => at({ per: n })} />;
 
   return (
     <Container width="data">
@@ -93,7 +118,13 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
           trail={[...trailFor("/armory")!, { name: def.title, path }]}
           title={`${def.title} rankings`}
           lede={def.lede}
-          meta={<ArmoryCredit at={fetched.length ? newest(fetched.map((r) => r.fetchedAt)) : null} />}
+          meta={<>
+            <ArmoryCredit at={fetched.length ? newest(fetched.map((r) => r.fetchedAt)) : null} />
+            <p data-board-counts>
+              Each region is ranked on its own, top {BOARD_ROWS}; equal numbers share a rank, the character who logged in
+              last listed first. A character&apos;s own page shows its rank within its region and ruleset.
+            </p>
+          </>}
         />
         {PLAY_HISTORY_METRICS.includes(metric) && <p className="text-sm text-fg-2">
           Characters are ranked once their play history has been read; the armory reads each character at least every 20 days.
@@ -104,24 +135,25 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             <div className="grid gap-4 lg:grid-cols-2">
               {split.map(({ region, rows: regionRows }) => (
-                <RegionBoard key={region} metric={metric} region={region} rows={regionRows}
+                <RegionBoard key={region} metric={metric} region={region} rows={regionRows} shown={shown}
                   footer={<Link href={armoryBoardHref(metric, { ...q, region })} className={link}>{regionLabel(region)} only, with level, race and realm</Link>} />
               ))}
             </div>
+            <Pager label="Pages" page={page} pages={pages} href={(n) => at({ page: n })} />
           </>
         ) : rows === null ? <Unreachable /> : (
           <>
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             {rows.length === 0
               ? <p className="text-sm text-fg-2">No character with this number here yet.</p>
-              : <DataTable dense caption={`${def.title}, top ${rows.length}`} columns={columns(metric, rows[0]?.value ?? 0)} rows={rows} rowKey={(r) => `${r.region}/${r.slug}`}
-                meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardClass row={r} /><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>} />}
+              : <>
+                {strip(rows.length)}
+                <DataTable dense caption={`${def.title}, top ${rows.length}`} columns={columns(metric, rows[0]?.value ?? 0, sharedRanks(rows))} rows={rows.slice(...shown)} rowKey={(r) => `${r.region}/${r.slug}`}
+                  meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardClass row={r} /><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>} />
+                {stripBelow(strip(rows.length))}
+              </>}
           </>
         )}
-        <p className="text-sm text-fg-2">
-          Top {BOARD_ROWS}. A character&apos;s own page shows its rank within its region and ruleset. Equal numbers keep the
-          character who logged in last first.
-        </p>
       </article>
     </Container>
   );

@@ -231,6 +231,27 @@ export function rankText(r: { rank: number; of: number; tied?: number | null }):
   return r.of >= RANK_TOP_SHARE_MIN_BOARD && percent <= RANK_TOP_SHARE_MAX_PERCENT ? `${base(tie)} · ${topShare(percent)}` : base(tie);
 }
 
+/** A board row's place: its rank, and whether a row beside it stands on the same value. */
+export interface BoardRank { rank: number; tied: boolean }
+
+/**
+ * The ranks a board's rows show, highest value first: a row on the same value as the one above it shares that row's
+ * rank, as a character page's rank does. `rankOf` is the board's own running count (the SQL's row_number), the
+ * position by default. A board knows only the rows it shows, so it says a row is tied, never with how many.
+ */
+export function boardRanks<T>(rows: readonly T[], valueOf: (row: T) => number | null, rankOf: (row: T, i: number) => number = (_, i) => i + 1): BoardRank[] {
+  const out: BoardRank[] = [];
+  rows.forEach((row, i) => {
+    const v = valueOf(row);
+    const same = (j: number) => j >= 0 && j < rows.length && v !== null && valueOf(rows[j]!) === v;
+    out.push({ rank: same(i - 1) ? out[i - 1]!.rank : rankOf(row, i), tied: RANK_SHOW_TIES && (same(i - 1) || same(i + 1)) });
+  });
+  return out;
+}
+
+/** "#2 (tied)" or "#1": a board row's rank in words, in rankText's wording. */
+export const boardRankText = (r: BoardRank) => `#${r.rank.toLocaleString("en-US")}${r.tied ? " (tied)" : ""}`;
+
 /** "Read 2026-11-09 14:05 UTC": when the crawler last read the row, or that it is unrecorded. */
 export function readLine(at: string | null | undefined): string {
   const label = dataAgeLabel(at);

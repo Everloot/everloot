@@ -5,13 +5,13 @@ import { Card, Container, EmptyState, Field, PageHeader, SectionHeading } from "
 import { armoryOn } from "@/lib/armory";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildIndexingOn, guildsOn } from "@/lib/guilds";
-import { leaderboardMetric, leaderboardRegion, loadLeaderboards } from "@/lib/leaderboards";
+import { leaderboardRegion, loadLeaderboards } from "@/lib/leaderboards";
 import {
   COLLECTING_LINE, RANKINGS, hubIndexable, hubMetrics, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView, topMovers, weeklyCharacters,
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { BestOfClass, CharacterBoards, GuildBoards, RegionTabs } from "./leaderboards";
+import { BestOfClass, BoardCards, GuildBoards, RegionTabs } from "./leaderboards";
 import { HowItCounts, MetricTiles, Movers, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState, WeeklyTotals } from "./parts";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RankingsHub(props: { searchParams?: Promise<Search> }) {
   const search = await props.searchParams;
   const region = leaderboardRegion(first(search?.region));
-  const metric = leaderboardMetric(first(search?.metric));
-  const [{ weeks, unreachable, dataAsOf }, boards] = await Promise.all([loadRankingWeeks(), loadLeaderboards(region, metric)]);
+  const [{ weeks, unreachable, dataAsOf }, boards] = await Promise.all([loadRankingWeeks(), loadLeaderboards(region)]);
   const views = RANKINGS.map((def) => rankingView(def, weeks));
   // The hero stacks the class shares: the first ranking, every class with a number in the newest week.
   const classes = views[0];
@@ -65,9 +64,9 @@ export default async function RankingsHub(props: { searchParams?: Promise<Search
             ))}
           </div>
           <RankingRail row />
-          {boards.characters !== null && <RegionTabs region={region} metric={metric} />}
+          {boards.characters !== null && <RegionTabs region={region} />}
+          {boards.characters !== null && <BoardCards boards={boards.characters} region={region} />}
           {boards.characters !== null && <BestOfClass rows={boards.bestOfClass} />}
-          {boards.characters !== null && <CharacterBoards board={boards.characters} region={region} />}
           {(boards.guildGear !== null || boards.raids !== null) && <GuildBoards gear={boards.guildGear} raids={boards.raids} region={region} progression={boards.progression} />}
           {boards.characters !== null && <Card>
             <p className="text-fg">Not on the boards? <Link href="/armory/submit" className="underline underline-offset-4">Add your character</Link> or <Link href="/armory/guilds/submit" className="underline underline-offset-4">Add your guild</Link>.</p>

@@ -1,23 +1,23 @@
 import { loadGuildProgressionRanking, type GuildProgressionRank } from "./progression";
 import { unstable_cache } from "next/cache";
-import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryOn, isArmoryMetric, isArmoryRegion, type ArmoryMetric, type ArmoryRegion } from "./armory";
+import { ARMORY_BOARDS, ARMORY_METRICS, armoryOn, isArmoryRegion, type ArmoryMetric, type ArmoryRegion } from "./armory";
 import { loadGuildDirectory } from "./armory-guilds";
 import { armoryStore, type ArmoryBoardRow, type ArmoryGuildRow } from "./armory-store";
 import { GUILD_SEARCH_TAG, guildsOn, loadGuildData, loadLadder, raidsOpen, type RankedRow } from "./guilds";
 import { PLAYER_SEARCH_TAG } from "@/app/players/player-view";
 import { playerStore } from "./player-store";
 
-// The leaderboards the /rankings hub leads with: one armory character board at a time (its metric a tab), each region
-// ranked on its own beside the other, guild gear, and the progression ladder from members' uploads. Each is a preview
-// of a page that lists everything; the hub never computes a rank itself.
+// The leaderboards the /rankings hub leads with: every armory character board as a card with its top three, guild
+// gear, and the progression ladder from members' uploads. Each is a preview of a page that lists everything; the hub
+// never computes a rank itself.
 
-/** Rows each board previews; its full list is one link away. */
+/** Rows each guild board previews; its full list is one link away. */
 export const BOARD_PREVIEW = 10;
+/** Rows each character board's card shows: the head of the board, its full list one link away. */
+export const BOARD_TOP = 3;
 
-/** One region's top of a board: null rows when the armory could not be read. */
-export interface RegionRows { region: ArmoryRegion; rows: ArmoryBoardRow[] | null }
-/** One character board: US and EU side by side, or the one region chosen. */
-export interface CharacterBoard { metric: ArmoryMetric; regions: RegionRows[] }
+/** One character board's top three, US and EU ranked together (or the region chosen): null rows when the armory could not be read. */
+export interface BoardTop { metric: ArmoryMetric; rows: ArmoryBoardRow[] | null }
 /**
  * The guild gear board keeps guilds with at least this many members read (owner decision D6, the benchmark's
  * recommended default, awaiting the owner): one member's gear is not a guild's. The full directory still lists them all.
@@ -35,18 +35,13 @@ export interface RaidProgress { rows: RankedRow[]; instance: string | null; open
 export interface Leaderboards {
   progression?: GuildProgressionRank[];
   region: ArmoryRegion | null;
-  /** Null while the armory is off. */
-  characters: CharacterBoard | null;
+  /** Every board's top, in board order; null while the armory is off. */
+  characters: BoardTop[] | null;
   /** Null while the armory is off. */
   guildGear: GuildGear | null;
   bestOfClass: ArmoryBoardRow[] | null;
   /** Null while guild progression is off. */
   raids: RaidProgress | null;
-}
-
-/** `?metric=` names the board the hub shows; anything else the first one. */
-export function leaderboardMetric(raw: string | undefined): ArmoryMetric {
-  return raw !== undefined && isArmoryMetric(raw) ? raw : ARMORY_METRICS[0]!;
 }
 
 /** `?region=us|eu` in any casing, anything else every region. */
@@ -63,17 +58,14 @@ async function hiddenGuilds(): Promise<Set<string> | null> {
 /** The boards' reads are kept five minutes (the metric pages keep theirs thirty); a hide clears them through its tags. */
 const BOARDS_KEPT_SECONDS = 300;
 
-/** One board, each region read on its own; a region the store could not answer is null, the other still comes. */
-const characterBoard = unstable_cache(async (metric: ArmoryMetric, region: ArmoryRegion | null): Promise<CharacterBoard> => {
+/** Every board's top three, one read of three rows each; a board the store could not answer is null, the others still come. */
+const boardTops = unstable_cache(async (region: ArmoryRegion | null): Promise<BoardTop[]> => {
   const store = armoryStore();
-  return {
+  return Promise.all(ARMORY_METRICS.map(async (metric) => ({
     metric,
-    regions: await Promise.all((region ? [region] : ARMORY_REGIONS).map(async (r) => ({
-      region: r,
-      rows: await store.boardFiltered(ARMORY_BOARDS[metric].key, r, null, null, null, BOARD_PREVIEW).catch(() => null),
-    }))),
-  };
-}, ["rankings-character-board"], { revalidate: BOARDS_KEPT_SECONDS, tags: [PLAYER_SEARCH_TAG] });
+    rows: await store.boardFiltered(ARMORY_BOARDS[metric].key, region, null, null, null, BOARD_TOP).catch(() => null),
+  })));
+}, ["rankings-board-tops"], { revalidate: BOARDS_KEPT_SECONDS, tags: [PLAYER_SEARCH_TAG] });
 
 const bestOfClass = unstable_cache(async (region: ArmoryRegion | null) =>
   armoryStore().topPerClass("gear_score", region, null),
@@ -100,10 +92,10 @@ async function raidProgress(): Promise<RaidProgress> {
 }
 
 /** Every board at once; a board that cannot be read says so on its own, never the whole hub. */
-export async function loadLeaderboards(region: ArmoryRegion | null, metric: ArmoryMetric = ARMORY_METRICS[0]!): Promise<Leaderboards> {
+export async function loadLeaderboards(region: ArmoryRegion | null): Promise<Leaderboards> {
   const armory = armoryOn();
   const [characters, gear, raids, best] = await Promise.all([
-    armory ? characterBoard(metric, region) : null,
+    armory ? boardTops(region) : null,
     armory ? guildGear(region).catch((): GuildGear => ({ state: "unreachable" })) : null,
     guildsOn() ? raidProgress().catch((): RaidProgress => ({ rows: [], instance: null, open: raidsOpen(), unreachable: true })) : null,
     armory ? bestOfClass(region).catch(() => null) : null,
