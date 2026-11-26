@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: a character page opens on the verdict: a facts strip (item level, Gear Score, honorable kills, achievements, quests, read age), rank badges with their region and ruleset, spec cards and profession bars above the gear; an empty dungeons-and-raids section is one line.
+- Site: NPC pages read like a database entry: level, rank badge, type, reaction and zone link under the name; tabs in order Drops, Sells, Starts, Ends, Boss, Map with empty ones left out; drop and goods items in their quality colour, and the drops table sorts by item, count or rate. The NPC list shows ranks as badges and links zones.
 - Site: quest pages show the side in its faction colour, the type (group, dungeon, raid) and category in the header, Start and End NPCs, rewards with icons in their quality colour, and the quest chain as a row of steps with this quest marked.
 - Site: item tooltips show "This Item Begins a Quest", link Use and Equip lines to the spell page on the item page, and sum up players' reported numbers in one line with each number's installs, build and date behind it.
 - Site: Players is a directory to browse characters: class, race, faction, level, region, ruleset and guild filters in the address, sortable headers, 25/50/100 rows, names in class colour, guild links to that guild's members, and before a search the latest reads and the best item level of each class.

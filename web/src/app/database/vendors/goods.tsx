@@ -2,6 +2,7 @@ import Coins from "@/components/ui/Coins";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { DataTable } from "@/components/ui";
+import { qualityNamed } from "@/components/ui/quality";
 import { stockLabel, type VendorOffer } from "@kb/world-pages";
 import type { ComponentProps, ReactNode } from "react";
 
@@ -15,7 +16,7 @@ export function VendorGoods({ title, offers, tips, items, evidence }: {
       dense
       caption={`What ${title} sells`}
       columns={[
-        { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} /></ItemTip> },
+        { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} quality={qualityNamed(tips.get(o.itemId)?.quality)} /></ItemTip> },
         { key: "price", header: "Price", numeric: true, cell: (o: VendorOffer) => <Coins copper={o.priceCopper} /> },
         { key: "stock", header: "Stock", numeric: true, cell: (o: VendorOffer) => stockLabel(o) },
         ...(evidence ? [{ key: "reported", header: "Reported", cell: evidence }] : [

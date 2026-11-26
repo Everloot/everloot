@@ -2,12 +2,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "@kb/world-pages";
 
-const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn(), sightings: vi.fn() }));
+const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn(), sightings: vi.fn(), tips: vi.fn(), loot: vi.fn() }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: mocks.world, computeRollups: mocks.rollup, loadItemFacts: mocks.items,
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
 }));
-vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
+vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: mocks.tips }));
+// The real loot table unless a test hands the page one.
+vi.mock("@kb/loot-tables", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@kb/loot-tables")>();
+  return { ...real, npcLootTable: (...args: Parameters<typeof real.npcLootTable>) => mocks.loot(...args) ?? real.npcLootTable(...args) };
+});
 vi.mock("@/lib/game-renders", () => ({ loadRenders: mocks.renders }));
 // The dungeon and raid reports: none unless a test ties this NPC to a boss.
 vi.mock("@/lib/instances", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/instances")>()), loadSightings: mocks.sightings }));
@@ -26,7 +31,7 @@ const quest = (questId: number, role: "giverNpcId" | "turnInNpcId", count = 3) =
   installId, questId, title: `Quest ${questId} title`, level: 55, [role]: 1125, rewardItemIds: [], capturedAt: at,
 }));
 const goods = (count = 3) => installs.slice(0, count).map((installId) => ({ installId, vendorNpcId: 1125, itemId: 117, priceCopper: 12345, capturedAt: at }));
-const html = async () => renderToStaticMarkup(await NpcPage({ params: Promise.resolve({ id: "1125" }) }));
+const html = async (search: Record<string, string> = {}) => renderToStaticMarkup(await NpcPage({ params: Promise.resolve({ id: "1125" }), searchParams: Promise.resolve(search) }));
 const panel = (out: string, id: string) => out.split(`data-tab-panel="${id}"`)[1]?.split('role="tabpanel"')[0] ?? "";
 const fact = (out: string, name: string) => new RegExp(`>${name}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1];
 
@@ -36,6 +41,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.wiki.mockResolvedValue(null);
   mocks.renders.mockResolvedValue(null);
+  mocks.tips.mockResolvedValue(new Map());
+  mocks.loot.mockReturnValue(undefined);
   mocks.sightings.mockResolvedValue({ unreachable: false, instances: { entrances: [], encounters: [] } });
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
@@ -47,27 +54,31 @@ beforeEach(() => {
   mocks.items.mockResolvedValue({ rates: [], names: [], npcs: [], unreachable: false });
 });
 
-test("the tabs with rows link agreed goods and giver/turn-in quests with their evidence; the empty ones are left out", async () => {
+test("the tabs with rows link agreed goods and the quests it starts and ends with their evidence; the empty ones are left out", async () => {
   facts.vendors = goods();
   facts.quests = [...quest(10, "giverNpcId"), ...quest(11, "turnInNpcId"), ...quest(12, "giverNpcId").map((r) => ({ ...r, turnInNpcId: 1125 }))];
   const out = await html();
-  expect(out.match(/role="tab"/g)).toHaveLength(2);
-  for (const id of ["goods", "quests"]) expect(out).toContain(`data-tab-panel="${id}"`);
+  // Sells, then the quests it starts, then the ones it ends.
+  expect([...out.matchAll(/data-tab-panel="([a-z-]+)"/g)].map((m) => m[1])).toEqual(["sells", "starts", "ends"]);
+  expect(out).toMatch(/role="tab"[^>]*>Sells<span[^>]*> \(1\)<\/span>/);
+  expect(out).toMatch(/role="tab"[^>]*>Starts<span[^>]*> \(2\)<\/span>/);
+  expect(out).toMatch(/role="tab"[^>]*>Ends<span[^>]*> \(2\)<\/span>/);
   // No drop and no agreed position: no "Drops (0)" or "Map (0)" before the tabs with rows.
-  for (const id of ["drops", "map"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
-  expect(panel(out, "goods")).toContain('href="/database/vendors/1125"');
-  expect(panel(out, "goods")).toContain('href="/database/items/117"');
-  expect(panel(out, "goods")).toContain("1 gold 23 silver 45 copper");
-  for (const id of [10, 11, 12]) expect(panel(out, "quests")).toContain(`href="/database/quests/${id}"`);
-  expect(panel(out, "quests")).toContain("Giver");
-  expect(panel(out, "quests")).toContain("Turn-in");
-  for (const id of ["goods", "quests"]) {
+  for (const id of ["drops", "map", "boss"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
+  expect(panel(out, "sells")).toContain('href="/database/vendors/1125"');
+  expect(panel(out, "sells")).toContain('href="/database/items/117"');
+  expect(panel(out, "sells")).toContain("1 gold 23 silver 45 copper");
+  for (const id of [10, 12]) expect(panel(out, "starts")).toContain(`href="/database/quests/${id}"`);
+  for (const id of [11, 12]) expect(panel(out, "ends")).toContain(`href="/database/quests/${id}"`);
+  expect(panel(out, "starts")).not.toContain('href="/database/quests/11"');
+  expect(panel(out, "ends")).not.toContain('href="/database/quests/10"');
+  for (const id of ["sells", "starts", "ends"]) {
     expect(panel(out, id)).toContain("3 of 3 installs agree");
     expect(panel(out, id)).toContain(`last seen 2 days ago`);
   }
-  expect(panel(out, "goods")).not.toContain(">Installs<");
+  expect(panel(out, "sells")).not.toContain(">Installs<");
   expect(out).toContain("1 goods and 3 quests");
-  expect(panel(out, "goods")).toContain("This NPC sells goods.");
+  expect(panel(out, "sells")).toContain("This NPC sells goods.");
   expect(mocks.world).toHaveBeenCalledTimes(1);
   expect(mocks.items).toHaveBeenCalledTimes(1);
 });
@@ -85,10 +96,10 @@ test("empty and below-threshold tabs explain the three-install rule without publ
       continue;
     }
     // Short of 3 installs the tab stays, with its meter and the rule.
-    expect(panel(out, "goods")).toContain(EMPTY.goods);
-    expect(panel(out, "quests")).toContain(EMPTY.quests);
-    expect(panel(out, "goods")).toContain(`data-agreement="${count}"`);
-    expect(panel(out, "quests")).toContain(`data-agreement="${count}"`);
+    expect(panel(out, "sells")).toContain(EMPTY.goods);
+    expect(panel(out, "starts")).toContain(EMPTY.quests);
+    expect(panel(out, "sells")).toContain(`data-agreement="${count}"`);
+    expect(panel(out, "starts")).toContain(`data-agreement="${count}"`);
   }
 });
 
@@ -96,8 +107,8 @@ test("repeated rows from one install and conflicting quest relations stay privat
   facts.vendors = [goods(1)[0], goods(1)[0], goods(1)[0]];
   facts.quests = [...quest(10, "giverNpcId"), ...quest(10, "giverNpcId").map((r) => ({ ...r, giverNpcId: 999 }))];
   const out = await html();
-  expect(panel(out, "quests")).toContain("No agreed quest yet.");
-  expect(panel(out, "goods")).toContain("No agreed goods yet.");
+  expect(panel(out, "starts")).toContain("No agreed quest yet.");
+  expect(panel(out, "sells")).toContain("No agreed goods yet.");
 });
 
 test("unnamed NPC retains all agreed list traits, with unreported traits shown as unknown", async () => {
@@ -117,9 +128,9 @@ test("missing dates say not reported yet; stock without agreement never becomes 
   facts.vendors = goods().map(({ capturedAt: _, ...r }, i) => ({ ...r, limitedStock: i + 1 }));
   facts.quests = quest(10, "giverNpcId").map(({ capturedAt: _, ...r }) => r);
   const out = await html();
-  expect(panel(out, "goods")).toContain("date not reported yet");
-  expect(panel(out, "quests")).toContain("date not reported yet");
-  expect(panel(out, "goods")).toContain("stock unrecorded");
+  expect(panel(out, "sells")).toContain("date not reported yet");
+  expect(panel(out, "starts")).toContain("date not reported yet");
+  expect(panel(out, "sells")).toContain("stock unrecorded");
 });
 
 test("named NPC uses only agreed quest names and counts each install once per relation", async () => {
@@ -128,10 +139,10 @@ test("named NPC uses only agreed quest names and counts each install once per re
   facts.quests.push({ ...facts.quests[0], installId: "four", capturedAt: "2026-11-10T00:00:00Z" }, facts.quests[0]);
   const out = await html();
   expect(out).toMatch(/<h1[^>]*>A shopkeeper<\/h1>/);
-  expect(panel(out, "quests")).toContain('href="/database/quests/10"');
-  expect(panel(out, "quests")).toContain("3 of 3 installs agree");
-  expect(panel(out, "quests")).toContain("last seen 12 h ago");
-  expect(panel(out, "quests")).not.toContain(">one<");
+  expect(panel(out, "starts")).toContain('href="/database/quests/10"');
+  expect(panel(out, "starts")).toContain("3 of 3 installs agree");
+  expect(panel(out, "starts")).toContain("last seen 12 h ago");
+  expect(panel(out, "starts")).not.toContain(">one<");
 });
 
 test("a recheck on a quest reward item also resets its NPC relation", async () => {
@@ -139,7 +150,7 @@ test("a recheck on a quest reward item also resets its NPC relation", async () =
   facts.recheck = [{ source: "test", type: "quests", ids: [117], since: "2026-11-09T00:00:00Z" }];
   const out = await html();
   expect(out).not.toContain('href="/database/quests/10"');
-  expect(out).not.toContain('data-tab-panel="quests"');
+  expect(out).not.toContain('data-tab-panel="starts"');
 });
 
 test("rechecks hide old agreements until three fresh installs agree", async () => {
@@ -147,20 +158,20 @@ test("rechecks hide old agreements until three fresh installs agree", async () =
   facts.quests = quest(10, "giverNpcId");
   facts.recheck = [{ source: "test", since: "2026-11-09T00:00:00Z", ids: [1125, 10] }];
   const old = await html();
-  for (const id of ["goods", "quests"]) expect(old).not.toContain(`data-tab-panel="${id}"`);
+  for (const id of ["sells", "starts"]) expect(old).not.toContain(`data-tab-panel="${id}"`);
   const fresh = "2026-11-10T00:00:00Z";
   facts.vendors.push(...goods().map((r) => ({ ...r, capturedAt: fresh })));
   facts.quests.push(...quest(10, "giverNpcId").map((r) => ({ ...r, capturedAt: fresh })));
   const out = await html();
-  expect(panel(out, "goods")).toContain(`last seen 12 h ago`);
-  expect(panel(out, "quests")).toContain(`last seen 12 h ago`);
+  expect(panel(out, "sells")).toContain(`last seen 12 h ago`);
+  expect(panel(out, "starts")).toContain(`last seen 12 h ago`);
 });
 
 test("unreachable storage shows unavailable panels rather than empty agreements", async () => {
   facts.unreachable = true;
   const out = await html();
-  expect(panel(out, "goods")).not.toContain("No agreed goods");
-  expect(panel(out, "quests")).not.toContain("No agreed quest");
+  expect(panel(out, "sells")).not.toContain("No agreed goods");
+  expect(panel(out, "starts")).not.toContain("No agreed quest");
 });
 
 test("vendor page keeps the same goods table after sharing it with NPC pages", async () => {
@@ -175,8 +186,8 @@ test("short meters count agreement on one offer or relation, not unrelated repor
   facts.vendors = goods(2).map((r, i) => ({ ...r, priceCopper: i + 1 }));
   facts.quests = [quest(10, "giverNpcId", 1)[0], quest(11, "giverNpcId", 2)[1]];
   const out = await html();
-  expect(panel(out, "goods")).toContain('data-agreement="1"');
-  expect(panel(out, "quests")).toContain('data-agreement="1"');
+  expect(panel(out, "sells")).toContain('data-agreement="1"');
+  expect(panel(out, "starts")).toContain('data-agreement="1"');
 });
 
 test("zone rechecks reset goods and quest relations at the NPC's reported zone", async () => {
@@ -186,7 +197,7 @@ test("zone rechecks reset goods and quest relations at the NPC's reported zone",
   facts.recheck = [{ source: "test", zones: [1426], since: "2026-11-09T00:00:00Z" }];
   const out = await html();
   expect(out).not.toContain("1 gold 23 silver 45 copper");
-  for (const id of ["goods", "quests"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
+  for (const id of ["sells", "starts"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
 });
 
 test.each([1, 2])("%i agreeing reports plus a wiki match name all page surfaces without identities", async (count) => {
@@ -248,7 +259,52 @@ test("an NPC 3 installs tie to a boss encounter links that boss's page; others n
   // SYNTHETIC: three installs killed Oggleflint in Ragefire Chasm and tie this NPC to it.
   const encounters = installs.map((installId) => ({ installId, encounterId: 2732, name: "Oggleflint", instanceMapId: 389, success: true, npcIds: [1125], capturedAt: at }));
   mocks.sightings.mockResolvedValue({ unreachable: false, asOf: new Date("2026-11-10T00:00:00Z"), instances: { entrances: [], encounters } });
-  const boss = fact(await html(), "Boss");
+  const out = await html();
+  const boss = fact(out, "Boss");
   expect(boss).toContain('href="/database/bosses/2732-oggleflint"');
   expect(boss).toContain('href="/database/instances/389-ragefire-chasm"');
+  // Its own tab too, linking the boss page and the instance.
+  expect(out).toMatch(/role="tab"[^>]*>Boss<span[^>]*> \(1\)<\/span>/);
+  expect(panel(out, "boss")).toContain('href="/database/bosses/2732-oggleflint"');
+  expect(panel(out, "boss")).toContain('href="/database/instances/389-ragefire-chasm"');
+});
+
+test("the header reads level, rank badge, type, reaction and zone link from the agreed traits", async () => {
+  facts.npcs = facts.npcs.map((r) => ({ ...r, mapId: 1426, x: 40, y: 60, positionKind: "npc", rank: "rare_elite", reaction: "hostile", creatureType: "Beast", level: 32 }));
+  const header = (await html()).split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+  const meta = header.split("data-entity-meta")[1] ?? "";
+  expect(meta).toContain("Level 32");
+  expect(meta).toMatch(/data-badge="neutral"[^>]*>Rare elite</);
+  expect(meta).toContain("Beast");
+  expect(meta).toContain("Hostile");
+  expect(meta).toMatch(/href="\/database\/zones\/1426-[a-z-]+"/);
+  // A normal creature gets no badge; traits short of 3 installs are not in the header.
+  facts.npcs = facts.npcs.map((r) => ({ ...r, rank: "normal" }));
+  expect((await html()).split("</header>")[0]).not.toContain("data-badge");
+  facts.npcs = facts.npcs.slice(0, 2);
+  const short = (await html()).split("data-entity-meta")[1]?.split("</p>")[0] ?? "";
+  for (const word of ["Level", "Beast", "Hostile"]) expect(short).not.toContain(word);
+});
+
+test("goods and drops show the item's icon and quality colour, and drops sort by their headers", async () => {
+  const tip = (name: string, quality: string) => ({ name, quality, color: "#fff", icon: `https://assets.example.test/icons/${name}.png`, lines: [], partial: false, why: [] });
+  mocks.tips.mockResolvedValue(new Map([[117, tip("Linen", "Epic")], [118, tip("Apple", "Poor")]]));
+  facts.vendors = goods();
+  const sells = panel(await html(), "sells");
+  expect(sells).toMatch(/<img[^>]*src="https:\/\/assets.example.test\/icons\/Linen.png"/);
+  expect(sells).toMatch(/class="[^"]*text-q-epic[^"]*"[^>]*>Linen</);
+  facts.vendors = [];
+  // SYNTHETIC: a rated table, Linen in 1 of 4 windows and Apple in 3 of 4.
+  const row = (itemId: number, withItem: number) => ({ sourceNpcId: 1125, itemId, withItem, windows: 4, installs: 3, rate: withItem / 4, first: null, last: null });
+  mocks.loot.mockReturnValue({ npcId: 1125, state: "rated", span: { windows: 4, installs: 3, first: null, last: null }, rows: [row(118, 3), row(117, 1)], missingInstalls: 0 });
+  mocks.rollup.mockResolvedValue({ rates: [117, 118].map((itemId) => ({ itemId, sourceNpcId: 1125, reporters: 3 })), measuredZeros: [], stats: { unreachable: false } });
+  const drops = panel(await html(), "drops");
+  expect(drops).toMatch(/class="[^"]*text-q-poor[^"]*"[^>]*>Apple</);
+  expect(drops).toContain('href="/database/npcs/1125?sort=item#drops"');
+  expect(drops.indexOf(">Apple<")).toBeLessThan(drops.indexOf(">Linen<"));
+  const byName = panel(await html({ sort: "-item" }), "drops");
+  expect(byName.indexOf(">Linen<")).toBeLessThan(byName.indexOf(">Apple<"));
+  expect(byName).toContain('aria-sort="descending"');
+  const byRate = panel(await html({ sort: "rate" }), "drops");
+  expect(byRate.indexOf(">Linen<")).toBeLessThan(byRate.indexOf(">Apple<"));
 });
