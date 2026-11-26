@@ -222,6 +222,23 @@ test("database art: icons of the spells the relations point at and of pet famili
   expect(manifest.familyIcons).toEqual({ "1": "6007.webp" });
 });
 
+test("collection art: currency and companion pet icons by id, and the icon of each mount's spell", async () => {
+  const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
+  const withCollections: Record<string, Rows> = {
+    ...site,
+    CurrencyTypes: t([{ ID: 515, Name_lang: "Darkmoon Prize Ticket", InventoryIconFileID: 6007 }, { ID: 1792, Name_lang: "Honor Points", InventoryIconFileID: 0 }]),
+    BattlePetSpecies: t([{ ID: 39, CreatureID: 2671, IconFileDataID: 6008 }, { ID: 40, CreatureID: 7385, IconFileDataID: 6009 }]),
+    Mount: t([{ ID: 6, Name_lang: "Brown Horse", SourceSpellID: 1001 }]),
+  };
+  const src: TableSource = { ...source([]), fileStatus: (id) => ({ ...siteStatus, 6007: "present", 6008: "present", 6009: "encrypted" } as Record<number, FileStatus>)[id] ?? "absent" };
+  const { manifest } = await buildAssetsFromTables({ get: (n) => withCollections[n], build, outDir, source: src, convert: fakeConvert });
+  // Honor Points has no icon file and the second pet's is encrypted.
+  expect(manifest.currencyIcons).toEqual({ "515": "6007.webp" });
+  expect(manifest.petIcons).toEqual({ "39": "6008.webp" });
+  // The mount's spell gets its icon with no relation or buff list asking for it.
+  expect(manifest.spellIcons).toEqual({ "1001": "5001.webp" });
+});
+
 test("a map with an encrypted tile is skipped with the reason, never drawn with a hole", async () => {
   const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
   const src: TableSource = { ...source([]), fileStatus: (id) => (id === 7001 ? "encrypted" : siteStatus[id] ?? "absent") };

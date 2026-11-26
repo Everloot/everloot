@@ -9,6 +9,7 @@ import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
 import { loadCatalog } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
+import { currencyEntries, mountEntries, petEntries, toyEntries } from "@/lib/collectibles";
 import { instanceRows } from "@/lib/instances";
 import { publicZones } from "@/lib/zones";
 import { terrainTypes } from "@/lib/terrain";
@@ -86,6 +87,10 @@ export default async function DatabasePage() {
     "/database/quest-chains": listed(catalog?.chains.length),
     // The item sets the game files list, like the zone count: it reads the files, not the uploads.
     "/database/item-sets": n(ITEM_SETS.length),
+    "/database/mounts": listed(mountEntries()?.length),
+    "/database/pets": listed(petEntries()?.length),
+    "/database/toys": listed(toyEntries()?.length),
+    "/database/currencies": listed(currencyEntries()?.length),
     "/database/drops": seen(live),
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.

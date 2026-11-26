@@ -29,6 +29,7 @@ import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
 import { writeClientItemSets } from "./client-item-sets.js";
+import { writeClientCollections } from "./client-collections.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -231,6 +232,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+  client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
     (every quest line with its quest ids in order. Pages and search, as above)
   client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
     (every item set with its pieces, its bonuses as pieces needed and spell id, and the skill a crafted set asks
@@ -810,6 +812,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-item-sets.json";
       const table = writeClientItemSets(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.sets.length} item sets -> ${path}`);
+      return 0;
+    }
+    case "client-collections": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-collections.json";
+      const table = writeClientCollections(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.currencies.length} currencies, ${table.pets.length} pets, ${table.toys.length} toys -> ${path}`);
       return 0;
     }
     case "client-diff": {

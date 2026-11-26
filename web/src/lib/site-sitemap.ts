@@ -15,6 +15,7 @@ import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-r
 import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@/lib/items";
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
+import { currencyEntries, currencyHref, mountEntries, mountHref, petEntries, petHref } from "@/lib/collectibles";
 import { loadSightings } from "@/lib/instances";
 import { loadListNames } from "@/lib/item-view";
 import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
@@ -66,6 +67,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
   const catalog = await loadCatalog();
   const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
+  // Mount, companion pet and currency pages: one per entry the game files list, each with its facts. A toy's page is its item page.
+  const collectibleRoutes = [
+    ...(mountEntries() ?? []).map((m) => mountHref(m.id, m.name)), ...(petEntries() ?? []).map((p) => petHref(p.id, p.name)),
+    ...(currencyEntries() ?? []).map((c) => currencyHref(c.id, c.name)),
+  ];
   // The rankings hub and each unfiltered ranking, once it asks to be indexed (10 ranked rows).
   const rankings = await loadRankingWeeks();
   if (rankings.unreachable) return null;
@@ -89,7 +95,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
   const toolRoutes = tools.filter((tool) => !tool.private && !tool.hidden && tool.status !== "coming-soon").map(toolHref)
     .filter((path) => path !== "/rankings" || hubIndexable(rankings.weeks));
-  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...chooserRoutes, ...itemRoutes, ...zoneRoutes, ...coverageRoutes, ...instanceRoutes, ...catalogRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
+  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...chooserRoutes, ...itemRoutes, ...zoneRoutes, ...coverageRoutes, ...instanceRoutes, ...catalogRoutes, ...collectibleRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;

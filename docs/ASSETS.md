@@ -126,8 +126,12 @@ How it works, and what it will not do:
   9, top-level lines only); the raid buff list's spells from `SpellMisc`.
 - **Relation spell and pet family icons.** `spellIcons` also holds the icon of every spell the
   committed client layer (`web/src/data/game-data/client-layer.json`) says an item is created by or
-  used in, for the `/database` item pages; `familyIcons` holds `CreatureFamily.IconFileID` by pet
-  family id. Spells and families are not items, so these are not gated on reports.
+  used in, for the `/database` item pages, and of every spell that teaches a mount (`Mount.SourceSpellID`), for
+  the mount pages; `familyIcons` holds `CreatureFamily.IconFileID` by pet family id. Spells and families are not
+  items, so these are not gated on reports.
+- **Currency and companion pet icons.** `currencyIcons` holds `CurrencyTypes.InventoryIconFileID` by currency id
+  and `petIcons` `BattlePetSpecies.IconFileDataID` by species id, for the currency and companion pet pages. A
+  page shows one only when the manifest lists it, so a build uploaded before these keys shows none.
 - **Map pictures.** `UiMapXMapArt` names each map's art, `UiMapArtTile` its tiles by row and column,
   `UiMapArtStyleLayer` the tile and picture size. The tiles of the base zoom layer are laid on their
   grid and cut to the picture, which covers exactly the rectangle `UiMapAssignment` gives the map, so
