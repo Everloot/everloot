@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item and NPC pages show the model picture from the game files beside the quick facts, where the page already names the item or NPC.
 - Site: zone pages gain a Places tab with the subzones and the points of interest the game files name, each point linked to its spot on the map, and the achievement list groups by the categories the game files name; labelled found in game files, unconfirmed.
 - Site: the database lists holidays and world events (when each starts and how long it lasts) and hunter pet families (icon and the spells on each family's skill line) from the game files, each with its own page, in search and the sitemap; labelled found in game files, unconfirmed.
 - Site: instance pages show how many linked characters killed each boss and cleared the instance, and /armory/clears/<instance> lists recent clears (migration `20261125120000_instance_clears.sql` applied 2026-11-25).

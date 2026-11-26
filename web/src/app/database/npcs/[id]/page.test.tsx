@@ -2,12 +2,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "@kb/world-pages";
 
-const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn() }));
+const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn() }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: mocks.world, computeRollups: mocks.rollup, loadItemFacts: mocks.items,
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
 }));
 vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
+vi.mock("@/lib/game-renders", () => ({ loadRenders: mocks.renders }));
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
@@ -32,6 +33,7 @@ afterEach(() => vi.restoreAllMocks());
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.wiki.mockResolvedValue(null);
+  mocks.renders.mockResolvedValue(null);
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
     npcs: installs.map((installId) => ({ installId, npcId: 1125, name: installId, mapId: 0, x: 0, y: 0, level: 55, reaction: "friendly", creatureType: "Humanoid", rank: "normal", capturedAt: at })),
@@ -206,4 +208,34 @@ test("disagreeing reports cannot borrow a wiki name", async () => {
   facts.npcs = facts.npcs.slice(0, 2).map((r, i) => ({ ...r, name: i ? "Other" : "Hogger" }));
   mocks.wiki.mockResolvedValue({ version: "x", names: new Map([["hogger", { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
   expect(await html()).toMatch(/<h1[^>]*>NPC 1125<\/h1>/);
+});
+
+const MODEL = { url: `https://assets.example.test/renders/${"a".repeat(32)}.webp`, size: 512 };
+
+test("a named NPC with a model picture shows it in the side column: lazy, sized, its alt the name", async () => {
+  facts.npcs = facts.npcs.map((r) => ({ ...r, name: "Hogger" }));
+  mocks.renders.mockResolvedValue({ npcs: new Map([[1125, MODEL]]), items: new Map() });
+  const out = await html();
+  const sidebar = out.split("data-entity-sidebar")[1] ?? "";
+  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Hogger" width="512" height="512" loading="lazy"`));
+});
+
+test("no picture for the NPC, or no renders.json: nothing in its place", async () => {
+  facts.npcs = facts.npcs.map((r) => ({ ...r, name: "Hogger" }));
+  mocks.renders.mockResolvedValue({ npcs: new Map([[9999, MODEL]]), items: new Map([[1125, MODEL]]) });
+  expect(await html()).not.toContain("data-model-picture");
+  mocks.renders.mockResolvedValue(null);
+  expect(await html()).not.toContain("data-model-picture");
+});
+
+test("an NPC the page shows no name for gets no picture, and renders.json is not read", async () => {
+  mocks.renders.mockResolvedValue({ npcs: new Map([[1125, MODEL]]), items: new Map() });
+  // The installs disagree on the name: the page says "NPC 1125".
+  const out = await html();
+  expect(out).toContain("NPC 1125</h1>");
+  expect(out).not.toContain("data-model-picture");
+  facts.npcs = facts.npcs.map((r) => ({ ...r, name: "Hogger" }));
+  facts.unreachable = true;
+  expect(await html()).not.toContain("data-model-picture");
+  expect(mocks.renders).not.toHaveBeenCalled();
 });

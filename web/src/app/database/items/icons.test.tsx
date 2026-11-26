@@ -7,7 +7,9 @@ const state = vi.hoisted(() => ({
   assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
   progress: [] as { fact: "armor"; reporters: number; build: string }[],
+  renders: null as unknown, renderCalls: 0,
 }));
+vi.mock("@/lib/game-renders", () => ({ loadRenders: async () => { state.renderCalls++; return state.renders; } }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSiteAssets: async () => state.assets,
@@ -55,7 +57,7 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
+beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; state.renders = null; state.renderCalls = 0; });
 
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
@@ -295,4 +297,32 @@ test("the pager and the other filters' links keep the level and binding filters"
   // The name box keeps them as hidden fields.
   expect(page).toContain('name="ilvl" value="11-20"');
   expect(page).toContain('name="bind" value="equip"');
+});
+
+const MODEL = { url: `https://assets.example.test/renders/${"b".repeat(32)}.webp`, size: 512 };
+
+test("an item page that shows the item's name and icon shows its model picture in the side column; no credit line of its own", async () => {
+  state.assets = assets;
+  const id = clothIds()[0];
+  state.matched = matchedNames([id]);
+  state.renders = { npcs: new Map([[id, { ...MODEL, url: "https://assets.example.test/renders/npc.webp" }]]), items: new Map([[id, MODEL]]) };
+  const page = await html(ItemPage(props(String(id))));
+  const sidebar = page.split("data-entity-sidebar")[1] ?? "";
+  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Wiki name ${id}" width="512" height="512" loading="lazy"`));
+  // The item's own picture, never the NPC with the same id.
+  expect(page).not.toContain("renders/npc.webp");
+  expect(page).not.toContain(CREDIT);
+  // An item with no picture: nothing in its place.
+  state.renders = { npcs: new Map(), items: new Map() };
+  expect(await html(ItemPage(props(String(id))))).not.toContain("data-model-picture");
+});
+
+test("an item the page shows no name or icon for gets no picture, and renders.json is not read", async () => {
+  state.assets = assets;
+  const other = clothIds()[1];
+  state.renders = { npcs: new Map(), items: new Map([[other, MODEL]]) };
+  const page = await html(ItemPage(props(String(other))));
+  expect(page).toContain(`Item ${other}</h1>`);
+  expect(page).not.toContain("data-model-picture");
+  expect(state.renderCalls).toBe(0);
 });

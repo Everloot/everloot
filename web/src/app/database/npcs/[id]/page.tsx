@@ -16,7 +16,8 @@ import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
+import { loadRenders } from "@/lib/game-renders";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
@@ -109,6 +110,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const lootTable = npcLootTable(loot.tables, npcId);
   const trail = [...trailFor("/database/npcs")!, { name: title, path: `/database/npcs/${npcId}` }];
   const named = title !== `NPC ${npcId}`;
+  // The model picture only where the page names the NPC; renders.json lists only NPCs the site lists.
+  const picture = named && !unreachable ? (await loadRenders())?.npcs.get(npcId) : undefined;
   // The page in three lines: where it is, what players reported, and where the name came from.
   const summary = entitySummary({
     identity: zone
@@ -156,6 +159,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
           )}
         />
         <EntitySidebar>
+          <ModelPicture picture={picture} name={title} />
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
           <OpenData
             text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
