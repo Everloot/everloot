@@ -43,7 +43,7 @@ export default function Facts({ items, layout = "grid", label }: { items: Fact[]
     <dl data-facts="grid" aria-label={label} className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-card border border-line bg-panel p-6 md:grid-cols-4">
       {items.map((item, i) => (
         <div key={i} className="min-w-0">
-          <dt className="font-mono text-xs text-muted">{item.label}</dt>
+          <dt className="text-meta text-muted">{item.label}</dt>
           <dd className={`mt-1 text-lg text-fg [overflow-wrap:anywhere] ${item.numeric ? "font-mono tabular-nums" : ""}`}>{item.value}</dd>
         </div>
       ))}

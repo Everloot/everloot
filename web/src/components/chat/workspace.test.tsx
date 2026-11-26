@@ -55,7 +55,7 @@ function server() {
     if (path.startsWith("/schema/mcp/")) return Response.json({ title: "T", inputSchema: { type: "object", properties: {} } });
     if (path.startsWith("/api/tools/item_page")) return Response.json({ answer: { connected: true, dataAsOf: null, page: { drops: [] } } });
     if (path.startsWith("/api/tools/")) return Response.json({ text: HIT });
-    if (path === "/database/card/item/2589") return Response.json({ ok: true, card: CARD });
+    if (path === "/card/item/2589") return Response.json({ ok: true, card: CARD });
     if (path === "/api/me/builds") return Response.json({ characters: [], builds: builds() });
     if (!path.startsWith("/api/me/chat")) throw new Error(`Unexpected request ${path}`);
 

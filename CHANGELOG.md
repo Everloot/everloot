@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the header has six items instead of nine: Community (players, guilds, rankings, census, addons), Database, Tools (market tools and planners), Guides, Chat and Profile, with Menu only below 1280 px; labels, badges and table headers are sans, the header's pills share one small button size, and docs/design/direction.md sets the site's type, colour and component rules.
 - Site: armory character pages are a character sheet: a header with portrait, class-coloured name, faction, region and guild; the gear around a summary of item level, Gear Score, ranks and key stats, in quality borders with item levels, collapsing to one list on a phone; the dungeon progress line in its own slot. A character the addon saw that the armory certainly has (same first name, realm in its region, guilds agreeing, one of each) now has one page: `/characters/forever/<realm>/<name>` redirects there permanently, the armory page shows what the addon last saw, and the site search links it.
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
@@ -276,6 +277,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
