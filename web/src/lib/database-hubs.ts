@@ -23,6 +23,8 @@ export const DATABASE_HUBS: readonly DatabaseHub[] = [
   { href: "/database/pets", label: "Companion pets", source: "files" },
   { href: "/database/toys", label: "Toys", source: "files" },
   { href: "/database/currencies", label: "Currencies", source: "files" },
+  { href: "/database/holidays", label: "Holidays and world events", source: "files" },
+  { href: "/database/pet-families", label: "Hunter pet families", source: "files" },
   { href: "/database/drops", label: "Loot observations", source: "players" },
   { href: "/database/coverage", label: "Coverage: where the data is thin", source: "players" },
   { href: "/database/download", label: "Download the data", source: "players" },

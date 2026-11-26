@@ -16,6 +16,7 @@ import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
 import { currencyEntries, currencyHref, mountEntries, mountHref, petEntries, petHref } from "@/lib/collectibles";
+import { holidayEntries, holidayHref, petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { loadSightings } from "@/lib/instances";
 import { loadListNames } from "@/lib/item-view";
 import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
@@ -72,6 +73,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
     ...(mountEntries() ?? []).map((m) => mountHref(m.id, m.name)), ...(petEntries() ?? []).map((p) => petHref(p.id, p.name)),
     ...(currencyEntries() ?? []).map((c) => currencyHref(c.id, c.name)),
   ];
+  // Holiday and hunter pet family pages: one per entry the game files list.
+  const eventRoutes = [...(holidayEntries() ?? []).map((h) => holidayHref(h.id, h.name)), ...(petFamilyEntries() ?? []).map((f) => petFamilyHref(f.id, f.name))];
   // The rankings hub and each unfiltered ranking, once it asks to be indexed (10 ranked rows).
   const rankings = await loadRankingWeeks();
   if (rankings.unreachable) return null;
@@ -95,7 +98,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
   const toolRoutes = tools.filter((tool) => !tool.private && !tool.hidden && tool.status !== "coming-soon").map(toolHref)
     .filter((path) => path !== "/rankings" || hubIndexable(rankings.weeks));
-  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...chooserRoutes, ...itemRoutes, ...zoneRoutes, ...coverageRoutes, ...instanceRoutes, ...catalogRoutes, ...collectibleRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
+  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...chooserRoutes, ...itemRoutes, ...zoneRoutes, ...coverageRoutes, ...instanceRoutes, ...catalogRoutes, ...collectibleRoutes, ...eventRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;

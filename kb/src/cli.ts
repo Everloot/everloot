@@ -30,6 +30,8 @@ import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
 import { writeClientItemSets } from "./client-item-sets.js";
 import { writeClientCollections } from "./client-collections.js";
+import { writeClientHolidays } from "./client-holidays.js";
+import { writeClientPetFamilies } from "./client-pet-families.js";
 import { writeClientPlaces } from "./client-places.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
@@ -241,6 +243,8 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
   client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
+  client-holidays <snapshot.sqlite> [--out ../web/src/data/game-data/client-holidays.json]
+  client-pet-families <snapshot.sqlite> [--out ../web/src/data/game-data/client-pet-families.json]
   client-places <snapshot.sqlite> [--out ../web/src/data/game-data/client-places.json]
     (every quest line with its quest ids in order. Pages and search, as above)
   client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
@@ -828,6 +832,20 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-collections.json";
       const table = writeClientCollections(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.currencies.length} currencies, ${table.pets.length} pets, ${table.toys.length} toys -> ${path}`);
+      return 0;
+    }
+    case "client-holidays": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-holidays.json";
+      const table = writeClientHolidays(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.holidays.length} holidays -> ${path}`);
+      return 0;
+    }
+    case "client-pet-families": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-pet-families.json";
+      const table = writeClientPetFamilies(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.families.length} hunter pet families -> ${path}`);
       return 0;
     }
     case "client-places": {

@@ -45,6 +45,8 @@ import { loadItemIcons } from "@/lib/item-icons";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 
@@ -352,6 +354,8 @@ export default async function ItemPage(props: Props) {
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
         </div>
+        <EntityScreenshots type="item" id={itemId} name={title} />
+        <EntityComments type="item" id={itemId} />
       </EntityLayout>
     </Container>
   );

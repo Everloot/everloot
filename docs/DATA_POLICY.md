@@ -711,6 +711,21 @@ game files list, with a page for each mount, companion pet and currency. The rul
   `spellIcons`), shown only where the manifest lists one. None of it is in the API, the MCP server or the bulk
   download.
 
+**Holidays and hunter pet families.** *Proposed 2026-11-25 in the pull request that adds them (the maintainer
+review).* `/database/holidays` and `/database/pet-families` list what the game files list, with a page for each. The
+rules:
+
+- Holidays read `client-holidays.json` (`npm run kb -- client-holidays`, from `Holidays`, `HolidayNames` and
+  `HolidayDescriptions`): the name, the files' own description, how many hours it lasts and its starts (the client's
+  packed dates, read as every year, every week or a dated start, in server time). A holiday with no name is a
+  server-side helper and is left out. The descriptions are game text and stay on the pages.
+- Hunter pet families read `client-pet-families.json` (`npm run kb -- client-pet-families`, from `CreatureFamily`,
+  `SkillLineAbility` and `SpellName`): the families whose food mask names any food, with their icon file, their own
+  skill line and the spell ids on it, development helpers left out. The food mask itself is not published: the files
+  name no foods for its bits. Spell names follow the spell name rule on the pages.
+- Every page is labelled *found in game files, unconfirmed* with its build; no player report confirms either yet.
+  The family icons are the existing `familyIcons` in asset storage. None of it is in the API, the MCP server or the
+  bulk download.
 **Places in a zone and achievement categories.** *Proposed 2026-11-25 in the pull request that adds them (the
 maintainer review).* The rules:
 
@@ -982,6 +997,67 @@ data, not game data and not an observation.
   and a few more) cannot be taken.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
+
+## Comments
+
+*Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_COMMENTS=1`), a signed-in player
+can comment at the bottom of an item, quest, NPC, spell, zone or instance page. A comment is the player's own words,
+not game data and not an observation.
+
+- **Who can post.** Any signed-in Everloot account with a profile handle. A comment names its author by the handle
+  their profile has now, never the BattleTag, the account name or the email. Changing the handle changes the name on
+  every comment.
+- **What a comment holds.** The words (up to 2,000 characters, a little markup: bold, italic, code, spoiler tags and
+  links), the page it is on, its author's account, and when it was posted, edited, hidden or deleted. Links go only to
+  everloot.app and a short list of well-known WoW sites (Blizzard's, Wowhead, warcraft.wiki.gg, CurseForge). No images.
+- **Spoilers.** Anything that spoils a fight or a story goes behind a spoiler tag, which a reader opens on purpose.
+- **Shown at once, moderated after.** A comment shows as soon as it is posted. Signed-in players can report one, with a
+  reason and an optional note; a report is stored with the reporter's account so the same person cannot report a
+  comment twice, and moderators see the reasons and notes, never who reported. The owner and the moderators the
+  owner names hide reported comments. A hidden comment shows as "hidden by a moderator", with no words and no name,
+  and can be restored.
+- **Editing and deleting.** The author edits a comment for 15 minutes after posting and deletes it at any time. Deleting
+  wipes the words; the page keeps a one-line "deleted by its author" in its place.
+- **Limits.** 20 comments, 30 edits and 30 reports per account a day.
+- **Site only.** Comments are shown on their pages on everloot.app and nowhere else. They are not in the open data or
+  its licence, the API, the MCP server, chat answers, exports or sitemaps, and the pages load them in the browser, so
+  the cached page carries none. Authors keep the rights to their words and give Everloot a licence to show them on the
+  site (the [terms](https://everloot.app/terms#comments)).
+- **Deletion.** Deleting the account (write to hello@everloot.app) deletes its comments and its reports. The nightly
+  private backup holds comments as it holds the rest of the players' data.
+
+## Screenshots
+
+*Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_SCREENSHOTS=1`), a signed-in player can
+upload screenshots for an item, quest, NPC, spell, zone or instance page, in a gallery above the comments. A screenshot
+is the player's own picture of the game, not game data and not an observation.
+
+- **Who can upload.** Any signed-in Everloot account with a profile handle. The gallery credits the handle the
+  uploader's profile has now, never the BattleTag, the account name or the email.
+- **What is kept.** Not the file that was sent. The server reads it by its content (PNG, JPEG or WebP; anything else is
+  refused, whatever its name), has Cloudflare Images save a WebP copy at most 1920 px a side, keeps only that copy's
+  picture data (no EXIF, XMP, colour profile, camera, GPS position, date or editing app) and stores it in a private
+  bucket. The row beside it holds the page, the uploader's account, the copy's size in pixels and bytes, when it was
+  uploaded, approved, rejected or deleted, and which moderator decided.
+- **Nothing shows before review.** A new screenshot waits until a moderator (the comment moderators, any number) approves
+  it; until then only the uploader and the moderators can see it. Moderators reject anything that is not the player's
+  own game screenshot of the page's subject, anything showing chat, real names, other players' names or details that
+  identify a real person, and spoilers of unreleased content (the same rule as everywhere, "What we refuse"). An
+  approved screenshot can be taken down later.
+- **Limits.** 5 uploads per account a day, at most 10 waiting for review per account, 300 a day across the site; 8 MB per
+  file sent, 2,000,000 bytes per copy kept, 40 megapixels per picture.
+- **Deleting.** The uploader deletes their own at any time, waiting or shown; its files are removed and the row stays
+  as "deleted". A rejected screenshot's files are removed the same way. A page may keep showing a deleted or taken-down
+  picture for up to an hour where a browser or the edge cache already holds it.
+- **Site only.** Screenshots are shown on their pages on everloot.app and nowhere else. They are not in the open data or
+  its licence, the API, the MCP server, chat answers, exports or sitemaps, and search engines are asked not to index
+  them. The pages load the gallery in the browser, so the cached page carries none. Uploaders confirm the screenshot is
+  their own and give Everloot a licence to show it on the site (the [terms](https://everloot.app/terms#screenshots)).
+  The game art in a screenshot stays Blizzard's and is shown under the same fan-site terms as the other game art,
+  credited (`docs/ASSETS.md`).
+- **Deletion of the account.** Deleting the account (write to hello@everloot.app) deletes its screenshot rows; a file
+  without a row is never served, and the operator removes those files from the bucket
+  (`docs/2026-11-25-screenshots-activation.md`). The nightly private backup holds the rows, not the pictures.
 
 ## Public character pages
 

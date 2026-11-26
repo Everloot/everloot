@@ -27,6 +27,8 @@ import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
 import { writeClientItemSets } from "../client-item-sets.js";
 import { writeClientCollections } from "../client-collections.js";
+import { writeClientHolidays } from "../client-holidays.js";
+import { writeClientPetFamilies } from "../client-pet-families.js";
 import { writeClientPlaces } from "../client-places.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
@@ -103,6 +105,8 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));
         writeClientItemSets(snapshot, join(root, GAME_DATA_DIR, "client-item-sets.json"));
         writeClientCollections(snapshot, join(root, GAME_DATA_DIR, "client-collections.json"));
+        writeClientHolidays(snapshot, join(root, GAME_DATA_DIR, "client-holidays.json"));
+        writeClientPetFamilies(snapshot, join(root, GAME_DATA_DIR, "client-pet-families.json"));
         writeClientPlaces(snapshot, join(root, GAME_DATA_DIR, "client-places.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),
