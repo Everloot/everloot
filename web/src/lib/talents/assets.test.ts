@@ -151,8 +151,9 @@ const SHOWS_ART = new Set([
   // The spell list reads the spell names to list them, under the quest list's rule, and the icon its spell page shows. No tooltip.
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
-  // the item names only to know whether a category has enough to list. No art, no tooltip.
-  "web/src/app/database/(hub)/page.tsx",
+  // the item names only to know whether a category has enough to list; and its grid's card icons (map pins, class,
+  // profession, pet, currency and faction icons the manifest names), which database-home.ts picks. No tooltip.
+  "web/src/app/database/(hub)/page.tsx", "web/src/lib/database-home.ts",
   // The quest list's reward icons, under the item lists' rule (reported or wiki-named items only).
   "web/src/app/database/quests/page.tsx",
   // Chain quests read the same quest names as the quest list; no art or tooltip.
