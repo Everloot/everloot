@@ -284,6 +284,35 @@ describe("flight masters and flight lines from the taxi tables", () => {
   });
 });
 
+describe("whose territory a zone is, from AreaTable's FactionGroupMask", () => {
+  // The area each zone's whole-map assignment shows: 2 the Alliance's, 4 the Horde's, 0 neither side's.
+  const areaOf: Record<number, number> = { 1429: 12, 1411: 14, 2548: 16591 };
+  const withMasks = (masks: Record<number, number | undefined>): typeof tables => ({
+    ...tables,
+    UiMapAssignment: rows([...tables.UiMapAssignment!.values()].map((a) => ({ ...a, AreaID: areaOf[Number(a.UiMapID)] ?? 0 }))),
+    AreaTable: rows(Object.entries(masks).map(([ID, FactionGroupMask]) => ({ ID: Number(ID), ParentAreaID: 0, FactionGroupMask }))),
+  });
+  const sideOf = (t: typeof tables, uiMapId: number) => {
+    const d = buildWorldMapData((n) => t[n], source);
+    return [...d.zones, ...d.heldBackZones].find((z) => z.uiMapId === uiMapId)?.faction;
+  };
+
+  test("2 is the Alliance's, 4 the Horde's, 0 or both bits contested", () => {
+    expect(sideOf(withMasks({ 12: 2, 14: 4 }), 1429)).toBe("alliance");
+    expect(sideOf(withMasks({ 12: 2, 14: 4 }), 1411)).toBe("horde");
+    expect(sideOf(withMasks({ 12: 0 }), 1429)).toBe("contested");
+    expect(sideOf(withMasks({ 12: 6 }), 1429)).toBe("contested");
+    expect(sideOf(withMasks({ 16591: 4 }), 2548)).toBe("horde");
+  });
+
+  test("no area row, no mask, or no AreaTable gives no side, not a guess", () => {
+    expect(sideOf(withMasks({ 14: 4 }), 1429)).toBeUndefined();
+    expect(sideOf(withMasks({ 12: undefined }), 1429)).toBeUndefined();
+    expect(sideOf(tables, 1429)).toBeUndefined();
+    expect(data.zones.every((z) => !("faction" in z))).toBe(true);
+  });
+});
+
 describe("difficulty names and the difficulties an instance has, from Difficulty and MapDifficulty", () => {
   const diff = (ID: number, Name_lang: string, MinPlayers?: number, MaxPlayers?: number): Row => ({ ID, Name_lang, MinPlayers, MaxPlayers });
   const withDifficulties: typeof tables = {
@@ -354,7 +383,7 @@ describe("the committed map data", () => {
   test("carries no third-party data: only the fields the page uses, and no unused-map placeholders", () => {
     expect(committed.entrances.length).toBeGreaterThan(15);
     expect(committed.entrances.some((e) => /unused/i.test(e.name))).toBe(false);
-    expect(Object.keys(committed.zones[0]).sort()).toEqual(["bounds", "continentId", "name", "uiMapId"]);
+    expect(Object.keys(committed.zones[0]).sort()).toEqual(["bounds", "continentId", "faction", "name", "uiMapId"]);
   });
 
   test("flight masters and lines are there, on the continents, and every line joins two masters", () => {

@@ -10,7 +10,7 @@
     "version": "1.60.1.71139",
     "buildConfig": "7a16decda3672d84db0d34d0784fda98",
     "definitions": "8308f39154b5",
-    "extractedAt": "2026-11-25T21:58:41.560Z",
+    "extractedAt": "2026-11-26T02:52:56.022Z",
     "tables": [
       {
         "table": "Map",
@@ -101,7 +101,8 @@
         "top": 1808.3,
         "right": -7250,
         "bottom": -1716.7
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1412,
@@ -112,7 +113,8 @@
         "top": 266.7,
         "right": -3675,
         "bottom": -3835.4
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1413,
@@ -123,7 +125,8 @@
         "top": 1612.5,
         "right": -7510.4,
         "bottom": -5143.7
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1416,
@@ -134,7 +137,8 @@
         "top": 1500,
         "right": -2016.7,
         "bottom": -366.7
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1417,
@@ -145,7 +149,8 @@
         "top": -133.3,
         "right": -4466.7,
         "bottom": -2533.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1418,
@@ -156,7 +161,8 @@
         "top": -5889.6,
         "right": -4566.7,
         "bottom": -7547.9
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1419,
@@ -167,7 +173,8 @@
         "top": -10566.7,
         "right": -4591.7,
         "bottom": -12800
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1420,
@@ -178,7 +185,8 @@
         "top": 3837.5,
         "right": -1485.4,
         "bottom": 825
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1421,
@@ -189,7 +197,8 @@
         "top": 1666.7,
         "right": -750,
         "bottom": -1133.3
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1422,
@@ -200,7 +209,8 @@
         "top": 3366.7,
         "right": -3883.3,
         "bottom": 500
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1423,
@@ -211,7 +221,8 @@
         "top": 3691.7,
         "right": -6558.3,
         "bottom": 825
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1424,
@@ -222,7 +233,8 @@
         "top": 400,
         "right": -2133.3,
         "bottom": -1733.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1425,
@@ -233,7 +245,8 @@
         "top": 1466.7,
         "right": -5425,
         "bottom": -1100
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1426,
@@ -244,7 +257,8 @@
         "top": -3877.1,
         "right": -3122.9,
         "bottom": -7160.4
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1427,
@@ -255,7 +269,8 @@
         "top": -6100,
         "right": -2554.2,
         "bottom": -7587.5
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1428,
@@ -266,7 +281,8 @@
         "top": -7031.2,
         "right": -3195.8,
         "bottom": -8983.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1429,
@@ -277,7 +293,8 @@
         "top": -7939.6,
         "right": -1935.4,
         "bottom": -10254.2
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1430,
@@ -288,7 +305,8 @@
         "top": -9866.7,
         "right": -3333.3,
         "bottom": -11533.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1431,
@@ -299,7 +317,8 @@
         "top": -9716.7,
         "right": -1866.7,
         "bottom": -11516.7
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1432,
@@ -310,7 +329,8 @@
         "top": -4487.5,
         "right": -4752.1,
         "bottom": -6327.1
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1433,
@@ -321,7 +341,8 @@
         "top": -8575,
         "right": -3852.1,
         "bottom": -10022.9
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1434,
@@ -332,7 +353,8 @@
         "top": -11168.7,
         "right": -4160.4,
         "bottom": -15422.9
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1435,
@@ -343,7 +365,8 @@
         "top": -9620.8,
         "right": -4516.7,
         "bottom": -11150
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1436,
@@ -354,7 +377,8 @@
         "top": -9400,
         "right": -483.3,
         "bottom": -11733.3
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1437,
@@ -365,7 +389,8 @@
         "top": -2147.9,
         "right": -4525,
         "bottom": -4904.2
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1438,
@@ -376,7 +401,8 @@
         "top": 11831.3,
         "right": -1277.1,
         "bottom": 8437.5
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1439,
@@ -387,7 +413,8 @@
         "top": 8333.3,
         "right": -3608.3,
         "bottom": 3966.7
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1440,
@@ -398,7 +425,8 @@
         "top": 4672.9,
         "right": -4066.7,
         "bottom": 829.2
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1441,
@@ -409,7 +437,8 @@
         "top": -3966.7,
         "right": -4833.3,
         "bottom": -6900
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1442,
@@ -420,7 +449,8 @@
         "top": 2916.7,
         "right": -1637.5,
         "bottom": -339.6
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1443,
@@ -431,7 +461,8 @@
         "top": 452.1,
         "right": -262.5,
         "bottom": -2545.8
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1444,
@@ -442,7 +473,8 @@
         "top": -2366.7,
         "right": -1508.3,
         "bottom": -7000
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1445,
@@ -453,7 +485,8 @@
         "top": -2033.3,
         "right": -6225,
         "bottom": -5533.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1446,
@@ -464,7 +497,8 @@
         "top": -5875,
         "right": -7118.7,
         "bottom": -10475
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1447,
@@ -475,7 +509,8 @@
         "top": 5341.7,
         "right": -8347.9,
         "bottom": 1960.4
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1448,
@@ -486,7 +521,8 @@
         "top": 7133.3,
         "right": -4108.3,
         "bottom": 3300
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1449,
@@ -497,7 +533,8 @@
         "top": -5966.7,
         "right": -3166.7,
         "bottom": -8433.3
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1450,
@@ -508,7 +545,8 @@
         "top": 8491.7,
         "right": -3689.6,
         "bottom": 6952.1
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1451,
@@ -519,7 +557,8 @@
         "top": -5958.3,
         "right": -945.8,
         "bottom": -8281.2
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1452,
@@ -530,7 +569,8 @@
         "top": 8533.3,
         "right": -7416.7,
         "bottom": 3800
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 1453,
@@ -541,7 +581,8 @@
         "top": -7995.8,
         "right": -14.6,
         "bottom": -9154.2
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1454,
@@ -552,7 +593,8 @@
         "top": 2273.9,
         "right": -5083.2,
         "bottom": 1338.5
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1455,
@@ -563,7 +605,8 @@
         "top": -4569.2,
         "right": -1504.2,
         "bottom": -5096.8
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1456,
@@ -574,7 +617,8 @@
         "top": -850,
         "right": -527.1,
         "bottom": -1545.8
-      }
+      },
+      "faction": "horde"
     },
     {
       "uiMapId": 1457,
@@ -585,7 +629,8 @@
         "top": 10238.3,
         "right": 1880,
         "bottom": 9532.6
-      }
+      },
+      "faction": "alliance"
     },
     {
       "uiMapId": 1458,
@@ -596,7 +641,8 @@
         "top": 1877.9,
         "right": -86.2,
         "bottom": 1237.8
-      }
+      },
+      "faction": "horde"
     }
   ],
   "heldBackZones": [
@@ -609,7 +655,8 @@
         "top": 6304.2,
         "right": -4395.8,
         "bottom": 3989.6
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 2548,
@@ -620,7 +667,8 @@
         "top": -6466.7,
         "right": -6741.7,
         "bottom": -9700
-      }
+      },
+      "faction": "contested"
     },
     {
       "uiMapId": 2652,
@@ -631,7 +679,8 @@
         "top": -1900,
         "right": -25,
         "bottom": -3266.7
-      }
+      },
+      "faction": "contested"
     }
   ],
   "difficulties": {

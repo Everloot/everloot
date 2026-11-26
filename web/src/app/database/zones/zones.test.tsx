@@ -357,3 +357,80 @@ test("a zone page shows its map art as the header icon and its map in the map sl
   expect(plain.split("data-entity-header")[1]?.split("</header>")[0]).not.toContain("data-game-icon");
   expect(plain.split('class="entity-box')[1]).toContain("data-zone-preview");
 });
+
+// A zone page reads like a zone guide: whose land it is, the creature levels players agree on, and quick facts.
+const traits = (npcId: number, name: string, mapId: number, x: number, y: number, extra: Record<string, unknown>) =>
+  three(npcId, name, mapId, x, y).map((r) => ({ ...r, ...extra }));
+const sidedQuest = (questId: number, giverNpcId: number, level: number, faction: "alliance" | "horde") => installs.map((installId) => ({
+  kind: "quest", installId, eventId: `q:${installId}:${questId}`, capturedAt: "2026-10-10T00:00:00.000Z", questId, title: `Quest ${questId}`, level, giverNpcId, rewardItemIds: [], faction,
+}));
+
+test("the header says whose territory the game files make the zone, and the creature levels players agree on, labelled", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...traits(100, "Guard Orin", 1436, 40, 50, { level: 55, reaction: "friendly" }),
+    ...traits(101, "Defias Thug", 1436, 41, 51, { level: 11, reaction: "hostile" }),
+    ...traits(102, "Young Fleshripper", 1436, 42, 52, { level: 14, reaction: "neutral" }),
+  ]));
+  const header = (await html(ZonePage(props("1436-westfall")))).split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+  expect(header).toMatch(/text-faction-alliance[^>]*>Alliance territory</);
+  // The guard's 55 is a townsperson's level, not the zone's.
+  expect(header).toMatch(/Creatures 11–14(?:<[^>]*>)*\s*\(agreed NPC levels\)/);
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const contested = (await html(ZonePage(props("1434-stranglethorn-vale")))).split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+  expect(contested).toContain(">Contested territory<");
+  expect(contested).not.toContain("Creatures");
+});
+
+test("the quick facts link the zone's dungeons and flight masters from the game files, and count what players agreed on", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Guard Orin", 1436, 40, 50),
+    ...sidedQuest(7, 100, 12, "alliance"),
+  ]));
+  const page = await html(ZonePage(props("1436-westfall")));
+  const facts = page.split('data-slot="top"')[1]?.split("</section>")[0] ?? "";
+  expect(facts).toMatch(/Dungeons and raids<\/dt><dd[^>]*>(?:<[^>]*>)*Deadmines/);
+  expect(facts).toContain('href="/database/instances/36-deadmines"');
+  expect(facts).toMatch(/Flight masters<\/dt><dd[^>]*>(?:<[^>]*>)*Sentinel Hill, Westfall/);
+  expect(facts).toMatch(/NPCs<\/dt><dd[^>]*>(?:<[^>]*>)*1</);
+  expect(facts).toMatch(/Quests<\/dt><dd[^>]*>(?:<[^>]*>)*1</);
+  // Nothing agreed of a kind: no row for it, not a zero.
+  expect(facts).not.toContain(">Vendors<");
+  expect(facts).not.toContain(">Objects<");
+  // Stranglethorn's two Booty Bay masters, one per side, say which side each serves.
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const stv = (await html(ZonePage(props("1434-stranglethorn-vale")))).split('data-slot="top"')[1]?.split("</section>")[0] ?? "";
+  expect(stv).toMatch(/Booty Bay, Stranglethorn(?:<[^>]*>)*\s*\((?:<[^>]*>)*Alliance/);
+  expect(stv).toMatch(/Booty Bay, Stranglethorn(?:<[^>]*>)*\s*\((?:<[^>]*>)*Horde/);
+  expect(stv).not.toContain(">NPCs<");
+});
+
+test("the tabs open on Quests, each with its level and side in colour, then NPCs with their rank badge and level", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...traits(100, "Guard Orin", 1436, 40, 50, { level: 55, reaction: "friendly" }),
+    ...traits(103, "Old Murk-Eye", 1436, 30, 30, { level: 20, reaction: "hostile", rank: "elite" }),
+    ...sidedQuest(7, 100, 12, "alliance"),
+  ]));
+  const page = await html(ZonePage(props("1436-westfall")));
+  const tabs = [...page.matchAll(/role="tab"[^>]*>(?:<[^>]*>)*([A-Za-z ]+)/g)].map((m) => m[1].trim());
+  expect(tabs.slice(0, 2)).toEqual(["Quests", "NPCs"]);
+  const quests = page.split('data-tab-panel="quests"')[1]?.split("data-tab-panel")[0] ?? "";
+  expect(quests).toMatch(/text-faction-alliance[^>]*>Alliance</);
+  expect(quests).toMatch(/>12</);
+  // The giver stands in the zone, so its agreed name is the link's text, not its id.
+  expect(quests).toMatch(/href="\/database\/npcs\/100"[^>]*>Guard Orin</);
+  const npcs = page.split('data-tab-panel="npcs"')[1]?.split("data-tab-panel")[0] ?? "";
+  expect(npcs).toMatch(/Old Murk-Eye(?:<[^>]*>)*\s*(?:<[^>]*>)*Elite/);
+  expect(npcs).toMatch(/>20</);
+  // A normal NPC gets no badge.
+  expect(npcs.match(/data-badge="neutral"/g)).toHaveLength(1);
+});
+
+test("farming and gathering links sit in the quick facts", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Guard Orin", 1436, 40, 50),
+    ...installs.map((i) => loot(i, { npc: 100 }, [750])),
+  ]));
+  const facts = (await html(ZonePage(props("1436-westfall")))).split('data-slot="top"')[1]?.split("</section>")[0] ?? "";
+  expect(facts).toContain("Farming and gathering");
+  expect(facts).toContain('href="/tools/farming-routes"');
+});

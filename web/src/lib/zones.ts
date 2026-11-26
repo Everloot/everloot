@@ -1,7 +1,7 @@
 import { placeEntrances, worldToZone, zoneAt, zoneTable, zoneToWorld, type WorldPoint } from "@kb/world-coords";
 import type { WorldMapData } from "@kb/world-map-data";
 import { observedPins } from "@kb/world-map-near";
-import { questPage, type WorldFacts } from "@kb/world-pages";
+import { npcTraits, questPage, questTraits, type NpcRank, type NpcReaction, type NpcSightingRow, type QuestSide, type WorldFacts } from "@kb/world-pages";
 import { confirmedEntrances, instanceBosses, type InstanceBoss, type InstanceFacts } from "@kb/instances";
 import { objectSpawns, type ObjectSpawnPin, type ObjectSpawnRow } from "@kb/object-spawns";
 import { slugify } from "@kb/lore-slug";
@@ -28,25 +28,38 @@ export function parseZoneSegment(segment: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-export interface ZoneSummary { mapId: number; name: string; continentId: number; continentName: string }
+/** `faction`: whose territory the game files say the zone is (AreaTable); absent when they give none. */
+export interface ZoneSummary { mapId: number; name: string; continentId: number; continentName: string; faction?: ZoneFaction }
+export type ZoneFaction = NonNullable<WorldMapData["zones"][number]["faction"]>;
 
 /**
  * The zones the site shows: the released ones only. A zone found only in the game files (UiMap id above
  * 1458, kept in `heldBackZones`) never gets a page or a line in the index, as on the map without spoilers.
  */
 export function publicZones(data: Pick<WorldMapData, "zones" | "continents"> = WORLD_MAP): ZoneSummary[] {
-  return zoneTable(data).map((z) => ({
-    mapId: z.mapId, name: z.name, continentId: z.continentId,
-    continentName: data.continents.find((c) => c.id === z.continentId)?.name ?? `Continent ${z.continentId}`,
-  }));
+  return zoneTable(data).map((z) => {
+    const faction = data.zones.find((row) => row.uiMapId === z.mapId)?.faction;
+    return {
+      mapId: z.mapId, name: z.name, continentId: z.continentId,
+      continentName: data.continents.find((c) => c.id === z.continentId)?.name ?? `Continent ${z.continentId}`,
+      ...(faction ? { faction } : {}),
+    };
+  });
+}
+
+/** The flight masters the game files put in a zone (TaxiNodes, placed by the ground under them), by name. */
+export function zoneFlightMasters(mapId: number, data: Pick<WorldMapData, "flightNodes"> = WORLD_MAP): WorldMapData["flightNodes"] {
+  return data.flightNodes.filter((n) => n.uiMapId === mapId).sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
 }
 
 export function zoneByMapId(mapId: number, data: Pick<WorldMapData, "zones" | "continents"> = WORLD_MAP): ZoneSummary | undefined {
   return publicZones(data).find((z) => z.mapId === mapId);
 }
 
-export interface ZoneNpc { npcId: number; name: string | null; x: number; y: number; reporters: number; vendor: boolean }
-export interface ZoneQuest { questId: number; title: string | null; level: number | null; giverNpcId: number | null; turnInNpcId: number | null }
+/** `level`, `rank` and `reaction`: what 3 installs agree on for the NPC, else null. */
+export interface ZoneNpc { npcId: number; name: string | null; x: number; y: number; reporters: number; vendor: boolean; level: number | null; rank: NpcRank | null; reaction: NpcReaction | null }
+/** `side`: the side 3 installs agree the quest is offered to, else null. */
+export interface ZoneQuest { questId: number; title: string | null; level: number | null; giverNpcId: number | null; turnInNpcId: number | null; side: QuestSide | null }
 /**
  * A dungeon or raid entrance. `files` is true for one the game files place; `confirmed` is the installs that zoned
  * in there, once 3 agree, else null, and `lastSeen` the latest time one did; `bosses` are the encounters 3 installs
@@ -135,10 +148,15 @@ export function zoneContents(
   const out = new Map<number, ZoneContents>(zones.map((z) => [z.mapId, { npcs: [], quests: [], entrances: [], treasures: [] }]));
 
   const npcsHere = new Map<number, Set<number>>();
+  // The site stores the agreed table (agreedNpcs); without it, the raw sightings give the same answer.
+  const rowsOf = new Map<number, NpcSightingRow[]>();
+  if (!facts.agreedNpcs) for (const r of facts.npcs) rowsOf.set(r.npcId, [...(rowsOf.get(r.npcId) ?? []), r]);
+  const traitsOf = (npcId: number) => facts.agreedNpcs?.get(npcId) ?? npcTraits(rowsOf.get(npcId) ?? [], facts.recheck);
   for (const pin of observedPins(facts, data)) {
     const here = out.get(pin.mapId);
     if (!here) continue;
-    here.npcs.push({ npcId: pin.npcId, name: pin.name, x: pin.x, y: pin.y, reporters: pin.reporters, vendor: pin.kind === "vendor" });
+    const { level, rank, reaction } = traitsOf(pin.npcId);
+    here.npcs.push({ npcId: pin.npcId, name: pin.name, x: pin.x, y: pin.y, reporters: pin.reporters, vendor: pin.kind === "vendor", level, rank, reaction });
     npcsHere.set(pin.mapId, (npcsHere.get(pin.mapId) ?? new Set()).add(pin.npcId));
   }
 
@@ -146,9 +164,11 @@ export function zoneContents(
   for (const q of facts.quests) byQuest.set(q.questId, [...(byQuest.get(q.questId) ?? []), q]);
   for (const [questId, rows] of byQuest) {
     const q = questPage(questId, { npcs: facts.npcs, quests: rows, vendors: [], recheck: facts.recheck, ...(facts.agreedNpcs ? { agreedNpcs: facts.agreedNpcs } : {}) });
+    let side: QuestSide | null | undefined;
     for (const [mapId, npcs] of npcsHere) {
       if ((q.giverNpcId !== null && npcs.has(q.giverNpcId)) || (q.turnInNpcId !== null && npcs.has(q.turnInNpcId))) {
-        out.get(mapId)!.quests.push({ questId, title: q.title, level: q.level, giverNpcId: q.giverNpcId, turnInNpcId: q.turnInNpcId });
+        side ??= questTraits(rows, facts).side;
+        out.get(mapId)!.quests.push({ questId, title: q.title, level: q.level, giverNpcId: q.giverNpcId, turnInNpcId: q.turnInNpcId, side });
       }
     }
   }
@@ -172,6 +192,15 @@ export function zoneContents(
     here.treasures.sort((a, b) => a.objectId - b.objectId || a.x - b.x || a.y - b.y);
   }
   return out;
+}
+
+/**
+ * The lowest and highest level 3 installs agree on among the zone's NPCs that are not friendly (the creatures players
+ * fight there, not its guards and townsfolk), or null when none has one. Player data, not the game files' range.
+ */
+export function creatureLevels(npcs: readonly Pick<ZoneNpc, "level" | "reaction">[]): { min: number; max: number } | null {
+  const levels = npcs.filter((n) => n.level !== null && n.reaction !== null && n.reaction !== "friendly").map((n) => n.level!);
+  return levels.length ? { min: Math.min(...levels), max: Math.max(...levels) } : null;
 }
 
 /** Players' reports or the game files put something on the page beyond the zone's name. */
