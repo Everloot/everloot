@@ -1,32 +1,38 @@
 // The parts of upload-game-assets.mjs that decide things, kept apart so they are tested without a bucket.
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 export const USAGE = [
   "usage: node scripts/upload-game-assets.mjs <asset folder> [--dry-run] [--skip-items]",
   "   or: node scripts/upload-game-assets.mjs --snapshot <snapshot.sqlite> [--dry-run] [--skip-items]",
+  "   or: node scripts/upload-game-assets.mjs --renders <renders build folder> [--folder=<live build folder>] [--dry-run]",
 ].join("\n");
 
 /** Reads the arguments. A flag is never taken for a path: `--snapshot --dry-run` is an error, not a file called "--dry-run". */
 export function parseUploadArgs(argv) {
-  const out = { dry: false, skipItems: false, snapshot: null, folder: null, error: null };
+  const out = { dry: false, skipItems: false, snapshot: null, folder: null, renders: null, live: null, error: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") out.dry = true;
     else if (a === "--skip-items") out.skipItems = true;
-    else if (a === "--snapshot" || a.startsWith("--snapshot=")) {
+    else if (a.startsWith("--folder=")) out.live = a.slice("--folder=".length);
+    else if (a === "--snapshot" || a.startsWith("--snapshot=") || a === "--renders" || a.startsWith("--renders=")) {
+      const key = a.startsWith("--snapshot") ? "snapshot" : "renders";
       const value = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[i + 1];
-      if (!value || value.startsWith("--")) return { ...out, error: "--snapshot needs the path of a snapshot file" };
-      out.snapshot = value;
+      if (!value || value.startsWith("--")) return { ...out, error: key === "snapshot" ? "--snapshot needs the path of a snapshot file" : "--renders needs the path of a renders build folder" };
+      out[key] = value;
       if (!a.includes("=")) i++;
     } else if (a.startsWith("--")) return { ...out, error: `unknown option ${a}` };
     else if (out.folder) return { ...out, error: `one folder only, not also ${a}` };
     else out.folder = a;
   }
-  if (out.snapshot && out.folder) return { ...out, error: "give a snapshot or a folder, not both" };
-  if (!out.snapshot && !out.folder) return { ...out, error: "nothing to upload" };
+  if ([out.snapshot, out.folder, out.renders].filter(Boolean).length > 1) {
+    return { ...out, error: out.renders ? "give one of a snapshot, a folder or --renders" : "give a snapshot or a folder, not both" };
+  }
+  if (out.live !== null && !out.renders) return { ...out, error: "--folder goes with --renders" };
+  if (!out.snapshot && !out.folder && !out.renders) return { ...out, error: "nothing to upload" };
   return out;
 }
 
@@ -34,6 +40,44 @@ export function parseUploadArgs(argv) {
 export const isPublicFile = (rel) => rel === "manifest.json" || (/\.webp$/.test(rel) && !rel.startsWith("items/"));
 /** The private bucket gets the item index and its shards only. */
 export const isPrivateFile = (rel) => rel === "items.json" || /^items\/\d+\.json$/.test(rel);
+
+/** Model pictures: hash-named WebP files in the bucket's shared `renders/` folder (`npm run kb -- client-renders`). */
+export const isRenderFile = (rel) => /^renders\/[0-9a-f]{32}\.webp$/.test(rel);
+
+/**
+ * What is wrong with a renders build folder (`<out>/<build folder>/` with renders.json and checksums.json; the
+ * pictures are in `<out>/renders/`), the build folder renders.json goes to, and the pictures to send. Every picture
+ * renders.json names must be listed, present, unchanged and a hash-named WebP. `live` (--folder) may name a
+ * re-extract of the same build (`<build folder>-2`), never another build's folder.
+ * @param {string} root
+ * @param {any} manifest renders.json
+ * @param {any} checksums checksums.json beside it
+ * @param {string | null} [live]
+ */
+export function rendersCheck(root, manifest, checksums, live = null) {
+  const problems = [];
+  if (manifest?.schema !== "everloot.game-renders/1") problems.push(`renders.json has schema ${manifest?.schema}, expected everloot.game-renders/1`);
+  const built = basename(root);
+  const prefix = live === null ? built : /^[A-Za-z0-9_.-]+$/.test(live) && (live === built || live.startsWith(`${built}-`)) ? live : null;
+  if (prefix === null) problems.push(`--folder ${live} is not a folder of build ${built}`);
+  const listed = new Map(Object.entries(checksums?.files ?? {}).map(([f, s]) => [f, s.sha256]));
+  const named = new Set([...Object.values(manifest?.creatureDisplays ?? {}), ...Object.values(manifest?.itemDisplays ?? {})]);
+  for (const f of named) if (!listed.has(f)) problems.push(`named in renders.json but not listed: ${f}`);
+  const out = dirname(root);
+  for (const [f, hash] of listed) {
+    if (!isRenderFile(f)) problems.push(`may not go to this bucket: ${f}`);
+    if (!existsSync(join(out, f))) problems.push(`missing: ${f}`);
+    else if (sha(join(out, f)) !== hash) problems.push(`hash differs: ${f}`);
+  }
+  return { prefix, files: [...listed.keys()].filter(isRenderFile).sort(), problems };
+}
+
+/** The pictures the bucket does not hold yet. A picture's name is the hash of what made it, so one already there is the same picture. */
+export async function missingRemote(files, exists) {
+  const out = [];
+  for (const f of files) if (!(await exists(f))) out.push(f);
+  return out;
+}
 
 export function walk(base, prefix = "") {
   return readdirSync(join(base, prefix)).flatMap((name) => {

@@ -44,6 +44,7 @@ import { CASC_LIBRARY, extractTables, iconIds, NOT_IN_BUILD, openCdn, pinDefinit
 import { readTerrainAreas } from "./terrain-area.js";
 import { writeCatalogs } from "./client-catalog.js";
 import { buildClientAssets } from "./client-assets.js";
+import { buildClientRenders } from "./client-renders.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
 import { OPEN_DATA_KINDS } from "./open-data/build.js";
 import { readOpenDataGameFiles } from "./open-data/game-data.js";
@@ -166,6 +167,12 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     <out>/<product>-<build>-<config>/ with manifest.json and checksums.json (public bucket), and the item tooltip
     facts into <out>/<product>-<build>-<config>-private/ (private bucket only). Needs Python with Pillow. Never
     commit the output; see docs/ASSETS.md)
+  client-renders <snapshot.sqlite> --npcs <id list> --items <id list> [--out data/renders]
+    (still pictures of creature and item models, drawn from unencrypted model, skin and texture files of the
+    snapshot's build, for the NPCs the site lists and the items 3 installs reported only: the id lists come from
+    the site's gates (web/scripts/render-ids.mts). Pictures go to <out>/renders/<hash>.webp, shared by all builds;
+    <out>/<product>-<build>-<config>/ gets renders.json and checksums.json. Needs Python with Pillow. Never
+    commit the output; see docs/ASSETS.md, "Model pictures")
   client-diff <old.sqlite> <new.sqlite> [--out diff.json]   (field-level diff of two snapshots)
   recheck-scopes <diff.json> --since <ISO time> --source <build or post url> [--root ..]
     (adds recheck scopes to kb/curated/recheck.json from a client-diff: changed QuestV2 rows put their quests to
@@ -875,6 +882,28 @@ async function main(): Promise<number> {
       // Printed before the public folder line: the upload script reads both.
       if (run.privateDir) console.log(`private -> ${run.privateDir}`);
       if (run.manifest.missingFrames.length) console.log(`frame pieces not available: ${run.manifest.missingFrames.join(", ")}`);
+      console.log(`-> ${run.dir}`);
+      return 0;
+    }
+    case "client-renders": {
+      if (!args[0]) break;
+      const npcsFile = flags.get("npcs"), itemsFile = flags.get("items");
+      if (!npcsFile && !itemsFile) {
+        console.error("client-renders draws only what the site's gates list: give --npcs and/or --items (web/scripts/render-ids.mts writes them)");
+        return 1;
+      }
+      const meta = readClientMeta(args[0]);
+      const { build, source } = await openCdn(meta.product);
+      if (build.buildConfig !== meta.buildConfig) {
+        console.error(`the snapshot is build ${meta.version} but the CDN now serves ${build.version}; run client-extract first, or the pictures would not match the snapshot`);
+        return 1;
+      }
+      const ids = (file: string | undefined) => new Set(file ? parseItemIds(readFileSync(file, "utf8")) : []);
+      const started = Date.now();
+      const run = await buildClientRenders({ snapshotPath: args[0], outDir: flags.get("out") || "data/renders", source, gates: { npcs: ids(npcsFile), items: ids(itemsFile) } });
+      for (const n of run.notes) console.log(n);
+      for (const s of run.manifest.skipped.slice(0, 10)) console.log(`skipped: ${s}`);
+      console.log(`time: ${((Date.now() - started) / 1000).toFixed(0)} s`);
       console.log(`-> ${run.dir}`);
       return 0;
     }

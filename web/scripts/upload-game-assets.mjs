@@ -3,6 +3,10 @@
 //
 //   node scripts/upload-game-assets.mjs <kb/data/assets/<build>> [--dry-run] [--skip-items]
 //   node scripts/upload-game-assets.mjs --snapshot <kb/data/client/<build>.sqlite> [--dry-run] [--skip-items]
+//   node scripts/upload-game-assets.mjs --renders <kb/data/renders/<build>> [--folder=<live build folder>] [--dry-run]
+//
+// --renders uploads model pictures (`npm run kb -- client-renders`): the pictures to the public bucket's shared
+// renders/ folder, only those it does not hold yet, then renders.json to the build folder.
 //
 // With --snapshot it first runs the extraction (`client-assets` in kb/, which needs Python with Pillow)
 // and then uploads what it wrote: one command for the talent art, the item, class, buff and profession
@@ -30,10 +34,10 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AwsClient } from "aws4fetch";
-import { folderProblems, isPrivateFile, isPublicFile, parseUploadArgs, uploadOrder, USAGE, withRetry } from "./game-assets-upload.mjs";
+import { folderProblems, isPrivateFile, isPublicFile, missingRemote, parseUploadArgs, rendersCheck, uploadOrder, USAGE, withRetry } from "./game-assets-upload.mjs";
 
 const opts = parseUploadArgs(process.argv.slice(2));
 if (opts.error) fail(`${opts.error}\n${USAGE}`);
@@ -54,6 +58,61 @@ function extract(snapshotPath) {
   const out = /^-> (.+)$/m.exec(run.stdout ?? "")?.[1]?.trim();
   if (!out) fail("The extraction did not say where it wrote the files; nothing uploaded.");
   return resolve(kb, out);
+}
+
+if (opts.renders) {
+  await uploadRenders(resolve(opts.renders));
+  process.exit(0);
+}
+
+/**
+ * Model pictures (`npm run kb -- client-renders`): the hash-named pictures go to the public bucket's shared
+ * `renders/` folder, each only if the bucket does not hold it yet (a name is the hash of what made the picture),
+ * then renders.json to the build folder, last.
+ */
+async function uploadRenders(root) {
+  if (!existsSync(join(root, "renders.json")) || !existsSync(join(root, "checksums.json"))) fail(`${root} has no renders.json and checksums.json; run client-renders first.`);
+  const manifest = JSON.parse(readFileSync(join(root, "renders.json"), "utf8"));
+  const sums = JSON.parse(readFileSync(join(root, "checksums.json"), "utf8"));
+  const check = rendersCheck(root, manifest, sums, opts.live);
+  if (check.problems.length) fail(`The renders folder does not match its list, nothing uploaded:\n${check.problems.slice(0, 20).join("\n")}`);
+  const c = manifest.counts;
+  console.log(`Renders: ${check.files.length} pictures for build ${manifest.build.version} (${Object.keys(manifest.creatureDisplays).length} creature and ${Object.keys(manifest.itemDisplays).length} item displays) -> <public bucket>/renders/, renders.json -> <public bucket>/${check.prefix}/`);
+  console.log(`         ${c.made} drawn this run, ${c.reused} reused; skipped ${c.encrypted} encrypted, ${c.absent} not in build, ${c.failed} failed`);
+  if (opts.dry) { console.log("Dry run, nothing sent. A real run first asks the bucket which pictures it already holds and sends only the others."); process.exit(0); }
+  const need = ["ASSETS_S3_ENDPOINT", "ASSETS_BUCKET", "ASSETS_ACCESS_KEY_ID", "ASSETS_SECRET_ACCESS_KEY"];
+  const missing = need.filter((k) => !process.env[k]);
+  if (missing.length) fail(`Set ${missing.join(", ")} in the environment first.`);
+  const bucket = process.env.ASSETS_BUCKET;
+  const client = new AwsClient({ accessKeyId: process.env.ASSETS_ACCESS_KEY_ID, secretAccessKey: process.env.ASSETS_SECRET_ACCESS_KEY, service: "s3", region: process.env.ASSETS_REGION || "auto" });
+  const endpoint = process.env.ASSETS_S3_ENDPOINT.replace(/\/+$/, "");
+  const out = dirname(root);
+  const send = async (key, path, type, cache) => {
+    try {
+      await withRetry(async () => {
+        const res = await client.fetch(`${endpoint}/${bucket}/${key}`, { method: "PUT", headers: { "content-type": type, "cache-control": cache }, body: readFileSync(path) });
+        if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+      });
+    } catch (e) {
+      fail(`Upload of ${key} failed after 4 tries: ${e.message}`);
+    }
+  };
+  const held = async (key) => {
+    const res = await withRetry(async () => {
+      const r = await client.fetch(`${endpoint}/${bucket}/${key}`, { method: "HEAD" });
+      if (r.status !== 200 && r.status !== 404) throw new Error(`HEAD ${key}: ${r.status}`);
+      return r;
+    });
+    return res.status === 200;
+  };
+  const todo = await missingRemote(check.files, held);
+  console.log(`${check.files.length - todo.length} already in the bucket, ${todo.length} to send.`);
+  const queue = [...todo];
+  await Promise.all(Array.from({ length: 8 }, async () => {
+    for (let f = queue.shift(); f !== undefined; f = queue.shift()) await send(f, join(out, f), "image/webp", "public, max-age=31536000, immutable");
+  }));
+  await send(`${check.prefix}/renders.json`, join(root, "renders.json"), "application/json", "public, max-age=300");
+  console.log(`Done. The site reads ${check.prefix}/renders.json beside manifest.json.`);
 }
 
 const root = opts.snapshot ? extract(opts.snapshot) : resolve(opts.folder);
