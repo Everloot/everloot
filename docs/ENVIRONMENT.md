@@ -110,6 +110,7 @@ one is not recorded here.
 | `EVERLOOT_ARMORY` | `web/src/lib/armory.ts` | The armory pages from Blizzard data | Switch |
 | `EVERLOOT_ARMORY_LOOKUP` | `web/src/lib/armory-lookup.ts` | `1` lets /search look up a full name nobody stored in Blizzard's character API (needs `EVERLOOT_ARMORY=1`, the BNET client and `20261117150000_armory_lookup.sql` applied) | Switch, off by default |
 | `EVERLOOT_GUIDE_SUBMISSIONS` | `web/src/lib/guide-submissions.ts` | Guide submissions from signed-in players; needs `EVERLOOT_PROFILES` | Switch |
+| `EVERLOOT_SCREENSHOTS` | `web/src/lib/screenshots.ts` | `1` turns on player screenshots on item, quest, NPC, spell, zone and instance pages and the moderation page `/ops/screenshots`; needs `EVERLOOT_PROFILES`, `20261125140000_entity_screenshots.sql` applied and the Worker's `SCREENSHOTS` (R2) and `IMAGES` (Cloudflare Images) bindings (docs/2026-11-25-screenshots-activation.md) | Switch, off by default |
 | `EVERLOOT_COMMENTS` | `web/src/lib/comments.ts` | `1` turns on comments on item, quest, NPC, spell, zone and instance pages and the moderation page `/ops/comments`; needs `EVERLOOT_PROFILES` and `20261125130000_entity_comments.sql` applied (docs/2026-11-25-comments-activation.md) | Switch, off by default |
 | `EVERLOOT_PLAYER_PAGES_INDEX` | `web/src/lib/player-pages.ts` | Character pages drop `noindex` | Switch |
 | `EVERLOOT_GUILDS_INDEX` | `web/src/lib/guild-switch.ts` | Guild pages drop `noindex` | Switch |

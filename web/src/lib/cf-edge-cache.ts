@@ -50,6 +50,11 @@ export function isPrivatePath(pathname: string): boolean {
  * spelling this does not match keeps its credentials and bypasses the cache, as before.
  */
 const CREDENTIAL_FREE_PATH = /^\/(?:database\/)?card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
+/**
+ * An approved player screenshot's file (app/screenshots/file/[id]): the route reads no session and serves only what the
+ * database calls approved, so it drops credentials like the cards, and every visitor shares the one edge copy.
+ */
+const SCREENSHOT_FILE_PATH = /^\/screenshots\/file\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * The public Auction House pages read only the market rollup, its stored history and item names: no cookie, no
@@ -71,7 +76,7 @@ function credentialFreeAuctionPath(pathname: string): boolean {
 export function withoutCredentials(req: Request): Request {
   if (req.method !== "GET" || !(req.headers.has("cookie") || req.headers.has("authorization"))) return req;
   const pathname = new URL(req.url).pathname;
-  if (!CREDENTIAL_FREE_PATH.test(pathname) && !credentialFreeAuctionPath(pathname)) return req;
+  if (!CREDENTIAL_FREE_PATH.test(pathname) && !SCREENSHOT_FILE_PATH.test(pathname) && !credentialFreeAuctionPath(pathname)) return req;
   const headers = new Headers(req.headers);
   headers.delete("cookie");
   headers.delete("authorization");

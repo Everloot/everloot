@@ -995,6 +995,39 @@ not game data and not an observation.
 - **Deletion.** Deleting the account (write to hello@everloot.app) deletes its comments and its reports. The nightly
   private backup holds comments as it holds the rest of the players' data.
 
+## Screenshots
+
+*Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_SCREENSHOTS=1`), a signed-in player can
+upload screenshots for an item, quest, NPC, spell, zone or instance page, in a gallery above the comments. A screenshot
+is the player's own picture of the game, not game data and not an observation.
+
+- **Who can upload.** Any signed-in Everloot account with a profile handle. The gallery credits the handle the
+  uploader's profile has now, never the BattleTag, the account name or the email.
+- **What is kept.** Not the file that was sent. The server reads it by its content (PNG, JPEG or WebP; anything else is
+  refused, whatever its name), has Cloudflare Images save a WebP copy at most 1920 px a side, keeps only that copy's
+  picture data (no EXIF, XMP, colour profile, camera, GPS position, date or editing app) and stores it in a private
+  bucket. The row beside it holds the page, the uploader's account, the copy's size in pixels and bytes, when it was
+  uploaded, approved, rejected or deleted, and which moderator decided.
+- **Nothing shows before review.** A new screenshot waits until a moderator (the comment moderators, any number) approves
+  it; until then only the uploader and the moderators can see it. Moderators reject anything that is not the player's
+  own game screenshot of the page's subject, anything showing chat, real names, other players' names or details that
+  identify a real person, and spoilers of unreleased content (the same rule as everywhere, "What we refuse"). An
+  approved screenshot can be taken down later.
+- **Limits.** 5 uploads per account a day, at most 10 waiting for review per account, 300 a day across the site; 8 MB per
+  file sent, 2,000,000 bytes per copy kept, 40 megapixels per picture.
+- **Deleting.** The uploader deletes their own at any time, waiting or shown; its files are removed and the row stays
+  as "deleted". A rejected screenshot's files are removed the same way. A page may keep showing a deleted or taken-down
+  picture for up to an hour where a browser or the edge cache already holds it.
+- **Site only.** Screenshots are shown on their pages on everloot.app and nowhere else. They are not in the open data or
+  its licence, the API, the MCP server, chat answers, exports or sitemaps, and search engines are asked not to index
+  them. The pages load the gallery in the browser, so the cached page carries none. Uploaders confirm the screenshot is
+  their own and give Everloot a licence to show it on the site (the [terms](https://everloot.app/terms#screenshots)).
+  The game art in a screenshot stays Blizzard's and is shown under the same fan-site terms as the other game art,
+  credited (`docs/ASSETS.md`).
+- **Deletion of the account.** Deleting the account (write to hello@everloot.app) deletes its screenshot rows; a file
+  without a row is never served, and the operator removes those files from the bucket
+  (`docs/2026-11-25-screenshots-activation.md`). The nightly private backup holds the rows, not the pictures.
+
 ## Public character pages
 
 A signed-in player who has linked one of their characters (Linked characters, on /account) can give it a public
