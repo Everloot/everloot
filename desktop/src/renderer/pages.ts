@@ -613,9 +613,9 @@ export function market(s: AppState, v: View): string {
     <section class="panel"><div class="row between"><h2>Price file for the add-on</h2><span class="muted small">${j.state === "ok" && j.at && last.length ? `Last successful refresh ${when(j.at)}` : ""}</span></div>
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
       ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td>${esc(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
-        : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td>${houseCell(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
+        : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td>${houseCell(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">Price file on disk. No refresh for this installation in this session.</p>`
         : emptyState(marketWritten, icon("market"))}
-      <p class="muted small"><strong>Verify in WoW.</strong> Run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Check the house and price date in the result.</p>
+      <p class="muted small"><strong>Verify in WoW.</strong> After a refresh, run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Compare the house and observation day in the Everloot market result with the lookup above.</p>
     </section>
   </div>`;
 }

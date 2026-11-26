@@ -11,8 +11,8 @@ export interface AddonRelease {
  * Whether the addon has been checked in the live Forever client. Only a person who ran it there can say so, so this
  * is flipped by hand, never by date; the home page and the addon page both read it.
  */
-// The owner confirmed the 0.3.30 release archive displays the Transmute: Arcanite reagent breakdown in WoW: Forever.
-export const ADDON_LIVE_VERIFIED = true;
+// Stable release 0.3.31 awaits an in-game check of its exact archive.
+export const ADDON_LIVE_VERIFIED = false;
 
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;
 

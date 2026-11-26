@@ -29,6 +29,14 @@ test("a file summary counts records per kind, asks, scan realms and confirmed ev
   expect(JSON.stringify(s)).not.toContain("sourceNpcId");
 });
 
+test("a full scan saved by the add-on has a usable freshness time", () => {
+  const at = "2026-10-18T18:00:00.000Z";
+  const saved = SV.replace('"2026-10-18T00:00:00Z" } } }', `${Date.parse(at) / 1000} } } }`);
+  const { scans } = summarizeSavedVariables(saved, () => 0);
+  expect(scans).toEqual([{ realm: "Nightslayer", at }]);
+  expect(staleScans(scans, Date.parse("2026-10-19T06:00:00Z"))).toEqual([]);
+});
+
 test("a damaged file reports the parser's reason instead of counts", () => {
   const s = summarizeSavedVariables("EverlootDB = { version = ", () => 0);
   expect(s.ok).toBe(false);

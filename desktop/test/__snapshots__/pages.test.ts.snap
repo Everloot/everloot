@@ -214,7 +214,7 @@ exports[`market > populated 1`] = `
     <section class="panel"><div class="row between"><h2>Price file for the add-on</h2><span class="muted small"></span></div>
       
       <div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody><tr><td>Doomhowl</td><td>Alliance</td><td class="num">1200</td><td>2026-10-20T06:00:00Z</td><td class="muted">your scans</td></tr></tbody></table></div>
-      <p class="muted small"><strong>Verify in WoW.</strong> Run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Check the house and price date in the result.</p>
+      <p class="muted small"><strong>Verify in WoW.</strong> After a refresh, run <code>/reload</code>, then try <code>/everloot price 2589</code> for Linen Cloth or use an item quoted for your realm and house. Compare the house and observation day in the Everloot market result with the lookup above.</p>
     </section>
   </div>"
 `;

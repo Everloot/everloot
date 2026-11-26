@@ -383,6 +383,7 @@ local function finish()
   end
   if s.character then
     saveLocalScan(s)
+    if E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting) end
     return say(string.format("scanned %d items. The game did not identify the realm, so this scan stays on this character.", #ids))
   end
   table.sort(ids)
@@ -419,6 +420,7 @@ local function finish()
   EverlootDB.lastScans = EverlootDB.lastScans or {}
   EverlootDB.lastScans[s.realm] = { scanId = scanId, at = s.startedAt }
   E.ownScanCache = nil
+  if E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting) end
   return say(string.format("scanned %d items on %s (%d rows skipped, %d not loaded). Upload with the Everloot Desktop App or at everloot.app/upload.",
     #ids, s.realm, s.skipped, s.incomplete))
 end

@@ -283,7 +283,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
-- Addon: Crafting Costs highlights the selected recipe and shopping result, auction lists show price caps, and Settings previews tooltip choices. Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
+- Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
+- Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
 
 ### Changed
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
@@ -699,6 +700,22 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - Refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
+
+## [0.3.31] - 2026-11-26
+
+Select a recipe in WoW: Forever's Professions window to see its materials cost and estimated profit per craft. Open Details for reagent quotes, expected output and the auction-house cut.
+
+### Added
+
+- A full scan from the same auction house can refresh the recipe estimate while it is open. Details identifies the source and age of the quotes and shows the finished item's listed units and lowest buyout when the scan includes it.
+- Collection shows faction standing names beside reputation progress.
+
+### Changed
+
+- Everloot's Crafting Costs screen highlights the selected recipe and shopping-list result. Auction shopping lists show price caps, and Settings previews tooltip choices.
+- Updates the bundled game data for WoW: Forever build 1.60.1.71139.
+
+Recipes with missing prices show which quote is unavailable. The estimate uses asking prices and expected output, with the auction-house cut deducted from the finished item's value.
 
 ## [0.3.30] - 2026-11-24
 
