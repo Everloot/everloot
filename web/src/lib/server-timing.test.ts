@@ -20,7 +20,7 @@ describe("Server-Timing on armory pages", () => {
     };
     for (const path of ["/armory/us/ar-cc", "/armory/eu/guilds/arkham-house"]) {
       const res = await withServerTiming(page(path), handler);
-      expect(timingOf(res)).toMatch(/^db-armory_character;dur=\d+, total;dur=\d+$/);
+      expect(timingOf(res)).toMatch(/^db-armory_character;dur=\d+, total;dur=\d+, isolate;dur=\d+;desc="request \d+"$/);
       expect(res.headers.get("cache-control")).toBe("private, no-store");
       expect(await res.text()).toBe("<html>");
     }
@@ -31,7 +31,16 @@ describe("Server-Timing on armory pages", () => {
 
   it("a read still running when the response starts says so", async () => {
     const res = await withServerTiming(page("/armory/us/x"), async () => { timeRead("r2-shard"); return new Response("ok"); });
-    expect(timingOf(res)).toMatch(/^r2-shard;dur=\d+;desc="unfinished", total;dur=\d+$/);
+    expect(timingOf(res)).toMatch(/^r2-shard;dur=\d+;desc="unfinished", total;dur=\d+, isolate;dur=\d+;desc="request \d+"$/);
+  });
+
+  it("says how many requests this isolate has served, every path counted, and how long since its first", async () => {
+    const ok = async () => new Response("ok");
+    const before = Number(/isolate;dur=\d+;desc="request (\d+)"$/.exec(timingOf(await withServerTiming(page("/armory/us/a"), ok)))?.[1]);
+    expect(before).toBeGreaterThan(0);
+    await withServerTiming(page("/about"), ok);
+    const after = timingOf(await withServerTiming(page("/armory/eu/guilds/b"), ok));
+    expect(after).toMatch(new RegExp(`^total;dur=\\d+, isolate;dur=\\d+;desc="request ${before + 2}"$`));
   });
 
   it("outside a timed request nothing is recorded and nothing throws", () => {
@@ -60,6 +69,6 @@ describe("Server-Timing on armory pages", () => {
       await loadSiteAssets("https://assets.example/build-1", fetch);
       return new Response("ok");
     });
-    expect(timingOf(res)).toMatch(/^db-armory_character;dur=\d+, r2-items;dur=\d+, r2-items;dur=\d+, assets-manifest;dur=\d+, total;dur=\d+$/);
+    expect(timingOf(res)).toMatch(/^db-armory_character;dur=\d+, r2-items;dur=\d+, r2-items;dur=\d+, assets-manifest;dur=\d+, total;dur=\d+, isolate;dur=\d+;desc="request \d+"$/);
   });
 });

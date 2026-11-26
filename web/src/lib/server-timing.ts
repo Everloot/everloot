@@ -7,6 +7,11 @@
  * (authQuery, the private bucket, the asset manifest) call `timeRead`. The store sits on globalThis because the entry
  * and the Next server code are bundled apart, so each holds its own copy of this module. Outside a timed request,
  * `timeRead` does nothing, and this file imports nothing Node-only, so client code can import a module that times.
+ *
+ * A Worker's clock stands still while code runs and moves only while it waits (a read, a fetch), so `total` is the
+ * time spent waiting, not the time spent rendering. The `isolate` entry says whether the page ran in a fresh isolate,
+ * which pays for loading the page's code first: the requests this isolate has served, this one included, and the
+ * time since its first.
  */
 
 interface Entry { name: string; start: number; end: number | null }
@@ -14,8 +19,9 @@ interface Timings { start: number; entries: Entry[] }
 interface Storage { run<R>(store: Timings, fn: () => R): R; getStore(): Timings | undefined }
 
 const KEY = Symbol.for("everloot.server-timing");
+const ISOLATE = Symbol.for("everloot.server-timing.isolate");
 const MAX_ENTRIES = 40;
-const slot = globalThis as { [KEY]?: Storage };
+const slot = globalThis as { [KEY]?: Storage; [ISOLATE]?: { first: number; served: number } };
 
 /** The entry calls this once with a `new AsyncLocalStorage()`. */
 export function installServerTiming(storage: Storage): void {
@@ -47,9 +53,10 @@ export function timeRead(name: string): () => void {
   return () => { entry.end ??= performance.now(); };
 }
 
+const ms = (n: number) => Math.max(0, Math.round(n));
+
 /** The header value: each read in the order it started, then the whole request so far as `total`. */
 export function serverTimingHeader(timings: Timings, now: number): string {
-  const ms = (n: number) => Math.max(0, Math.round(n));
   const reads = timings.entries.map((e) => `${e.name};dur=${ms((e.end ?? now) - e.start)}${e.end === null ? ';desc="unfinished"' : ""}`);
   return [...reads, `total;dur=${ms(now - timings.start)}`].join(", ");
 }
@@ -60,10 +67,14 @@ export function serverTimingHeader(timings: Timings, now: number): string {
  */
 export async function withServerTiming(request: Request, handler: () => Promise<Response>): Promise<Response> {
   const storage = slot[KEY];
+  // Every request the entry hands over is counted, so a page after other pages in the same isolate says so.
+  const isolate = (slot[ISOLATE] ??= { first: Date.now(), served: 0 });
+  isolate.served += 1;
+  const served = isolate.served;
   if (!storage || !TIMED_PATH.test(new URL(request.url).pathname)) return handler();
   const timings: Timings = { start: performance.now(), entries: [] };
   const res = await storage.run(timings, handler);
   const headers = new Headers(res.headers);
-  headers.set("server-timing", serverTimingHeader(timings, performance.now()));
+  headers.set("server-timing", `${serverTimingHeader(timings, performance.now())}, isolate;dur=${ms(Date.now() - isolate.first)};desc="request ${served}"`);
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
