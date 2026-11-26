@@ -29,9 +29,10 @@ function Panel({ id, title, action, note, children }: { id: string; title: strin
 
 const Unread = ({ what }: { what: string }) => <p role="status" className="text-cell text-fg-2">{what} could not be read just now.</p>;
 
-function NewestPanel({ facts }: { facts: HomeFact[] | null }) {
+/** Also the /database hub's "Recently confirmed" strip, under its own id and title. */
+export function NewestPanel({ facts, id = "live-newest", title = "Newly confirmed" }: { facts: HomeFact[] | null; id?: string; title?: string }) {
   return (
-    <Panel id="live-newest" title="Newly confirmed" note="Reached three installs most recently." action={<Link href="/database/recent" prefetch={false} className={link}>All new facts →</Link>}>
+    <Panel id={id} title={title} note="Reached three installs most recently." action={<Link href="/database/recent" prefetch={false} className={link}>All new facts →</Link>}>
       {facts === null ? <Unread what="The newest facts" /> : facts.length === 0 ? <p className="text-cell text-fg-2">No new public facts in the last 30 days.</p> : (
         <ol className="border-t border-line">
           {facts.map((f) => (
