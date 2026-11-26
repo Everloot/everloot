@@ -30,6 +30,11 @@ export const QUALITY_LABEL: Record<Quality, string> = {
   legendary: "Legendary",
 };
 
+/** A quality by its name as a tooltip gives it ("Epic"); undefined for one the site has no colour for. */
+export function qualityNamed(name: string | null | undefined): Quality | undefined {
+  return QUALITIES.find((q) => q === name?.toLowerCase());
+}
+
 /** The game's quality number (0 poor to 5 legendary) as a token name; anything else reads as common. */
 export function qualityOf(id: number): Quality {
   return QUALITIES[id] ?? "common";
