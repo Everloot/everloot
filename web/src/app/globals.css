@@ -234,6 +234,30 @@ main p a, main .list-disc a {
 }
 }
 
+/* Long price tables stay light: a coin is a 12 px reference to the root layout's sprite (components/ui/Coins.tsx),
+   and a dense table cell carries one class instead of its whole style list (components/ui/DataTable.tsx). */
+@layer components {
+.coin {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 0.125rem;
+  vertical-align: -1px;
+}
+.dt-td {
+  @apply h-row-sm px-3 py-1 text-left align-middle text-fg sm:h-row;
+}
+.dt-num {
+  @apply text-right font-mono tabular-nums whitespace-nowrap;
+}
+.dt-nowrap {
+  white-space: nowrap;
+}
+.dt-fold {
+  @apply hidden sm:table-cell;
+}
+}
+
 /* Forced colours drop the fill and paint both pills' borders the same colour, so the primary one
    gets a thicker edge. */
 @media (forced-colors: active) {

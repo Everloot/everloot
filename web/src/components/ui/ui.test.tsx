@@ -256,7 +256,8 @@ describe("DataTable", () => {
     expect(html).not.toMatch(/[\s"]sticky[\s"]/);
     expect(html).not.toMatch(/sm:sticky/);
     expect(html).not.toContain("font-mono text-xs");
-    expect(html).toMatch(/<td class="[^"]*sm:h-row/);
+    // The 36 px row (`sm:h-row`) and the cell padding come from the one .dt-td class (globals.css).
+    expect(html).toMatch(/<td class="dt-td[\s"]/);
     expect(html).toContain("▲");
     // The sorted column turns around; an unsorted text column starts A to Z, a number column high to low.
     expect(html).toContain('href="?sort=-name"');
@@ -265,10 +266,21 @@ describe("DataTable", () => {
 
   test("dense with a phone line: only the first column shows below 640 px, the rest folds into its second line", () => {
     const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} meta={(r) => `Seen ${r.count}`} />);
-    expect(html.match(/hidden sm:table-cell/g)).toHaveLength(1 + rows.length);
+    expect(html.match(/<th [^>]*hidden sm:table-cell/g)).toHaveLength(1);
+    expect(html.match(/<td class="dt-td dt-num dt-fold"/g)).toHaveLength(rows.length);
     expect(html).toContain('<div class="text-cell-2 text-muted sm:hidden">Seen 12</div>');
     // The columns that show from 640 px can still be wider than a tablet: the table scrolls inside itself below 1024 px.
     expect(html).toMatch(/role="region" aria-label="Items" tabindex="0" class="[^"]*overflow-x-auto lg:overflow-visible/);
+  });
+
+  test("dense cells carry one short class each, not the cell's whole style list", () => {
+    const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} meta={(r) => `Seen ${r.count}`} />);
+    const cells = [...html.matchAll(/<td class="([^"]*)"/g)].map((m) => m[1]);
+    expect(cells).toEqual(rows.flatMap(() => ["dt-td", "dt-td dt-num dt-fold"]));
+    const css = readFileSync(fileURLToPath(new URL("../../app/globals.css", import.meta.url)), "utf8");
+    expect(css).toMatch(/\.dt-td \{\s*@apply h-row-sm px-3 py-1 text-left align-middle text-fg sm:h-row;/);
+    expect(css).toMatch(/\.dt-num \{\s*@apply text-right font-mono tabular-nums whitespace-nowrap;/);
+    expect(css).toMatch(/\.dt-fold \{\s*@apply hidden sm:table-cell;/);
   });
 
   test("dense without a phone line scrolls inside itself below 1024 px, not 640", () => {

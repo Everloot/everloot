@@ -1,9 +1,9 @@
-import { CoinText } from "@/components/ui/Coins";
+import ClientCoins from "./ClientCoins";
 import type { AuctionHouse } from "@everloot/protocol";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { QUALITIES } from "@kb/item-taxonomy";
-import { MARKET_RULE, formatCopper } from "@kb/market";
+import { MARKET_RULE } from "@kb/market";
 import { uploadStore } from "@/lib/upload-store";
 import { loadMarketBoards } from "@/lib/market-boards";
 import {
@@ -13,7 +13,7 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent,
+  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, onRuleset, percent,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
@@ -191,8 +191,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
     ...(!q.house ? [{ key: "house", header: "House", nowrap: true, cell: ({ row }: BrowseRow) => row.house }] : []),
     { key: "ilvl", header: "iLvl", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.level || <span className="text-muted">—</span> },
     { key: "req", header: "Req.", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.required || <span className="text-muted">—</span> },
-    { key: "market", header: "Market value", numeric: true, sortable: true, cell: ({ row }) => <span className={row.value.market === null ? "text-muted" : undefined}><CoinText text={money(row.value.market)} /></span> },
-    { key: "min", header: "Min buyout", numeric: true, sortable: true, cell: ({ row }) => <CoinText text={formatCopper(row.value.min)} /> },
+    // ClientCoins: the page's flight data carries each price as a number, not a copy of the coins' markup.
+    { key: "market", header: "Market value", numeric: true, sortable: true, cell: ({ row }) => <span className={row.value.market === null ? "text-muted" : undefined}><ClientCoins copper={row.value.market} /></span> },
+    { key: "min", header: "Min buyout", numeric: true, sortable: true, cell: ({ row }) => <ClientCoins copper={row.value.min} /> },
     { key: "units", header: "Units", numeric: true, sortable: true, cell: ({ row }) => `${row.value.quantity.toLocaleString("en-US")}${row.value.thin ? " (thin)" : ""}` },
     ...(listings ? [{ key: "listings", header: "Listings", numeric: true, sortable: true, cell: ({ row }: BrowseRow) => row.listings?.toLocaleString("en-US") ?? <span className="text-muted">—</span> }] : []),
     { key: "change", header: "7 days", numeric: true, sortable: true, cell: ({ move }) => (move ? <span className={move.change > 0 ? "text-accent" : "text-fg"}>{percent(move.change)}</span> : <span className="text-muted">—</span>) },
@@ -252,7 +253,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
         rowKey={({ row }) => `${row.realm.key}:${row.house}:${row.value.itemId}`}
         sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
         sortHref={(key, dir) => here({ sort: key === fallback.key && (dir === "desc") === fallback.desc ? undefined : { key: key as AhSort, desc: dir === "desc" } })}
-        meta={({ row, move }) => [showRealm ? row.realm.name : null, row.house, <CoinText key="price" text={money(row.value.market)} />, `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).map((part, i) => <span key={i}>{i > 0 && " · "}{part}</span>)}
+        meta={({ row, move }) => [showRealm ? row.realm.name : null, row.house, <ClientCoins key="price" copper={row.value.market} />, `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).map((part, i) => <span key={i}>{i > 0 && " · "}{part}</span>)}
         empty={empty}
       />
     );

@@ -61,8 +61,7 @@ describe("item tooltip lines", () => {
     expect(row(root, '"Synthetic."').className).toBe("text-tip-yellow");
     const price = row(root, "Sell Price:");
     expect(spoken(price)).toBe("Sell Price: 2 gold 18 silver 94 copper");
-    expect([...price.querySelectorAll("svg")].map((c) => c.getAttribute("class")))
-      .toEqual(expect.arrayContaining([expect.stringContaining("text-coin-gold"), expect.stringContaining("text-coin-silver"), expect.stringContaining("text-coin-copper")]));
+    expect([...price.querySelectorAll("svg > use")].map((c) => c.getAttribute("href"))).toEqual(["#coin-g", "#coin-s", "#coin-c"]);
     expect(price.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(3);
   });
 
