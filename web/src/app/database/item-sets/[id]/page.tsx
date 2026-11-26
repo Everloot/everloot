@@ -5,21 +5,18 @@ import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { CLIENT_SKILLS } from "@kb/client-layer-file";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
-import EdgeDegraded from "@/components/EdgeDegraded";
 import EntityLink from "@/components/EntityLink";
-import JsonLd from "@/components/JsonLd";
-import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, TooltipLines, type Fact, type TabItem } from "@/components/ui";
+import { Badge, DataTable, Tabs, TooltipFrame, TooltipLines, type Fact, type TabItem } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { itemSet, itemSetClasses, itemSetHref, ITEM_SETS_BUILD } from "@/lib/item-sets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName } from "@/lib/items";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import { professionHrefById } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EmptyTab, EntityHeader, EntityLayout, EntitySidebar, EntityTop, LINK } from "../../entity";
+import { EmptyTab, EntityPage, LINK } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -139,30 +136,21 @@ export default async function ItemSetPage(props: Props) {
   ];
 
   return (
-    <Container width="data">
-      <EdgeDegraded when={degraded || !setNames} />
-      <JsonLd data={entityPageJsonLd({ name: title, path, identifier: `item_set:${set.id}` })} />
-      <EntityLayout>
-        <EntityHeader
-          trail={trail}
-          title={title}
-          meta={["Item set", plural(set.items.length, "piece"), <span key="id" className="tabular-nums">ID {set.id}</span>, <Badge key="files" tone="files" />]}
-        />
-        <EntityTop
-          box={
-            <TooltipFrame name={title} label={`${title}, ${CLIENT_LABEL.toLowerCase()}`}>
-              <TooltipLines lines={[plural(set.items.length, "piece"), ...set.bonuses.map(bonusLine)]} />
-            </TooltipFrame>
-          }
-          facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />}
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData report={{ type: "Item set", id: set.id, path }} text={[`${title} (item set ${set.id})`, ...summary, ...set.bonuses.map(bonusLine), `Source: https://everloot.app${path}`].join("\n")} />
-        </EntitySidebar>
-        <Tabs label={`${title}: pieces and bonuses`} tabs={tabs} className="mt-6" />
-        <p className="mt-6 text-meta text-muted">{GAME_DATA_CREDIT}</p>
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      degraded={degraded || !setNames}
+      jsonLd={{ name: title, path, identifier: `item_set:${set.id}` }}
+      header={{ trail, title, meta: ["Item set", plural(set.items.length, "piece"), <span key="id" className="tabular-nums">ID {set.id}</span>, <Badge key="files" tone="files" />] }}
+      box={
+        <TooltipFrame name={title} label={`${title}, ${CLIENT_LABEL.toLowerCase()}`}>
+          <TooltipLines lines={[plural(set.items.length, "piece"), ...set.bonuses.map(bonusLine)]} />
+        </TooltipFrame>
+      }
+      facts={facts}
+      summary={summary}
+      main={<Tabs label={`${title}: pieces and bonuses`} tabs={tabs} />}
+      openData={{ report: { type: "Item set", id: set.id, path }, text: [`${title} (item set ${set.id})`, ...summary, ...set.bonuses.map(bonusLine), `Source: https://everloot.app${path}`].join("\n") }}
+      credit={<p className="mt-3 text-meta text-muted">{GAME_DATA_CREDIT}</p>}
+    />
   );
 }

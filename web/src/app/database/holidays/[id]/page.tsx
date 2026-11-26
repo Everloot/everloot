@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import JsonLd from "@/components/JsonLd";
-import { Container, Facts, InShort, OpenData, TooltipFrame } from "@/components/ui";
+import { TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { parseSegment } from "@/lib/completion-lists";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { holidayEntries, holidayHref, holidaysBuild, lastsLabel, startLabel } from "@/lib/world-events";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EntityHeader, EntityTop, LINK } from "../../entity";
+import { EntityPage, LINK } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -50,33 +48,24 @@ export default async function HolidayPage(props: Props) {
     "The name and text are shown from the game files; players have not reported them yet.",
   ];
   return (
-    <Container width="data">
-      <article>
-        <JsonLd data={entityPageJsonLd({ name: holiday.name, path, identifier: `holiday:${holiday.id}` })} />
-        <EntityHeader trail={trail} title={holiday.name} meta={["Holiday", <span key="id" className="tabular-nums">ID {holiday.id}</span>]} />
-        <EntityTop
-          box={(
-            <TooltipFrame name={holiday.name} label={`${holiday.name}, ${CLIENT_LABEL.toLowerCase()}`}>
-              {holiday.description?.split("\n\n").map((p, i) => <p key={i} className={i > 0 ? "mt-1.5" : undefined}>{p}</p>)}
-            </TooltipFrame>
-          )}
-          facts={(
-            <Facts
-              layout="list"
-              label={`${holiday.name}: quick facts`}
-              items={[
-                { label: starts.length > 1 ? "Starts" : "Start", value: starts.length ? <ul>{starts.map((s) => <li key={s}>{s}</li>)}</ul> : "None in the files" },
-                { label: "Lasts", value: lasts ?? "None in the files" },
-                ...(guide ? [{ label: "Guide", value: <Link href={guide} className={LINK}>{holiday.name} guide</Link> }] : []),
-                { label: "Build", value: holidaysBuild() ?? "Unrecorded", numeric: true },
-              ]}
-            />
-          )}
-        />
-        <p className="mb-4 text-meta text-muted">Times are server time, as the game files give them.</p>
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData report={{ type: "Holiday", id: holiday.id, path }} text={[`${holiday.name} (holiday ${holiday.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
-      </article>
-    </Container>
+    <EntityPage
+      name={holiday.name}
+      jsonLd={{ name: holiday.name, path, identifier: `holiday:${holiday.id}` }}
+      header={{ trail, title: holiday.name, meta: ["Holiday", <span key="id" className="tabular-nums">ID {holiday.id}</span>] }}
+      box={(
+        <TooltipFrame name={holiday.name} label={`${holiday.name}, ${CLIENT_LABEL.toLowerCase()}`}>
+          {holiday.description?.split("\n\n").map((p, i) => <p key={i} className={i > 0 ? "mt-1.5" : undefined}>{p}</p>)}
+        </TooltipFrame>
+      )}
+      facts={[
+        { label: starts.length > 1 ? "Starts" : "Start", value: starts.length ? <ul>{starts.map((s) => <li key={s}>{s}</li>)}</ul> : "None in the files" },
+        { label: "Lasts", value: lasts ?? "None in the files" },
+        ...(guide ? [{ label: "Guide", value: <Link href={guide} className={LINK}>{holiday.name} guide</Link> }] : []),
+        { label: "Build", value: holidaysBuild() ?? "Unrecorded", numeric: true },
+      ]}
+      notices={<p className="mb-4 text-meta text-muted">Times are server time, as the game files give them.</p>}
+      summary={summary}
+      openData={{ report: { type: "Holiday", id: holiday.id, path }, text: [`${holiday.name} (holiday ${holiday.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n") }}
+    />
   );
 }
