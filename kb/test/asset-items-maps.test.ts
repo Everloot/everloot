@@ -21,6 +21,7 @@ const itemTables: Record<string, Rows> = {
 test("item records keep what the tables give, and only stat kinds with a share", () => {
   const { records, iconOf } = buildItemSet((n) => itemTables[n]);
   expect([...records.keys()]).toEqual([25, 600]);
+  // No StartQuestID and no effect tables: no `qs`, no `fx` or `fs`.
   expect(records.get(25)).toEqual({ n: "Worn Shortsword", q: 1, l: 2, r: 1, b: 0, s: 13, c: 2, sc: 7, d: 1900, st: [], sp: 7, u: 0, cr: [], rq: [] });
   expect(records.get(600)).toMatchObject({ n: "Test Helm", q: 3, b: 2, s: 1, c: 4, sc: 4, st: [7, 4], u: 1, t: "Shiny." });
   // Only an item with an icon file has one; no icon is invented.
@@ -113,6 +114,30 @@ test("the set, the Unique category, who may use it, what it requires and its eff
   expect(records.get(3)!.cr).not.toContainEqual(expect.stringContaining("Races"));
   // Without a describer the effects are not read, so the record says nothing about them.
   expect(buildItemSet((n) => tables[n]).records.get(1)!.fx).toBeUndefined();
+});
+
+test("each printed effect line keeps its spell id, and an item that begins a quest keeps the quest id", () => {
+  // Made-up rows; the ids are invented, the column names are the build's.
+  const tables: Record<string, Rows> = {
+    ItemSparse: t([
+      { ID: 1, Display_lang: "Synthetic Charm", StartQuestID: 0 },
+      { ID: 2, Display_lang: "Synthetic Letter", StartQuestID: 4321 },
+    ]),
+    Item: t([{ ID: 1, ClassID: 0, SubclassID: 0 }, { ID: 2, ClassID: 12, SubclassID: 0 }]),
+    ItemEffect: t([
+      { ID: 50, TriggerType: 1, SpellID: 500, LegacySlotIndex: 1 }, { ID: 51, TriggerType: 0, SpellID: 501, LegacySlotIndex: 0 },
+      { ID: 52, TriggerType: 6, SpellID: 502, LegacySlotIndex: 2 }, { ID: 53, TriggerType: 2, SpellID: 503, LegacySlotIndex: 3 },
+    ]),
+    ItemXItemEffect: t([{ ID: 1, ItemID: 1, ItemEffectID: 50 }, { ID: 2, ItemID: 1, ItemEffectID: 51 }, { ID: 3, ItemID: 1, ItemEffectID: 52 }, { ID: 4, ItemID: 1, ItemEffectID: 53 }]),
+  };
+  const describe = (id: number) => ({ 500: "Synthetic equip effect.", 501: "Restores [?] health.", 502: "Teaches something." } as Record<number, string>)[id] ?? null;
+  const { records } = buildItemSet((n) => tables[n], undefined, describe);
+  // One id per printed line, in the same order: the learning spell and the spell without a description print nothing.
+  expect(records.get(1)).toMatchObject({ fx: ["Use: Restores [?] health.", "Equip: Synthetic equip effect."], fs: [501, 500] });
+  expect(records.get(1)!.qs).toBeUndefined();
+  expect(records.get(2)).toMatchObject({ qs: 4321, fx: [], fs: [] });
+  // Without a describer no effect is read, so neither the lines nor their spells are recorded.
+  expect(buildItemSet((n) => tables[n]).records.get(1)!.fs).toBeUndefined();
 });
 
 test("an allowlist limits the items, and a snapshot without item tables is refused", () => {

@@ -235,13 +235,15 @@ export default async function ItemPage(props: Props) {
   // The box, as the hover card draws it (lib/item-tooltip.ts): the game file lines, the set's pieces and bonuses, and
   // the reasons for a [?] under the box, not inside the game's tooltip.
   const set = tip ? itemSetOf(itemId) : undefined;
-  const bonusNames = set?.bonuses.length ? spellNames ?? await loadSpellNames(version) : null;
+  // The same file names the set's bonuses and tells which Use and Equip spells have a page (a spell it lacks is a 404).
+  const bonusNames = set?.bonuses.length || tip?.spells ? spellNames ?? await loadSpellNames(version) : null;
   const box = itemTooltip({
     // The name as the hover card has it: the game file name where the tooltip shows and no other source names the item.
     id: itemId, tip, name: shownItemName(itemId, agreed, matched?.names, tip), category, namesQuality: matched?.names.get(itemId)?.quality,
     set: set && { ...set, pieceName: itemName, spellName: (spell) => bonusNames?.names.get(spell) },
+    spellHref: (spell) => (bonusNames?.names.has(spell) ? `/database/spells/${spell}` : undefined),
   });
-  const tooltipLines = tip ? [...box.card.lines, ...(box.card.notes ?? [])] : box.card.lines;
+  const tooltipLines = tip ? [...box.card.lines, ...(box.card.evidence?.lines ?? []), ...(box.card.notes ?? [])] : box.card.lines;
   // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain. The
   // taxonomy gives the quality, else the names file (for an item whose quality the taxonomy leaves unrecorded).
   const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;

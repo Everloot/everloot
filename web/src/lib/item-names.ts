@@ -21,6 +21,9 @@ export function qualityColor(q: number): string {
   return q === 6 ? "#E6CC80" : q === 7 ? "#00CCFF" : tokens.dark["q-common"];
 }
 
+/** The game's line for an item that begins a quest (ItemSparse.StartQuestID). */
+export const BEGINS_QUEST = "This Item Begins a Quest";
+
 const BINDING: Record<number, string> = { 1: "Binds when picked up", 2: "Binds when equipped", 3: "Binds when used", 4: "Quest Item" };
 
 /** Armor subclasses that carry an armor value (cloth to plate, shields), and the slots that never do (shirt, tabard). */
@@ -55,6 +58,8 @@ export interface ItemTipText {
    * files give is printed only once checked in the game, and then a line here says so.
    */
   why: string[];
+  /** The spell behind each Use, Equip and Chance on hit line, by the line's text; absent for a record without them. */
+  spells?: Record<string, number>;
 }
 
 /** What a placeholder stands for, by kind. A reason says what the files lack, never only that a value is unknown. */
@@ -91,6 +96,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
   if (BINDING[r.b]) lines.push(BINDING[r.b]);
   if (r.lc) lines.push(r.lc);
   else if (r.u === 1) lines.push("Unique");
+  if (r.qs) lines.push(BEGINS_QUEST);
   const slot = SLOT[r.s];
   const k = kind(r.c, r.sc);
   if (slot || k) lines.push([slot, k].filter(Boolean).join(PAIR));
@@ -132,7 +138,12 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
   if (r.t) lines.push(`"${r.t}"`);
   if (r.sp > 0) lines.push(`Sell Price: ${formatCopper(r.sp)}`);
   if (range) why.add(damageSource(range, damage));
-  return { name: r.n, quality: QUALITY_NAMES[r.q] ?? `quality ${r.q}`, lines, partial: lines.some((l) => l.includes(PLACEHOLDER)), why: [...why] };
+  // Only where every printed line has its spell: a record from before the ids were kept has none.
+  const spells = r.fx && r.fs?.length === r.fx.length ? Object.fromEntries(r.fx.map((line, i) => [line, r.fs![i]])) : undefined;
+  return {
+    name: r.n, quality: QUALITY_NAMES[r.q] ?? `quality ${r.q}`, lines, partial: lines.some((l) => l.includes(PLACEHOLDER)), why: [...why],
+    ...(spells && Object.keys(spells).length ? { spells } : {}),
+  };
 }
 
 /* ---------- The numbers players' tooltips showed (kb/src/item-facts.ts) ---------- */
@@ -178,31 +189,48 @@ function slotFor(lines: readonly string[], fact: ItemFactName): number {
   return before >= 0 ? before : lines.length;
 }
 
+/** The line under an item tooltip with numbers still waiting for a third install; the tooltip draws it as a link. */
+export const HELP_CONFIRM = "Help confirm these values: install the addon at /addon.";
+
+/** One reported number's provenance: the line as shown, and how many installs, when and from which build. */
+export interface ReportedLine {
+  /** "+11 Stamina: reported by 3 installs, last seen 2026-11-20, build 1.60.1.71139." */
+  detail: string;
+  reporters: number;
+  /** YYYY-MM-DD, or null when not known. */
+  lastSeen: string | null;
+  /** Fewer than 3 installs: shown as unconfirmed. */
+  pending: boolean;
+}
+
 const installs = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "install" : "installs"}`;
 
 /**
  * The tooltip with the numbers 3 installs agree on in place of their placeholders, a line the files did not print
  * added where the game prints it, and one line per number saying how many installs reported it, from which build,
- * and when. A contested line keeps its placeholder and says why. The reasons for the stat and armour placeholders go
+ * and when (also as `reported`, for a tooltip that sums them up in one line). A contested line keeps its placeholder and says why. The reasons for the stat and armour placeholders go
  * once no such placeholder is left.
  */
-export function withReported<T extends Pick<ItemTipText, "lines" | "why" | "partial">>(tip: T, state: Pick<ItemFactState, "shown" | "contested" | "unconfirmed">): T {
+export function withReported<T extends Pick<ItemTipText, "lines" | "why" | "partial">>(tip: T, state: Pick<ItemFactState, "shown" | "contested" | "unconfirmed">): T & { reported?: ReportedLine[] } {
   if (!state.shown.length && !state.contested.length && !state.unconfirmed?.length) return tip;
   const lines = [...tip.lines];
   const evidence: string[] = [];
+  const reported: ReportedLine[] = [];
   for (const f of [...state.shown, ...(state.unconfirmed ?? [])]) {
     const pending = f.reporters < 3;
     const text = factLine(f.fact, f.value) + (pending ? ` (unconfirmed, seen by ${f.reporters} ${f.reporters === 1 ? "player" : "players"})` : "");
     const at = lines.indexOf(factLine(f.fact, null));
     if (at >= 0) lines[at] = text;
     else lines.splice(slotFor(lines, f.fact), 0, text);
-    const seen = f.lastSeen ? f.lastSeen.slice(0, 10) : PLACEHOLDER;
-    evidence.push(`${text.replace(/^\((.*)\)$/, "$1")}: reported by ${installs(f.reporters)}, last seen ${seen}, build ${f.build}.`);
+    const seen = f.lastSeen ? f.lastSeen.slice(0, 10) : null;
+    const detail = `${text.replace(/^\((.*)\)$/, "$1")}: reported by ${installs(f.reporters)}, last seen ${seen ?? PLACEHOLDER}, build ${f.build}.`;
+    evidence.push(detail);
+    reported.push({ detail, reporters: f.reporters, lastSeen: seen, pending });
   }
-  if (state.unconfirmed?.length) evidence.push("Help confirm these values: install the addon at /addon.");
+  if (state.unconfirmed?.length) evidence.push(HELP_CONFIRM);
   const why = tip.why.filter((w) =>
     !(w === WHY.stats && !lines.some((l) => l.startsWith(`+${PLACEHOLDER} `))) && !(w === WHY.armor && !lines.includes(factLine("armor", null))));
   const disputed = state.contested.filter((fact) => lines.includes(factLine(fact, null))).map((fact) => FACT_WORD[fact]);
   if (disputed.length) why.push(`${PLACEHOLDER} ${disputed.join(", ")}: installs disagree on the number, so none is shown until 3 agree on one.`);
-  return { ...tip, lines, why: [...why, ...evidence], partial: lines.some((l) => l.includes(PLACEHOLDER)) };
+  return { ...tip, lines, why: [...why, ...evidence], partial: lines.some((l) => l.includes(PLACEHOLDER)), ...(reported.length ? { reported } : {}) };
 }

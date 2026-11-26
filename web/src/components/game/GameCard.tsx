@@ -20,6 +20,8 @@ export interface CardContent {
   lines: string[];
   /** Why the lines hold `[?]`, one sentence per kind; drawn under the card, and only while a line holds one. */
   notes?: string[];
+  /** The players' numbers in one line, each number's installs, date and build behind it (lib/item-tooltip.ts). */
+  evidence?: { summary: string; lines: string[] };
   foot: string | null;
 }
 
@@ -45,6 +47,13 @@ export function GameCard({ card, links, label }: { card: CardContent; links?: Re
         label={label}
       >
         {card.lines.length > 0 ? <TooltipLines lines={card.lines} links={links} /> : null}
+        {card.evidence && (
+          // One line in the box; each number's own line on demand (a click on the page, the title on hover).
+          <details data-card-evidence className="text-xs text-muted">
+            <summary className="cursor-pointer" title={card.evidence.lines.join("\n")}>{card.evidence.summary}</summary>
+            <ul className="mt-0.5 space-y-0.5">{card.evidence.lines.map((line, i) => <li key={i}>{line}</li>)}</ul>
+          </details>
+        )}
       </TooltipFrame>
       {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
     </div>

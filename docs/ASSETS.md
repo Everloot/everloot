@@ -123,7 +123,10 @@ How it works, and what it will not do:
   fetched from Blizzard's CDN the same way the DB2 tables are, and converted to WebP.
 - **Item icons and tooltips.** `Item.IconFileDataID` for the icon; name, quality, item level,
   required level, binding, slot, armour or weapon kind, weapon speed, stat kinds, flavour text and
-  sell price from `ItemSparse` and `Item`. Stat amounts, armour and damage are worked out by the
+  sell price from `ItemSparse` and `Item`, the quest the item begins (`StartQuestID`, as `qs`) and the
+  spell behind each Use, Equip and Chance on hit line (`ItemEffect.SpellID`, as `fs`, in the order of
+  the lines in `fx`). Build 1.60.1's `ItemSparse` has no `MaxDurability` or `Resistances` columns, so
+  neither is recorded. Older shards without `qs` and `fs` still parse. Stat amounts, armour and damage are worked out by the
   client from tables we do not read, so the tooltip shows `[?]` for them and says so: `+[?] Stamina`,
   `[?] Armor` on cloth to plate and shields, and `[?] - [?] Damage` with `([?] damage per second)` on
   weapons. Build 1.60.1's `ItemSparse` has no `MinDamage`/`MaxDamage` columns (WoWDBDefs layout

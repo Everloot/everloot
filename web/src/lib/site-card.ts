@@ -60,6 +60,8 @@ export interface SiteCard {
   lines: string[];
   /** Why the lines hold `[?]`, apart from the lines so the card can draw them as a footnote; absent without any. */
   notes?: string[];
+  /** An item's reported numbers in one line, each number's installs, date and build behind it; absent without any. */
+  evidence?: { summary: string; lines: string[] };
   /** Where the name and the game file lines come from, one short line; null when there is nothing to say. */
   foot: string | null;
 }
