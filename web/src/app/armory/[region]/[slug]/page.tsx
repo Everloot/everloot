@@ -3,27 +3,28 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";
-import { Card, Container, Facts, PageHeader, SectionHeading, Tabs, type Fact } from "@/components/ui";
+import { Badge, Card, Container, PageHeader, SectionHeading, Tabs, type Fact } from "@/components/ui";
 import ShowcaseSections from "@/components/showcase/ShowcaseSections";
 import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
 import {
   armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
-  metricOfKey, metricValue, PLAY_HISTORY_METRICS, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
+  metricOfKey, PLAY_HISTORY_METRICS, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { loadEquippedTips } from "@/lib/equipped-item-tips";
 import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
-import { readTimes } from "../../profile";
+import { Equipment, readTimes } from "../../profile";
 import { characterTabs } from "../../character-tabs";
 import { loadCharacterProgression } from "@/lib/progression";
-import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
+import { addonSighting } from "@/lib/character-match";
+import { AddonSighting, DungeonRaidSlot, SheetSummary } from "./sheet";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
-import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, Unreachable } from "../../parts";
+import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 /** Read on every request, so a hidden character is gone at once. */
 export const dynamic = "force-dynamic";
@@ -111,48 +112,52 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
       : [];
   });
   const progression = await loadCharacterProgression(c.region, c.slug);
-  const facts: Fact[] = [
-    ...(c.itemLevel !== null ? [{ label: "Item level", value: metricValue("item-level", c.itemLevel), numeric: true }] : []),
-    ...(c.averageItemLevel !== null ? [{ label: "Average item level", value: c.averageItemLevel, numeric: true }] : []),
-    ...(c.gearScore !== null ? [{ label: "Gear Score", value: metricValue("gear-score", c.gearScore), numeric: true }] : []),
-    ...rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills" && !historyKeys.has(r.metric))),
-  ];
+  // The gear ranks sit in the sheet's summary; honorable kills in the PvP tab, play history in its own.
+  const gearRanks = rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills" && !historyKeys.has(r.metric)));
+  const seen = await addonSighting(c);
+  const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
 
   return (
     <Container width="wide">
       <article className="space-y-8">
         <div className="flex items-start gap-4">
-        <Portrait src={portrait} name={c.name} />
-        <PageHeader
-          trail={[...trailFor("/armory")!, { name: fullName, path }]}
-          title={<span className={classText(classTokenOfName(c.class))}>{fullName}</span>}
-          lede={`Level ${c.level} ${c.race} ${c.class}`}
-          meta={
-            <span>
-              {c.faction} · {regionLabel(c.region)} {c.ruleset}
-              {c.guildName && <> · {c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</>}
-              {lastLogin && <> · Last login <span className="font-mono tabular-nums">{lastLogin}</span></>}
-              {lastRead && <> · Last read <time dateTime={lastRead} className="font-mono tabular-nums">{day(lastRead)}</time></>}
-            </span>
-          }
-        />
+          <Portrait src={portrait} name={c.name} />
+          <div className="min-w-0 flex-1">
+            <PageHeader
+              trail={[...trailFor("/armory")!, { name: fullName, path }]}
+              title={<span className={classText(classTokenOfName(c.class))}>{fullName}</span>}
+              lede={`Level ${c.level} ${c.race} ${c.class}`}
+              meta={<>
+                <Badge tone="neutral">{c.faction}</Badge>
+                <RegionRuleset region={c.region} ruleset={c.ruleset} />
+                {c.guildName && <span>{c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</span>}
+                {lastLogin && <span>Last login <span className="font-mono tabular-nums">{lastLogin}</span></span>}
+                {lastRead && <span>Last read <time dateTime={lastRead} className="font-mono tabular-nums">{day(lastRead)}</time></span>}
+              </>}
+              actions={<>
+                <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-secondary min-h-11">Update character</button></form>
+                <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={link}>View Blizzard armory</a>
+              </>}
+            />
+          </div>
         </div>
-        <DungeonProgressSummary progress={progression.summary} href="#progress" />
 
-        <div className="flex flex-wrap items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <span className="rounded-control border border-edge px-2 py-1 text-fg-2">Blizzard profile</span>
           {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
-          <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-secondary min-h-11">Update character</button></form>
-          <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={link}>View Blizzard armory</a>
           <ArmoryCredit at={lastRead} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
-        {facts.length > 0 && <Facts label="Numbers" items={facts} />}
+        <DungeonRaidSlot progress={progression.summary} href="#progress" />
+
+        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} ranks={gearRanks} />} />
+
+        {seen && <AddonSighting seen={seen} />}
 
         <div id="progress">
-          <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks, historyRanks, progression })} />
+          <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { categories, pvpFacts: pvpRanks, historyRanks, progression })} />
         </div>
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">

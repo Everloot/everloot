@@ -180,6 +180,19 @@ describe("armory characters", () => {
     expect(new Set(rows.map((r) => r.href)).size).toBe(rows.length);
   });
 
+  test("an addon row the armory has (lib/character-lookup's rule) is the armory row: one row, linking the armory page", async () => {
+    armoryOn();
+    await held.store!.upsert([
+      { name: "Volvik", realm: "EU1 Realm 2 Normal", race: "Human", class: "WARRIOR", level: 58, seen: "2026-11-16" },
+      { name: "Volvik", realm: "CAMWOW US1 Realm 4 PvP", race: "Human", class: "WARRIOR", level: 30, seen: "2026-11-16" },
+    ]);
+    const rows = (await peopleSearch("volvik", 25)).characters.results;
+    expect(rows.map((r) => r.href)).not.toContain(playerPath({ ruleset: "forever", realm: "EU1 Realm 2 Normal", name: "Volvik" }));
+    expect(rows.filter((r) => r.href === armoryCharacterPath("eu", "volvik-morningstar"))).toEqual([expect.objectContaining({ label: "Volvik Morningstar" })]);
+    // Two US armory characters named Volvik: the US sighting keeps its own page.
+    expect(rows.map((r) => r.href)).toContain(playerPath({ ruleset: "forever", realm: "CAMWOW US1 Realm 4 PvP", name: "Volvik" }));
+  });
+
   test("an armory that fails leaves the addon rows, and the switch off asks it nothing", async () => {
     on();
     const search = vi.spyOn(held.armory!, "search");

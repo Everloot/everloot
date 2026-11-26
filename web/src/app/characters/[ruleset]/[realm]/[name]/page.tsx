@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import ShowcaseSections, { showcaseContents, ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, Facts, PageHeader, ReadingLayout, RailFacts, SectionHeading, type TocItem } from "@/components/ui";
@@ -23,6 +23,7 @@ import { ArmoryPart, armoryHeading } from "@/app/characters/armory-part";
 import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
 import { armoryCharacterPath } from "@/lib/armory";
 import { loadLinkedDungeonProgress } from "@/lib/progression";
+import { armoryMatch } from "@/lib/character-match";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -213,6 +214,12 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
         </div>
       </Container>
     );
+  }
+  // One page per character: a sighting the armory certainly has (lib/character-match.ts) lives on the armory page, which
+  // shows what the addon saw. An owner's own page keeps its address; so does a sighting when the owner's row could not be read.
+  if (owner === null && found(seen)) {
+    const match = await armoryMatch(seen);
+    if (match) permanentRedirect(armoryCharacterPath(match.region, match.slug));
   }
   const now = new Date();
   const built = found(owner) ? characterShowcase(owner, now, await plannedBuilds(owner), await publishedFacts(owner)) : null;
