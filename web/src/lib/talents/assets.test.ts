@@ -134,11 +134,13 @@ const SHOWS_ART = new Set([
   "web/src/app/database/item-sets/[id]/opengraph-image.tsx",
   // The mount, companion pet and currency pages: their icon, by id, from the same manifest.
   "web/src/app/database/mounts/[id]/page.tsx", "web/src/app/database/pets/[id]/page.tsx", "web/src/app/database/currencies/[id]/page.tsx",
+  // Their lists: the same icon beside each row's name, by the same id.
+  "web/src/app/database/mounts/page.tsx", "web/src/app/database/pets/page.tsx", "web/src/app/database/currencies/page.tsx",
   // The hunter pet family list and pages: the family icons and the icons and names of the spells on its skill line.
   "web/src/app/database/pet-families/page.tsx", "web/src/app/database/pet-families/[id]/page.tsx",
   // The Alliance and Horde faction pages: the faction emblem in the header, as the race and class table shows it.
   "web/src/app/database/factions/[id]/page.tsx",
-  // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
+  // The spell list reads the spell names to list them, under the quest list's rule, and the icon its spell page shows. No tooltip.
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
   // the item names only to know whether a category has enough to list. No art, no tooltip.

@@ -1,4 +1,5 @@
 import Link from "./PendingLink";
+import { PAGE_SIZES } from "@/lib/page-size";
 
 type Steps = { label: string; page: number; prevHref?: string | null; nextHref?: string | null };
 type Numbered = { label: string; page: number; pages: number; href: (page: number) => string; nofollow?: boolean };
@@ -52,19 +53,38 @@ function NumberedPager({ label, page, pages, href, nofollow }: Numbered) {
  * The line above and below a database list: the count on the left, the rows shown and the pager on the right
  * ("3,845 items · 1–50 · ‹ 1 2 … 77 ›").
  */
-export function ResultStrip({ total, noun, page, perPage, href, label = "Pages", nofollow }: { total: number; noun: string; page: number; perPage: number; href: (page: number) => string; label?: string; nofollow?: boolean }) {
+export function ResultStrip({ total, noun, page, perPage, href, sizeHref, label = "Pages", nofollow }: {
+  total: number; noun: string; page: number; perPage: number; href: (page: number) => string;
+  /** The list at another page size (?per=): the strip offers PAGE_SIZES once the list is longer than the smallest. */
+  sizeHref?: (per: number) => string;
+  label?: string; nofollow?: boolean;
+}) {
   // An empty list says so in its own empty state, never as a bare "0 items".
   if (total === 0) return null;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const from = total === 0 ? 0 : (page - 1) * perPage + 1;
   const to = Math.min(total, page * perPage);
+  const sizes = sizeHref && total > PAGE_SIZES[0];
+  const rel = nofollow ? "nofollow" : undefined;
   return (
     <div data-result-strip className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-meta text-muted">
       <span className="tabular-nums"><span className="text-fg-2">{total.toLocaleString("en-US")}</span> {noun}</span>
-      {pages > 1 && (
-        <span className="flex items-center gap-2">
-          <span className="tabular-nums">{from.toLocaleString("en-US")}–{to.toLocaleString("en-US")}</span>
-          <Pager label={label} page={page} pages={pages} href={href} nofollow={nofollow} />
+      {(pages > 1 || sizes) && (
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {pages > 1 && (
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{from.toLocaleString("en-US")}–{to.toLocaleString("en-US")}</span>
+              <Pager label={label} page={page} pages={pages} href={href} nofollow={nofollow} />
+            </span>
+          )}
+          {sizes && (
+            <nav data-page-sizes aria-label="Rows per page" className="flex items-center gap-1">
+              <span>Rows</span>
+              {PAGE_SIZES.map((n) => n === perPage
+                ? <span key={n} aria-current="true" className="ctl inline-flex min-w-8 items-center justify-center border border-edge px-2 tabular-nums text-fg">{n}</span>
+                : <Link key={n} href={sizeHref(n)} rel={rel} aria-label={`${n} rows per page`} className="ctl inline-flex min-w-8 items-center justify-center px-2 tabular-nums text-fg-2 hover:bg-panel hover:text-fg">{n}</Link>)}
+            </nav>
+          )}
         </span>
       )}
     </div>

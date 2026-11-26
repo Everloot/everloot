@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { loadSiteAssets } from "@/lib/game-assets";
 import { petEntries, petHref } from "@/lib/collectibles";
 import type { ClientPet } from "@kb/client-collections";
 import { CollectibleList, collectibleListMetadata, type CollectibleRow } from "../collectible-list";
@@ -12,12 +13,13 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 }
 
 export default async function PetListPage(props: { searchParams?: Promise<Search> }) {
-  const rows: (CollectibleRow & ClientPet)[] | null = petEntries()?.map((p) => ({ ...p, href: petHref(p.id, p.name) })) ?? null;
+  const assets = await loadSiteAssets();
+  const rows: (CollectibleRow & ClientPet)[] | null = petEntries()?.map((p) => ({ ...p, href: petHref(p.id, p.name), icon: assets?.petIcons.get(p.id) })) ?? null;
   return (
     <CollectibleList
       path={META.path} title="Companion pets" noun={["companion pet", "companion pets"]} rows={rows} search={(await props.searchParams) ?? {}}
       note="Every companion pet species the game files list, named by its creature. No player report confirms a pet yet."
-      columns={[{ key: "spell", header: "Summon spell", numeric: true, cell: (r) => <span className="font-mono text-cell-2 text-muted">{r.spellId}</span> }]}
+      columns={[{ key: "spell", header: "Summon spell", numeric: true, cell: (r) => <span className="text-fg-2">{r.spellId}</span> }]}
     />
   );
 }

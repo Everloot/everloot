@@ -1,30 +1,83 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { CSSProperties, ReactNode } from "react";
+import GameIcon from "@/components/game/GameIcon";
 import { AgreementMeter, type SortDirection } from "@/components/ui";
+import Badge from "@/components/ui/Badge";
+import type { Quality } from "@/components/ui/quality";
 import { pageMetadata } from "@/lib/seo";
 import { matchNames } from "@/lib/name-match";
+import { PER_PAGE, parsePer, perParam } from "@/lib/page-size";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
-// What the database lists other than items share: their query strings, their indexing rule and their empty
-// states (density spec, 2026-10-20, section 4).
+// What the database lists share: their query strings, their indexing rule, their cells and their empty states
+// (density spec, 2026-10-20, section 4; docs/design/direction.md). One column order on every list: the entity's
+// name (with its icon) and what kind of thing it is, then its key numbers, then where it is or comes from, then
+// its status (confirmed by players or found in the game files), and the id last.
 
 export type Search = Record<string, string | string[] | undefined>;
 
-/** Rows on one page of a list. */
-export const PER_PAGE = 50;
+/** Rows on one page of a list when the address names no size (?per= picks another, lib/page-size.ts). */
+export { PER_PAGE };
 
 const one = (search: Search, k: string) => (typeof search[k] === "string" ? (search[k] as string) : undefined);
 
-/** A list's sort and page, and its name box; null when a value is malformed (the page answers 404). */
-export interface ListQuery<K extends string> { q?: string; sort?: { key: K; desc: boolean }; page: number }
+/** A list's sort, page size and page, and its name box; null when a value is malformed (the page answers 404). */
+export interface ListQuery<K extends string> { q?: string; sort?: { key: K; desc: boolean }; per?: number; page: number }
 
 export function listQuery<K extends string>(search: Search, sorts: readonly K[]): ListQuery<K> | null {
-  const sort = one(search, "sort"), page = one(search, "page");
+  const sort = one(search, "sort"), page = one(search, "page"), per = parsePer(one(search, "per"));
   const sorted = sort === undefined ? undefined : /^(-?)([a-z]+)$/.exec(sort);
   if (sort !== undefined && (!sorted || !(sorts as readonly string[]).includes(sorted[2]))) return null;
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
+  if (per === null) return null;
   const q = one(search, "q")?.trim().slice(0, 60);
-  return { ...(q ? { q } : {}), ...(sorted ? { sort: { key: sorted[2] as K, desc: sorted[1] === "-" } } : {}), page: page === undefined ? 1 : Number(page) };
+  return { ...(q ? { q } : {}), ...(sorted ? { sort: { key: sorted[2] as K, desc: sorted[1] === "-" } } : {}), ...(per ? { per } : {}), page: page === undefined ? 1 : Number(page) };
+}
+
+/** The last parameters of every list URL, in one order: the sort, the page size, the page. */
+export const pageParams = <K extends string>(q: Partial<ListQuery<K>>): [string, string | undefined][] => [
+  ["sort", sortParam(q.sort)], ["per", perParam(q.per)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+];
+
+/** One page of a list's rows at its size; a page past the end is a 404. */
+export function paged<T>(rows: readonly T[], q: { page: number; per?: number }): { shown: T[]; pages: number; per: number } {
+  const per = q.per ?? PER_PAGE;
+  const pages = Math.max(1, Math.ceil(rows.length / per));
+  if (q.page > pages) notFound();
+  return { shown: rows.slice((q.page - 1) * per, q.page * per), pages, per };
+}
+
+/**
+ * A list's first cell: the entity's icon when the art exists, its name as a link in its colour (an item's quality,
+ * a class's class colour, a faction's side), and the hollow diamond when only the game files give it.
+ * `icon` is a URL (a 24 px game icon, its border in `quality`) or a node of its own (a map or loading-screen thumb).
+ */
+export function NameCell({ href, children, icon, quality, tone = "text-fg", style, files, after }: {
+  href: string; children: ReactNode; icon?: string | ReactNode | null; quality?: Quality; tone?: string; style?: CSSProperties;
+  files?: boolean;
+  /** After the name, before the mark: words for a screen reader, or a muted note on why the row is listed by id. */
+  after?: ReactNode;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {icon && (typeof icon === "string" ? <GameIcon src={icon} size={24} quality={quality} /> : icon)}
+      <Link prefetch={false} href={href} className={`min-w-0 ${tone} hover:underline underline-offset-4`} style={style}>{children}</Link>
+      {after}
+      {files && <Badge tone="files" />}
+    </span>
+  );
+}
+
+/** The line under a list's title: where its rows come from and what confirms one; a game-files list leads with the mark. */
+export function ListNote({ children, files }: { children: ReactNode; files?: boolean }) {
+  return (
+    <p data-list-note className="mb-2 max-w-reading text-meta text-fg-2">
+      {files && <><Badge tone="files" />{" "}</>}
+      {children}
+    </p>
+  );
 }
 
 /**
@@ -145,6 +198,15 @@ export function listCaption(noun: string, rows: readonly { confirmed: boolean }[
 /** The Confirmed column. With no rollup read, nothing is known about confirmation: unrecorded, not unconfirmed. */
 export function confirmedCell(entry: { confirmed: boolean }, confirmations: boolean): string {
   return entry.confirmed ? "Confirmed" : confirmations ? "Unconfirmed" : "Unrecorded";
+}
+
+/** The Confirmed column's cell: "Confirmed", the hollow diamond before "Unconfirmed", or a muted "Unrecorded". */
+export function ConfirmedCell({ entry, confirmations }: { entry: { confirmed: boolean }; confirmations: boolean }) {
+  const word = confirmedCell(entry, confirmations);
+  if (word === "Confirmed") return <span className="text-fg">{word}</span>;
+  if (word === "Unrecorded") return <span className="text-muted">{word}</span>;
+  // The diamond's own screen-reader word would repeat the cell's, so it says where the entry comes from instead.
+  return <span className="inline-flex items-center gap-1.5 text-fg-2"><Badge tone="files">from the game files</Badge>{word}</span>;
 }
 
 /** The sentence a list shows when it holds no entry at all: neither the files nor the players have given one. */

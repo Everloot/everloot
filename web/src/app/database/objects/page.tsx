@@ -8,7 +8,7 @@ import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
 import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
-import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
 const META = {
   title: "WoW Forever objects: chests, herbs and ore",
@@ -24,7 +24,7 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "name" as Sort, desc: false };
 const NO_NAME = "No agreed name yet. A name needs 3 installs reporting the same one.";
 
-const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/objects", [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
+const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/objects", [["q", q.q], ...pageParams(q)]);
 
 /** Keep the full search query when following an all-matches link; shared sort/page validation still applies. */
 function objectQuery(search: Search) {
@@ -35,7 +35,7 @@ function objectQuery(search: Search) {
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = objectQuery((await props.searchParams) ?? {});
-  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per, q?.page);
 }
 
 type Row = ReturnType<typeof objectList>[number];
@@ -55,24 +55,25 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
     : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;
   const rows = byRank(sortRows(matched, key, sort.desc, (o) => o.objectId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Row>[] = [
     { key: "name", header: "Object", sortable: true, cell: (o) => {
       const name = names.get(o.objectId);
-      const link = <Link prefetch={false} href={`/database/objects/${o.objectId}`} className={LINK}>{name ?? `Object ${o.objectId}`}</Link>;
       // An object with no agreed name is listed by its id, with a line saying why.
-      return name ? link : <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{link}<span className="text-meta text-muted">no agreed name yet</span></span>;
+      return (
+        <span title={name ? undefined : NO_NAME}>
+          <NameCell href={`/database/objects/${o.objectId}`} after={!name && <span className="text-meta text-muted">no agreed name yet</span>}>{name ?? `Object ${o.objectId}`}</NameCell>
+        </span>
+      );
     } },
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (o) => o.windows },
     { key: "items", header: "Items seen", numeric: true, sortable: true, cell: (o) => o.items },
     { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (o) => o.reporters },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "object" : "objects"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Object pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "object" : "objects"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Object pages" />;
   const empty = facts.unreachable ? <Unreadable />
     : q.q ? <>
         <NoMatches noun="objects" chips={[{ label: `${id !== null ? "Id" : "Name"}: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />

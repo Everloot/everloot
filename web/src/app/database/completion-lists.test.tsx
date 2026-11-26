@@ -24,7 +24,7 @@ vi.mock("@/data/game-data/client-achievements", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/data/game-data/client-achievements")>();
   return { get CLIENT_ACHIEVEMENTS() { return { ...real.CLIENT_ACHIEVEMENTS, achievements: file(game.achievements) }; } };
 });
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
@@ -143,6 +143,17 @@ test("an agreed faction shows as confirmed and keeps the rollup's header", async
   expect(out).toContain("Factions in the game files or reported by players: 4, 3 confirmed by players");
   expect(out).not.toContain("data-confirmations-unread");
   expect(out).not.toContain("three players reported:");
+});
+
+test("a faction's name wears its side's colour; unconfirmed rows carry the hollow diamond", async () => {
+  game.factions = [{ id: 69, name: "Darnassus (base)", shown: true }, { id: 72, name: "Stormwind", shown: true }];
+  const out = await html(FactionList(search()));
+  expect(rowOf(out, "/database/factions/69-darnassus")).toMatch(/class="[^"]*text-faction-alliance[^"]*">Darnassus</);
+  expect(rowOf(out, "/database/factions/76-orgrimmar")).toMatch(/class="[^"]*text-faction-horde[^"]*">Orgrimmar</);
+  const neutral = rowOf(out, "/database/factions/529-argent-dawn");
+  expect(neutral).toMatch(/class="[^"]*text-fg[^"]*">Argent Dawn</);
+  expect(neutral).not.toContain("text-faction-");
+  expect(rowOf(out, "/database/factions/72-stormwind")).toContain('data-badge="files"');
 });
 
 test("titles, quest chains and achievements list from the base too; statistics stay out", async () => {

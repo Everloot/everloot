@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { AchievementEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
-import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
-  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
-  sortParam, sortRows, Unreadable, type ListQuery, type Search,
+  ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
+  pageParams, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
 const META = { title: "WoW Forever Achievement List", description: "Achievements in WoW: Forever by category, points and criteria. From the game files; confirmed once three installs report each the same way.", path: "/database/achievements" };
@@ -28,13 +26,13 @@ function achievementQuery(search: Search): AchievementQuery | null {
 }
 
 const href = (q: Partial<AchievementQuery>) => listHref("/database/achievements", [
-  ["q", q.q], ["category", q.category], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ["category", q.category], ...pageParams(q),
 ]);
 const filters = (q: AchievementQuery) => Number(Boolean(q.q)) + Number(Boolean(q.category));
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = achievementQuery((await props.searchParams) ?? {});
-  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort && !q!.per, q?.page);
 }
 
 export default async function AchievementListPage(props: { searchParams?: Promise<Search> }) {
@@ -52,17 +50,15 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const key = (x: Listed<AchievementEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
     : sort.key === "points" ? x.points : sort.key === "criteria" ? x.criteriaCount : x.achievementId;
   const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.achievementId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Listed<AchievementEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={achievementHref(x.achievementId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={achievementHref(x.achievementId, x.name)}>{x.name}</NameCell> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
     { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
-    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
+    { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
   ];
 
@@ -76,7 +72,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
     },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "achievement" : "achievements"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Achievement pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "achievement" : "achievements"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Achievement pages" />;
   const chips = [
     ...(q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []),
     ...(q.category ? [{ label: `Category: ${q.category}`, href: here({ category: undefined }) }] : []),

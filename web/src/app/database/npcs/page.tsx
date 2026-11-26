@@ -9,7 +9,7 @@ import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@
 import { parseZoneSegment, publicZones, zoneSlug } from "@/lib/zones";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
-  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
+  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -49,14 +49,13 @@ function npcQuery(search: Search): NpcQuery | null {
 
 const zoneParam = (id?: number) => { const z = id === undefined ? undefined : publicZones().find((x) => x.mapId === id); return z ? zoneSlug(z.mapId, z.name) : undefined; };
 const href = (q: Partial<NpcQuery>) => listHref("/database/npcs", [
-  ["q", q.q], ["zone", zoneParam(q.zone)], ["level", rangeParam(q.level)], ["react", q.react], ["type", q.type], ["rank", q.rank], ["drops", q.drops ? "1" : undefined], ["sort", sortParam(q.sort)],
-  ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ["zone", zoneParam(q.zone)], ["level", rangeParam(q.level)], ["react", q.react], ["type", q.type], ["rank", q.rank], ["drops", q.drops ? "1" : undefined], ...pageParams(q),
 ]);
 const filters = (q: NpcQuery) => Number(Boolean(q.q)) + Number(Boolean(q.zone)) + Number(Boolean(q.drops)) + Number(Boolean(q.level)) + Number(Boolean(q.react)) + Number(Boolean(q.type)) + Number(Boolean(q.rank));
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = npcQuery((await props.searchParams) ?? {});
-  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort && !q!.per, q?.page);
 }
 
 export default async function NpcListPage(props: { searchParams?: Promise<Search> }) {
@@ -83,20 +82,19 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
     : sort.key === "type" ? n.creatureType?.toLowerCase() ?? null : sort.key === "rank" ? (n.rank ? NPC_RANKS.indexOf(n.rank) : null)
     : sort.key === "react" ? n.reaction : sort.key === "zone" ? n.zone?.name ?? null : sort.key === "drops" ? n.drops : n.npcId;
   const rows = byRank(sortRows(matched, key, sort.desc, (n) => n.npcId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<NpcQuery>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
+  // What it is (type, rank, reaction), its numbers (level, drops), where it stands, its id.
   const columns: SparseColumn<NpcRow>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (n) => <Link prefetch={false} href={`/database/npcs/${n.npcId}`} className={LINK}>{n.name ?? `NPC ${n.npcId}`}</Link> },
-    { key: "level", header: "Level", numeric: true, sortable: true, cell: (n) => n.level ?? dash, blank: (n) => n.level === null },
+    { key: "name", header: "Name", sortable: true, cell: (n) => <NameCell href={`/database/npcs/${n.npcId}`}>{n.name ?? `NPC ${n.npcId}`}</NameCell> },
     { key: "type", header: "Type", sortable: true, cell: (n) => n.creatureType ?? dash, blank: (n) => !n.creatureType },
     { key: "rank", header: "Rank", sortable: true, cell: (n) => (n.rank ? RANK_LABEL[n.rank] : dash), blank: (n) => !n.rank },
     { key: "react", header: "Reaction", sortable: true, cell: (n) => (n.reaction ? REACTION_LABEL[n.reaction] : dash), blank: (n) => !n.reaction },
-    { key: "zone", header: "Zone", sortable: true, cell: (n) => n.zone?.name ?? dash, blank: (n) => !n.zone },
+    { key: "level", header: "Level", numeric: true, sortable: true, cell: (n) => n.level ?? dash, blank: (n) => n.level === null },
     { key: "drops", header: "Drops", numeric: true, sortable: true, cell: (n) => n.drops || dash, blank: (n) => !n.drops },
+    { key: "zone", header: "Zone", sortable: true, cell: (n) => n.zone?.name ?? dash, blank: (n) => !n.zone },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (n) => n.npcId },
   ];
 
@@ -135,7 +133,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
     { type: "toggle", key: "drops", label: "Has drops", href: here({ drops: q.drops ? undefined : true }), on: Boolean(q.drops) },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "NPC" : "NPCs"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="NPC pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "NPC" : "NPCs"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="NPC pages" />;
   const chips = [
     ...(q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []),
     ...(q.zone ? [{ label: zones.find((z) => z.mapId === q.zone)?.name ?? "Zone", href: here({ zone: undefined }) }] : []),
@@ -176,7 +174,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
             rowKey={(n) => String(n.npcId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(n) => [n.level !== null && `Level ${n.level}`, n.rank && n.rank !== "normal" && RANK_LABEL[n.rank], n.creatureType, n.reaction && REACTION_LABEL[n.reaction], n.zone?.name, n.drops > 0 && `${n.drops} drops`, `ID ${n.npcId}`].filter(Boolean).join(" · ")}
+            meta={(n) => [n.creatureType, n.rank && n.rank !== "normal" && RANK_LABEL[n.rank], n.reaction && REACTION_LABEL[n.reaction], n.level !== null && `Level ${n.level}`, n.drops > 0 && `${n.drops} drops`, n.zone?.name, `ID ${n.npcId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         )}</div>

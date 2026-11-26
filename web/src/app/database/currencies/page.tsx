@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { loadSiteAssets } from "@/lib/game-assets";
 import { currencyEntries, currencyHref } from "@/lib/collectibles";
 import type { ClientCurrency } from "@kb/client-collections";
 import { CollectibleList, collectibleListMetadata, type CollectibleRow } from "../collectible-list";
@@ -12,14 +13,15 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 }
 
 export default async function CurrencyListPage(props: { searchParams?: Promise<Search> }) {
-  const rows: (CollectibleRow & ClientCurrency)[] | null = currencyEntries()?.map((c) => ({ ...c, href: currencyHref(c.id, c.name) })) ?? null;
+  const assets = await loadSiteAssets();
+  const rows: (CollectibleRow & ClientCurrency)[] | null = currencyEntries()?.map((c) => ({ ...c, href: currencyHref(c.id, c.name), icon: assets?.currencyIcons.get(c.id) })) ?? null;
   return (
     <CollectibleList
       path={META.path} title="Currencies" noun={["currency", "currencies"]} rows={rows} search={(await props.searchParams) ?? {}}
       note="Every currency the game files list for players; the game's own hidden counters are left out."
       columns={[
-        { key: "category", header: "Category", cell: (r) => r.category },
-        { key: "max", header: "Cap", numeric: true, cell: (r) => r.max?.toLocaleString("en-US") ?? <span className="text-muted">–</span> },
+        { key: "category", header: "Category", sortBy: (r) => r.category.toLowerCase(), cell: (r) => r.category },
+        { key: "max", header: "Cap", numeric: true, sortBy: (r) => r.max ?? null, cell: (r) => r.max?.toLocaleString("en-US") ?? <span className="text-muted">—</span> },
       ]}
     />
   );

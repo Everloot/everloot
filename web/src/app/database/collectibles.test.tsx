@@ -28,6 +28,7 @@ import CurrencyPage, { generateMetadata as currencyMeta } from "./currencies/[id
 import MountListPage from "./mounts/page";
 import ToyListPage from "./toys/page";
 import CurrencyListPage from "./currencies/page";
+import PetListPage from "./pets/page";
 import { siteSearch } from "@/lib/site-search";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 
@@ -108,6 +109,18 @@ test("the mount list links each page, filters by name, and marks the confirmed o
   expect(out).toContain('href="/database/mounts/6-brown-horse"');
   expect(out).toMatch(/Brown Horse[\s\S]*Confirmed/);
   expect(await page(MountListPage(list()))).toContain("Mounts in the game files: 141");
+});
+
+test("the mount, pet and currency lists show each row's icon where the art exists, and say the list is from the game files", async () => {
+  const mounts = await page(MountListPage(list({ q: "brown horse" })));
+  expect(mounts).toContain('src="https://a.test/icons/132261.webp"');
+  expect(mounts).toMatch(/data-list-note[^>]*><span data-badge="files"/);
+  // Not reported by 3 installs: the hollow diamond before "Unconfirmed".
+  expect(mounts).toMatch(/data-badge="files"[\s\S]*Unconfirmed/);
+  expect(await page(CurrencyListPage(list()))).toContain('src="https://a.test/icons/135725.webp"');
+  expect(await page(PetListPage(list({ q: "39" })))).toContain('src="https://a.test/icons/132761.webp"');
+  // A list may sort by its own columns, in the URL.
+  expect(await page(MountListPage(list({ sort: "-riding" })))).toContain('aria-sort="descending"');
 });
 
 test("the currency list leaves the game's hidden counters out", async () => {

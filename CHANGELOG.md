@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the database lists work as one system: each row starts with the entity's icon and its name in its colour (item quality, a faction's side, a quest's side, a set's classes), columns run name, numbers, where, status, id, a Rows choice of 25, 50 or 100 sits beside the pager (?per=), more columns sort in the URL, the spell list filters by class, game-file lists lead with the unconfirmed mark, and the dungeon list folds into one line per row on a phone.
 - Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.
 - Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.
 - Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).
