@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: dungeon and raid pages give the group size and entrance zone, each boss's level, picture and top drops, and one paged loot table for the whole instance; boss pages give the creature's level and page long loot tables (#1579).
+- Site: player and guild directories show class icons beside names, a separate race column, region chips, sortable guild columns and a fuller phone line (#1582).
 - Site: item pages show the zone each vendor stands in, a recipe's reagents and the skill where it turns yellow and grey, and list vendors first under "Get it from"; the armory talents list sets only numbers in the number font (#1575).
 - Site: item drop sources show the zone each creature stands in and sort by drop chance; long drop lists on item and NPC pages show 25 rows a page with a pager and "Show all"; the "Not yet reported" fact lists its missing facts as small tags (#1576).
 - Site: faction pages show the eight standings, the parent and sub-factions; title pages say prefix or suffix and show the title on a sample name; quest chain pages draw the chain as numbered steps with agreed levels, start NPC and zone, and the three lists gain those columns (#1566).
@@ -323,6 +325,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: the first page a new server instance renders needs about a fifth less memory; the stored aggregates are read as ASCII text and parsed without a reviver, and names files are kept only as the names built from them (#1581).
+- Site: profession, guild, NPC and map data files need less memory and time to read on a new server instance (#1583).
 - Site: auction browse and realm pages are about 40% lighter (760 kB → 450 kB of HTML for 50 rows): coins come from one shared drawing and price cells carry only their amounts. They look the same (#1573).
 - Site: the armory character page's facts strip sits right under the header, the spec cards sit beside the professions on wide screens, and words like "points" and "3 days ago" are no longer set in the number font (#1574).
 - Site: a burst of item pages no longer runs the server out of memory; pages that need the same game-data file at once share one read of it (#1577).
