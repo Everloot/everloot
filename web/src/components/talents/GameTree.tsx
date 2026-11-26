@@ -15,7 +15,7 @@ const GOLD = "#ffd100";
 /** The preview's mark on its node: a ring 7 px out, clear of the frame and of the gold focus ring 2 to 4 px out. */
 const MARK = "pointer-events-none absolute -inset-[7px] border-2 border-accent";
 
-export default function GameTree({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, onAdd, onSelect, onTip }: Props & { assets: GameAssets }) {
+export default function GameTree({ catalog, tree, ranks, available, spent, selected, roving, highlighted = null, assets, readOnly = false, onAdd, onSelect, onTip }: Props & { assets: GameAssets }) {
   const frames = assets.frames;
   const nodes = catalog.nodes.filter((n) => n.treeId === tree.id);
   const rows = Math.max(...nodes.map((n) => n.row));
@@ -84,7 +84,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
 
             if (node.kind === "choice") {
               return (
-                <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available)} data-highlighted={marked || undefined} className="absolute flex items-center justify-center gap-0.5" style={pos}>
+                <div key={node.id} role="group" aria-label={nodeLabel(catalog, node, ranks, available, readOnly)} data-highlighted={marked || undefined} className="absolute flex items-center justify-center gap-0.5" style={pos}>
                   {node.entries.map((entry, i) => {
                     const picked = rank > 0 && ranks[node.id]?.choice === i;
                     const icon = assetOf(assets, entry)?.icon;
@@ -119,7 +119,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                 key={node.id}
                 type="button"
                 id={`talent-${node.id}`}
-                aria-label={nodeLabel(catalog, node, ranks, available)}
+                aria-label={nodeLabel(catalog, node, ranks, available, readOnly)}
                 aria-describedby={`talent-desc-${node.id}`}
                 tabIndex={tabIndex}
                 {...common}

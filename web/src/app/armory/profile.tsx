@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import GameIcon from "@/components/game/GameIcon";
+import ArmoryTalentTrees from "@/components/talents/ArmoryTalentTrees";
+import { armoryBuild, armoryCatalog } from "@/components/talents/armory-build";
 import ItemTip from "@/components/game/ItemTip";
 import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
@@ -117,12 +119,21 @@ export function StatList({ rows }: { rows: NonNullable<Details["statistics"]>["r
 }
 
 /**
- * The talent trees as Blizzard lists them, and a link to the calculator for the class. The armory keeps talent names
- * and ranks, not the calculator's node ids, so the build itself cannot be opened there. `open` lists every talent.
+ * The talent trees drawn as the calculator draws them, read-only, with a link that opens the build there. The armory
+ * keeps Blizzard's talent names and ranks; each must match a node of the class's trees (armory-build.ts). When one does
+ * not, the trees are listed as Blizzard gives them, with the reason, and the link opens the class's empty calculator.
+ * `open` lists every talent in that list.
  */
 export function TalentTrees({ character: c, trees, open = false }: { character: ArmoryCharacter; trees: NonNullable<Details["talents"]>["trees"]; open?: boolean }) {
   const classSlug = classTokenOfName(c.class).toLowerCase();
+  const catalog = armoryCatalog(classSlug);
+  const build = catalog ? armoryBuild(catalog, trees) : null;
+  if (catalog && build?.ok) return <>
+    <ArmoryTalentTrees catalog={catalog} ranks={build.ranks} />
+    <p className="text-sm"><Link href={build.href} className={link}>Open this build in the calculator</Link></p>
+  </>;
   return <>
+    {build && !build.ok && <p className="text-sm text-fg-2">Shown as a list: {build.reason}</p>}
     <div className="divide-y divide-line">
       {trees.map((tree) => <div key={tree.name} className="py-3">
         <p className="flex justify-between gap-3 text-sm text-fg"><span>{tree.name}</span><span className="font-mono tabular-nums">{tree.points} points</span></p>
