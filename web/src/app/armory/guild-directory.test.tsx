@@ -48,6 +48,8 @@ const pages = {
   board: async (metric: string, search: Record<string, string> = {}) => (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric }), searchParams: Promise.resolve(search) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
+/** The roster section alone: the top five above it names members too. */
+const roster = (out: string) => out.slice(out.indexOf('aria-labelledby="armory-roster"'));
 
 describe("the guild directory", () => {
   test("is a 404 on /guilds with the armory and guild switches off", async () => {
@@ -176,7 +178,7 @@ describe("the guild page summary", () => {
 
   test("sort parameters order roster rows and keep unread item levels last", async () => {
     for (const [sort, first, last] of [["rank", "Brannoc", "Torvin"], ["level", "Velkara", "Brannoc"], ["item-level", "Velkara", "Brannoc"], ["name", "Brannoc", "Velkara"], ["invalid", "Brannoc", "Torvin"]]) {
-      const out = await html(pages.guild("eu", "ember-wardens", { sort: sort! }));
+      const out = roster(await html(pages.guild("eu", "ember-wardens", { sort: sort! })));
       expect(out.indexOf(first!)).toBeLessThan(out.indexOf(last!));
       expect(out).toContain(`?sort=item-level`);
     }
@@ -223,11 +225,56 @@ test("ranking rows carry the region chip, and each side-by-side column its regio
   expect(await html(pages.board("item-level"))).toMatch(/id="board-us"[^>]*><span data-region="us"[^>]*>US<\/span>Item level/);
 });
 
-test("the roster comes first, then progression, then the summary charts", async () => {
+test("the summary strip and class bar come first, then the top five, the roster, progression and the full charts", async () => {
   const result = await html(pages.guild("eu", "ember-wardens"));
-  expect(result).toContain("data-guild-progression-hook");
-  expect(result.indexOf('aria-labelledby="armory-roster"')).toBeLessThan(result.indexOf("data-guild-progression-hook"));
-  expect(result.indexOf("data-guild-progression-hook")).toBeLessThan(result.indexOf('aria-labelledby="armory-summary"'));
+  const at = (s: string) => { expect(result).toContain(s); return result.indexOf(s); };
+  expect(at("data-guild-header")).toBeLessThan(at("data-guild-summary"));
+  expect(at("data-guild-summary")).toBeLessThan(at("data-class-bar"));
+  expect(at("data-class-bar")).toBeLessThan(at('aria-labelledby="guild-top"'));
+  expect(at('aria-labelledby="guild-top"')).toBeLessThan(at('aria-labelledby="armory-roster"'));
+  expect(at('aria-labelledby="armory-roster"')).toBeLessThan(at("data-guild-progression-hook"));
+  expect(at("data-guild-progression-hook")).toBeLessThan(at('aria-labelledby="armory-summary"'));
+  expect(at('aria-labelledby="armory-summary"')).toBeLessThan(at('data-population="classes"'));
+});
+
+test("the summary strip drops the region the header already gives; the class bar names each class with its count", async () => {
+  const out = await html(pages.guild("eu", "ember-wardens"));
+  const strip = out.slice(out.indexOf("data-guild-summary"), out.indexOf('aria-labelledby="guild-top"'));
+  expect(strip).not.toContain(">Region<");
+  expect(strip).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
+  expect(strip).toContain("53.7 (2 read)");
+  const bar = strip.slice(strip.indexOf("data-class-bar"));
+  expect(bar).toContain('aria-label="Class mix: Hunter 2, Warrior 1"');
+  expect(bar).toContain("bg-class-hunter");
+  expect(bar).toMatch(/width:66\.7%/);
+});
+
+test("the top five by item level link to the members, highest first, and leave out members not read", async () => {
+  mem.putCharacter(armoryCharacter({ slug: "brannoc-tide", name: "Brannoc", surname: "Tide", class: "Hunter", classId: 3, level: 41, itemLevel: 61, fetchedAt: "2026-11-09T11:30:00.000Z" }));
+  const out = await html(pages.guild("eu", "ember-wardens"));
+  const top = out.slice(out.indexOf('aria-labelledby="guild-top"'), out.indexOf('aria-labelledby="armory-roster"'));
+  expect(top).toContain("Top item levels");
+  const order = ["/armory/eu/brannoc-tide", "/armory/eu/velkara-duskmantle", "/armory/eu/torvin-ashbrook"].map((h) => top.indexOf(`href="${h}"`));
+  expect(order.every((i) => i >= 0)).toBe(true);
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+  await mem.hide("eu", "brannoc-tide");
+  const hidden = await html(pages.guild("eu", "ember-wardens"));
+  expect(hidden.slice(hidden.indexOf('aria-labelledby="guild-top"'), hidden.indexOf('aria-labelledby="armory-roster"'))).not.toContain("brannoc-tide");
+});
+
+test("no top five when no member has an item level read", async () => {
+  mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), [{ characterSlug: "nobody-read", name: "Nobody", surname: "Read", level: 20, classId: 1, raceId: 1, rank: 0 }]);
+  const out = await html(pages.guild("eu", "wardens"));
+  expect(out).not.toContain('aria-labelledby="guild-top"');
+  expect(out).toContain("data-guild-summary");
+});
+
+test("the roster names rank 0 Guild Master and the others Rank n", async () => {
+  const out = await html(pages.guild("eu", "ember-wardens"));
+  const roster = out.slice(out.indexOf('aria-labelledby="armory-roster"'));
+  expect(roster).toContain(">Guild Master<");
+  expect(roster).toContain(">Rank 1<");
+  expect(roster).toContain(">Rank 2<");
 });
 
 describe("the guild home", () => {
@@ -255,14 +302,14 @@ describe("the guild home", () => {
   });
 
   test("sorts both ways by any column and filters by class and level, all in the address", async () => {
-    const byLevelUp = await html(pages.guild("eu", "ember-wardens", { sort: "level", dir: "asc" }));
+    const byLevelUp = roster(await html(pages.guild("eu", "ember-wardens", { sort: "level", dir: "asc" })));
     expect(byLevelUp.indexOf("Brannoc")).toBeLessThan(byLevelUp.indexOf("Velkara"));
-    const byLevelDown = await html(pages.guild("eu", "ember-wardens", { sort: "level" }));
+    const byLevelDown = roster(await html(pages.guild("eu", "ember-wardens", { sort: "level" })));
     expect(byLevelDown.indexOf("Velkara")).toBeLessThan(byLevelDown.indexOf("Brannoc"));
     expect(byLevelDown).toContain('href="/armory/eu/guilds/ember-wardens?sort=level&amp;dir=asc"');
-    const byLogin = await html(pages.guild("eu", "ember-wardens", { sort: "last-login" }));
+    const byLogin = roster(await html(pages.guild("eu", "ember-wardens", { sort: "last-login" })));
     expect(byLogin.indexOf("Torvin")).toBeLessThan(byLogin.indexOf("Brannoc"));
-    const warriors = await html(pages.guild("eu", "ember-wardens", { class: "warrior" }));
+    const warriors = roster(await html(pages.guild("eu", "ember-wardens", { class: "warrior" })));
     expect(warriors).toContain("Torvin Ashbrook");
     expect(warriors).not.toContain("Velkara Duskmantle</a>");
     expect(warriors).toContain('href="/armory/eu/guilds/ember-wardens?class=warrior&amp;sort=name&amp;dir=asc"');

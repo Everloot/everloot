@@ -52,6 +52,8 @@ const pages = {
   submit: async (search: Record<string, string> = {}) => (await import("./submit/page")).default({ searchParams: Promise.resolve(search) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
+/** The roster section alone: the top five above it names members too. */
+const roster = (out: string) => out.slice(out.indexOf('aria-labelledby="armory-roster"'));
 
 test("with the switch off every armory page is a 404, says Page not found, and reads nothing", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "");
@@ -215,7 +217,7 @@ describe("the guild page", () => {
     expect(out).toContain("2026-10-01");
     expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
     expect(out).not.toContain('href="/armory/eu/brannoc-tide"');
-    expect(out.indexOf("Brannoc")).toBeLessThan(out.indexOf("Velkara"));
+    expect(roster(out).indexOf("Brannoc")).toBeLessThan(roster(out).indexOf("Velkara"));
     expect(out).toContain("text-class-hunter");
     expect(out).toContain(">Unknown<");
     expect(out).toContain("57.41");

@@ -31,3 +31,31 @@ test("hub hook adds a public score board alongside the raid board only for posit
   expect(html).toContain('href="/armory/eu/guilds/invented-watch"');
   expect(html).toContain('aria-labelledby="board-raids"');
 });
+
+test("only instances with a kill are listed; the rest fold behind one closed disclosure, and the notes print once", async () => {
+  const rows = guildProgression([base], []);
+  loader.mockResolvedValue({ score: 10, links: {}, instances: [
+    { ...rows[0], id: 33, name: "Killed Keep", state: "partial", killed: 1 },
+    { ...rows[0], id: 34, name: "Quiet Vault", state: "none", killed: 0 },
+    { ...rows[0], id: 35, name: "Silent Spire", group: "Raids", state: "none", killed: 0 },
+  ] });
+  const html = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
+  const [open, folded] = html.split("<details");
+  expect(open).toContain("Killed Keep");
+  expect(open).not.toContain("Quiet Vault");
+  expect(open).not.toContain(">Raids</h3>");
+  expect(folded).toContain("2 instances with no kills yet");
+  expect(folded).toContain("Quiet Vault");
+  expect(folded).toContain("Silent Spire");
+  expect(html).not.toContain("<details open");
+  expect(html.match(/not a Blizzard release announcement/g)).toHaveLength(1);
+});
+
+test("a guild with no kills says so in one line above the folded list", async () => {
+  const rows = guildProgression([base], []);
+  loader.mockResolvedValue({ score: 0, links: {}, instances: [{ ...rows[0], state: "none", killed: 0 }] });
+  const html = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
+  expect(html).toContain("No roster member has a synced kill yet.");
+  expect(html).toContain("1 instance with no kills yet");
+  expect(html.indexOf("No roster member has a synced kill yet.")).toBeLessThan(html.indexOf("<details"));
+});
