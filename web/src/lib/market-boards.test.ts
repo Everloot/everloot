@@ -50,6 +50,17 @@ test("the stored boards equal what realmBoards builds, for every house and for a
   expect(view.boards("Horde")).toBe(view.boards("Horde"));
 });
 
+test("a house's rows are read back from the file once, shared by its board and the all-houses board", async () => {
+  const view = boardsFromFile(await roundTrip());
+  const all = view.boards(null);
+  for (const house of HOUSES) {
+    for (const board of view.boards(house)) {
+      const whole = all.find((b) => b.realm.key === board.realm.key)!;
+      for (const row of board.rows) expect(whole.rows).toContain(row);
+    }
+  }
+});
+
 test("the realms below the gate and the agreement meter equal the rollup's, and no reporter is named", async () => {
   const file = await roundTrip();
   const view = boardsFromFile(file);

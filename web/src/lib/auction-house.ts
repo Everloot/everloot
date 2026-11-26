@@ -184,6 +184,18 @@ const boardsOf = (source: BoardSource, now: Date, house: AuctionHouse | null) =>
   typeof source === "function" ? source(house) : realmBoards(source, now, house);
 
 const boardsMemo = new WeakMap<MarketState, Map<string, { day: number; boards: RealmBoard[] }>>();
+/** Each realm's house boards, by `realm key|house`, for one day of one rollup. */
+const houseMemo = new WeakMap<MarketState, { day: number; parts: Map<string, ReturnType<typeof houseBoard>> }>();
+
+/** `houseBoard`, built once per rollup and day: a house's board and the all-houses board share its rows. */
+function houseBoardOnce(state: MarketState, key: string, now: Date, house: AuctionHouse): ReturnType<typeof houseBoard> {
+  const day = todayNumber(now);
+  let memo = houseMemo.get(state);
+  if (!memo || memo.day !== day) houseMemo.set(state, memo = { day, parts: new Map() });
+  const id = `${key}|${house}`;
+  if (!memo.parts.has(id)) memo.parts.set(id, houseBoard(state, key, now, house));
+  return memo.parts.get(id)!;
+}
 
 /**
  * Every realm with a public value, the busiest first: with `house` that house's own market on each realm; without it
@@ -198,7 +210,7 @@ export function realmBoards(state: MarketState, now: Date = new Date(), house: A
   const keys = house ? houseRealmKeys(state, house) : [...new Set(HOUSES.flatMap((h) => houseRealmKeys(state, h)))];
   const boards = keys
     .map((key) => {
-      const parts = (house ? [house] : HOUSES).map((h) => houseBoard(state, key, now, h)).filter((p) => p !== null);
+      const parts = (house ? [house] : HOUSES).map((h) => houseBoardOnce(state, key, now, h)).filter((p) => p !== null);
       return !parts.length ? null : house ? parts[0]!.board : allHouses(parts);
     })
     .filter((b): b is RealmBoard => b !== null)
@@ -382,14 +394,24 @@ export interface Move {
   change: number;
 }
 
+const moveMemo = new WeakMap<MarketRow, Map<string, Move | null>>();
+
 /**
  * The market value's move over a day or a week, by the rule the price file's `change1d` uses (kb/src/market.ts):
  * the newest solid day (today or yesterday) against the solid day `span` days before it. A value that did not
  * move is no move for the boards: null, as without a pair.
  */
 export function priceMove(row: MarketRow, span: MoveSpan, now: Date): Move | null {
-  const move = priceMoveOf(row.points, span, now);
-  return move && move.change !== 0 ? { row, ...move } : null;
+  // Worked out once per row, span and day: the ruleset summary, the results and their sort all read every row's week.
+  const id = `${span}:${todayNumber(now)}`;
+  let memo = moveMemo.get(row);
+  if (!memo) moveMemo.set(row, memo = new Map());
+  if (memo.has(id)) return memo.get(id)!;
+  if (memo.size >= 4) memo.clear();
+  const found = priceMoveOf(row.points, span, now);
+  const move = found && found.change !== 0 ? { row, ...found } : null;
+  memo.set(id, move);
+  return move;
 }
 
 export const SPARK_DAYS = 14;

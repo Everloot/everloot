@@ -142,10 +142,20 @@ export function parseHouse(text: string): AuctionHouse | null {
 const dayString = (n: number) => new Date(n * DAY_MS).toISOString().slice(0, 10);
 const today = (now: Date) => Math.floor(now.getTime() / DAY_MS);
 
+/**
+ * Day numbers by day string, read once each: a rollup holds a few dozen days, and every item's days are read on each
+ * board, move and value. Cleared when full, so day strings from uploads cannot grow it without bound.
+ */
+const dayNumbers = new Map<string, number | null>();
+
 function dayNumber(day: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  const ms = Date.parse(`${day}T00:00:00Z`);
-  return Number.isFinite(ms) ? Math.floor(ms / DAY_MS) : null;
+  const kept = dayNumbers.get(day);
+  if (kept !== undefined) return kept;
+  const ms = /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T00:00:00Z`) : NaN;
+  const n = Number.isFinite(ms) ? Math.floor(ms / DAY_MS) : null;
+  if (dayNumbers.size >= 4096) dayNumbers.clear();
+  dayNumbers.set(day, n);
+  return n;
 }
 
 /** Days from the last 60 up to one day ahead (client clocks drift). */

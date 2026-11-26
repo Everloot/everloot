@@ -200,3 +200,30 @@ test("one item's rows and a slug's realm read from the rollup match the boards, 
   realmBoards(structuredClone(houses), now);
   expect(new Set(reads.mock.calls.map((c) => c[2]))).toEqual(new Set([765, 2589]));
 });
+
+test("each house's board is built once per rollup and day: the one-house and all-houses boards share its rows", () => {
+  const rollup = foldMarket(emptyMarket(), [...scans("Forever", 0, [[2589, 205], [765, 33]]), ...scans("Mal'Ganis", 0, [[2589, 300]])], now);
+  const fresh = realmBoards(structuredClone(rollup), now, "Horde");
+  const all = realmBoards(rollup, now);
+  const reads = vi.mocked(market.itemMarket);
+  reads.mockClear();
+  const horde = realmBoards(rollup, now, "Horde");
+  expect(reads).not.toHaveBeenCalled();
+  // The same rows as a house board built on its own, and the very rows of the all-houses board.
+  expect(horde).toEqual(fresh);
+  for (const [i, board] of horde.entries()) for (const row of board.rows) expect(all[i]!.rows).toContain(row);
+  // The next day builds again.
+  reads.mockClear();
+  realmBoards(rollup, new Date(now.getTime() + 86_400_000), "Horde");
+  expect(reads).toHaveBeenCalled();
+});
+
+test("a row's move is worked out once a day: every list that reads it gets the same answer", () => {
+  const row = realmBoards(state, now)[0]!.rows.find((r) => r.value.itemId === 2592)!;
+  const week = priceMove(row, 7, now);
+  expect(week).not.toBeNull();
+  expect(priceMove(row, 7, new Date(now.getTime() + 3_600_000))).toBe(week);
+  expect(priceMove(row, 1, now)).toBeNull();
+  // Another day is worked out again, since which days pair depends on the day.
+  expect(priceMove(row, 7, new Date(now.getTime() + 86_400_000))).not.toBe(week);
+});
