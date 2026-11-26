@@ -97,3 +97,11 @@ test.each(PAGES)("the %s page fills the entity template's slots in its one order
   expect(footer).toContain("Copy for AI");
   expect(footer).toContain("Report wrong data");
 });
+
+test("a spell page fills the changes slot only when the spell changed in a live build", async () => {
+  // Vampiric Embrace's numbers changed in 1.60.1.71037; spell 2963 never changed.
+  const changed = renderToStaticMarkup(await SpellPage(id("15286")));
+  expect(changed).toContain('data-slot="changes"');
+  expect(changed).toContain("1.60.1.71037");
+  expect(renderToStaticMarkup(await SpellPage(id("2963")))).not.toContain('data-slot="changes"');
+});

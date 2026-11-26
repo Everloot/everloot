@@ -28,6 +28,9 @@ const Where = z.object({
   /** Talent name; a choice or tiered node joins its entries with " / ". */
   name: z.string(),
   spoiler: z.boolean(),
+  /** The spells the node holds (before the change for a removed node), so a spell's page finds its talent's changes.
+   *  Absent in entries written before 2026-11-26; an optional addition, so the schema string stays. */
+  spellIds: z.array(z.number().int()).optional(),
 });
 
 const Position = z.object({ tree: z.string().nullable(), x: z.number().int(), y: z.number().int(), row: z.number().int(), col: z.number().int() });

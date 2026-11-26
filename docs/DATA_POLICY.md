@@ -751,6 +751,8 @@ its build and is labelled *found in game files, unconfirmed*. Anything that coul
 unreleased content is marked as a spoiler and hidden on the site unless the reader turns spoilers
 on; the repository itself is public, so the marking is a warning, not a lock. Encrypted content
 stays out, because we never decrypt. Description and tooltip text is not part of these files.
+The spell and zone pages show their own lines from these entries (decided 2026-11-26): the same
+values, labelled the same way, and only from live builds and items not marked as spoilers.
 
 **Blizzard's own posts.** The "what changed" page at `/changes` lists posts by Blizzard staff on
 the WoW forum and by the official World of Warcraft account on Bluesky, and the game builds
