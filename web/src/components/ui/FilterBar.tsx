@@ -74,7 +74,7 @@ function Controls({ search, controls, active, clearHref, phone, nofollow }: Filt
   return (
     <>
       {search && (
-        <form action={search.action} method="get" role="search" className={`flex ${phone ? "w-full" : ""}`}>
+        <form action={search.action} method="get" role="search" aria-label={search.label} className={`flex ${phone ? "w-full" : ""}`}>
           {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <label htmlFor={phone ? "filter-q-phone" : "filter-q"} className="sr-only">{search.label}</label>
           <input

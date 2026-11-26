@@ -141,9 +141,12 @@ export const MapName = ({ mapId }: { mapId: number }) => <span title={`UiMap ${m
 /** The header of a pin table's link column: the <th> has a name for screen readers and no visible word. */
 export const MAP_LINK_HEADER = <span className="sr-only">Map link</span>;
 
-/** A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same. */
+/**
+ * A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same; the
+ * place follows the visible words, so the link's name starts with what is on screen (WCAG 2.5.3).
+ */
 export function ShowOnMap({ href, mapId, x, y }: { href: string; mapId: number; x: number; y: number }) {
-  return <Link href={href} className={LINK} aria-label={`Show ${zoneName(mapId)} at ${x}, ${y} on the map`}>Show on the map</Link>;
+  return <Link href={href} className={LINK}>Show on the map<span className="sr-only">: {zoneName(mapId)} at {x}, {y}</span></Link>;
 }
 
 /** A position 3 installs agree on: the UiMap and the point on it, with how many installs reported it. */

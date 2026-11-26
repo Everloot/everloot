@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: the home page opens on live data under the hero: the newest facts to reach three installs (with item icons and quality colours), the top of the guild ladder and this week's census class shares with the top movers. Each panel says so on its own when its read fails. Start here is one row of five, and the trust figures' labels are sans.
+- Site: a character page opens on the verdict: a facts strip (item level, Gear Score, honorable kills, achievements, quests, read age), rank badges with their region and ruleset, spec cards and profession bars above the gear; an empty dungeons-and-raids section is one line.
 - Site: NPC pages read like a database entry: level, rank badge, type, reaction and zone link under the name; tabs in order Drops, Sells, Starts, Ends, Boss, Map with empty ones left out; drop and goods items in their quality colour, and the drops table sorts by item, count or rate. The NPC list shows ranks as badges and links zones.
 - Site: quest pages show the side in its faction colour, the type (group, dungeon, raid) and category in the header, Start and End NPCs, rewards with icons in their quality colour, and the quest chain as a row of steps with this quest marked.
 - Site: item tooltips show "This Item Begins a Quest", link Use and Equip lines to the spell page on the item page, and sum up players' reported numbers in one line with each number's installs, build and date behind it.
@@ -303,6 +304,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: item, NPC, zone and instance pages load 12 to 15 kB less compressed script (the switched-off comments and screenshots code no longer rides along), and screen readers get distinct names for search boxes and tables plus map links whose name starts with the words on screen.
 - Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.

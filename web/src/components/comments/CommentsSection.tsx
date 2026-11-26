@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
-import { SectionHeading } from "@/components/ui";
+import SectionHeading from "@/components/ui/SectionHeading";
 import { signInPath } from "@/lib/auth/return-to";
 import { COMMENT_LINK_HOSTS } from "@/lib/comment-markup";
 import {

@@ -263,7 +263,7 @@ export default async function ZonePage(props: Props) {
       { key: "at", header: "Position", numeric: true, cell: (p) => (p.x !== null && p.y !== null ? position(p.x, p.y) : "–") },
       { key: "show", header: <span className="sr-only">Map link</span>, cell: (p) => {
         const href = p.x !== null && p.y !== null ? pinLink(zone.mapId, p.x, p.y) : null;
-        return href ? <Link href={href} className={link} aria-label={`Show ${p.name} on the map`}>Show on the map</Link> : null;
+        return href ? <Link href={href} className={link}>Show on the map<span className="sr-only">: {p.name}</span></Link> : null;
       } },
     ];
     all.push({ id: "places", label: "Places", count: places.pois.length + places.subzones.length, panel: <>
