@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import {
   MARKET_LIMITS, MARKET_MAX_BYTES, MAX_PRICE_ROWS, OPEN_DAYS, THIN_UNITS, TRUSTED_ONLY_TEXT, change1d, coverageText, emptyMarket, foldMarket, handleMarketValue,
   itemListings, itemMarket, marketBytes, marketCoverage, marketHouses, marketPrices, marketRealms, marketUpdatedAt, parseHouse, realmMarket, trimMarket,
@@ -612,4 +612,19 @@ test("market_value says what each value rests on", () => {
   const ownText = handleMarketValue({ realm: "Forever", itemId: 2589 }, foldMarket(emptyMarket(), own, NOW, {}, undefined, new Set(["install-own"])), NOW);
   expect(ownText).toContain("Market value: 1s 10c, from 1 solid day in the last 14");
   expect(ownText).toContain(TRUSTED_ONLY_TEXT);
+});
+
+test("a day's date is read once, however many items and reads carry it", () => {
+  const items = Array.from({ length: 40 }, (_, i) => [3000 + i, 4, 80, 100, 110]);
+  const state = foldMarket(emptyMarket(), ["install-a", "install-b", "install-c"].map((id) => snapshot(id, "2026-10-18", items)), NOW);
+  const parse = vi.spyOn(Date, "parse");
+  try {
+    for (const [itemId] of items) {
+      expect(itemMarket(state, "Forever", itemId!, NOW).points.map((p) => p.day)).toEqual(["2026-10-18"]);
+      itemListings(state, "Forever", itemId!, NOW);
+    }
+    expect(parse.mock.calls.filter(([text]) => text === "2026-10-18T00:00:00Z").length).toBeLessThanOrEqual(1);
+  } finally {
+    parse.mockRestore();
+  }
 });

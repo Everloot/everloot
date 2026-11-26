@@ -110,9 +110,20 @@ export async function buildMarketBoards(state: MarketState, marketAsOf: string, 
 /** The pages' view of a stored file: the boards put back together once per house and kept with the file. */
 export function boardsFromFile(file: BoardsFile): MarketBoards {
   const refs = new Map<string, RealmRef>(file.realms.map((r) => [r.key, { key: r.key, name: r.name, slug: realmSlug(r.name), ruleset: realmRuleset(r.name) }]));
-  const rowsOf = (r: StoredRealm, house: AuctionHouse): MarketRow[] => (r.houses[house]?.rows ?? []).map((row) => ({
-    realm: refs.get(r.key)!, house, value: row.value, points: row.points.map(unpoint), listings: row.listings, updatedAt: row.updatedAt,
-  }));
+  // Each realm's house rows are read back once and shared by that house's board and the all-houses board.
+  const read = new Map<string, MarketRow[]>();
+  const rowsOf = (r: StoredRealm, house: AuctionHouse): MarketRow[] => {
+    const id = `${r.key}|${house}`;
+    let rows = read.get(id);
+    if (!rows) {
+      rows = (r.houses[house]?.rows ?? []).map((row) => ({
+        realm: refs.get(r.key)!, house, value: row.value, points: row.points.map(unpoint), listings: row.listings, updatedAt: row.updatedAt,
+      }));
+      read.set(id, rows);
+    }
+    // `board` sorts the list it is given, so each board gets its own list of the shared rows.
+    return [...rows];
+  };
   const made = new Map<AuctionHouse | null, RealmBoard[]>();
   const boards = (house: AuctionHouse | null) => {
     let hit = made.get(house);
