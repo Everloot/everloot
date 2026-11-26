@@ -22,12 +22,9 @@ import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
+import { unknownVendor } from "../../unknown";
 
 export const dynamic = "force-dynamic";
-
-/** An NPC no vendor row names: a 404 (uploads are the only list of vendors). Unreachable storage rules nothing out. */
-const unknownVendor = (vendorNpcId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>) =>
-  !facts.unreachable && !facts.vendors.some((r) => r.vendorNpcId === vendorNpcId);
 
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const params = await props.params;
@@ -37,7 +34,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   if (unknownVendor(page.vendorNpcId, facts)) notFound();
   const name = (facts.unreachable ? undefined : npcNames(facts).get(page.vendorNpcId)) ?? `Vendor ${params.id}`;
   return {
-    ...pageMetadata({ title: entityTitle(name, "vendor"), description: vendorDescription({ name, id: page.vendorNpcId, offers: facts.unreachable ? 0 : page.offers.length }), path: `/database/vendors/${params.id}` }),
+    ...pageMetadata({ title: entityTitle(name, "vendor"), description: vendorDescription({ name, id: page.vendorNpcId, offers: facts.unreachable ? 0 : page.offers.length }), path: `/database/vendors/${params.id}`, image: `${`/database/vendors/${params.id}`}/opengraph-image` }),
     robots: { index: vendorIndexable(page, facts.unreachable), follow: true },
   };
 }
@@ -107,7 +104,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         />
         <EntitySidebar>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
+          <OpenData report={{ type: "Vendor", id: page.vendorNpcId, path: `/database/vendors/${page.vendorNpcId}` }}
             text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
             // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
             jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}

@@ -28,7 +28,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (!holiday) return { robots: { index: false, follow: true } };
   const lasts = lastsLabel(holiday.hours);
   return {
-    ...pageMetadata({ title: `${holiday.name} (holiday)`, description: `${holiday.name} in WoW: Forever${lasts ? `, lasting ${lasts}` : ""}. ${CLIENT_LABEL}.`, path: holidayHref(holiday.id, holiday.name) }),
+    ...pageMetadata({ title: `${holiday.name} (holiday)`, description: `${holiday.name} in WoW: Forever${lasts ? `, lasting ${lasts}` : ""}. ${CLIENT_LABEL}.`, path: holidayHref(holiday.id, holiday.name), image: `${holidayHref(holiday.id, holiday.name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -75,7 +75,7 @@ export default async function HolidayPage(props: Props) {
         />
         <p className="mb-4 text-meta text-muted">Times are server time, as the game files give them.</p>
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData text={[`${holiday.name} (holiday ${holiday.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
+        <OpenData report={{ type: "Holiday", id: holiday.id, path }} text={[`${holiday.name} (holiday ${holiday.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
       </article>
     </Container>
   );

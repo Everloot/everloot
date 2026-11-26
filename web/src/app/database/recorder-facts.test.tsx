@@ -65,7 +65,8 @@ test("the item and object pages count the windows, and the object page pins the 
   const { Item, Obj } = await pages();
   const item = await html(Item(props("2230")));
   expect(item).toContain("6 more loot windows with this item reported, not yet in the rates.");
-  expect(item).not.toContain("%");
+  // No rate on the page; the Report wrong data link's href is URL-encoded, so it is left out of the check.
+  expect(item.replace(/href="https:\/\/github\.com\/Everloot\/everloot\/issues\/new\?[^"]*"/g, "")).not.toContain("%");
   const object = await html(Obj(props("2843")));
   expect(object).toContain("Battered Chest");
   expect(object).toContain("3 more loot windows reported, not yet in the rates.");
