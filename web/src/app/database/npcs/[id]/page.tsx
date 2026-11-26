@@ -16,6 +16,8 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { DataTable, Tabs, TooltipFrame } from "@/components/ui";
 import { EMPTY, EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
+import EntityMap from "../../EntityMap";
+import { entityMapZones } from "../../entity-map";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
@@ -99,8 +101,11 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   // Item names (and icons, when the game files have them) for the drop and goods lists; an item nobody named stays "Item N".
   const itemFacts = unreachable || (dropped.length === 0 && goods.length === 0) ? null : await loadItemFacts();
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const assets = dropped.length > 0 || goods.length > 0 || zone ? await loadSiteAssets() : null;
+  const pins = unreachable ? [] : page.pins;
+  const assets = dropped.length > 0 || goods.length > 0 || pins.length > 0 ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, [...dropped.map((row) => row.itemId), ...goods.map((o) => o.itemId)]);
+  // The map slot draws every agreed position on its zone's art; the pin table below is its text.
+  const mapZones = entityMapZones(pins.map((p) => ({ kind: "npc", mapId: p.mapId, x: p.x, y: p.y, label: title, agreed: true })), assets?.maps);
   const art = zone ? assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) : undefined;
   const lore = !unreachable && page.name ? await loreFor("npc", npcId, page.name) : null;
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
@@ -137,7 +142,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
       }}
       railMap
       // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
-      box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
+      // With the map slot drawn, the thumbnail would be a second copy of it.
+      box={firstPin && mapZones.length === 0 && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
         <TooltipFrame name={title} label={`${title}, as players saw it`}>
           <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>
         </TooltipFrame>
@@ -155,6 +161,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
       ]}
       media={picture && <ModelPicture picture={picture} name={title} />}
       summary={summary}
+      map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
       main={<Tabs
         label={`${title}: relations`}
         tabs={[

@@ -211,12 +211,13 @@ export function EntitySidebar({ children }: { children: ReactNode }) {
  * The slots of an entity page, in the order every page renders them (each one a `data-slot`). `side` holds `media`
  * then `summary`: the xl rail, inline under the top band below xl. A slot with nothing in it renders nothing.
  */
-export const ENTITY_SLOTS = ["header", "top", "notices", "side", "media", "summary", "main", "related", "map", "changes", "screenshots", "comments", "footer"] as const;
+export const ENTITY_SLOTS = ["header", "top", "notices", "side", "media", "summary", "map", "main", "related", "changes", "screenshots", "comments", "footer"] as const;
 
 /**
  * The one template every database entity page fills, so they all read alike: the header (icon, name, type line), the
  * top band (tooltip box or art, and the quick facts), any notices about them, the side column (a model picture or map,
- * then In short), the main tabs, related (lore, more sections), map, changes, screenshots, comments, and last the
+ * then In short), the map of its positions (before the tabs, whose pin tables are its text), the main tabs, related
+ * (lore, more sections), changes, screenshots, comments, and last the
  * open-data row with its Report wrong data link and any credit line. Pages pass what they have; they never reorder.
  */
 export function EntityPage({
@@ -237,6 +238,7 @@ export function EntityPage({
   summary?: readonly string[];
   main?: ReactNode;
   related?: ReactNode;
+  /** Where it stands: an EntityMap of the positions the pin tables list, or nothing without them or without map art. */
   map?: ReactNode;
   /** This entity's changes across builds: a later lane fills it. */
   changes?: ReactNode;
@@ -260,9 +262,9 @@ export function EntityPage({
             {inShort && <div data-slot="summary"><InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} /></div>}
           </EntitySidebar>
         )}
+        {map && <div data-slot="map" className="mt-6">{map}</div>}
         {main && <div data-slot="main" className="mt-6">{main}</div>}
         {related && <div data-slot="related" className="mt-6 space-y-6 empty:hidden">{related}</div>}
-        {map && <div data-slot="map">{map}</div>}
         {changes && <div data-slot="changes">{changes}</div>}
         {screenshots && <div data-slot="screenshots">{screenshots}</div>}
         {comments && <div data-slot="comments">{comments}</div>}
