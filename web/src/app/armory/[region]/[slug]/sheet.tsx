@@ -70,8 +70,8 @@ export function CharacterOverview({ character: c }: { character: ArmoryCharacter
           <h2 id="armory-spec" className="text-h2 text-fg">Specialization</h2>
           <a href="#talents" className={`text-sm ${link}`}>Talent details</a>
         </div>
-        <ul className="grid grid-cols-3 gap-2">
-          {trees.map((tree, i) => <li key={tree.name} data-spec-card={tree.name} className="min-w-0 rounded-card border border-line bg-panel p-3"><p className={`text-sm [overflow-wrap:anywhere] ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.name}</p>
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+          {trees.map((tree, i) => <li key={tree.name} data-spec-card={tree.name} className="min-w-0 rounded-card border border-line bg-panel p-3"><p className={`text-sm [overflow-wrap:break-word] ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.name}</p>
             <p className={`font-mono text-lg tabular-nums ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.points} points</p>
           </li>)}
         </ul>
