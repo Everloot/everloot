@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Container, DataTable, Disclosure, EmptyState, Facts, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type Fact, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Container, DataTable, Disclosure, Facts, filledColumns, InShort, OpenData, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
@@ -21,13 +21,14 @@ import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { npcLootTable } from "@kb/loot-tables";
 import EntityLink from "@/components/EntityLink";
-import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadingArt, loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { CLIENT_LAYER } from "@/lib/items";
 import { gearFor, instanceTerrain, TERRAIN_BUILD, TERRAIN_PATH } from "@/lib/terrain";
 import TerrainGearTable from "@/components/TerrainGearTable";
 import { itemNames, npcNames } from "@/lib/names";
 import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
-import { EntityHeader, EntityTop, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityArt, EntityHeader, EntityLayout, EntitySidebar, EntityTop, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
 import { loreFor } from "@/lib/lore-links";
@@ -87,7 +88,11 @@ export default async function InstancePage(props: Props) {
   const canonical = instanceHref(row.instanceMapId, row.name);
   if (`/database/instances/${segment}` !== canonical) permanentRedirect(canonical);
   const title = instanceTitle(row);
-  const empty = (message: string) => <EmptyState message={message} framed={false} />;
+  // An empty list is one muted line, aligned with the table's cells, as on the zone pages.
+  const empty = (message: string) => <div className="px-3"><EmptyTab message={message} players={false} action={null} /></div>;
+  const assets = await loadSiteAssets();
+  // The loading screen is the page's picture: a crop of it as the header icon, the whole of it as the top band's box.
+  const loading = loadingArt(assets, row.instanceMapId);
   const prep = prepPage(row.instanceMapId);
   // The archive files an instance as a zone page; the match is by the game files' name for it.
   const lore = await loreFor("instance", row.instanceMapId, row.name);
@@ -147,7 +152,7 @@ export default async function InstancePage(props: Props) {
   const [spellNames, setNames] = gear.length
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
-  const tips = await loadItemTips(droppedIds.length || gearIds.length ? await loadSiteAssets() : null, [...droppedIds, ...gearIds]);
+  const tips = await loadItemTips(droppedIds.length || gearIds.length ? assets : null, [...droppedIds, ...gearIds]);
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
   const world = unreachable || row.name === null ? null : await loadWorldFacts();
@@ -196,17 +201,136 @@ export default async function InstancePage(props: Props) {
     </> },
   ];
 
-  const unconfirmed = row.reported > 0
-    ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
-    : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place.";
+  // The page's sections as tabs, like every other entity page. Each keeps its tab even when empty (no 0 count), so
+  // its one line saying what is missing stays; a tab's count is its rows.
+  const tabs: TabItem[] = [
+    {
+      id: "bosses", label: "Bosses", count: bosses.length || undefined,
+      panel: (
+        <DataTable
+          dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
+          meta={anyReport ? bossMeta : undefined}
+          footer={bosses.length > 0 && !anyBossReported ? (unreachable
+            ? "Players' reports cannot be shown right now; this list is the game files' own."
+            : anyReport
+              ? "No boss here has 3 installs reporting it yet. Kills and last seen show once one does."
+              : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
+          empty={empty(EMPTY.bosses)}
+        />
+      ),
+    },
+    {
+      id: "loot", label: "Loot",
+      panel: unreachable || loot?.unreachable ? <Unreachable />
+        : lootBosses.length === 0 ? <EmptyTab message={EMPTY.bossLoot} players={false} action={null} />
+        : (
+          <div className="space-y-4">
+            {lootBosses.map((b) => (
+              <div key={b.encounterId} data-boss-loot={b.encounterId}>
+                <h3 className="text-cell font-semibold text-fg">{b.name}</h3>
+                {b.npcIds.length === 0 && (
+                  <p className="pt-1 text-meta text-fg-2">Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.</p>
+                )}
+                {b.npcIds.map((id) => {
+                  const table = lootTables.get(id)!;
+                  return (
+                    <div key={id}>
+                      <p className="flex flex-wrap items-center gap-x-3 pt-1 text-meta">
+                        <Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link>
+                        {table.state === "short" && <AgreementMeter count={table.span.installs} withText />}
+                      </p>
+                      <NpcLootPanel
+                        table={table}
+                        title={b.name}
+                        dataAsOf={loot!.dataAsOf}
+                        item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ),
+    },
+    {
+      id: "entrance", label: "Entrance",
+      panel: <>
+        {row.files.length > 0 && (
+          <ul className="mb-3 space-y-1 text-sm">
+            {row.files.map((p) => (
+              <li key={`${p.mapId}-${p.x}-${p.y}`} className="flex flex-wrap items-center gap-2">
+                {placeCell(p)}
+                <span className="inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the game files, not confirmed by players</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!unreachable && (
+          <DataTable
+            dense caption={`Entrances to ${title} players confirmed`} columns={confirmedColumns} rows={row.confirmed}
+            rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} empty={empty(EMPTY.entrance(row.reported))}
+          />
+        )}
+      </>,
+    },
+    {
+      id: "quests", label: "Quests", count: quests.length || undefined,
+      panel: unreachable || world?.unreachable ? <Unreachable /> : (
+        <DataTable
+          dense caption={`Quests players filed under ${title}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)}
+          empty={empty(EMPTY.instanceQuests(row.name))}
+        />
+      ),
+    },
+    ...(clears ? [{
+      id: "clears", label: "Clears", count: clears.clears.length || undefined,
+      panel: <>
+        <p className="mb-2 text-meta text-muted">From the boss kills linked characters sync through the Everloot Desktop App, public on their armory pages; up to the 500 with the newest kills here. A clear is a kill of every boss the game files list for it.</p>
+        <p className="mb-3 text-sm text-fg-2">
+          {clears.characters.toLocaleString("en-US")} linked {clears.characters === 1 ? "character has" : "characters have"} a synced kill here; {clears.clears.length.toLocaleString("en-US")} {clears.clears.length === 1 ? "has" : "have"} killed every boss.
+          {clears.clears.length > 0 && <> <Link href={`/armory/clears/${row.instanceMapId}`} className={link} rel="nofollow">Recent clears</Link></>}
+        </p>
+        {clears.characters > 0 && (
+          <DataTable dense caption={`Kills of each boss in ${title} by linked characters`} columns={clearColumns} rows={clears.bosses} rowKey={(b) => String(b.id)} />
+        )}
+      </>,
+    }] : []),
+    ...(terrain.length > 0 || gear.length > 0 ? [{
+      id: "terrain", label: "Terrain", count: gear.length || undefined,
+      panel: <div data-instance-terrain>
+        <p className="mb-2 text-meta text-muted">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
+        {terrain.length > 0 && (
+          <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
+            {terrain.map((type) => (
+              <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">{type.name}</Link>
+            ))}
+          </p>
+        )}
+        {gear.length > 0 && (
+          <TerrainGearTable
+            gear={gear}
+            caption={`Gear whose effect works in ${title}`}
+            names={{
+              item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+              spell: (id) => spellNames?.names.get(id),
+              set: (id) => setNames?.names.get(id),
+              instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+            }}
+          />
+        )}
+      </div>,
+    }] : []),
+  ];
 
   return (
     <Container width="data">
       <EdgeDegraded when={unreachable || !!world?.unreachable || !!loot?.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
-      <article>
+      <EntityLayout>
         <EntityHeader
           title={title}
+          icon={<EntityIcon src={loading?.small?.url ?? loading?.url} cover />}
           meta={[kindLabel(row.raid), <span key="id" className="tabular-nums">Instance {row.instanceMapId}</span>]}
           trail={[
             ...trailFor("/database/instances")!,
@@ -220,14 +344,18 @@ export default async function InstancePage(props: Props) {
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
 
-        <EntityTop box={null} facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />} />
+        <EntityTop
+          box={loading && <EntityArt src={loading.url} alt={`Loading screen of ${title}`} width={loading.width} height={Math.round((loading.width * 9) / 16)} />}
+          facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />}
+        />
 
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
-        {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
-        <OpenData report={{ type: "Instance", id: row.instanceMapId, path: canonical }} className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+          {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
+          <OpenData report={{ type: "Instance", id: row.instanceMapId, path: canonical }} className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+        </EntitySidebar>
 
         <div className="space-y-6">
-          {/* One note for the whole page, above the first section, rather than one per section. */}
           <Disclosure as="h2" summary="How this is counted">
             <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
             <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
@@ -236,135 +364,13 @@ export default async function InstancePage(props: Props) {
             <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
           </Disclosure>
 
-          {(terrain.length > 0 || gear.length > 0) && (
-            <section aria-labelledby="terrain" data-instance-terrain>
-              <SectionHeading id="terrain" note={`Read from the game files, build ${TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.`}>
-                Terrain
-              </SectionHeading>
-              {terrain.length > 0 && (
-                <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
-                  {terrain.map((type) => (
-                    <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">{type.name}</Link>
-                  ))}
-                </p>
-              )}
-              {gear.length > 0 && (
-                <TerrainGearTable
-                  gear={gear}
-                  caption={`Gear whose effect works in ${title}`}
-                  names={{
-                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
-                    spell: (id) => spellNames?.names.get(id),
-                    set: (id) => setNames?.names.get(id),
-                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
-                  }}
-                />
-              )}
-            </section>
-          )}
-
-          <section aria-labelledby="entrance">
-            <SectionHeading id="entrance">Entrance</SectionHeading>
-            {row.files.length > 0 && (
-              <ul className="mb-3 space-y-1 text-sm">
-                {row.files.map((p) => (
-                  <li key={`${p.mapId}-${p.x}-${p.y}`} className="flex flex-wrap items-center gap-2">
-                    {placeCell(p)}
-                    <span className="inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the game files, not confirmed by players</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!unreachable && (
-              <DataTable
-                dense caption={`Entrances to ${title} players confirmed`} columns={confirmedColumns} rows={row.confirmed}
-                rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} empty={empty(unconfirmed)}
-              />
-            )}
-          </section>
-
-          <section aria-labelledby="bosses">
-            <SectionHeading id="bosses">Bosses</SectionHeading>
-            <DataTable
-              dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
-              meta={anyReport ? bossMeta : undefined}
-              footer={bosses.length > 0 && !anyBossReported ? (unreachable
-                ? "Players' reports cannot be shown right now; this list is the game files' own."
-                : anyReport
-                  ? "No boss here has 3 installs reporting it yet. Kills and last seen show once one does."
-                  : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
-              empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
-            />
-          </section>
-
-          {clears && (
-            <section aria-labelledby="clears">
-              <SectionHeading id="clears" note="From the boss kills linked characters sync through the Everloot Desktop App, public on their armory pages; up to the 500 with the newest kills here. A clear is a kill of every boss the game files list for it.">
-                Clears by linked characters
-              </SectionHeading>
-              <p className="mb-3 text-sm text-fg-2">
-                {clears.characters.toLocaleString("en-US")} linked {clears.characters === 1 ? "character has" : "characters have"} a synced kill here; {clears.clears.length.toLocaleString("en-US")} {clears.clears.length === 1 ? "has" : "have"} killed every boss.
-                {clears.clears.length > 0 && <> <Link href={`/armory/clears/${row.instanceMapId}`} className={link} rel="nofollow">Recent clears</Link></>}
-              </p>
-              {clears.characters > 0 && (
-                <DataTable dense caption={`Kills of each boss in ${title} by linked characters`} columns={clearColumns} rows={clears.bosses} rowKey={(b) => String(b.id)} />
-              )}
-            </section>
-          )}
-
-          <section aria-labelledby="loot">
-            <SectionHeading id="loot">Loot</SectionHeading>
-
-            {unreachable || loot?.unreachable ? <Unreachable />
-              : lootBosses.length === 0 ? empty("No loot to show yet: no boss is known here. Loot shows per boss once 3 installs report the boss and the creature they fought.")
-              : (
-                <div className="space-y-4">
-                  {lootBosses.map((b) => (
-                    <div key={b.encounterId} data-boss-loot={b.encounterId}>
-                      <h3 className="text-cell font-semibold text-fg">{b.name}</h3>
-                      {b.npcIds.length === 0 && (
-                        <p className="pt-1 text-meta text-fg-2">Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.</p>
-                      )}
-                      {b.npcIds.map((id) => {
-                        const table = lootTables.get(id)!;
-                        return (
-                          <div key={id}>
-                            <p className="flex flex-wrap items-center gap-x-3 pt-1 text-meta">
-                              <Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link>
-                              {table.state === "short" && <AgreementMeter count={table.span.installs} withText />}
-                            </p>
-                            <NpcLootPanel
-                              table={table}
-                              title={b.name}
-                              dataAsOf={loot!.dataAsOf}
-                              item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              )}
-          </section>
-
-          <section aria-labelledby="quests">
-            <SectionHeading id="quests">Quests</SectionHeading>
-            {unreachable || world?.unreachable ? <Unreachable /> : (
-              <DataTable
-                dense caption={`Quests players filed under ${title}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)}
-                empty={empty(row.name === null
-                  ? "Not reported yet: this instance has no name to match the quest log by."
-                  : `Not reported yet: no quest has 3 installs filing it under ${row.name} in the quest log.`)}
-              />
-            )}
-          </section>
+          <Tabs label={`${title}: sections`} tabs={tabs} />
 
           <LoreSection match={lore} />
           <EntityScreenshots type="instance" id={row.instanceMapId} name={title} />
           <EntityComments type="instance" id={row.instanceMapId} />
         </div>
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

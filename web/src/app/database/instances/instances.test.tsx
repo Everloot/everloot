@@ -24,9 +24,18 @@ vi.mock("@/lib/instances", async (importOriginal) => ({
   loadSightings: async () => state.seen,
 }));
 
+// The asset manifest: no art unless a test hands in loading screens.
+const art = vi.hoisted(() => ({ assets: null as unknown }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/game-assets")>()),
+  loadSiteAssets: async () => art.assets,
+}));
+
 import InstancesPage from "./page";
 import InstancePage, { generateMetadata as instanceMetadata } from "./[instance]/page";
 
+/** One tab panel's markup, up to the next panel: the sections are tabs, so each test reads only its own. */
+const panel = (html: string, id: string) => html.split(`data-tab-panel="${id}"`)[1]?.split("data-tab-panel=")[0] ?? "";
 const text = (html: string) => html.replace(/<[^>]+>/g, "|").replace(/\|+/g, "|");
 /** The cells of the list row that links to `href`, in column order. */
 const cells = (html: string, href: string) => {
@@ -64,7 +73,7 @@ test("an instance's page lists its level in the facts, or a dash when the files 
 
 test("with storage down, an instance's page lists the bosses the game files give it, each marked unconfirmed; the list shows their count", async () => {
   const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "409-molten-core" }) }));
-  const bosses = html.split('id="bosses"')[1] ?? "";
+  const bosses = panel(html, "bosses");
   expect(bosses).toContain("Ragnaros");
   expect(bosses.indexOf("Lucifron")).toBeLessThan(bosses.indexOf("Ragnaros")); // the files' order
   const rows = bosses.split("<tr").slice(2); // the header row and the caption split
@@ -75,7 +84,7 @@ test("with storage down, an instance's page lists the bosses the game files give
   expect(headers).toEqual(["Boss"]);
   for (const r of rows) expect(r).not.toContain("[?]");
   // The entrance the files give is labelled as such, beside the line saying none is confirmed.
-  expect(text(html.split('id="entrance"')[1] ?? "")).toContain("in the game files, not confirmed by players");
+  expect(text(panel(html, "entrance"))).toContain("in the game files, not confirmed by players");
   expect(text(html)).toMatch(/\|Bosses reported\|\[\?\]\|unconfirmed\|in the files, 11\|/);
   const list = renderToStaticMarkup(await InstancesPage({}));
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
@@ -91,7 +100,7 @@ test("on night one, each boss one install reported shows 1 of 3, and nothing it 
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters } };
   try {
     const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
-    const bosses = (html.split('id="bosses"')[1] ?? "").split('id="loot"')[0]!;
+    const bosses = panel(html, "bosses");
     // The files' names stay, marked unconfirmed; the one install's name, kills and dates are not shown.
     for (const r of bosses.split("<tr").slice(2)) expect(r).toContain('data-badge="files"');
     expect(bosses).not.toContain("Reported name");
@@ -161,7 +170,7 @@ const looted = (npcId: number, installs: string[], windows: number) => new Map([
   windows: windows * installs.length, installs: new Set(installs), first: "2026-11-03T20:00:00Z", last: "2026-11-04T20:00:00Z",
   items: new Map([[14149, { windows: windows * installs.length, installs: new Set(installs) }]]),
 }]]);
-const lootOf = async (segment: string) => (renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })).split('id="loot"')[1] ?? "");
+const lootOf = async (segment: string) => panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })), "loot");
 
 test("an instance's page lists each boss's loot: the creature's own loot table, linked to the items", async () => {
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
@@ -253,7 +262,7 @@ test("instance 2999 takes the name the game files' kill statistic for its boss R
 // SYNTHETIC: quest reports filed under Shadowfang Keep in the quest log, by three installs and by two.
 const reportedQuest = (questId: number, title: string, category: string, installs: string[], capturedAt = "2026-11-04T20:00:00Z") =>
   installs.map((installId) => ({ installId, questId, title, level: 22, giverNpcId: 3849, rewardItemIds: [], category, capturedAt }));
-const questsOf = async (segment: string) => (renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })).split('id="quests"')[1] ?? "");
+const questsOf = async (segment: string) => panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })), "quests");
 
 test("an instance's page lists the quests 3 installs file under its name, with installs and last seen; fewer than 3 are left out", async () => {
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: [] } };
@@ -345,7 +354,7 @@ test("an instance's page counts linked characters' clears and each boss's kills,
     { region: "us", slug: "ash-brook", name: "Ash", surname: "Brook", kills: [k(2732, "2026-11-23T00:00:00Z", 4)] },
   ]);
   const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
-  const section = html.split('id="clears"')[1]?.split("</section>")[0] ?? "";
+  const section = panel(html, "clears");
   expect(text(section)).toMatch(/3 linked characters have a synced kill here; 2 have killed every boss/);
   expect(section).toContain('href="/armory/clears/389"');
   // Armory names are Blizzard data and hides apply at once: they stay on the armory's own uncached pages.
@@ -354,5 +363,46 @@ test("an instance's page counts linked characters' clears and each boss's kills,
   expect([...boss.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/g)].map((m) => text(m[1]!).replace(/^\||\|$/g, ""))).toEqual(["Oggleflint", "3", "7"]);
   clears.value = null;
   const off = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
-  expect(off).not.toContain('id="clears"');
+  expect(off).not.toContain('data-tab-panel="clears"');
+});
+
+const loading = (mapId: number, heldBack = false) => ({ mapId, name: "Ragefire Chasm", kind: "dungeon", heldBack, url: `https://a.test/loading/${mapId}.webp`, width: 1024, small: { url: `https://a.test/loading/${mapId}-small.webp`, width: 256 } });
+
+test("an instance's header and top band show its loading screen when the upload has one, and no picture at all when not", async () => {
+  art.assets = { loadingScreens: new Map([[389, loading(389)], [409, loading(409, true)]]) };
+  try {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+    const header = html.split("data-entity-header")[1]?.split("</header>")[0] ?? "";
+    expect(header).toContain('src="https://a.test/loading/389-small.webp"');
+    const box = html.split('class="entity-box')[1]?.split("</figure>")[0] ?? "";
+    expect(box).toContain("data-entity-art");
+    expect(box).toContain('src="https://a.test/loading/389.webp"');
+    expect(box).toContain('alt="Loading screen of Ragefire Chasm"');
+    // A held-back loading screen and an instance with none: no icon, no box, never an empty frame.
+    for (const segment of ["409-molten-core", "249-onyxia-s-lair"]) {
+      const other = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) }));
+      expect(other).not.toContain("data-game-icon");
+      expect(other).not.toContain("data-entity-art");
+      expect(other).not.toContain("entity-box");
+    }
+  } finally {
+    art.assets = null;
+  }
+});
+
+test("an instance's sections are tabs like the other entity pages, in the wide-screen layout, with one-line empty states", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: [] } };
+  try {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+    expect(html).toContain('class="entity-layout');
+    expect(html.split("data-entity-sidebar")[1]).toContain("In short");
+    expect(html).toContain('role="tablist"');
+    for (const id of ["bosses", "loot", "entrance", "quests"]) expect(html).toContain(`data-tab-panel="${id}"`);
+    // No 20 px section headings for the data, and the empty lines are the shared one-line EmptyTab, not framed boxes with a button.
+    expect(html).not.toMatch(/<h2[^>]*>(Bosses|Loot|Entrance|Quests)</);
+    expect(html).not.toContain("btn shrink-0");
+    expect(text(panel(html, "quests"))).toContain("Not reported yet: no quest has 3 installs filing it under Ragefire Chasm in the quest log.");
+  } finally {
+    state.seen = { unreachable: true };
+  }
 });

@@ -12,7 +12,9 @@ import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityHeader, EntityLayout, EntitySidebar, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
+import { loadSiteAssets } from "@/lib/game-assets";
 
 export const dynamic = "force-dynamic";
 
@@ -70,12 +72,14 @@ export default async function FactionPage(props: Props) {
   const summary = entry ? [what, observed, inFiles, "No quest is linked to it yet.", !entry.confirmed && files ? FILES_NAME : name] : [];
   // The archive files a faction under no type of its own, so its page is one of the "other" pages.
   const lore = entry ? await loreFor("faction", id, entry.name) : null;
+  // The Alliance and Horde have the game's own emblem; no other faction has art.
+  const emblem = entry ? (await loadSiteAssets())?.factions.get(entry.name.toLowerCase()) : undefined;
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         {entry && <JsonLd data={entityPageJsonLd({ name: title, path: factionHref(entry.factionId, entry.name), identifier: `faction:${id}` })} />}
-        <EntityHeader trail={trail} title={title} meta={["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>]} />
+        <EntityHeader trail={trail} icon={<EntityIcon src={emblem} />} title={title} meta={["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>
             <EntityTop
@@ -100,15 +104,17 @@ export default async function FactionPage(props: Props) {
                 />
               }
             />
-            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData report={{ type: "Faction", id, path: factionHref(entry.factionId, entry.name) }} text={[`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n")} />
+            <EntitySidebar>
+              <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+              <OpenData report={{ type: "Faction", id, path: factionHref(entry.factionId, entry.name) }} text={[`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n")} />
+            </EntitySidebar>
             <Tabs
               label={`${entry.name}: relations`}
               tabs={[
                 {
                   id: "reputation-from", label: "Reputation from", count: 0,
                   // A quest is public once 3 installs report it; which faction it pays is in no file read so far and in no report.
-                  panel: <EmptyTab action={null} message="No quest is linked to this faction yet. A quest shows once 3 installs report it, and the reputation it gives is in none of the game files read so far." />,
+                  panel: <EmptyTab action={null} message={EMPTY.factionQuests} />,
                 },
               ]}
             />
@@ -117,7 +123,7 @@ export default async function FactionPage(props: Props) {
             </div>
           </>
         ) : <Unreachable />}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }
