@@ -120,7 +120,7 @@ test("a query shows the groups the site search found, each under its heading, an
   expect(html).toContain('href="/search?q=thrall&amp;in=lore"');
   siteSearch.groups = [];
   const none = await render({ q: "zzzz" });
-  expect(none).toContain("Nothing matches that.");
+  expect(none).toContain("No results for “zzzz”");
   // An empty search points at the database lists, not the lore archive.
   expect(none).toContain('href="/database/items"');
   expect(none).not.toContain("3 installs");
@@ -178,18 +178,18 @@ test("the tab row lists All, every group with its count opening its list, and Ch
   expect(thrall).toContain('href="/guilds?q=thrall"');
   // The tabs take their own row under the field, and the group footer opens the list too.
   expect(html.indexOf('name="q"')).toBeLessThan(html.indexOf('aria-label="Result types"'));
-  expect(html).toContain(">All 6 quests</a>");
-  expect(html).toMatch(/href="\/search\?q=test%20of%20lore&amp;in=lore"[^>]*>All 20 lore results<\/a>/);
+  expect(html).toContain(">See all 6 quests</a>");
+  expect(html).toMatch(/href="\/search\?q=test%20of%20lore&amp;in=lore"[^>]*>See all 20 lore results<\/a>/);
   siteSearch.groups = [];
 });
 
 test("the overview lists what the search gave it and asks for five rows per group", async () => {
   siteSearch.groups = [{ type: "item", heading: "Items", total: 222, results: manyResults(5) }];
   const html = await render({ q: "potion" });
-  expect(html).toMatch(/href="\/database\/items\?q=potion"[^>]*>All 222 items<\/a>/);
+  expect(html).toMatch(/href="\/database\/items\?q=potion"[^>]*>See all 222 items<\/a>/);
   expect(html).not.toContain("Showing");
   siteSearch.groups = [{ type: "item", heading: "Items", total: 3, results: manyResults(3) }];
-  expect(await render({ q: "potion" })).not.toContain("All 3 items");
+  expect(await render({ q: "potion" })).not.toContain("See all 3 items");
   siteSearch.groups = [];
 });
 
@@ -249,7 +249,7 @@ test("with no database match the character lookup still runs, and the empty line
   siteSearch.groups = [];
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   const html = await render({ q: "zuljinna" });
-  expect(html).toMatch(/<div data-people="zuljinna"><p[^>]*>Nothing matches that\./);
+  expect(html).toMatch(/<div data-people="zuljinna"><div[^>]*><p[^>]*>No results for “zuljinna”/);
 });
 
 test("the search is a plain GET form, so it works without JavaScript", async () => {
@@ -344,9 +344,85 @@ test.each([
   siteSearch.groups = [{ type, heading, total: 9, results }];
   const html = await render({ q: "Trial & Test" });
   expect(html).toContain(`href="${list}?q=Trial%20%26%20Test"`);
-  expect(html).toContain(`All 9 ${heading.toLowerCase()}`);
+  expect(html).toContain(`See all 9 ${heading.toLowerCase()}`);
   await expect(render({ q: "Trial & Test", in: type })).rejects.toThrow(`REDIRECT ${list}?q=Trial%20%26%20Test`);
   siteSearch.groups = [{ type, heading, total: 5, results }];
-  expect(await render({ q: "Trial & Test" })).not.toContain(`All 5 ${heading.toLowerCase()}`);
+  expect(await render({ q: "Trial & Test" })).not.toContain(`See all 5 ${heading.toLowerCase()}`);
   siteSearch.groups = [];
  });
+
+test("an exact name or id leads the page as one best-match card: icon, type, facts and its page's link, above the groups", async () => {
+  siteSearch.groups = [
+    { type: "item", heading: "Items", total: 2, results: [
+      { label: "Thunderfury", href: "/database/items/19019", exact: true, id: 19019, quality: 5, meta: "Sword · One-Hand" },
+      { label: "Thunderfury's Hilt", href: "/database/items/5", exact: false, id: 5, quality: 1 },
+    ] },
+  ];
+  icons.map = new Map([[19019, "https://assets.everloot.app/b/icons/1.webp"]]);
+  const html = await render({ q: "thunderfury" });
+  const card = html.match(/<section[^>]*data-best-match[\s\S]*?<\/section>/)?.[0] ?? "";
+  expect(card).toContain("Best match");
+  expect(card).toContain('src="https://assets.everloot.app/b/icons/1.webp"');
+  // The name is the link the hover card listens for, in its quality colour; the type and facts sit under it.
+  expect(card).toMatch(/<a href="\/database\/items\/19019" class="[^"]*text-q-legendary/);
+  expect(card).toMatch(/>Item<\/span>/);
+  expect(card).toContain("Legendary");
+  expect(card).toContain("Sword · One-Hand");
+  // The label is a word (sans); only the id is mono.
+  expect(card).toMatch(/ID <span class="font-mono tabular-nums">19019<\/span>/);
+  expect(html.indexOf("data-best-match")).toBeLessThan(html.indexOf('id="results-item"'));
+  icons.map = new Map();
+
+  // No exact hit: no card.
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 1, results: [{ label: "Thunderfury's Hilt", href: "/database/items/5", exact: false, id: 5, quality: 1 }] }];
+  expect(await render({ q: "thunder" })).not.toContain("data-best-match");
+  siteSearch.groups = [];
+});
+
+test("a best-match quest, NPC or dungeon shows the facts its row carries", async () => {
+  siteSearch.groups = [{ type: "quest", heading: "Quests", total: 1, results: [{ label: "Wanted: Hogger", href: "/database/quests/176", exact: true, id: 176 }] }];
+  facts.quests = [{ questId: 176, title: "Wanted: Hogger", level: 10, giverNpcId: 1, turnInNpcId: null, rewards: [], category: "Elwynn Forest", side: "alliance", suggestedGroup: null, tag: null }];
+  const quest = (await render({ q: "wanted: hogger" })).match(/<section[^>]*data-best-match[\s\S]*?<\/section>/)?.[0] ?? "";
+  expect(quest).toMatch(/>Quest<\/span>/);
+  expect(quest).toContain("Level 10");
+  expect(quest).toContain("Elwynn Forest");
+  expect(quest).toMatch(/text-faction-alliance[^>]*>Alliance</);
+  siteSearch.groups = [{ type: "instance", heading: "Dungeons and raids", total: 1, results: [{ label: "The Deadmines", href: "/database/instances/36-the-deadmines", note: "Dungeon, level 18", exact: true, id: 36 }] }];
+  const dungeon = (await render({ q: "deadmines" })).match(/<section[^>]*data-best-match[\s\S]*?<\/section>/)?.[0] ?? "";
+  expect(dungeon).toMatch(/>Dungeon or raid<\/span>/);
+  expect(dungeon).toContain("Dungeon, level 18");
+  siteSearch.groups = [];
+});
+
+test("each group has a visible heading with its count and a See all link to its tab", async () => {
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 222, results: manyResults(5) }];
+  const html = await render({ q: "potion" });
+  expect(html).toMatch(/<h2 id="results-item-heading" class="(?![^"]*sr-only)[^"]*">Items/);
+  expect(html).toMatch(/href="\/database\/items\?q=potion"[^>]*>See all 222 items<\/a>/);
+  siteSearch.groups = [];
+});
+
+test("rows say what their note says (the dungeon a boss is in) and a class takes its colour", async () => {
+  siteSearch.groups = [
+    { type: "class", heading: "Classes", total: 1, results: [{ label: "Mage", href: "/classes/mage", note: "Guides, talents and who can play it", exact: true }] },
+    { type: "boss", heading: "Bosses", total: 1, results: [{ label: "Edwin VanCleef", href: "/database/bosses/1-edwin-vancleef", note: "Boss in The Deadmines", exact: false, id: 1 }] },
+  ];
+  const html = await render({ q: "mage" });
+  expect(html).toContain("Boss in The Deadmines");
+  expect(html).toMatch(/<a href="\/classes\/mage" class="[^"]*text-class-mage/);
+  siteSearch.groups = [];
+});
+
+test("no results says so with the query, then the kinds a search finds and queries to try", async () => {
+  siteSearch.groups = [];
+  const html = await render({ q: "zzzz" });
+  expect(html).toContain("No results for “zzzz”");
+  expect(html).toContain('href="/search?q=Thrall"');
+  expect(html).toContain('href="/database/items"');
+  expect(html).toContain('href="/database/npcs"');
+});
+
+test("the field is the page's large one", async () => {
+  const html = await render({ q: "thrall" });
+  expect(html).toMatch(/<input[^>]*id="search-page"[^>]*class="h-12 /);
+});

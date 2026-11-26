@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import LoreSearchForm from "@/components/LoreSearchForm";
 import GameIcon from "@/components/game/GameIcon";
-import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
+import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_LABEL, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
+import { CLASS_TEXT, classNameOf } from "@/components/ui/class-colour";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
 import { HEADINGS, isResultScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
@@ -78,10 +80,10 @@ const KINDS: { type: SearchType; href: string }[] = [
 const EXAMPLES = ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"];
 
 /** The empty page's hint: the kinds a search finds and four queries to try. */
-function SearchStart() {
+function SearchStart({ heading = "What you can search" }: { heading?: string }) {
   return (
     <section aria-labelledby="search-start" className="max-w-reading space-y-3 py-4 text-cell">
-      <h2 id="search-start" className="font-semibold text-fg">What you can search</h2>
+      <h2 id="search-start" className="font-semibold text-fg">{heading}</h2>
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {KINDS.map((k) => <li key={k.type}><Link href={k.href} className={link}>{HEADINGS[k.type]}</Link></li>)}
       </ul>
@@ -176,23 +178,23 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   const archive = (g: SearchGroup) => g.type === "lore" || g.type === "tool" || g.type === "doc";
   let split = groups?.length ?? 0;
   while (split > 0 && archive(groups![split - 1])) split--;
+  // No match: the query said back, then the lists a search covers and queries that find something.
   const nothing = (
-    <p className="py-4 text-cell text-fg-2">
-      Nothing matches that. An id always opens its page, or browse the{" "}
-      <Link href="/database/items" className={link}>items</Link>, <Link href="/database/quests" className={link}>quests</Link> and{" "}
-      <Link href="/database/npcs" className={link}>NPCs</Link>.
-    </p>
+    <div className="py-4">
+      <p className="text-h2-sm font-semibold text-fg sm:text-h2">No results for “{q}”</p>
+      <p className="mt-1 text-cell text-fg-2">Check the spelling, try fewer words, or type an id: an id always opens its page.</p>
+      <SearchStart heading="Browse instead" />
+    </div>
   );
+  const best = groups ? bestMatch(groups) : undefined;
   const table = (group: SearchGroup) => <ResultTable key={group.type} group={group} q={q} icons={icons} unknown={unknown} facts={facts} />;
   return (
     <Container width="data">
       <article>
-        {/* The title and the field share a row on a wide screen; the result tabs take the next one, so the first result is in view. */}
-        <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
-          <div className="[&>header]:mb-0"><DataTitle title="Search" /></div>
-          <div className="w-full max-w-xl sm:flex-1">
-            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} compact />
-          </div>
+        {/* The title, then the query in the page's large field; the result tabs take the next row. */}
+        <div className="[&>header]:mb-3"><DataTitle title="Search" /></div>
+        <div className="mb-4 max-w-3xl">
+          <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} surface="search-page" />
         </div>
         {tabs && <div className="mb-4"><LinkTabs label="Result types" tabs={tabs} /></div>}
 
@@ -202,6 +204,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
           <>
             {groups[0]?.respelled && <p className="mb-2 text-cell text-fg-2">Showing results for {groups[0].respelled}</p>}
+            {best && <BestMatch hit={best.hit} type={best.type} icons={icons} unknown={unknown} facts={facts} />}
             {groups.slice(0, split).map(table)}
             {people && <PeopleResults q={q} />}
             {groups.slice(split).map(table)}
@@ -212,9 +215,77 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   );
 }
 
+/** One of a type, for the best-match card: "Item", "Dungeon or raid". */
+const ONE: Record<SearchType, string> = {
+  class: "Class", item: "Item", npc: "NPC", vendor: "Vendor", quest: "Quest", object: "Object", spell: "Spell", achievement: "Achievement", faction: "Faction", title: "Title",
+  chain: "Quest chain", "item-set": "Item set", mount: "Mount", pet: "Companion pet", currency: "Currency", holiday: "Holiday or world event", family: "Hunter pet family",
+  zone: "Zone", instance: "Dungeon or raid", boss: "Boss", guide: "Wiki page", lore: "Lore page", tool: "Tool", doc: "Docs page",
+};
+
+/** The hit that leads the page: the first exact name or id in the first group, unless that group is the lore archive. */
+function bestMatch(groups: SearchGroup[]): { hit: SearchResult; type: SearchType } | undefined {
+  const g = groups[0];
+  const hit = g && g.type !== "lore" ? g.results.find((r) => r.exact) : undefined;
+  return hit && { hit, type: g.type };
+}
+
+const itemQuality = (r: SearchResult) => (typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined);
+
+/** A hit's name colour: an item's quality, a class's own colour; any other name is plain. */
+function nameColour(type: SearchType, r: SearchResult): string | undefined {
+  const quality = type === "item" ? itemQuality(r) : undefined;
+  if (quality) return QUALITY_TEXT[quality];
+  const cls = type === "class" ? classNameOf(r.href.split("/").pop()) : undefined;
+  return cls && CLASS_TEXT[cls];
+}
+
+/** A hit's note when it says something its id does not ("Boss in The Deadmines", a lore snippet): never "id 12" or "zone". */
+const noteOf = (r: SearchResult) => (r.note && !/^id \d+$/.test(r.note) && r.note !== "zone" ? r.note : undefined);
+
+/** The side of a quest, Alliance and Horde in their faction's colour. */
+function Side({ side }: { side: NonNullable<QuestRow["side"]> }) {
+  const colour = side === "alliance" ? "text-faction-alliance" : side === "horde" ? "text-faction-horde" : undefined;
+  return <span className={colour}>{SIDE_LABEL[side]}</span>;
+}
+
 /**
- * One type's results as a dense table; its heading is the first column's header. Quest and NPC rows carry the facts
- * their lists show, so two of a name tell apart; a column no row here has a value for is left out.
+ * The best match, above the groups: the hit's icon (items), its type, its name as the link (which the hover card on
+ * every database link answers), and the facts its row already carries. Nothing is read for it.
+ */
+function BestMatch({ hit, type, icons, unknown, facts }: { hit: SearchResult; type: SearchType; icons: Map<number, string>; unknown: string | null; facts: OverviewFacts }) {
+  const quality = type === "item" ? itemQuality(hit) : undefined;
+  const icon = type === "item" && unknown ? (hit.id === undefined ? undefined : icons.get(hit.id)) || unknown : undefined;
+  const quest = type === "quest" && hit.id !== undefined ? facts.quests.get(hit.id) : undefined;
+  const npc = type === "npc" && hit.id !== undefined ? facts.npcs.get(hit.id) : undefined;
+  const items: ReactNode[] = [
+    quality && QUALITY_LABEL[quality], type === "item" && hit.meta,
+    quest?.level != null && `Level ${quest.level}`, quest?.category, quest?.side && <Side side={quest.side} />,
+    npc?.level != null && `Level ${npc.level}`, npc?.creatureType, npc?.zone?.name, npc?.drops ? `${npc.drops} drop${npc.drops === 1 ? "" : "s"}` : false,
+    type !== "item" && noteOf(hit),
+    hit.id !== undefined && <>ID <span className="font-mono tabular-nums">{hit.id}</span></>,
+  ].filter(Boolean);
+  return (
+    <section data-best-match aria-labelledby="best-match" className="mb-6 flex min-w-0 items-start gap-4 rounded-card border border-line bg-panel p-4">
+      {icon && <GameIcon src={icon} size={48} quality={quality} />}
+      <div className="min-w-0">
+        <h2 id="best-match" className="text-meta text-muted">Best match · <span>{ONE[type]}</span></h2>
+        <p className="mt-1 text-h2-sm font-semibold sm:text-h2">
+          <Link href={hit.href} className={`${nameColour(type, hit) ?? "text-fg"} underline decoration-edge underline-offset-4 hover:decoration-fg`}>{hit.label}</Link>
+        </p>
+        {items.length > 0 && (
+          <p className="mt-1 text-cell text-fg-2">
+            {items.map((x, i) => <span key={i}>{i > 0 && " · "}{x}</span>)}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * One type's results under its heading and count, as a dense table, with a link to every match where there are more.
+ * Quest and NPC rows carry the facts their lists show, so two of a name tell apart; a column no row here has a value
+ * for is left out.
  */
 function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; q: string; icons: Map<number, string>; unknown: string | null; facts: OverviewFacts }) {
   const more = group.total > group.results.length;
@@ -223,22 +294,23 @@ function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; 
   const quest = (r: SearchResult) => (r.id === undefined ? undefined : facts.quests.get(r.id));
   const npc = (r: SearchResult) => (r.id === undefined ? undefined : facts.npcs.get(r.id));
   const name = (r: SearchResult) => {
-    // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
-    const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+    // An item takes its quality colour and a class its own; any other hit is a plain link, never the accent an uncommon item resembles.
+    const colour = nameColour(group.type, r);
+    const style = colour ? `${colour} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
     const link = <Link href={r.href} className={style}>{r.label}</Link>;
     // Item hits carry the game icon as the item lists do, and the game's fallback where one is missing.
     if (group.type !== "item" || !unknown) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);
     return (
       <span className="flex min-w-0 items-center gap-2">
-        <GameIcon src={icon || unknown} size={20} quality={typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined} />
+        <GameIcon src={icon || unknown} size={20} quality={itemQuality(r)} />
         {link}
       </span>
     );
   };
   const about: SparseColumn<SearchResult>[] = group.type === "quest" ? [
     { key: "level", header: "Level", numeric: true, cell: (r) => quest(r)?.level ?? dash, blank: (r) => quest(r)?.level == null },
-    { key: "side", header: "Side", cell: (r) => { const s = quest(r)?.side; return s ? SIDE_LABEL[s] : dash; }, blank: (r) => !quest(r)?.side },
+    { key: "side", header: "Side", cell: (r) => { const s = quest(r)?.side; return s ? <Side side={s} /> : dash; }, blank: (r) => !quest(r)?.side },
     { key: "category", header: "Category", cell: (r) => quest(r)?.category ?? dash, blank: (r) => !quest(r)?.category },
   ] : group.type === "npc" ? [
     { key: "level", header: "Level", numeric: true, cell: (r) => npc(r)?.level ?? dash, blank: (r) => npc(r)?.level == null },
@@ -246,10 +318,10 @@ function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; 
     { key: "zone", header: "Zone", cell: (r) => npc(r)?.zone?.name ?? dash, blank: (r) => !npc(r)?.zone },
     { key: "drops", header: "Drops", numeric: true, cell: (r) => npc(r)?.drops || dash, blank: (r) => !npc(r)?.drops },
   ] : [
-    { key: "about", header: group.type === "item" ? "Type" : "", cell: (r) => <span className="line-clamp-1 text-fg-2">{group.type === "item" ? r.meta ?? "" : r.id !== undefined ? "" : r.note ?? ""}</span> },
+    { key: "about", header: group.type === "item" ? "Type" : "About", cell: (r) => <span className="line-clamp-1 text-fg-2">{(group.type === "item" ? r.meta : noteOf(r)) ?? ""}</span>, blank: (r) => !(group.type === "item" ? r.meta : noteOf(r)) },
   ];
   const columns: SparseColumn<SearchResult>[] = [
-    { key: "name", header: <>{group.heading} <span className="font-normal tabular-nums">({group.total})</span></>, cell: name },
+    { key: "name", header: "Name", cell: name },
     ...about,
     // Lore, zones, tools and docs have no id: the column is left out for them.
     { key: "id", header: "ID", numeric: true, cell: (r) => r.id ?? "", blank: (r) => r.id === undefined },
@@ -259,11 +331,14 @@ function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; 
     const id = r.id !== undefined && `ID ${r.id}`;
     if (group.type === "quest") { const x = quest(r); return [x?.level != null && `Level ${x.level}`, x?.category, x?.side && SIDE_LABEL[x.side], id].filter(Boolean).join(" · "); }
     if (group.type === "npc") { const n = npc(r); return [n?.level != null && `Level ${n.level}`, n?.creatureType, n?.zone?.name, n?.drops ? `${n.drops} drop${n.drops === 1 ? "" : "s"}` : false, id].filter(Boolean).join(" · "); }
-    return (group.type === "item" ? [r.meta, id] : [id || r.note]).filter(Boolean).join(" · ");
+    return (group.type === "item" ? [r.meta, id] : [noteOf(r), id]).filter(Boolean).join(" · ");
   };
   return (
     <section id={`results-${group.type}`} aria-labelledby={`results-${group.type}-heading`} className="mb-6 scroll-mt-20">
-      <h2 id={`results-${group.type}-heading`} className="sr-only">{group.heading}</h2>
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4">
+        <h2 id={`results-${group.type}-heading`} className="text-h2-sm font-semibold text-fg sm:text-h2">{group.heading} <span className="font-normal text-muted tabular-nums">({group.total})</span></h2>
+        {more && all && <Link href={all} className={`${link} text-meta`}>See all {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link>}
+      </div>
       <DataTable
         dense
         caption={`${group.heading} matching ${q}`}
@@ -271,7 +346,6 @@ function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; 
         rows={group.results}
         rowKey={(r) => r.href}
         meta={meta}
-        footer={more && all ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link> : undefined}
       />
     </section>
   );

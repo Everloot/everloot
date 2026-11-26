@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import GameIcon from "@/components/game/GameIcon";
+import { track } from "@/lib/analytics/track";
+import type { EventMap } from "@/lib/analytics/events";
 import type { PeopleSearch } from "@/lib/people-search-types";
 import { CLASS_TEXT, classColour } from "./class-colour";
 import { QUALITY_TEXT, qualityOf } from "./quality";
@@ -261,21 +263,23 @@ export interface SearchBarProps {
   /** Scope chips under the field (All · Items · NPCs · Quests · Objects), sent as `?in=`. */
   scopes?: boolean;
   defaultScope?: string;
-  /** 40 px instead of 48, for a field that shares its row (the search page). */
+  /** 40 px instead of 48, for a field that shares its row. */
   compact?: boolean;
+  /** Counts a submitted search as the product event from this surface; the query text is never sent. */
+  surface?: EventMap["search"]["surface"];
 }
 
 /**
  * The large search field a page leads with (48 px, full width), with instant suggestions and, on the database
  * hub, scope chips. A plain GET form underneath, so it works without JavaScript.
  */
-export default function SearchBar({ action, label, placeholder, defaultValue = "", id: given, hint, scopes = false, defaultScope = "", compact = false }: SearchBarProps) {
+export default function SearchBar({ action, label, placeholder, defaultValue = "", id: given, hint, scopes = false, defaultScope = "", compact = false, surface }: SearchBarProps) {
   const auto = useId();
   const id = given ?? `search-${auto.replace(/:/g, "")}`;
   const [scope, setScope] = useState(defaultScope);
   const height = compact ? "h-10" : "h-12";
   return (
-    <form action={action} method="get" role="search" data-search-bar className="min-w-0">
+    <form action={action} method="get" role="search" data-search-bar className="min-w-0" onSubmit={surface ? () => track("search", { surface }) : undefined}>
       <div className="flex min-w-0 gap-2">
         <SuggestField
           id={id}
