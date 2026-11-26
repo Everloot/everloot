@@ -6,6 +6,7 @@ import { loadEdges } from "./edges";
 import { loadItemSetNames, loadSpellNames } from "./game-assets";
 import { itemIndexable, npcIndexable, objectIndexable, questIndexable, spellIndexable, vendorIndexable } from "./indexable";
 import { instanceHref, instanceRows } from "./instances";
+import { bossEntries, bossHref } from "./bosses";
 import { itemSetHref, ITEM_SETS } from "./item-sets";
 import { CLIENT_LAYER, shownItemName } from "./items";
 import { loadObjectFacts } from "./objects";
@@ -116,6 +117,12 @@ export async function databasePaths(): Promise<string[] | null> {
 export function instancePaths(seen: ZoneSightings & { unreachable?: boolean }): string[] {
   if (seen.unreachable) return [];
   return [...instanceRows(seen).values()].map((row) => instanceHref(row.instanceMapId, row.name));
+}
+
+/** The boss pages that ask to be indexed: one per boss of an instance `instancePaths` lists, under the same rule. */
+export function bossPaths(seen: ZoneSightings & { unreachable?: boolean }): string[] {
+  if (seen.unreachable) return [];
+  return bossEntries(instanceRows(seen)).map((b) => bossHref(b.id, b.row.name));
 }
 
 export function databaseUnavailable(): Response {

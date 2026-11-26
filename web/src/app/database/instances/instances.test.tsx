@@ -406,3 +406,15 @@ test("an instance's sections are tabs like the other entity pages, in the wide-s
     state.seen = { unreachable: true };
   }
 });
+
+test("each boss in the Bosses tab and the loot section links its boss page", async () => {
+  const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+  const bosses = panel(html, "bosses");
+  for (const href of ["/database/bosses/2732-oggleflint", "/database/bosses/2735-bazzalan"]) expect(bosses).toContain(`href="${href}"`);
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: [] } };
+  try {
+    expect(await lootOf("389-ragefire-chasm")).toContain('href="/database/bosses/2732-oggleflint"');
+  } finally {
+    state.seen = { unreachable: true };
+  }
+});

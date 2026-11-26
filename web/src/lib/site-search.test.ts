@@ -467,3 +467,11 @@ test("the unscoped type-ahead suggests spells and vendors from the names passed 
   expect(rows).toContainEqual({ type: "vendor", id: 10, label: "Frostmane Vendor", href: "/database/vendors/10" });
   expect((await suggest("frost", "npc", mocks.names, { tolerant: true, spells: new Map([[116, "Frostbolt"]]), vendors: new Set([10]) })).map((r) => r.type)).toEqual(["npc"]);
 });
+
+test("a boss's name finds its boss page, the note naming its instance", async () => {
+  const group = (await search("oggleflint")).find((g) => g.type === "boss")!;
+  expect(group.heading).toBe("Bosses");
+  expect(group.results[0]).toMatchObject({ label: "Oggleflint", href: "/database/bosses/2732-oggleflint", note: "Boss in Ragefire Chasm", exact: true });
+  // Its encounter id finds it too.
+  expect((await search("2732")).find((g) => g.type === "boss")?.results[0]).toMatchObject({ href: "/database/bosses/2732-oggleflint", exact: true });
+});

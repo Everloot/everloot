@@ -342,6 +342,7 @@ test.each([
   ["/database/currencies/1792-honor-points", "currency/1792"],
   ["/database/holidays/62-fireworks-spectacular", "holiday/62"],
   ["/database/pet-families/1-wolf", "family/1"],
+  ["/database/bosses/2732-oggleflint", "boss/2732"],
 ])("a link to %s asks for its card", async (href, key) => {
   container.innerHTML = `<a href="${href}">Shown name</a>`;
   pointer("pointerover", link(href));
