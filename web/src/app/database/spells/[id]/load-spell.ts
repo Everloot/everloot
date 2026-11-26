@@ -26,8 +26,11 @@ export async function loadSpell(spellId: number) {
   const wiki = await loadWikiEntityNames("spell");
   const shownName = shownEntityName(spellId, spellNames?.names.get(spellId) || assets?.spellTips.get(spellId)?.name, wiki);
   const name = shownName.name;
-  const tip = assets?.spellTips.get(spellId);
   const talents = talentIndex.get(spellId) ?? [];
+  // A talent's text and icon sit in the manifest under its trait definition (the calculator's); a spell tooltip wins.
+  const talentArt = talents.map((t) => (t.definitionId !== null ? assets?.talents.get(t.definitionId) : undefined)).find((a) => a?.text);
+  const tip = assets?.spellTips.get(spellId) ?? talentArt;
+  const icon = assets?.spellIcons.get(spellId) ?? talentArt?.icon ?? undefined;
   const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length && !talents.length;
-  return { edges, assets, all, name, tip, talents, unknown, fromWiki: shownName.fromWiki };
+  return { edges, assets, all, name, tip, icon, talents, unknown, fromWiki: shownName.fromWiki, spellNames };
 }

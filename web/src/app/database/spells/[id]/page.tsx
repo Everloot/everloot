@@ -16,6 +16,18 @@ import type { SpellTalent } from "@/lib/talents/spell-talents";
 import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import EntityLink from "@/components/EntityLink";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { classLabel } from "@/lib/class-context";
+import { mountHref, petHref } from "@/lib/collectibles";
+import { loadItemSetNames, loadItemTips } from "@/lib/game-assets";
+import { itemSetHref } from "@/lib/item-sets";
+import { shownItemName } from "@/lib/items";
+import { loadShownNames } from "@/lib/shown-item-names";
+import {
+  costText, dispelName, durationText, effectValue, ITEM_TRIGGER, mechanicName, schoolNames, spellNumbers, spellRanks, spellUses,
+  SPELLS_BUILD, timeText, tooltipRows,
+} from "@/lib/spell-card";
 import { loadSpell } from "./load-spell";
 
 /**
@@ -121,8 +133,28 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, assets, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
+  const { edges, assets, all, name, tip, icon, talents, unknown, fromWiki, spellNames } = await loadSpell(spellId);
   if (unknown) notFound();
+  // The tooltip numbers and what uses the spell, from the committed game-data files (lib/spell-card.ts).
+  const numbers = spellNumbers(spellId);
+  const ranks = spellRanks(spellId);
+  const rank = ranks.length > 1 ? ranks.indexOf(spellId) + 1 : 0;
+  const uses = spellUses(spellId);
+  const schools = schoolNames(numbers?.school);
+  const rows = numbers ? tooltipRows(numbers) : [];
+  const duration = durationText(numbers?.durationMs);
+  // Items follow the item name rule, as on the item pages: one the rule does not show yet is counted, never listed.
+  const [shown, setNames] = await Promise.all([
+    uses.items.length ? loadShownNames() : null,
+    uses.sets.length ? loadItemSetNames(CLIENT_LAYER.build.version) : null,
+  ]);
+  const itemName = (item: number) => (shown ? shownItemName(item, shown.agreed, shown.matched?.names) : undefined);
+  const tipped = shown ? uses.items.filter((u) => shown.showsTip(u.item)) : [];
+  // A development leftover stays out, as in the item lists and on the item set pages; the line under the table counts it.
+  const shownItems = tipped.filter((u) => !isDevelopmentItemName(itemName(u.item)?.name));
+  const leftovers = tipped.length - shownItems.length;
+  const itemTips = shownItems.length ? await loadItemTips(assets, [...new Set(shownItems.map((u) => u.item))]) : new Map<number, { icon: string | null }>();
+  const spellName = (id: number) => spellNames?.names.get(id);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
   const build = edges.client.find((e) => e.fromId === spellId || e.toId === spellId)?.build ?? CLIENT_LAYER.build.version;
@@ -152,14 +184,72 @@ export default async function SpellPage(props: Props) {
     };
   };
 
+  const filesLine = <p className="mb-2 text-meta text-fg-2">From the game files, build {SPELLS_BUILD}; found in game files, unconfirmed.</p>;
+  const hidden = uses.items.length - tipped.length;
+  type RankRow = { spell: number; rank: number };
+  type ItemRow = { item: number; trigger: number };
+  type SetRow = { set: number; pieces: number };
+  type EffectRow = NonNullable<NonNullable<typeof numbers>["effects"]>[number];
+
   const tabs = [
+    talents.length
+      ? { id: "talent", label: "Talent", count: talents.length, panel: <>{talents.map((t) => <TalentFacts key={`${t.classSlug}-${t.tree}-${t.row}-${t.col}`} talent={t} title={title} />)}</> }
+      : null,
+    ranks.length > 1 ? {
+      id: "ranks", label: "Ranks", count: ranks.length,
+      panel: <>{filesLine}<DataTable dense caption={`Ranks of ${title}`} rows={ranks.map((spell, i) => ({ spell, rank: i + 1 }))} rowKey={(r) => String(r.spell)} columns={[
+        { key: "rank", header: "Rank", nowrap: true, cell: (r: RankRow) => `Rank ${r.rank}` },
+        { key: "spell", header: "Spell", cell: (r: RankRow) => r.spell === spellId
+          ? <span aria-current="true" className="font-semibold text-fg">{spellName(r.spell) ?? `Spell ${r.spell}`} (this spell)</span>
+          : <EntityLink kind="spell" id={r.spell} name={spellName(r.spell)} icon={assets?.spellIcons.get(r.spell)} /> },
+        { key: "level", header: "Spell level", numeric: true, cell: (r: RankRow) => spellNumbers(r.spell)?.level ?? "—" },
+        { key: "cost", header: "Cost", cell: (r: RankRow) => spellNumbers(r.spell)?.costs?.map((c) => costText(c)).join(", ") ?? "—" },
+      ]} /></>,
+    } : null,
+    uses.items.length ? {
+      id: "items", label: "Items", count: shownItems.length,
+      panel: <>
+        {filesLine}
+        {shownItems.length > 0 && <DataTable dense caption={`Items that cast ${title}`} rows={shownItems} rowKey={(r) => `${r.item}-${r.trigger}`} columns={[
+          { key: "item", header: "Item", cell: (r: ItemRow) => <EntityLink kind="item" id={r.item} name={itemName(r.item)?.name} icon={itemTips.get(r.item)?.icon} /> },
+          { key: "how", header: "Line", nowrap: true, cell: (r: ItemRow) => ITEM_TRIGGER[r.trigger] ?? "—" },
+        ]} />}
+        {hidden > 0 && <p className="py-2 text-meta text-fg-2">{`${hidden} ${hidden === 1 ? "item" : "items"} the game files list ${hidden === 1 ? "is" : "are"} not shown yet: an item's page and its lines show once players report it or a source names it.`}</p>}
+        {leftovers > 0 && <p className="py-2 text-meta text-fg-2">{`${leftovers} ${leftovers === 1 ? "item" : "items"} the game files mark as a development item ${leftovers === 1 ? "is" : "are"} left out.`}</p>}
+      </>,
+    } : null,
+    uses.sets.length ? {
+      id: "item-sets", label: "Item sets", count: uses.sets.length,
+      panel: <>{filesLine}<DataTable dense caption={`Item sets whose bonus is ${title}`} rows={uses.sets} rowKey={(r) => `${r.set}-${r.pieces}`} columns={[
+        { key: "set", header: "Set", cell: (r: SetRow) => <Link prefetch={false} href={itemSetHref(r.set)} className={LINK}>{setNames?.names.get(r.set) ?? `Item set ${r.set}`}</Link> },
+        { key: "pieces", header: "Pieces needed", numeric: true, cell: (r: SetRow) => r.pieces },
+      ]} /></>,
+    } : null,
+    uses.mounts.length ? {
+      id: "mounts", label: "Mount", count: uses.mounts.length,
+      panel: <>{filesLine}<ul className="space-y-1">{uses.mounts.map((m) => <li key={m.id}><Link prefetch={false} href={mountHref(m.id, m.name)} className={LINK}>{m.name}</Link>{m.ridingSkill ? <span className="text-fg-2">{` · riding skill ${m.ridingSkill}`}</span> : null}</li>)}</ul></>,
+    } : null,
+    uses.pets.length ? {
+      id: "pets", label: "Companion", count: uses.pets.length,
+      panel: <>{filesLine}<ul className="space-y-1">{uses.pets.map((p) => <li key={p.id}><Link prefetch={false} href={petHref(p.id, p.name)} className={LINK}>{p.name}</Link></li>)}</ul></>,
+    } : null,
     relationTab("creates", relLabel.created_by!, "created_by"),
     relationTab("costs", relLabel.reagent_for!, "reagent_for"),
     relationTab("taught-by", relLabel.in_skill_line!, "in_skill_line"),
     relationTab("reward-from", relLabel.reward_from!, "reward_from"),
-    talents.length
-      ? { id: "talent", label: "Talent", count: talents.length, panel: <>{talents.map((t) => <TalentFacts key={`${t.classSlug}-${t.tree}-${t.row}-${t.col}`} talent={t} title={title} />)}</> }
-      : null,
+    numbers?.effects?.length ? {
+      id: "effects", label: "Effect values", count: numbers.effects.length,
+      panel: <>
+        <p className="mb-2 text-meta text-fg-2">The numbers behind the tooltip text, effect by effect, from the game files (build {SPELLS_BUILD}). The files do not name what each effect does.</p>
+        <DataTable dense caption={`Effect values of ${title}`} rows={numbers.effects} rowKey={(e) => String(e[0])} columns={[
+          { key: "effect", header: "Effect", numeric: true, cell: (e: EffectRow) => e[0] + 1 },
+          { key: "value", header: "Value", numeric: true, cell: (e: EffectRow) => effectValue(e) },
+          { key: "period", header: "Every", cell: (e: EffectRow) => (e[3] ? timeText(e[3]) : "—") },
+          { key: "radius", header: "Radius", cell: (e: EffectRow) => (e[5] ? `${e[5]} yd` : "—") },
+          { key: "chain", header: "Chain targets", numeric: true, cell: (e: EffectRow) => e[4] || "—" },
+        ]} />
+      </>,
+    } : null,
   ].filter((t): t is TabItem => t !== null);
 
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
@@ -172,16 +262,42 @@ export default async function SpellPage(props: Props) {
       jsonLd={{ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` }}
       header={{
         trail,
-        icon: <EntityIcon src={assets?.spellIcons.get(spellId)} />,
+        icon: <EntityIcon src={icon} />,
         title: fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title,
         meta: ["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>],
       }}
       box={
-        <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
-          {tip?.text ? <p>{tip.text}</p> : <p>No text for this spell in the client files.</p>}
+        <TooltipFrame
+          name={rank ? <span className="flex justify-between gap-4"><span>{tip?.name ?? title}</span><span className="font-normal text-fg-2">Rank {rank}</span></span> : tip?.name ?? title}
+          label={`${tip?.name ?? title}, from the game files`}
+        >
+          {rows.map((r, i) => (
+            <p key={i} data-tip-pair className="flex justify-between gap-4 text-fg">
+              <span>{r.left}</span>
+              {r.left && r.right && <span className="sr-only">, </span>}
+              <span className="text-right">{r.right}</span>
+            </p>
+          ))}
+          {tip?.text ? <p className="text-tip-yellow">{tip.text}</p> : <p>No text for this spell in the client files.</p>}
+          {(schools.length > 0 || duration) && (
+            <div className="mt-1 text-muted">
+              {schools.length > 0 && <p>School: {schools.join(", ")}</p>}
+              {duration && <p>Duration: {duration}</p>}
+            </div>
+          )}
         </TooltipFrame>
       }
       facts={[
+        ...(schools.length ? [{ label: "School", value: schools.join(", ") }] : []),
+        // A talent's level is its row in the tree, shown on the Talent tab; the files' spell level would read as a second gate.
+        ...(numbers?.level && !talents.length ? [{ label: "Spell level", value: <span className="tabular-nums">{numbers.level}</span>, numeric: true }] : []),
+        ...(uses.classes.length ? [{
+          label: uses.classes.length === 1 ? "Class" : "Classes",
+          value: <span>{uses.classes.map((c, i) => <span key={c}>{i > 0 && ", "}<Link prefetch={false} href={`/classes/${c}`} className={LINK}>{classLabel(c)}</Link></span>)}</span>,
+        }] : []),
+        ...(talents.length ? [{ label: "Talent tree", value: [...new Set(talents.map((t) => `${t.className} · ${t.tree}`))].join(", ") }] : []),
+        ...(numbers && dispelName(numbers) ? [{ label: "Dispel type", value: dispelName(numbers)! }] : []),
+        ...(numbers && mechanicName(numbers) ? [{ label: "Mechanic", value: mechanicName(numbers)! }] : []),
         { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
         { label: "Build", value: build },
         // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
