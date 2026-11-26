@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import EntityLink from "@/components/EntityLink";
+import { EntityIcon } from "@/components/game/EntityIcon";
+import ItemTip from "@/components/game/ItemTip";
 import { Badge, DataTable, TooltipFrame } from "@/components/ui";
+import { qualityNamed } from "@/components/ui/quality";
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { asOfLine } from "@/lib/evidence";
+import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
@@ -14,6 +19,7 @@ import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { EMPTY, EmptyTab, EntityPage, LINK, Unreachable } from "../../entity";
 import { confirmedCell } from "../../list-parts";
+import { categoryHref, categoryPath } from "../categories";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +82,21 @@ export default async function AchievementPage(props: Props) {
   // The count and the list have separate sources: a confirmed entry's count is agreed by three installs whether or not
   // they agreed on the list's text; without an entry both are the game files'.
   const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;
+  // The files' category path, top first; a category players reported wins, and the path shows only while it ends there.
+  const filesPath = categoryPath(files?.category);
+  const path = !entry || filesPath.at(-1)?.name === entry.category ? filesPath : [];
+  const category = entry?.category || path.at(-1)?.name || null;
+  const categoryLinks = path.length > 0 ? (
+    <span>{path.map((step, i) => <span key={step.id}>{i > 0 && " › "}<Link href={categoryHref(step.name)} className={LINK}>{step.name}</Link></span>)}</span>
+  ) : category && <Link href={categoryHref(category)} className={LINK}>{category}</Link>;
+  const faction = files?.faction ? `${files.faction} only` : null;
+  const assets = files ? await loadSiteAssets() : null;
+  const icon = assets?.achievementIcons.get(id);
+  const rewardItem = files?.rewardItem;
+  const tip = rewardItem ? (await loadItemTips(assets, [rewardItem])).get(rewardItem) : undefined;
   const facts: { label: string; value: ReactNode; numeric?: boolean }[] = [
-    { label: "Category", value: entry?.category ?? null },
+    { label: "Category", value: categoryLinks || null },
+    ...(faction ? [{ label: "Faction", value: faction }] : []),
     { label: "Points", value: points, numeric: true },
     { label: "Criteria", value: criteria, numeric: true },
     { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
@@ -89,12 +108,12 @@ export default async function AchievementPage(props: Props) {
   const state = confirmedCell(listed ?? { confirmed: false }, catalog?.confirmations ?? false);
   const asOf = asOfLine(catalog?.dataAsOf ?? null, Date.now());
   const summary = entry || files ? [
-    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : entry?.category ? `An achievement in ${entry.category}` : "An achievement"}, ${points === null ? "points not reported yet" : `${points} ${points === 1 ? "point" : "points"}`}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
+    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet" : `${points} ${points === 1 ? "point" : "points"}`}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
     entry
       ? `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
         : fileCriteria.length ? `; the criteria list is the game files' (build ${fileVersion}), unconfirmed`
         : entry.criteriaCount > 0 ? "; the criteria list shows once three installs report the same full list" : ""}.`
-      : `The name, points and criteria are from the game files of build ${fileVersion}, unconfirmed; the category shows once three installs agree.`,
+      : `The name${category ? ", category" : ""}, points and criteria are from the game files of build ${fileVersion}, unconfirmed.`,
     state === "Confirmed" ? `Three installs confirmed it${asOf ? ` (${asOf})` : ""}.`
       : state === "Unconfirmed" ? `Not confirmed yet: ${listed?.reporters ?? 0} of 3 installs have sent it${asOf ? ` (${asOf})` : ""}.`
       : "Whether players confirmed it is unrecorded: player confirmations could not be read just now.",
@@ -105,7 +124,7 @@ export default async function AchievementPage(props: Props) {
     <EntityPage
       name={title}
       jsonLd={{ name: title, path: canonical, identifier: `achievement:${id}` }}
-      header={{ trail, title, meta: ["Achievement", entry ? entry.category : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      header={{ trail, title, icon: <EntityIcon src={icon} unconfirmed={!entry} />, meta: ["Achievement", category, faction, <span key="id" className="tabular-nums">ID {id}</span>] }}
       box={entry ? (
         <TooltipFrame name={title} label={`${title}, as players reported it`}>
           <p>{entry.category}</p>
@@ -142,9 +161,20 @@ export default async function AchievementPage(props: Props) {
         {entry && !entry.criteria && entry.criteriaCount > 0 && fileCriteria.length === 0 ? (
           <EmptyTab players={false} action={null} message={EMPTY.criteria} />
         ) : null}
+        {(files?.reward || rewardItem) && (
+          <section aria-labelledby="rewards" className="mt-6">
+            <h2 id="rewards" className="mb-2 text-h2-sm text-fg sm:text-h2">Rewards</h2>
+            <ul className="space-y-2 text-cell">
+              {files?.reward && <li className="flex items-baseline gap-1.5"><Badge tone="files" />{files.reward}</li>}
+              {rewardItem && (
+                <li><ItemTip tip={tip}><EntityLink kind="item" id={rewardItem} name={tip?.name} quality={qualityNamed(tip?.quality)} /></ItemTip></li>
+              )}
+            </ul>
+          </section>
+        )}
         {summary.length > 0 && <p data-confirmed-line className="mt-2 text-meta text-fg-2">{confirmedLine(state, listed?.reporters ?? 0)}</p>}
         {!entry && files && (
-          <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria and text are the game files&apos;; the category and the count of installs that earned it appear once three installs agree.</p>
+          <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria, text, category and rewards are the game files&apos;; the count of installs that earned it appears once three installs agree.</p>
         )}
       </>}
       related={<LoreSection match={lore} />}

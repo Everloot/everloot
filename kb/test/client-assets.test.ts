@@ -239,6 +239,17 @@ test("collection art: currency and companion pet icons by id, and the icon of ea
   expect(manifest.spellIcons).toEqual({ "1001": "5001.webp" });
 });
 
+test("achievement art: each achievement's icon by achievement id, left out when the file is missing or unreadable", async () => {
+  const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
+  const withAchievements: Record<string, Rows> = {
+    ...site,
+    Achievement: t([{ ID: 627, Title_lang: "Explore Dun Morogh", IconFileID: 6007 }, { ID: 628, Title_lang: "No icon", IconFileID: 0 }, { ID: 629, Title_lang: "Locked", IconFileID: 6009 }]),
+  };
+  const src: TableSource = { ...source([]), fileStatus: (id) => ({ ...siteStatus, 6007: "present", 6009: "encrypted" } as Record<number, FileStatus>)[id] ?? "absent" };
+  const { manifest } = await buildAssetsFromTables({ get: (n) => withAchievements[n], build, outDir, source: src, convert: fakeConvert });
+  expect(manifest.achievementIcons).toEqual({ "627": "6007.webp" });
+});
+
 test("a map with an encrypted tile is skipped with the reason, never drawn with a hole", async () => {
   const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
   const src: TableSource = { ...source([]), fileStatus: (id) => (id === 7001 ? "encrypted" : siteStatus[id] ?? "absent") };

@@ -142,6 +142,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/mounts/[id]/page.tsx", "web/src/app/database/pets/[id]/page.tsx", "web/src/app/database/currencies/[id]/page.tsx",
   // Their lists: the same icon beside each row's name, by the same id.
   "web/src/app/database/mounts/page.tsx", "web/src/app/database/pets/page.tsx", "web/src/app/database/currencies/page.tsx",
+  // The achievement list and pages: each achievement's icon by id, and on a page the reward item's tooltip.
+  "web/src/app/database/achievements/page.tsx", "web/src/app/database/achievements/[id]/page.tsx",
   // The hunter pet family list and pages: the family icons and the icons and names of the spells on its skill line.
   "web/src/app/database/pet-families/page.tsx", "web/src/app/database/pet-families/[id]/page.tsx",
   // The Alliance and Horde faction pages: the faction emblem in the header, as the race and class table shows it.

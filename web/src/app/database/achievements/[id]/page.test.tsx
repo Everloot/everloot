@@ -9,8 +9,18 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   uploadStore: { loadCompletion: store.loadCompletion, loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) },
 }));
 // The game files' achievements: one with text and a criterion, one with no criteria at all.
-const game = vi.hoisted(() => ({ achievements: {} as Record<string, { title: string; points: number; description?: string; criteria: { text: string; amount?: number }[] }> }));
-vi.mock("@/data/game-data/client-achievements", () => ({ get CLIENT_ACHIEVEMENTS() { return { build: { version: "1.15.8.70862" }, achievements: game.achievements }; } }));
+type FileAchievement = { title: string; points: number; description?: string; criteria: { text: string; amount?: number }[]; category?: number; icon?: number; faction?: "Horde" | "Alliance"; reward?: string; rewardItem?: number; statistic?: true };
+const game = vi.hoisted(() => ({ achievements: {} as Record<string, FileAchievement> }));
+// Adventure holds Eastern Kingdoms, as the files nest them.
+const CATEGORIES = { "15596": { name: "Adventure" }, "14777": { name: "Eastern Kingdoms", parent: 15596 } };
+vi.mock("@/data/game-data/client-achievements", () => ({ get CLIENT_ACHIEVEMENTS() { return { build: { version: "1.15.8.70862" }, achievements: game.achievements, categories: CATEGORIES }; } }));
+// The asset manifest lists one achievement's icon; the reward item has a tooltip.
+const art = vi.hoisted(() => ({ assets: null as unknown, tips: new Map<number, unknown>() }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/game-assets")>()),
+  loadSiteAssets: async () => art.assets,
+  loadItemTips: async () => art.tips,
+}));
 vi.mock("@/data/game-data/client-titles", () => ({ get CLIENT_TITLES() { return { titles: [] }; } }));
 vi.mock("@/data/game-data/client-factions", () => ({ get CLIENT_FACTIONS() { return { factions: [] }; } }));
 vi.mock("@/data/game-data/client-quest-lines", () => ({ get CLIENT_QUEST_LINES() { return { questLines: [] }; } }));
@@ -47,6 +57,8 @@ const TRACK = "Track it in the Collections tool. Progress needs the addon&#x27;s
 
 beforeEach(() => {
   seq = 0;
+  art.assets = null;
+  art.tips = new Map();
   game.achievements = {
     "50": { title: "Loremaster", points: 10, description: "Complete every zone.", criteria: [{ text: "Elwynn" }] },
     "684": { title: "Conqueror of the Lair", points: 10, criteria: [] },
@@ -75,7 +87,7 @@ test("a confirmed achievement: In short from its reported facts, the Collections
 test("an achievement only the game files know says so, counts no installs as agreeing, and copies no game text", async () => {
   const out = await html("50-loremaster");
   expect(out).toContain("An achievement, 10 points, 1 criterion.");
-  expect(out).toContain("The name, points and criteria are from the game files of build 1.15.8.70862, unconfirmed; the category shows once three installs agree.");
+  expect(out).toContain("The name, points and criteria are from the game files of build 1.15.8.70862, unconfirmed.");
   expect(out).toMatch(/Not confirmed yet: 0 of 3 installs have sent it/);
   expect(confirmedLine(out)).toBe("Unconfirmed: the list&#x27;s Confirmed column counts an achievement once three installs report it identically.");
   expect(out).toContain('href="/tools/collections"');
@@ -142,4 +154,35 @@ test("an achievement page sits in the wide-screen entity layout, In short and Op
   const side = out.split("data-entity-sidebar")[1] ?? "";
   expect(side).toContain("In short");
   expect(side).toContain("data-open-data");
+});
+
+test("an achievement from the files: its icon, the category path linking the list's groups, and the side that can earn it", async () => {
+  game.achievements["776"] = { title: "Explore Elwynn Forest", points: 0, criteria: [], category: 14777, icon: 236761, faction: "Alliance" };
+  art.assets = { achievementIcons: new Map([[776, "https://a.test/icons/236761.webp"]]) };
+  const out = await html("776-explore-elwynn-forest");
+  expect(out).toContain('src="https://a.test/icons/236761.webp"');
+  expect(out).toContain('href="/database/achievements?category=Adventure"');
+  expect(out).toContain('href="/database/achievements?category=Eastern+Kingdoms"');
+  expect(factOf(out, "Faction")).toBe("Alliance only");
+  expect(out).toContain("An achievement in Eastern Kingdoms, 0 points, 0 criteria.");
+  expect(out).toContain("The name, category, points and criteria are from the game files of build 1.15.8.70862, unconfirmed.");
+});
+
+test("rewards: the files' reward line and the reward item with its tooltip; no title, since the files link none", async () => {
+  game.achievements["15637"] = { title: "The Immortal", points: 0, criteria: [], rewardItem: 191481, reward: "Earn 1 Legacy Point." };
+  art.assets = { achievementIcons: new Map(), base: "https://a.test", version: "1.15.8.70862", label: "Found in game files, unconfirmed" };
+  art.tips = new Map([[191481, { name: "Tabard of the Immortal", color: "#a335ee", quality: "Epic", icon: "https://a.test/icons/1.webp", lines: [], partial: false, why: [], label: "Found in game files, unconfirmed" }]]);
+  const out = await html("15637-the-immortal");
+  expect(out).toMatch(/<h2[^>]*>Rewards<\/h2>/);
+  expect(out).toContain("Earn 1 Legacy Point.");
+  expect(out).toMatch(/href="\/database\/items\/191481"[^>]*>(?:<[^>]*>)*Tabard of the Immortal/);
+  expect(out).not.toContain("/database/titles/");
+  // The reward line is game text: on the page, not in Copy for AI.
+  expect(openData(out).join("\n")).not.toContain("Legacy Point");
+});
+
+test("an achievement with no reward in the files has no Rewards section", async () => {
+  const out = await html("50-loremaster");
+  expect(out).not.toMatch(/>Rewards<\/h2>/);
+  expect(factOf(out, "Faction")).toBe("");
 });

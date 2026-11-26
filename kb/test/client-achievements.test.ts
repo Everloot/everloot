@@ -83,6 +83,20 @@ test("buildClientAchievements: ids keyed, the files' text with reports-style cri
   expect(achievements.achievements["51"]).not.toHaveProperty("statistic");
 });
 
+test("icon, faction, reward text and reward item: kept where the files give them, absent otherwise", () => {
+  const out = buildClientAchievements(snapshotWith([
+    table("Achievement", [
+      [60, { ID: 60, Title_lang: "The Immortal", Points: 0, Criteria_tree: 0, IconFileID: 135922, Faction: -1, RewardItemID: 191481 }],
+      [61, { ID: 61, Title_lang: "Conqueror", Points: 1, Criteria_tree: 0, IconFileID: 254650, Faction: 1, Reward_lang: " Earn 1 Legacy Point. " }],
+      [62, { ID: 62, Title_lang: "Horde only", Points: 0, Criteria_tree: 0, IconFileID: 0, Faction: 0, RewardItemID: 0, Reward_lang: "" }],
+    ]),
+    table("CriteriaTree", tree2),
+  ]));
+  expect(out.achievements["60"]).toEqual({ title: "The Immortal", points: 0, criteria: [], icon: 135922, rewardItem: 191481 });
+  expect(out.achievements["61"]).toEqual({ title: "Conqueror", points: 1, criteria: [], icon: 254650, faction: "Alliance", reward: "Earn 1 Legacy Point." });
+  expect(out.achievements["62"]).toEqual({ title: "Horde only", points: 0, criteria: [], faction: "Horde" });
+});
+
 test("a snapshot without the two tables still yields a file, empty and labelled", () => {
   const empty = buildClientAchievements(snapshotWith([]));
   expect(empty.achievements).toEqual({});
