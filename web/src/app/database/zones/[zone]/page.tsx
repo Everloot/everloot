@@ -41,6 +41,7 @@ import { instanceRows } from "@/lib/instances";
 import { UNAVAILABLE } from "@/lib/lore";
 import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
+import EntityComments from "@/components/comments/EntityComments";
 
 export const dynamic = "force-dynamic";
 
@@ -346,6 +347,7 @@ export default async function ZonePage(props: Props) {
           )}
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
+        <EntityComments type="zone" id={zone.mapId} />
       </EntityLayout>
     </Container>
   );

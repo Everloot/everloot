@@ -967,6 +967,34 @@ data, not game data and not an observation.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
 
+## Comments
+
+*Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_COMMENTS=1`), a signed-in player
+can comment at the bottom of an item, quest, NPC, spell, zone or instance page. A comment is the player's own words,
+not game data and not an observation.
+
+- **Who can post.** Any signed-in Everloot account with a profile handle. A comment names its author by the handle
+  their profile has now, never the BattleTag, the account name or the email. Changing the handle changes the name on
+  every comment.
+- **What a comment holds.** The words (up to 2,000 characters, a little markup: bold, italic, code, spoiler tags and
+  links), the page it is on, its author's account, and when it was posted, edited, hidden or deleted. Links go only to
+  everloot.app and a short list of well-known WoW sites (Blizzard's, Wowhead, warcraft.wiki.gg, CurseForge). No images.
+- **Spoilers.** Anything that spoils a fight or a story goes behind a spoiler tag, which a reader opens on purpose.
+- **Shown at once, moderated after.** A comment shows as soon as it is posted. Signed-in players can report one, with a
+  reason and an optional note; a report is stored with the reporter's account so the same person cannot report a
+  comment twice, and moderators see the reasons and notes, never who reported. The owner and the moderators the
+  owner names hide reported comments. A hidden comment shows as "hidden by a moderator", with no words and no name,
+  and can be restored.
+- **Editing and deleting.** The author edits a comment for 15 minutes after posting and deletes it at any time. Deleting
+  wipes the words; the page keeps a one-line "deleted by its author" in its place.
+- **Limits.** 20 comments, 30 edits and 30 reports per account a day.
+- **Site only.** Comments are shown on their pages on everloot.app and nowhere else. They are not in the open data or
+  its licence, the API, the MCP server, chat answers, exports or sitemaps, and the pages load them in the browser, so
+  the cached page carries none. Authors keep the rights to their words and give Everloot a licence to show them on the
+  site (the [terms](https://everloot.app/terms#comments)).
+- **Deletion.** Deleting the account (write to hello@everloot.app) deletes its comments and its reports. The nightly
+  private backup holds comments as it holds the rest of the players' data.
+
 ## Public character pages
 
 A signed-in player who has linked one of their characters (Linked characters, on /account) can give it a public
