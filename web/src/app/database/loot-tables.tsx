@@ -1,6 +1,6 @@
 import { dropTierLabel } from "@kb/drop-rollup";
 import type { ReactNode } from "react";
-import { DataTable, type Column } from "@/components/ui";
+import { DataTable, type Column, type SortDirection } from "@/components/ui";
 import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "@kb/loot-tables";
 import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "@kb/drop-rate-settling";
 import { EMPTY, EmptyTab, FREQUENCY, percent } from "./entity";
@@ -26,8 +26,14 @@ function Method({ dataAsOf, lead, ranges = true }: { dataAsOf: string | null; le
   return <p className={NOTE}>{lead ? `${lead}. ` : ""}{METHOD_LINE}{ranges ? " Ranges describe the recorded sample (95% Wilson); windows may not be independent." : ""}{asOf}</p>;
 }
 
-/** The Drops tab of an NPC page. */
-export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootTable; title: string; item: (itemId: number) => ReactNode; dataAsOf: string | null }) {
+/** The sortable columns of the NPC loot table, for a page that sorts its rows (`sort`, `sortHref`). */
+export const NPC_LOOT_SORTS = ["item", "with", "rate"] as const;
+
+/** The Drops tab of an NPC page; with `sortHref` the item, count and rate headers sort the rows the caller sorted. */
+export function NpcLootPanel({ table, title, item, dataAsOf, sort, sortHref }: {
+  table: NpcLootTable; title: string; item: (itemId: number) => ReactNode; dataAsOf: string | null;
+  sort?: { key: string; direction: SortDirection }; sortHref?: (key: string, direction: SortDirection) => string;
+}) {
   if (table.state === "none") return <EmptyTab message={EMPTY.drops("this NPC")} />;
   if (table.state === "short") return <p className="py-3 text-meta text-fg">{missingLine(table)}</p>;
   if (table.rows.length === 0) {
@@ -37,14 +43,14 @@ export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootT
     </>;
   }
   const columns: Column<LootTableRow>[] = [
-    { key: "item", header: "Item", cell: (r) => item(r.itemId) },
-    { key: "with", header: "Windows with it", numeric: true, cell: (r) => r.withItem },
+    { key: "item", header: "Item", sortable: true, cell: (r) => item(r.itemId) },
+    { key: "with", header: "Windows with it", numeric: true, sortable: true, cell: (r) => r.withItem },
     { key: "windows", header: "Out of", numeric: true, cell: (r) => r.windows },
-    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => rateWithRange(r.withItem, r.windows, r.installs) },
+    { key: "rate", header: FREQUENCY, numeric: true, sortable: true, cell: (r) => rateWithRange(r.withItem, r.windows, r.installs) },
     { key: "installs", header: "Reports", cell: (r) => dropTierLabel(r.installs) },
   ];
   return <>
-    <DataTable dense caption={`What ${title} drops`} columns={columns} rows={table.rows} rowKey={(r) => String(r.itemId)} />
+    <DataTable dense caption={`What ${title} drops`} columns={columns} rows={table.rows} rowKey={(r) => String(r.itemId)} sort={sort} sortHref={sortHref} nofollow />
     <Method dataAsOf={dataAsOf} lead={`Out of ${spanPhrase(table.span)}`} />
   </>;
 }

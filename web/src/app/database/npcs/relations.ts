@@ -16,7 +16,8 @@ function reported(rows: readonly { installId: string; capturedAt?: string }[], n
 /** Uses only the stored world facts already loaded for the page. */
 export function npcRelations(npcId: number, facts: WorldFacts, now: number) {
   const zones = facts.recheck?.length ? npcZonesOf(facts) : new Map<number, number | null>();
-  let questsReported = 0;
+  // The most installs behind one relation of each kind: the meter of a Starts or Ends tab with no agreed quest.
+  const questsReported = { giverNpcId: 0, turnInNpcId: 0 };
   const candidates = new Set(facts.quests.filter((r) => r.giverNpcId === npcId || r.turnInNpcId === npcId).map((r) => r.questId));
   const grouped = new Map<number, QuestSighting[]>();
   for (const r of facts.quests) if (candidates.has(r.questId) && r.installId.trim()) {
@@ -30,9 +31,9 @@ export function npcRelations(npcId: number, facts: WorldFacts, now: number) {
     return (["giverNpcId", "turnInNpcId"] as const).flatMap((key) => {
       const effective = recheckRows(rows.filter((r) => r[key] !== undefined), since, { value: (r) => r[key]! }).rows;
       const matching = effective.filter((r) => r[key] === npcId);
-      questsReported = Math.max(questsReported, installsFor(matching));
+      questsReported[key] = Math.max(questsReported[key], installsFor(matching));
       if (page[key] !== npcId) return [];
-      return [{ questId, title: page.title, role: key === "giverNpcId" ? "Giver" : "Turn-in", reported: reported(matching, now) }];
+      return [{ questId, title: page.title, role: key === "giverNpcId" ? "starts" as const : "ends" as const, reported: reported(matching, now) }];
     });
   });
   const vendorRows = facts.vendors.filter((r) => r.vendorNpcId === npcId && r.installId.trim() && Number.isInteger(r.itemId) && r.itemId > 0);
