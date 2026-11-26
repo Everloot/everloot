@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item tooltips show "This Item Begins a Quest", link Use and Equip lines to the spell page on the item page, and sum up players' reported numbers in one line with each number's installs, build and date behind it.
 - Site: Players is a directory to browse characters: class, race, faction, level, region, ruleset and guild filters in the address, sortable headers, 25/50/100 rows, names in class colour, guild links to that guild's members, and before a search the latest reads and the best item level of each class.
 - Site: the database lists work as one system: each row starts with the entity's icon and its name in its colour (item quality, a faction's side, a quest's side, a set's classes), columns run name, numbers, where, status, id, a Rows choice of 25, 50 or 100 sits beside the pager (?per=), more columns sort in the URL, the spell list filters by class, game-file lists lead with the unconfirmed mark, and the dungeon list folds into one line per row on a phone.
 - Site: item tooltips read like the game's: reported armour, stats, resistances and DPS in white, and a set piece lists its set's pieces and bonuses under the set's name (linked on the item page). The hover card and the item page's box now come from one builder.

@@ -267,6 +267,7 @@ const ItemRecordSchema = z.object({
   w: z.object({ t: z.string(), dps: z.number(), dv: z.number(), ds: z.number() }).optional(),
   is: z.object({ id: z.number().int().positive(), n: z.string().nullable() }).optional(), lc: z.string().optional(),
   cr: z.array(z.string()).optional(), rq: z.array(z.string()).optional(), fx: z.array(z.string()).optional(),
+  fs: z.array(z.number().int().positive()).optional(), qs: z.number().int().positive().optional(),
 });
 
 /**
@@ -286,6 +287,8 @@ export interface ItemTip {
   partial: boolean;
   /** Why the lines hold `[?]`, one line per kind (item-names.ts, WHY). */
   why: string[];
+  /** The spell behind each Use, Equip and Chance on hit line, by the line's text (item-names.ts); absent without them. */
+  spells?: Record<string, number>;
   /** "found in game files, unconfirmed · build x". */
   label: string;
   /** Item level, required level (0 for both: none) and the bonding enum, for the item lists' columns and filters. */

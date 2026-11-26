@@ -215,6 +215,10 @@ when fewer than three have reported it (for example, "1 of 3 installs reported")
 are omitted for a line already agreed or contested in any build, include no install identity, and do not lower
 the confirmation threshold. The tooltip shows the partial value under the 2026-11-10 decision above.
 
+*Added 2026-11-26.* The tooltip box and the hover card sum up the reported numbers in one line (for example
+"Stats: 3 agreeing installs, last seen 2026-11-20 · 1 line unconfirmed"); each number's installs, build and
+last-seen date stay one click away under that line (and in its hover title), so nothing above is dropped.
+
 Full auction scans are not public records either. They feed market values only, and a value is
 published when three distinct reporters scanned the item. For that count, an upload containing a scan
 is stored with a keyed hash of the address it came from (never the address itself). The hash stays in
@@ -402,6 +406,12 @@ interface files, is a different thing and is covered by the second extension. Th
   (`SkillLine`, `SpellName`, `Faction`), and its Use, Equip and Chance on hit lines (`ItemEffect`, with the
   spell's description resolved like the talents'). Stat amounts, armour and weapon damage stay `[?]`, and
   the tooltip says why in plain words.
+  *Added 2026-11-26, in the pull request that adds them (the maintainer review):* under the same rules, the
+  "This Item Begins a Quest" line (`ItemSparse.StartQuestID`; the quest's id is recorded, its title is not
+  shown in the tooltip), and the spell id behind each Use, Equip and Chance on hit line (`ItemEffect.SpellID`),
+  so the item page's box links the line to the spell's page where the spell names file names the spell; the
+  hover card stays unlinked. Durability and resistances are not read: this build's `ItemSparse` has no such
+  columns, so resistances still come only from players' reports and durability is not shown.
 - **Map pictures**: the game's own continent and zone map art from the map art tables, laid under
   our zone outlines. A held-back zone's picture shows only with spoilers on. A continent's own
   picture always shows (decided 2026-10-19): it is the original world's parchment map, with no names

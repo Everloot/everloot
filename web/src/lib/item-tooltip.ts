@@ -1,5 +1,6 @@
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import type { ItemCategory } from "@kb/item-taxonomy";
+import type { ReportedLine } from "./item-names";
 import { itemSetHref } from "./item-sets";
 import { NAME_FROM, type ShownItemName } from "./items";
 import { splitWhy } from "./placeholder";
@@ -21,6 +22,11 @@ export interface ItemTooltip {
   lines: string[];
   /** Why the lines hold `[?]`; absent without any. */
   notes?: string[];
+  /**
+   * The players' numbers in one line ("Stats: 3 agreeing installs, last seen 2026-11-20 · 1 line unconfirmed"), and
+   * each number's installs, date and build behind it; absent when no number is reported.
+   */
+  evidence?: { summary: string; lines: string[] };
   foot: string | null;
 }
 
@@ -38,7 +44,7 @@ export interface TooltipSet {
 export interface ItemTooltipInput {
   id: number;
   /** The game file tooltip with the reported numbers in (withReported), only where the page shows it. */
-  tip: { lines: string[]; why: string[]; icon: string | null; label: string } | undefined;
+  tip: { lines: string[]; why: string[]; icon: string | null; label: string; spells?: Record<string, number>; reported?: ReportedLine[] } | undefined;
   /** The name the page shows (shownItemName), or null for "Item N". */
   name: ShownItemName | null;
   category: Pick<ItemCategory, "class" | "subclass" | "slot" | "quality"> | null | undefined;
@@ -47,6 +53,8 @@ export interface ItemTooltipInput {
   /** The item's icon where the tooltip has none (an item the files give only an icon for). */
   icon?: string | null;
   set?: TooltipSet | null;
+  /** A spell's page, for the Use, Equip and Chance on hit lines; undefined where the spell has none. */
+  spellHref?: (spellId: number) => string | undefined;
 }
 
 const SET_LINE = /^Set: (.+)$/;
@@ -71,14 +79,37 @@ function setLines(name: string, set: TooltipSet): { lines: string[]; links: Reco
   return { lines, links };
 }
 
+const span = (counts: number[]) => {
+  const lo = Math.min(...counts), hi = Math.max(...counts);
+  return lo === hi ? String(lo) : `${lo}–${hi}`;
+};
+
+/**
+ * The players' numbers in one line: how many installs agree on the confirmed ones and when one was last seen, and how
+ * many lines still wait for a third install. Each number's own line stays behind it.
+ */
+export function reportSummary(reported: readonly ReportedLine[]): string {
+  const agreed = reported.filter((r) => !r.pending);
+  const pending = reported.length - agreed.length;
+  const seen = reported.map((r) => r.lastSeen).filter((d): d is string => d !== null).sort().pop();
+  const parts = [
+    agreed.length ? `${span(agreed.map((r) => r.reporters))} agreeing installs${seen ? `, last seen ${seen}` : ""}` : null,
+    pending ? `${pending} ${pending === 1 ? "line" : "lines"} unconfirmed` : null,
+  ].filter(Boolean);
+  return `Stats: ${parts.join(" · ")}`;
+}
+
 /**
  * The card, and the lines that open a page (the set's name, its pieces) by the line's text: the page box links them,
  * the hover card takes no pointer and leaves them out.
  */
-export function itemTooltip({ id, tip, name, category, namesQuality, icon, set }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
+export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, spellHref }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
   const { reasons, evidence } = splitWhy(tip?.why ?? []);
   let links: Record<string, string> = {};
   const lines: string[] = [];
+  // The players' numbers are summed up in one line; their own lines go behind it (`evidence`), not in the box.
+  const reported = tip?.reported ?? [];
+  const details = new Set(reported.map((r) => r.detail));
   if (tip) {
     for (const line of tip.lines) {
       const named = SET_LINE.exec(line);
@@ -88,8 +119,12 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set }
         lines.push(...block.lines);
         links = { ...links, ...block.links };
       } else lines.push(line);
+      // A Use, Equip or Chance on hit line opens its spell's page, where the spell has one.
+      const spell = tip.spells?.[line];
+      const href = spell !== undefined ? spellHref?.(spell) : undefined;
+      if (href && !links[line]) links[line] = href;
     }
-    lines.push(...evidence);
+    lines.push(...evidence.filter((line) => !details.has(line)));
   } else {
     // No game file tooltip may be shown: the type and the slot from the client layer.
     lines.push(...[category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l)));
@@ -108,6 +143,7 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set }
       icon: tip?.icon ?? icon ?? null,
       lines,
       ...(notes ? { notes } : {}),
+      ...(reported.length ? { evidence: { summary: reportSummary(reported), lines: reported.map((r) => r.detail) } } : {}),
       foot,
     },
     links,

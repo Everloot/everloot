@@ -15,7 +15,10 @@
  *   AllowableRace with ChrRaces.PlayableRaceBit) and what it requires (RequiredSkill and RequiredSkillRank with
  *   SkillLine, RequiredAbility with SpellName, MinFactionID and MinReputation with Faction).
  * - ItemXItemEffect and ItemEffect: the item's Use, Equip and Chance on hit spells, whose descriptions the caller
- *   resolves (assets/tooltip.ts), so a value the spell tables do not give stays `[?]`.
+ *   resolves (assets/tooltip.ts), so a value the spell tables do not give stays `[?]`; each line keeps its spell id.
+ * - ItemSparse.StartQuestID: the quest the item begins.
+ * - Not recorded, because this build's ItemSparse has no such columns: durability (MaxDurability) and resistances
+ *   (Resistances). Players' tooltips report the resistances (item facts); durability is in no file we read.
  * - ItemDamage*: a weapon's damage per second by item level and quality. In 1.60.1 ItemSparse has no
  *   MinDamage/MaxDamage; the client works a weapon's damage out from this value, the weapon speed and
  *   ItemSparse.DmgVariance. Those inputs are recorded as the tables give them (`w`), not the damage:
@@ -79,6 +82,13 @@ export interface ItemRecord {
   cr?: string[];
   rq?: string[];
   fx?: string[];
+  /**
+   * The spell behind each `fx` line, in the same order (ItemEffect.SpellID), so a page can link the spell. Written
+   * with `fx` since 2026-11-26; absent in an older shard.
+   */
+  fs?: number[];
+  /** The quest the item begins ("This Item Begins a Quest", ItemSparse.StartQuestID); omitted when it begins none. */
+  qs?: number;
 }
 
 /** ITEM_FLAG2_CASTER_WEAPON, in the second Flags word. */
@@ -181,15 +191,22 @@ function limitLine(row: Record<string, unknown>, at: LineTables): string | null 
   return name ? `${kind}: ${name} (${count})` : count > 1 ? `${kind} (${count})` : kind;
 }
 
-/** "Equip: …" and the rest, for the spells that have a description: one without prints nothing in the game either. */
-function effectLines(itemId: number, at: LineTables, describe: DescribeSpell): string[] {
-  const out: string[] = [];
+/**
+ * "Equip: …" and the rest, for the spells that have a description: one without prints nothing in the game either.
+ * Each printed line's spell id beside it, in the same order.
+ */
+function effectLines(itemId: number, at: LineTables, describe: DescribeSpell): { lines: string[]; spells: number[] } {
+  const lines: string[] = [], spells: number[] = [];
   for (const e of at.effectsOf.get(itemId) ?? []) {
     const word = TRIGGER[num(e.TriggerType)];
-    const description = word ? describe(num(e.SpellID)) : null;
-    if (word && description) out.push(`${word}: ${description}`);
+    const spell = num(e.SpellID);
+    const description = word ? describe(spell) : null;
+    if (word && description) {
+      lines.push(`${word}: ${description}`);
+      spells.push(spell);
+    }
   }
-  return out;
+  return { lines, spells };
 }
 
 export interface ItemSet {
@@ -248,7 +265,13 @@ export function buildItemSet(get: TableReader, only?: ReadonlySet<number>, descr
     if (limit) record.lc = limit;
     record.cr = whoLines(row, at);
     record.rq = requireLines(row, at);
-    if (describe && at.hasEffects) record.fx = effectLines(id, at, describe);
+    if (describe && at.hasEffects) {
+      const fx = effectLines(id, at, describe);
+      record.fx = fx.lines;
+      record.fs = fx.spells;
+    }
+    const quest = num(row.StartQuestID);
+    if (quest > 0) record.qs = quest;
     records.set(id, record);
     const icon = base ? num(base.IconFileDataID) : 0;
     if (icon > 0) iconOf.set(id, icon);

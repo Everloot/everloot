@@ -122,6 +122,62 @@ describe("item tooltip, as the card and the page box draw it", () => {
     expect(rows(root).map((p) => [p.textContent, p.className])).toEqual([["Item Level 1", "text-tip-yellow"], ["Quest Item", ""], ["Unique", ""]]);
   });
 
+  test("an item that begins a quest says so under Unique, in the neutral colour", () => {
+    const root = drawn(itemTooltip(input({ ...QUEST, qs: 4321 })));
+    expect(rows(root).map((p) => [p.textContent, p.className])).toEqual([
+      ["Item Level 1", "text-tip-yellow"], ["Quest Item", ""], ["Unique", ""], ["This Item Begins a Quest", ""],
+    ]);
+  });
+
+  test("a Use or Equip line links its spell's page on the item page only, and only where the spell has a page", () => {
+    const fx = { ...USE, fx: ["Use: Restores [?] mana.", "Equip: Synthetic ward."], fs: [601, 602] };
+    const spellHref = (spell: number) => (spell === 601 ? `/database/spells/${spell}` : undefined);
+    const t = itemTooltip(input(fx, { spellHref }));
+    expect(t.links).toEqual({ "Use: Restores [?] mana.": "/database/spells/601" });
+    const page = drawn(t, true);
+    expect([...page.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([["Use: Restores [?] mana.", "/database/spells/601"]]);
+    // Still green, link or not.
+    expect(row(page, "Use: Restores").className).toBe("text-q-uncommon");
+    expect(row(page, "Equip: Synthetic ward.").className).toBe("text-q-uncommon");
+    expect(drawn(t).querySelectorAll("a")).toHaveLength(0);
+    // A record from before the spell ids were kept, or lines and ids that do not pair up: no link.
+    expect(itemTooltip(input(USE, { spellHref })).links).toEqual({});
+    expect(itemTooltip(input({ ...fx, fs: [601] }, { spellHref })).links).toEqual({});
+  });
+
+  test("the players' numbers: one short line in the box, the per-line installs, build and date behind it", () => {
+    const tip = tipOf(ARMOR, reported([["armor", 210, 3], ["stamina", 11, 4], ["fire_resistance", 10, 3], ["strength", 7, 1]]));
+    const t = itemTooltip(input(ARMOR, { tip }));
+    // No line per number inside the box any more.
+    expect(t.card.lines.filter((l) => l.includes("reported by"))).toEqual([]);
+    expect(t.card.evidence).toEqual({
+      summary: "Stats: 3–4 agreeing installs, last seen 2026-11-20 · 1 line unconfirmed",
+      lines: [
+        "210 Armor: reported by 3 installs, last seen 2026-11-20, build 1.60.1.71139.",
+        "+11 Stamina: reported by 4 installs, last seen 2026-11-20, build 1.60.1.71139.",
+        "+10 Fire Resistance: reported by 3 installs, last seen 2026-11-20, build 1.60.1.71139.",
+        "+7 Strength (unconfirmed, seen by 1 player): reported by 1 install, last seen [?], build 1.60.1.71139.",
+      ],
+    });
+    // The help line stays a line of its own.
+    expect(t.card.lines.at(-1)).toBe("Help confirm these values: install the addon at /addon.");
+    for (const page of [false, true]) {
+      const root = drawn(t, page);
+      const box = root.querySelectorAll("[data-card-evidence]");
+      expect(box).toHaveLength(1);
+      expect(box[0].tagName).toBe("DETAILS");
+      expect(box[0].querySelector("summary")!.textContent).toBe("Stats: 3–4 agreeing installs, last seen 2026-11-20 · 1 line unconfirmed");
+      expect(box[0].querySelector("summary")!.getAttribute("title")).toContain("+11 Stamina: reported by 4 installs");
+      expect([...box[0].querySelectorAll("li")].map((li) => li.textContent)).toEqual(t.card.evidence!.lines);
+    }
+    // Only unconfirmed numbers: no agreeing installs to count.
+    const pending = itemTooltip(input(ARMOR, { tip: tipOf(ARMOR, reported([["strength", 7, 1], ["stamina", 3, 2]])) }));
+    expect(pending.card.evidence!.summary).toBe("Stats: 2 lines unconfirmed");
+    // Nothing reported: no summary.
+    expect(itemTooltip(input(ARMOR)).card.evidence).toBeUndefined();
+    expect(drawn(itemTooltip(input(ARMOR))).querySelector("[data-card-evidence]")).toBeNull();
+  });
+
   test("the gates: no shown name is Item N without a colour; no game file tooltip is only the type and slot", () => {
     const anon = itemTooltip(input(ARMOR, { name: null }));
     expect(anon.card.title).toBe("Item 9001");

@@ -87,7 +87,9 @@ test("a number 3 installs' tooltips agree on fills its placeholder, with the ins
   });
   const { card } = await (await call("item", "647")).json();
   expect(card.notes).toEqual(["[?] stat amounts: reason."]);
-  expect(card.lines).toEqual(["Two-Hand", "+7 Strength", "+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."]);
+  // The number in the box; its installs, build and date behind one summary line.
+  expect(card.lines).toEqual(["Two-Hand", "+7 Strength"]);
+  expect(card.evidence).toEqual({ summary: "Stats: 4 agreeing installs, last seen 2026-11-05", lines: ["+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."] });
   expect(mocks.reported).toHaveBeenCalledWith(647);
 });
 
@@ -145,7 +147,9 @@ test("with the cron's stored item view, an item card reads that one small file: 
   const r2 = vi.fn(async () => new Response(JSON.stringify(view), { status: 200 }));
   vi.stubGlobal("fetch", r2);
   const { card } = await (await call("item", "647")).json();
-  expect(card.lines).toEqual(["Two-Hand", "+7 Strength", "+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."]);
+  // The number in the box; its installs, build and date behind one summary line.
+  expect(card.lines).toEqual(["Two-Hand", "+7 Strength"]);
+  expect(card.evidence).toEqual({ summary: "Stats: 4 agreeing installs, last seen 2026-11-05", lines: ["+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."] });
   expect((await (await call("item", "19019")).json()).card).toMatchObject({ title: "Thunderfury", foot: "Name confirmed by players" });
   expect((await call("item", "5")).status).toBe(404);
   // The names and the reported numbers came from the view, read once for both cards.
