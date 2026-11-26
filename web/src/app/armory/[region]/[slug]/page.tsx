@@ -20,7 +20,7 @@ import { Equipment, readTimes } from "../../profile";
 import { characterTabs } from "../../character-tabs";
 import { loadCharacterProgression } from "@/lib/progression";
 import { addonSighting } from "@/lib/character-match";
-import { AddonSighting, DungeonRaidSlot, SheetSummary } from "./sheet";
+import { AddonSighting, CharacterFacts, CharacterOverview, DungeonRaidSlot, RankBadges, SheetSummary, type RankBadge } from "./sheet";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
@@ -112,13 +112,19 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
       : [];
   });
   const progression = await loadCharacterProgression(c.region, c.slug);
-  // The gear ranks sit in the sheet's summary; honorable kills in the PvP tab, play history in its own.
-  const gearRanks = rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills" && !historyKeys.has(r.metric)));
+  // Every rank but the play-history ones shows as a badge under the facts strip, scoped by region and ruleset. The
+  // number is the store's own rank (one more than the characters strictly above); ties are not told apart yet.
+  const rankBadges: RankBadge[] = ranks.flatMap((r) => {
+    const metric = metricOfKey(r.metric);
+    if (!metric || historyKeys.has(r.metric)) return [];
+    const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
+    return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} #${r.rank} of ${r.of.toLocaleString("en-US")}`, href }];
+  });
   const seen = await addonSighting(c);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
 
   return (
-    <Container width="wide">
+    <Container width="data">
       <article className="space-y-8">
         <div className="flex items-start gap-4">
           <Portrait src={portrait} name={c.name} />
@@ -132,25 +138,30 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
                 <RegionRuleset region={c.region} ruleset={c.ruleset} />
                 {c.guildName && <span>{c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</span>}
                 {lastLogin && <span>Last login <span className="font-mono tabular-nums">{lastLogin}</span></span>}
-                {lastRead && <span>Last read <time dateTime={lastRead} className="font-mono tabular-nums">{day(lastRead)}</time></span>}
               </>}
               actions={<>
-                <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-secondary min-h-11">Update character</button></form>
-                <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={link}>View Blizzard armory</a>
+                <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-sm">Update character</button></form>
+                <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={`text-sm ${link}`}>Blizzard armory</a>
               </>}
             />
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <span className="rounded-control border border-edge px-2 py-1 text-fg-2">Blizzard profile</span>
           {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
           <ArmoryCredit at={lastRead} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
-        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} ranks={gearRanks} />} />
+        <div className="space-y-3">
+          <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
+          <RankBadges ranks={rankBadges} />
+        </div>
+
+        <CharacterOverview character={c} />
+
+        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} />} />
 
         <DungeonRaidSlot data={progression.dungeons} href="#progress" />
 

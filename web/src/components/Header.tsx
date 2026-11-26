@@ -301,7 +301,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
         {/* The site's one search, in the middle of the bar: items, NPCs, quests, zones, lore and tools, with instant
             suggestions for database pages. A GET form, so it works without JavaScript. */}
         <div className="hidden min-w-0 flex-1 justify-center xl:flex">
-          <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "header" })} className="flex h-8 w-full min-w-0 max-w-[360px] items-center gap-2 rounded-full border border-edge bg-panel px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+          <form action="/search" method="get" role="search" aria-label="Site search" onSubmit={() => track("search", { surface: "header" })} className="flex h-8 w-full min-w-0 max-w-[360px] items-center gap-2 rounded-full border border-edge bg-panel px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
             <SearchIcon />
             <SuggestField
               id="site-search"
@@ -336,7 +336,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       </div>
 
       <div id="header-search" hidden={!searchOpen} className="border-t border-line bg-canvas xl:hidden">
-        <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "header-phone" })} className="mx-auto flex max-w-wide items-center gap-2 px-4 py-2">
+        <form action="/search" method="get" role="search" aria-label="Site search" onSubmit={() => track("search", { surface: "header-phone" })} className="mx-auto flex max-w-wide items-center gap-2 px-4 py-2">
           <SuggestField
             id="header-search-field"
             inputRef={searchRow}
@@ -352,7 +352,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
         // Fixed from under the bar to the bottom of the window, so the open menu covers the page instead of showing it beneath.
         <nav id="site-navigation" aria-label="Site menu" className="pop fixed inset-x-0 bottom-0 top-header overflow-y-auto overscroll-contain bg-panel xl:hidden">
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
-            <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+            <form action="/search" method="get" role="search" aria-label="Site search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
               {/* The bar's suggesting field, so the menu's search finds the same pages as you type. */}
               <SuggestField

@@ -281,8 +281,9 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
           </p>
         )}
 
+        {/* Not a named region itself: the table's scroll box is the region named for the list. */}
         {(armory || count > 0 || (searched && !unreachable)) && (
-          <section aria-labelledby="player-results" className="space-y-3">
+          <section className="space-y-3">
             <SectionHeading id="player-results">
               {q ? <>{count} {count === 1 ? "character" : "characters"} matching &ldquo;{q}&rdquo; on this page</> : armory ? "Blizzard profiles" : "Players"}
             </SectionHeading>
