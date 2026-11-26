@@ -8,6 +8,12 @@ vi.mock("@/lib/class-hub", async (original) => ({
   ...(await original<typeof import("@/lib/class-hub")>()),
   classGuides: () => hubData.guides,
 }));
+// The asset folder's manifest, stood in for: the class icon and tree icons the calculator also shows.
+const assets = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock("@/lib/game-assets", async (original) => ({
+  ...(await original<typeof import("@/lib/game-assets")>()),
+  loadSiteAssets: async () => assets.value,
+}));
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
@@ -28,7 +34,7 @@ const GUIDE = { slug: "made-up-plan", title: "A made-up plan", summary: "Words f
 const params = (value: string) => ({ params: Promise.resolve({ class: value }) });
 const render = async (value: string = slug) => renderToStaticMarkup(await ClassHubPage(params(value)));
 
-beforeEach(() => { hubData.guides = []; });
+beforeEach(() => { hubData.guides = []; assets.value = null; });
 
 test("one hub per catalog class is built at deploy, and it may never read the request", () => {
   expect(route.dynamic).toBe("error");
@@ -64,4 +70,13 @@ test("with no reviewed guide the hub shows the shared empty state for its class;
 test("an address that is not a catalog class is a 404 and stays out of search", async () => {
   await expect(render("class-0")).rejects.toThrow("NEXT_NOT_FOUND");
   expect((await route.generateMetadata(params("class-0"))).robots).toEqual({ index: false, follow: true });
+});
+
+test("the title carries the game's class icon and the trees their icons when the asset folder has them, and none without it", async () => {
+  const plain = await render();
+  expect(plain).not.toContain("<img");
+  assets.value = { classes: new Map([[slug, { name, icon: "https://assets.test/icons/class.webp", trees: [{ name: null, icon: "https://assets.test/icons/tree.webp" }] }]]) };
+  const html = await render();
+  expect(/<header[\s\S]*?<\/header>/.exec(html)?.[0]).toContain('src="https://assets.test/icons/class.webp"');
+  expect(html).toContain('src="https://assets.test/icons/tree.webp"');
 });

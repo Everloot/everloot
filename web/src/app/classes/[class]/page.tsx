@@ -6,15 +6,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClassContextLink } from "@/components/classes/ClassContextChip";
 import UseClassButton from "@/components/classes/UseClassButton";
+import GameIcon from "@/components/game/GameIcon";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { Badge, Container, PageHeader, SectionHeading } from "@/components/ui";
+import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
+import { armoryBoardHref } from "@/lib/armory";
 import { censusHref } from "@/lib/census-filter";
 import { classLabel, contextLinks, type ContextDestination, type ContextLink } from "@/lib/class-context";
-import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
+import { classGear, classGuides, classRaces, classSpellLevels, guideRoles, hubIndexable, type GearType } from "@/lib/class-hub";
+import { loadSiteAssets } from "@/lib/game-assets";
 import { guideHref } from "@/lib/guides";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
-import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
+import { TALENT_CLASSES, isTalentClass, loadCatalog } from "@/lib/talents/catalogs";
+import { classFacts } from "@/lib/talents/facts";
 import { CENSUS_CLASSES } from "@kb/census";
 import type { GuideActivity, GuideRole } from "@kb/guides/guide";
 import GuidesEmpty from "../../guides/GuidesEmpty";
@@ -48,6 +53,26 @@ const NOTES: Record<Destination, (name: string) => string> = {
   professions: () => "Profession paths and recipe skill ranges, estimated from the recipes and prices players uploaded.",
   dungeons: () => "Every dungeon and raid, lowest level first, with where it is entered and the bosses players report.",
 };
+
+/** One row of types, "Plate from level 40": the level only where the files give the proficiency after level 1. */
+function GearList({ label, types }: { label: string; types: GearType[] }) {
+  if (!types.length) return null;
+  return (
+    <div className="grid gap-x-4 gap-y-1 py-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
+      <dt className="font-medium text-fg">{label}</dt>
+      <dd>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
+          {types.map((t) => (
+            <li key={t.href === null ? `type-${t.subclass}` : t.href}>
+              {t.href !== null ? <Link href={t.href} className={LINK}>{t.name}</Link> : <span className="text-fg">{`Type ${t.subclass}`}</span>}
+              {t.level > 1 && <span className="text-fg-2">{` from level ${t.level}`}</span>}
+            </li>
+          ))}
+        </ul>
+      </dd>
+    </div>
+  );
+}
 
 const guideCount = (name: string, guides: number) => `${guides} reviewed ${name} ${guides === 1 ? "guide" : "guides"}`;
 
@@ -85,6 +110,16 @@ export default async function ClassHubPage({ params }: Params) {
   const links = contextLinks({ classSlug: slug }).filter((l): l is ContextLink & { key: Destination } => l.key !== "hub");
   // The census keys a class by UnitClass's token, the talent catalog by its slug; the nine are the same names.
   const census = CENSUS_CLASSES.find((c) => c.name === name)!;
+  const roles = guideRoles(guides);
+  const gear = classGear(slug);
+  const spells = classSpellLevels(slug);
+  const placed = spells.levels.reduce((n, l) => n + l.spells.length, 0);
+  // The class and tree icons are the calculator's, read from the asset folder while the site builds; none without it.
+  const [catalog, assets] = await Promise.all([loadCatalog(slug), loadSiteAssets()]);
+  const facts = classFacts(catalog);
+  const art = assets?.classes.get(slug);
+  const treeIcon = (tree: string, i: number) => art?.trees.find((a) => a.name === tree)?.icon ?? art?.trees[i]?.icon ?? null;
+  const calculator = `/tools/talents/${slug}`;
 
   return (
     <Container>
@@ -92,7 +127,9 @@ export default async function ClassHubPage({ params }: Params) {
       <PageHeader
         trail={[...trailFor("/classes")!, { name, path }]}
         title={<span className={CLASS_TEXT[slug]}>{name}</span>}
+        icon={art?.icon ? <GameIcon src={art.icon} size={40} /> : undefined}
         lede={lede(name, guides.length)}
+        meta={roles.length ? <span>{`Roles in its reviewed guides: ${roles.map((r) => ROLE[r]).join(", ")}`}</span> : undefined}
       />
       <UseClassButton classSlug={slug} />
 
@@ -111,6 +148,57 @@ export default async function ClassHubPage({ params }: Params) {
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section aria-labelledby="talents">
+          <SectionHeading id="talents">Talent trees</SectionHeading>
+          <ul className="grid gap-3 sm:grid-cols-3">
+            {facts.trees.map((t, i) => {
+              const icon = treeIcon(t.name, i);
+              return (
+                <li key={t.name}>
+                  <Link href={calculator} className="flex items-center gap-3 rounded border border-line px-3 py-2 hover:border-edge">
+                    {icon && <GameIcon src={icon} size={32} />}
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-fg">{t.name}</span>
+                      <span className="block text-meta text-muted">{`${t.talents} talents, ${t.ranks} ranks`}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-sm text-fg-2">
+            <Link href={calculator} className={LINK}>{`Plan a ${name} in the talent calculator`}</Link>
+            {` ${facts.points} points by level ${facts.maxLevel}, from the talent catalog of build ${facts.build}. `}
+            <Badge tone="files" />
+          </p>
+        </section>
+
+        <section aria-labelledby="gear">
+          <SectionHeading id="gear">Weapons and armor</SectionHeading>
+          <dl className="divide-y divide-line text-sm">
+            <GearList label="Armor" types={gear.armor} />
+            <GearList label="Weapons" types={gear.weapons} />
+          </dl>
+          <p className="mt-3 text-sm text-muted">
+            <Badge tone="files" />{" "}
+            {`The ${name}'s proficiencies in the game files of build ${CLIENT_CLASS_GEAR.build.version}, unconfirmed. Each type opens the item list narrowed to what a ${name} can use.`}
+          </p>
+        </section>
+
+        <section aria-labelledby="spells">
+          <SectionHeading id="spells">Spells by level</SectionHeading>
+          {placed > 0 ? (
+            <p className="text-sm text-fg-2">
+              <Link href={`/classes/${slug}/spells`} className={LINK}>{`Every ${name} spell by the level it is learned`}</Link>
+              {` ${placed} ${name} spells with the level the game files give, from level ${spells.levels[0]!.level} to ${spells.levels.at(-1)!.level}: ranks, talents and passives as the files mix them. `}
+              {spells.unleveled > 0 && <>{`${spells.unleveled} more have no level in the files; `}<Link href={`/database/spells?class=${slug}`} className={LINK}>{`every ${name} spell`}</Link>{" lists them too. "}</>}
+              <Badge tone="files" />
+            </p>
+          ) : (
+            <p className="text-sm text-fg-2">{`The game files give no level for a ${name} spell in this build.`}</p>
           )}
         </section>
 
@@ -138,6 +226,11 @@ export default async function ClassHubPage({ params }: Params) {
             <li>
               <Link href="/rankings/classes" className={LINK}>{`Where ${name} ranks this week`}</Link>
               <span className="text-fg-2"> Every class by characters active in the week, with the change against last week.</span>
+            </li>
+            {/* Blizzard API numbers stay on the ad-free armory pages (docs/DATA_POLICY.md, "Armory"): this page only links them. */}
+            <li>
+              <Link href={armoryBoardHref("item-level", { region: null, ruleset: null, class: name })} className={LINK}>{`Top ${name} characters by item level`}</Link>
+              <span className="text-fg-2">{` The armory board narrowed to the ${name}, from Blizzard's API.`}</span>
             </li>
           </ul>
         </section>
