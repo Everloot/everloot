@@ -4,12 +4,12 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
-  "buildId": 71091,
-  "version": "1.60.1.71091"
+  "buildConfig": "7a16decda3672d84db0d34d0784fda98",
+  "buildId": 71139,
+  "version": "1.60.1.71139"
  },
- "definitions": "3783c908726e",
- "extractedAt": "2026-11-25T06:02:26.068Z",
+ "definitions": "8308f39154b5",
+ "extractedAt": "2026-11-26T04:37:28.478Z",
  "encryptedBlocksSkipped": {
   "ItemEffect": 12,
   "ItemXItemEffect": 12,
@@ -5518,6 +5518,9 @@
   ],
   "1294054": [
    274424
+  ],
+  "1294289": [
+   274491
   ],
   "1295805": [
    274972

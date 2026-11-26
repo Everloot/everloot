@@ -43,7 +43,7 @@ test("a set page: the name with the unconfirmed marker, its pieces with icons an
   expect(out).toContain('<a href="/database/spells/1301126">Spell 1301126</a>');
   expect(out).toContain("(3) Set: Increased Defense");
   // Found in game files, unconfirmed, with the build.
-  expect(out).toContain("Found in game files, unconfirmed: read from build 1.60.1.71091");
+  expect(out).toContain("Found in game files, unconfirmed: read from build 1.60.1.71139");
   expect(out).toContain("Blizzard Entertainment");
 });
 
