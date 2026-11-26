@@ -24,9 +24,10 @@ const clears = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.value }));
 const renders = vi.hoisted(() => ({ npcs: new Map<number, { url: string; size: number }>() }));
 vi.mock("@/lib/game-renders", () => ({ loadRenders: async () => ({ npcs: renders.npcs, items: new Map() }) }));
+const art = vi.hoisted(() => ({ assets: null as unknown }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
-  loadSiteAssets: async () => null,
+  loadSiteAssets: async () => art.assets,
 }));
 
 import BossPage, { generateMetadata } from "./[boss]/page";
@@ -42,7 +43,7 @@ const INSTALLS = ["install-a", "install-b", "install-c"];
 const killed = INSTALLS.map((installId) => ({ installId, encounterId: 2732, name: "Oggleflint", instanceMapId: 389, success: true, npcIds: [11517], capturedAt: "2026-11-04T20:00:00Z" }));
 const reported = () => { state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed } }; };
 
-afterEach(() => { state.seen = { unreachable: true }; state.loot = new Map(); clears.value = null; renders.npcs = new Map(); });
+afterEach(() => { state.seen = { unreachable: true }; state.loot = new Map(); clears.value = null; renders.npcs = new Map(); art.assets = null; });
 
 test("a boss page from the game files alone: its name marked unconfirmed, its instance linked, its place in the files' order", async () => {
   const html = await page("2733-taragaman-the-hungerer");
@@ -90,6 +91,7 @@ test("linked characters' kills of the boss are counts only, with no character na
   const html = await page("2732-oggleflint");
   const kills = text(panel(html, "kills"));
   expect(kills).toContain("2 linked characters have killed this boss, 7 kills in all.");
+  expect(kills).toContain("First synced kill 2026-11-10");
   for (const name of ["Mira", "Tavi"]) expect(html).not.toContain(name);
   clears.value = null;
   expect(await page("2732-oggleflint")).not.toContain('data-tab-panel="kills"');
@@ -113,4 +115,37 @@ test("the list: every boss with its instance and order, filtered by name or id",
   expect(found).toContain("Oggleflint");
   expect(found).not.toContain("Bazzalan");
   expect(await list({ q: "2735" })).toContain('href="/database/bosses/2735-bazzalan"');
+});
+
+test("the header links the previous and next boss in the instance's encounter order, and the ends link one side only", async () => {
+  // The Deadmines in the files: Rhahk'Zor, Sneed, Miner Johnson, Gilnid, ... Edwin VanCleef.
+  const aside = (html: string) => html.split("data-boss-nav")[1]?.split("</nav>")[0] ?? "";
+  const sneed = aside(await page("2742-sneed"));
+  expect(sneed).toContain('<a href="/database/bosses/2741-rhahk-zor">← Rhahk&#x27;Zor</a>');
+  expect(sneed).toContain('<a href="/database/bosses/3676-miner-johnson">Miner Johnson →</a>');
+  const first = aside(await page("2741-rhahk-zor"));
+  expect(first).not.toContain("←");
+  expect(first).toContain('<a href="/database/bosses/2742-sneed">Sneed →</a>');
+  const last = aside(await page("2747-edwin-vancleef"));
+  expect(last).toContain("← Cookie");
+  expect(last).not.toContain("→");
+});
+
+test("the top band shows the instance's loading screen when the upload has it, and no box when not", async () => {
+  expect(await page("2742-sneed")).not.toContain("data-entity-art");
+  art.assets = { loadingScreens: new Map([[36, { mapId: 36, name: "The Deadmines", kind: "dungeon", heldBack: false, url: "https://a.test/loading/36.webp", width: 1024 }]]) };
+  expect(await page("2742-sneed")).toMatch(/data-entity-art[^]*src="https:\/\/a.test\/loading\/36.webp"/);
+  art.assets = { loadingScreens: new Map([[36, { mapId: 36, name: "The Deadmines", kind: "dungeon", heldBack: true, url: "https://a.test/loading/36.webp", width: 1024 }]]) };
+  expect(await page("2742-sneed")).not.toContain("data-entity-art");
+});
+
+test("the loot tab opens first when it has rows; with none, the other tabs come first", async () => {
+  const tabOrder = (html: string) => [...html.matchAll(/data-tab-panel="([^"]+)"/g)].map((m) => m[1]);
+  expect(tabOrder(await page("2733-taragaman-the-hungerer"))[0]).not.toBe("loot");
+  reported();
+  state.loot = new Map([["npc:11517", {
+    windows: 6, installs: new Set(INSTALLS), first: "2026-11-03T20:00:00Z", last: "2026-11-04T20:00:00Z",
+    items: new Map([[14149, { windows: 6, installs: new Set(INSTALLS) }]]),
+  }]]);
+  expect(tabOrder(await page("2732-oggleflint"))[0]).toBe("loot");
 });
