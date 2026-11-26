@@ -122,6 +122,9 @@ const SHOWS_ART = new Set([
   "web/src/app/database/instances/[instance]/page.tsx",
   // The terrain page: the item names and icons of the gear bound to each terrain type, as the zone pages show them.
   "web/src/app/database/terrain/page.tsx",
+  // An item set page: its pieces' names and icons under the item name rule, and the set and bonus spell names and
+  // icons, as the item and spell pages show them. The set list reads the set names only, no art.
+  "web/src/app/database/item-sets/[id]/page.tsx", "web/src/app/database/item-sets/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
   "web/src/app/database/spells/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.
@@ -140,7 +143,7 @@ const SHOWS_ART = new Set([
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
   "web/src/lib/shown-item-names.ts", "web/src/lib/site-sitemap.ts", "web/scripts/upload-item-names.mjs",
-  // The spell names, read by the database sitemap only to know whether a spell's page is named: ids out, no names.
+  // The spell and item set names, read by the database sitemap only to know whether a page is named: ids out, no names.
   "web/src/lib/database-sitemap.ts",
   // The same names and the quest titles for the site's own search (/search and /search/suggest), never /api/suggest.
   "web/src/lib/shown-search-names.ts",

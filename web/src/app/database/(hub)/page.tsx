@@ -17,6 +17,7 @@ import { AgreementMeter, Container, DataTitle, Disclosure, SearchBar } from "@/c
 import { asOfLine, EVIDENCE_KEY } from "@/lib/evidence";
 import { loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
+import { ITEM_SETS } from "@/lib/item-sets";
 import { datasetJsonLd } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 
@@ -83,6 +84,8 @@ export default async function DatabasePage() {
     "/database/factions": listed(catalog?.factions.length),
     "/database/titles": listed(catalog?.titles.length),
     "/database/quest-chains": listed(catalog?.chains.length),
+    // The item sets the game files list, like the zone count: it reads the files, not the uploads.
+    "/database/item-sets": n(ITEM_SETS.length),
     "/database/drops": seen(live),
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
