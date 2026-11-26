@@ -30,6 +30,7 @@ export const DATABASE_HUBS: readonly DatabaseHub[] = [
   { href: "/database/download", label: "Download the data", source: "players" },
   { href: "/database/zones", label: "Zones", source: "files" },
   { href: "/database/instances", label: "Dungeons and raids", source: "files" },
+  { href: "/database/bosses", label: "Bosses", source: "files" },
   { href: "/database/terrain", label: "Terrain and speed gear", source: "files" },
 ];
 
