@@ -35,6 +35,8 @@ export interface ArmoryGuild {
 export interface ArmoryMember {
   characterSlug: string; name: string; surname: string; level: number | null; classId: number | null; raceId: number | null;
   rank: number | null; itemLevel: number | null; gearScore: number | null; stored: boolean;
+  /** The character's last login as Blizzard gives it, once read; null before 20261125110000_armory_roster_last_login.sql. */
+  lastLogin?: string | null;
 }
 
 export interface ArmoryHit { region: string; slug: string; name: string; surname: string; level: number; class: string; race: string; ruleset: string; guildName: string | null }
@@ -156,12 +158,13 @@ const GuildRow = z.object({
 // slug rather than taking the whole roster down.
 const MemberRow = z.object({
   character_slug: z.string(), name: textOrNull, surname: textOrNull, level: numOrNull, class_id: numOrNull, race_id: numOrNull,
-  rank: numOrNull, item_level: numOrNull, gear_score: numOrNull, stored: z.boolean(),
+  rank: numOrNull, item_level: numOrNull, gear_score: numOrNull, stored: z.boolean(), last_login: textOrNull.optional(),
 }).transform((r): ArmoryMember => {
   const fallback = namesFromSlug(r.character_slug);
   return {
     characterSlug: r.character_slug, name: r.name ?? fallback.name, surname: r.surname ?? fallback.surname, level: r.level,
     classId: r.class_id, raceId: r.race_id, rank: r.rank, itemLevel: r.item_level, gearScore: r.gear_score, stored: r.stored,
+    lastLogin: r.last_login ?? null,
   };
 });
 
@@ -363,7 +366,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
     async roster(region, slug) {
       return (members.get(key(region, slug)) ?? []).filter((m) => !hides.has(key(region, m.characterSlug))).map((m) => {
         const c = characters.get(key(region, m.characterSlug));
-        return { ...m, itemLevel: c?.itemLevel ?? null, gearScore: c?.gearScore ?? null, stored: Boolean(c) };
+        return { ...m, itemLevel: c?.itemLevel ?? null, gearScore: c?.gearScore ?? null, stored: Boolean(c), lastLogin: c?.lastLogin ?? null };
       });
     },
     async search(prefix, limit) {

@@ -210,3 +210,16 @@ describe("the sighting's faction and the class plan", () => {
     expect(html.indexOf('data-part="plan"')).toBeLessThan(html.indexOf("Hide this character"));
   });
 });
+
+test("a guild the armory has is linked at its armory page, from the facts and the guild part alike", async () => {
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const { armoryStore } = await import("@/lib/armory-store");
+  const { armoryGuild } = await import("@/lib/armory.fixture");
+  (armoryStore() as import("@/lib/armory-store").MemoryArmoryStore).putGuild(armoryGuild({ region: "us", slug: "fatal", name: "Fatal", rulesetId: 2, ruleset: "Normal" }), []);
+  await holder.store!.upsert([{ name: "Korgash", realm: "CAMWOW US1 Realm 3 PvE", race: "Orc", class: "WARRIOR", level: 60, guild: "Fatal", seen: "2026-10-23" }]);
+  const html = await render({ ruleset: "forever", realm: "camwow-us1-realm-3-pve", name: "korgash" });
+  expect(html).toContain('href="/armory/us/guilds/fatal"');
+  expect(html).not.toContain('href="/guilds/camwow-us1-realm-3-pve/fatal"');
+  (globalThis as { __everlootArmory?: unknown }).__everlootArmory = undefined;
+});

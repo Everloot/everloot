@@ -5,7 +5,6 @@ import type { ArmoryGuild } from "@/lib/armory-store";
 import { getUser } from "@/lib/supabase/server";
 import { guildProfileStore } from "@/lib/guild-profile-store";
 import { staleClaim } from "@/lib/guild-profile";
-import GuildCrest from "./guild-crest";
 
 export default async function GuildProfile({ guild }: { guild: ArmoryGuild }) {
   const user = await getUser().catch(() => null);
@@ -14,9 +13,7 @@ export default async function GuildProfile({ guild }: { guild: ArmoryGuild }) {
     const store = guildProfileStore();
     const profile = await store.profile(guild.region, guild.slug);
     const access = profile?.owner_user_id ? await store.access(user?.id ?? "00000000-0000-0000-0000-000000000000", guild.region, guild.slug) : null;
-    const crest = await GuildCrest({ crest: guild.crest, region: guild.region });
     return <section aria-label="Guild profile" className="space-y-3">
-      {crest}
       {profile?.recruiting.on && <Badge tone="neutral">Recruiting</Badge>}
       {profile?.bio && <p className="whitespace-pre-wrap text-sm text-fg-2">{profile.bio}</p>}
       {profile?.details.raidDays && <p className="text-sm">Raid days: {profile.details.raidDays}</p>}

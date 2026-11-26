@@ -33,6 +33,8 @@ import { zoneHref } from "@/lib/zones";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import EntityComments from "@/components/comments/EntityComments";
+import { loadInstanceClears } from "@/lib/progression";
+import type { InstanceClears } from "@/lib/dungeon-clears";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +113,13 @@ export default async function InstancePage(props: Props) {
       : PLACEHOLDER) },
   ];
   const shownBossColumns = filledColumns(bossColumns, bosses);
+  // Linked characters' public synced kills here, as counts only: their names are Blizzard's and stay on the armory.
+  const clears = await loadInstanceClears(row.instanceMapId);
+  const clearColumns: Column<InstanceClears["bosses"][number]>[] = [
+    { key: "boss", header: "Boss", cell: (b) => b.name },
+    { key: "characters", header: "Characters", numeric: true, cell: (b) => b.characters.toLocaleString("en-US") },
+    { key: "kills", header: "Kills", numeric: true, cell: (b) => (b.kills === null ? PLACEHOLDER : b.kills.toLocaleString("en-US")) },
+  ];
   const anyBossReported = bosses.some((b) => b.boss);
   const anyReport = anyBossReported || bosses.some((b) => b.reported);
   // On a phone the dense table keeps the boss name and folds the report into one line under it.
@@ -285,6 +294,21 @@ export default async function InstancePage(props: Props) {
               empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
             />
           </section>
+
+          {clears && (
+            <section aria-labelledby="clears">
+              <SectionHeading id="clears" note="From the boss kills linked characters sync through the Everloot Desktop App, public on their armory pages; up to the 500 with the newest kills here. A clear is a kill of every boss the game files list for it.">
+                Clears by linked characters
+              </SectionHeading>
+              <p className="mb-3 text-sm text-fg-2">
+                {clears.characters.toLocaleString("en-US")} linked {clears.characters === 1 ? "character has" : "characters have"} a synced kill here; {clears.clears.length.toLocaleString("en-US")} {clears.clears.length === 1 ? "has" : "have"} killed every boss.
+                {clears.clears.length > 0 && <> <Link href={`/armory/clears/${row.instanceMapId}`} className={link} rel="nofollow">Recent clears</Link></>}
+              </p>
+              {clears.characters > 0 && (
+                <DataTable dense caption={`Kills of each boss in ${title} by linked characters`} columns={clearColumns} rows={clears.bosses} rowKey={(b) => String(b.id)} />
+              )}
+            </section>
+          )}
 
           <section aria-labelledby="loot">
             <SectionHeading id="loot">Loot</SectionHeading>

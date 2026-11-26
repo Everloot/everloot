@@ -64,8 +64,10 @@ test("a relation target named from the name files: players first, a wiki title (
   expect(spell).toContain('title="From the game files, not yet confirmed by players">Rough Sharpening Stone</span>');
   expect(spell).toContain('data-badge="files"');
   expect(spell).toContain("· Blacksmithing");
-  // Nothing in the files: "item set 1", as before.
-  expect(renderToStaticMarkup(<RelationTarget edge={client(2862, "part_of_set", "item_set", 1)} rel="part_of_set" client={edges} gameName={gameName} />)).toBe("item set 1");
+  // No name from the files: "item set 1", linked to the set's page since the item set file lists it.
+  expect(renderToStaticMarkup(<RelationTarget edge={client(2862, "part_of_set", "item_set", 1)} rel="part_of_set" client={edges} gameName={gameName} />)).toBe('<a href="/database/item-sets/1">item set 1</a>');
+  // A set the item set file does not list (a development leftover, say) has no page, so no link.
+  expect(renderToStaticMarkup(<RelationTarget edge={client(2862, "part_of_set", "item_set", 999_999)} rel="part_of_set" client={edges} gameName={gameName} />)).toBe("item set 999999");
 });
 
 test("only observed relations: no game-file notice; none at all: says what is needed", () => {

@@ -6,14 +6,18 @@ import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT 308 ${to}`); },
+}));
 vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn, revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
 const AS_OF = "2026-10-24T10:00:00.000Z";
-const directory = vi.hoisted(() => ({ recruiting: false }));
+const directory = vi.hoisted(() => ({ recruiting: false, armory: new Map<string, unknown>() }));
 vi.mock("@/lib/armory-store", async (original) => ({
   ...await original<typeof import("@/lib/armory-store")>(),
-  armoryStore: () => ({ guildDirectory: async () => directory.recruiting ? { total: 1, rows: [{ region: "us", slug: "star-watch", name: "Star Watch", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 12, membersRead: 1, averageItemLevel: 30, level60: 0, fetchedAt: "2026-11-19T00:00:00Z" }] } : null, searchGuilds: async () => [] }),
+  armoryStore: () => ({ guildDirectory: async () => directory.recruiting ? { total: 1, rows: [{ region: "us", slug: "star-watch", name: "Star Watch", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 12, membersRead: 1, averageItemLevel: 30, level60: 0, fetchedAt: "2026-11-19T00:00:00Z" }] } : null, searchGuilds: async () => [],
+    guild: async (region: string, slug: string) => directory.armory.get(`${region}/${slug}`) ?? null }),
 }));
 vi.mock("@/lib/guild-profile-store", () => ({ guildProfileStore: () => ({ recruiting: async () => new Set(directory.recruiting ? ["us/star-watch"] : []) }) }));
 const holder = vi.hoisted(() => ({ store: null as PlayerStore | null, records: [] as unknown[], unreachable: false, reads: 0, stored: null as unknown }));
@@ -62,6 +66,7 @@ beforeEach(async () => {
   holder.unreachable = false;
   holder.reads = 0;
   holder.stored = null;
+  directory.armory.clear();
   await holder.store.upsert([
     { name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 25, guild: "Night Watch", seen: "2026-10-21" },
     { name: "Throgar", realm: "Forever Pioneer", race: "Orc", class: "WARRIOR", level: 30, guild: "Night Watch", seen: "2026-10-23" },
@@ -775,4 +780,25 @@ test("without a stored ladder the live rollup is kept while the store hands out 
   // A publication change (an opt-out inside a roster) comes as a new array, even with the same rows.
   holder.records = [...holder.records];
   expect((await loadGuildData()).instances).not.toBe(first.instances);
+});
+
+test("a guild the armory has redirects for good to its armory page; addon-only guilds keep their page", async () => {
+  on();
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  await holder.store!.upsert([
+    { name: "Korgash", realm: "CAMWOW US1 Realm 3 PvE", race: "Orc", class: "WARRIOR", level: 60, guild: "Fatal", seen: "2026-10-23" },
+    { name: "Mirel", realm: "CAMWOW US1 Realm 3 PvE", race: "Human", class: "MAGE", level: 40, guild: "Glizzy Gang", seen: "2026-10-23" },
+  ]);
+  directory.armory.set("us/fatal", { region: "us", slug: "fatal", name: "Fatal", faction: "Horde", rulesetId: 2, ruleset: "Normal" });
+  // The EU Glizzy Gang is another guild: the US addon page stays.
+  directory.armory.set("eu/glizzy-gang", { region: "eu", slug: "glizzy-gang", name: "Glizzy Gang", faction: "Horde", rulesetId: 2, ruleset: "Normal" });
+  // With the armory off, every addon page stays.
+  expect(await guildPage("camwow-us1-realm-3-pve", "fatal")).toContain("Korgash");
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  await expect(guildPage("camwow-us1-realm-3-pve", "fatal")).rejects.toThrow("NEXT_REDIRECT 308 /armory/us/guilds/fatal");
+  expect(await guildPage("camwow-us1-realm-3-pve", "glizzy-gang")).toContain("Mirel");
+  expect(await guildPage("forever-pioneer", "night-watch")).toContain("Night Watch");
+  // A hidden guild is a 404 on the addon address too, never a redirect to a page that is hidden.
+  await holder.store!.suppressGuild("CAMWOW US1 Realm 3 PvE", "Fatal");
+  await expect(guildPage("camwow-us1-realm-3-pve", "fatal")).rejects.toThrow("NEXT_NOT_FOUND");
 });

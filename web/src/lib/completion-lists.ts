@@ -99,10 +99,11 @@ export const loadCatalog = cache(async (): Promise<CompletionCatalog | null> => 
 });
 
 /** `4-ten-quests`: the id, then the name's words. A name with no letters or digits leaves the bare id. */
-function segment(id: number, name: string): string {
+export function idSegment(id: number, name: string): string {
   const words = slugify(name);
   return words ? `${id}-${words}` : String(id);
 }
+const segment = idSegment;
 export const achievementHref = (id: number, name: string) => `/database/achievements/${segment(id, name)}`;
 export const factionHref = (id: number, name: string) => `/database/factions/${segment(id, name)}`;
 /** The `%s` in a game-file title name: where the game puts the character's name. */

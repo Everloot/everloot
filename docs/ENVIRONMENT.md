@@ -41,6 +41,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `EVERLOOT_SHOWCASE` | `web/src/lib/character-showcase.ts` | The character showcase pages and share cards | Switch |
 | `EVERLOOT_BOSS_KILL_SYNC` | `web/src/lib/boss-kill-sync.ts` | Linked-character boss-kill sync, enabled in production vars; kills are public on progression pages. Requires `20261114120000_private_boss_kills.sql` and `20261120100000_public_boss_kills.sql` (the new migration has NOT been applied by this change); also needs private sync | Switch |
 | `EVERLOOT_DUNGEON_PROGRESS` | `web/src/app/api/progression/dungeons/route.ts` | Desktop download of public dungeon clear summaries by realm. Enable after `20261123110000_dungeon_progress.sql` is applied. Requires Armory and boss-kill sync | Switch |
+| `EVERLOOT_INSTANCE_CLEARS` | `web/src/lib/progression.ts` | Clears by linked characters on instance pages and the `/armory/clears/<instance>` list (needs `EVERLOOT_ARMORY`). Enable after `20261125120000_instance_clears.sql` is applied | Switch |
 | `EVERLOOT_PRIVATE_SYNC` | `web/src/lib/private-sync.ts` | Private sync of a linked character's data | Switch |
 | `EVERLOOT_LEADERBOARDS` | `web/src/lib/leaderboard-switch.ts` | The item level and gear score rankings | Switch |
 | `NEWS_DIR` | `web/src/lib/news.ts` | Where the bundled news posts are inside the Worker | Yes |

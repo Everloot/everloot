@@ -47,6 +47,8 @@ const site = z.object({
   professions: z.record(z.string(), z.object({ name: z.string(), icon: assetPath.nullable() })).default({}),
   spellIcons: z.record(z.string(), assetPath).default({}),
   familyIcons: z.record(z.string(), assetPath).default({}),
+  currencyIcons: z.record(z.string(), assetPath).default({}),
+  petIcons: z.record(z.string(), assetPath).default({}),
   maps: z.record(z.string(), z.object({
     file: assetPath, small: z.object({ file: assetPath }).nullable().default(null),
     kind: z.enum(["continent", "zone"]), name: z.string(), continentId: z.number().int(), heldBack: z.boolean(), rect: Rect,
@@ -85,6 +87,10 @@ export interface SiteAssets {
   spellIcons: Map<number, string>;
   /** Pet family id -> icon URL. */
   familyIcons: Map<number, string>;
+  /** Currency id -> icon URL. */
+  currencyIcons: Map<number, string>;
+  /** Companion pet species id -> icon URL. */
+  petIcons: Map<number, string>;
   maps: MapArt[];
   /** Raid buff spell id -> name and tooltip text. */
   spellTips: Map<number, SpellText>;
@@ -152,6 +158,7 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
     base, version: m.build.version, label: m.label,
     classes: new Map(Object.entries(m.classes).map(([key, c]) => [key.toLowerCase(), { name: c.name, icon: icon(c.icon), trees: c.trees.map((t) => ({ name: t.name, icon: icon(t.icon) })) }])),
     professions, spellIcons, familyIcons,
+    currencyIcons: byId(m.currencyIcons, (name) => iconUrl(base, name)), petIcons: byId(m.petIcons, (name) => iconUrl(base, name)),
     maps: Object.entries(m.maps).filter(([id]) => /^\d+$/.test(id)).map(([id, a]) => ({
       uiMapId: Number(id), kind: a.kind, name: a.name, continentId: a.continentId, heldBack: a.heldBack,
       url: assetUrl(base, a.file), smallUrl: a.small ? assetUrl(base, a.small.file) : null, rect: a.rect,
