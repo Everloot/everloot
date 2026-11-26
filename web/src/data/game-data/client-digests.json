@@ -1,4 +1,4 @@
-{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":71139,"version":"1.60.1.71139","buildConfig":"7a16decda3672d84db0d34d0784fda98","definitions":"8308f39154b5","extractedAt":"2026-11-25T21:58:41.560Z"},"tables":{
+{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":71139,"version":"1.60.1.71139","buildConfig":"7a16decda3672d84db0d34d0784fda98","definitions":"8308f39154b5","extractedAt":"2026-11-26T04:35:54.613Z"},"tables":{
   "Achievement": {"rows":438,"hash":"3c4f6a045b62"},
   "Achievement_Category": {"rows":56,"hash":"6484849bef14"},
   "AnimKit": {"rows":809,"hash":"fef6bcde3360"},
@@ -327,6 +327,7 @@
   "TaxiNodes": {"rows":101,"hash":"055063c3e1b3"},
   "TaxiPath": {"rows":328,"hash":"15bfbb507b8f"},
   "TaxiPathNode": {"rows":10965,"hash":"5dfa414cc70a"},
+  "TextureFileData": {"rows":58817,"hash":"db27eb17fe1e"},
   "TotemCategory": {"rows":28,"hash":"e6e090e7ee7d"},
   "Toy": {"rows":21,"hash":"177709d04a13"},
   "TraitCond": {"rows":171,"hash":"8622479aa3c3"},

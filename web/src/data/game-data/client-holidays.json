@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 71091,
-  "version": "1.60.1.71091",
-  "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
-  "definitions": "3783c908726e",
-  "extractedAt": "2026-11-25T05:58:53.872Z"
+  "buildId": 71139,
+  "version": "1.60.1.71139",
+  "buildConfig": "7a16decda3672d84db0d34d0784fda98",
+  "definitions": "8308f39154b5",
+  "extractedAt": "2026-11-26T04:35:54.613Z"
  },
  "holidays": [
   {"id":62,"name":"Fireworks Spectacular","description":"After the sun sets, the end of Midsummer is celebrated, with an hourly firework extravaganza.\n\nTo watch the show, visit any capital city or Booty Bay.","hours":18,"starts":[{"month":7,"day":4,"hour":6,"minute":0}]},
