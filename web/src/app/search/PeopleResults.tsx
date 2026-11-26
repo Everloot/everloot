@@ -41,12 +41,13 @@ export default function PeopleResults({ q, empty }: { q: string; empty?: ReactNo
 
   return groups.map(({ type, heading, group, more, where }) => {
     const columns: Column<PersonResult>[] = [
-      { key: "name", header: <>{heading} <span className="font-normal tabular-nums">({group.capped ? `${group.total}+` : group.total})</span></>, cell: (r) => <Link href={r.href} className={link}>{r.label}</Link> },
-      { key: "about", header: "", cell: (r) => <span className="line-clamp-1 text-fg-2">{r.meta}</span> },
+      { key: "name", header: "Name", cell: (r) => <Link href={r.href} className={link}>{r.label}</Link> },
+      { key: "about", header: "About", cell: (r) => <span className="line-clamp-1 text-fg-2">{r.meta}</span> },
     ];
+    // The same heading row as the database groups above (app/search/page.tsx): the group's name and its count.
     return (
       <section key={type} id={`results-${type}`} aria-labelledby={`results-${type}-heading`} className="mb-6 scroll-mt-20">
-        <h2 id={`results-${type}-heading`} className="sr-only">{heading}</h2>
+        <h2 id={`results-${type}-heading`} className="mb-1 text-h2-sm font-semibold text-fg sm:text-h2">{heading} <span className="font-normal text-muted tabular-nums">({group.capped ? `${group.total}+` : group.total})</span></h2>
         <DataTable
           dense
           caption={`${heading} matching ${q}`}

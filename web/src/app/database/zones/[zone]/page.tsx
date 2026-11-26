@@ -375,7 +375,7 @@ export default async function ZonePage(props: Props) {
       map={mapZones.length > 0 && <EntityMap name={zone.name} zones={mapZones} />}
       main={
         <section aria-labelledby="known">
-          <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
+          <SectionHeading id="known" size="data" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
             What we know here
           </SectionHeading>
           {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
@@ -392,10 +392,10 @@ export default async function ZonePage(props: Props) {
       related={<>
         {lore && lore !== UNAVAILABLE && (
           <section aria-labelledby="lore">
-            <SectionHeading id="lore">Lore</SectionHeading>
+            <SectionHeading id="lore" size="data">Lore</SectionHeading>
             <Card as="div">
-              <p className="max-w-prose text-fg">{lore.text}</p>
-              <p className="mt-3 text-sm text-muted">
+              <p className="max-w-prose text-cell text-fg">{lore.text}</p>
+              <p className="mt-3 text-meta text-muted">
                 From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
                 <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
               </p>
