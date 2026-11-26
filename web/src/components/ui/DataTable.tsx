@@ -70,7 +70,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
       {/* Focusable so a keyboard can scroll it sideways; named by the caption. Positioned, so a cell's
           absolutely placed sr-only text is clipped with the rest instead of widening the page. */}
       <div role="region" aria-label={caption} tabIndex={0} className="relative max-w-full overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-cell">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>
@@ -82,7 +82,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
                     key={col.key}
                     scope="col"
                     aria-sort={sorted ? ariaSort(sorted) : undefined}
-                    className={`h-9 whitespace-nowrap border-b border-line bg-canvas px-4 font-mono text-xs font-medium ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"}`}
+                    className={`h-th whitespace-nowrap border-b border-line bg-canvas px-4 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"}`}
                   >
                     {col.sortable && sortHref ? (
                       <Link href={sortHref(col.key, next)} rel={nofollow ? "nofollow" : undefined} className="inline-flex min-h-6 items-center gap-1 hover:text-fg">

@@ -16,6 +16,9 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
 }));
 // No lore archive here: the lookup answers "no page" (a missing release is an outage, which marks the page degraded).
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
+// Linked characters' public clears: none unless a test hands them in (null is the switch off or storage down).
+const clears = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.value }));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
@@ -330,4 +333,26 @@ test("the quest installs meter counts the installs that filed it under the heade
     state.seen = { unreachable: true };
     state.quests = [];
   }
+});
+
+test("an instance's page counts linked characters' clears and each boss's kills, names none, and links the named list", async () => {
+  const { instanceClears } = await import("@/lib/dungeon-clears");
+  const k = (encounterId: number, last: string, killCount: number) => ({ instanceMapId: 389, encounterId, difficulty: 1, firstKillAt: "2026-11-10T00:00:00Z", lastKillAt: last, killCount });
+  const all = [2732, 2733, 2734, 2735];
+  clears.value = instanceClears(389, [
+    { region: "us", slug: "mira-dawn", name: "Mira", surname: "Dawn", kills: all.map((id) => k(id, "2026-11-20T00:00:00Z", 2)) },
+    { region: "eu", slug: "tavi-reed", name: "Tavi", surname: "Reed", kills: all.map((id) => k(id, "2026-11-22T00:00:00Z", 1)) },
+    { region: "us", slug: "ash-brook", name: "Ash", surname: "Brook", kills: [k(2732, "2026-11-23T00:00:00Z", 4)] },
+  ]);
+  const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+  const section = html.split('id="clears"')[1]?.split("</section>")[0] ?? "";
+  expect(text(section)).toMatch(/3 linked characters have a synced kill here; 2 have killed every boss/);
+  expect(section).toContain('href="/armory/clears/389"');
+  // Armory names are Blizzard data and hides apply at once: they stay on the armory's own uncached pages.
+  for (const name of ["Mira", "Tavi", "Ash", "/armory/us/"]) expect(section).not.toContain(name);
+  const boss = section.split("<tr").find((r) => r.includes("Oggleflint")) ?? "";
+  expect([...boss.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/g)].map((m) => text(m[1]!).replace(/^\||\|$/g, ""))).toEqual(["Oggleflint", "3", "7"]);
+  clears.value = null;
+  const off = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+  expect(off).not.toContain('id="clears"');
 });

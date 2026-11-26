@@ -474,6 +474,15 @@ The rules:
 - An item no source names keeps "Item N". The game server sends those names while the game runs, so they come
   from the addon's uploads, after 3 installs agree. A category page where fewer than half the rows have a name
   stays out of search.
+- Icons of items the files give only an icon for (added 2026-11-25, at Carlos's request that gear show its icon, not
+  a question mark). Forever's `Item` table lists about 12,600 items in build 1.60.1.71091 whose `ItemSparse` row
+  (name, quality, tooltip) the server sends while the game runs; for those the files hold only the icon
+  (`Item.IconFileDataID`). The private item folder keeps that icon beside the tooltips, and a page shows it,
+  with the quiet unconfirmed marker, where it would show the item's tooltip (the rule above: an agreed name, a
+  public drop or a name from a source), and on a character's gear, which Blizzard's armory reports equipped and so
+  is in the game. The gear's card there takes the name and quality from the armory, the icon from the files,
+  and says so. No name, tooltip line, drop rate or price comes from this; an id no rule shows keeps "Item N" and the
+  question mark.
 - Pages only. The data downloads, the API and the MCP server carry no item names and no tooltip facts for these
   items, as before; a test checks that their code does not read the names. The embeddable cards keep the
   three-install rule.
@@ -1027,6 +1036,21 @@ full known boss list count. The Armory and the addon's Collection use the same d
 The feed respects the existing linked-character and hide rules. Desktop replaces the downloaded realm snapshot on
 refresh. The addon suppresses a snapshot when it reaches its two-hour expiry. It leaves the tooltip alone when the
 game cannot confirm the player's name or realm. The snapshot download sends realm names and page offsets.
+
+## Dungeon and raid clears
+
+*Proposed 25 November 2026, in the pull request that adds it (the maintainer review).* The public boss-kill history above
+is also shown as clears. Nothing new is collected. A linked character's armory page lists each instance it has a kill in,
+with every boss the game files list there, killed or not, and for each boss killed its lifetime kill count (summed across
+difficulties) and its first and last kill day. The history already held the counts and first kills; the pages did not
+show them before. A clear is a kill of every listed boss, dated by the day the last of them first fell.
+
+An instance's database page shows counts only, from up to the 500 linked characters with the newest kills there: how
+many have a kill, how many have killed every boss, and each boss's characters and kills. It names no one. The names of
+the characters who cleared it are listed only on `/armory/clears/<instance>`, an armory page with the armory's rules:
+read on every request, ad-free and out of search engines. Hiding a character removes it from that list and the
+character page at once, and from the database page's counts once that page's shared copy expires (an hour). Weekly raid
+lockouts are not part of these views; they stay in the owner-published Raids section.
 
 ## Gear rankings
 

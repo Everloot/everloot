@@ -53,6 +53,7 @@ begin
   if public.armory_upsert_guild('us','{"slug":"fable-watch","guild_id":1,"name":"Fable Watch","faction":"Alliance","ruleset_id":1,"ruleset":"PvP","member_count":3}',
     '[{"character_slug":"xelra-fable","name":"Xelra","surname":"Fable","level":60,"class_id":8,"race_id":1,"rank":0},{"character_slug":"novra-fable","name":"Novra","surname":"Fable"},{"character_slug":"pevra-fable","name":"Pevra","surname":"Fable"},{"character_slug":"invalid!","name":"Invalid","surname":"Fable"}]') <> 2 then raise exception 'roster enqueue'; end if;
   if not exists(select 1 from public.armory_roster('us','fable-watch') where character_slug='xelra-fable' and stored and item_level=70) then raise exception 'roster join'; end if;
+  if not exists(select 1 from public.armory_roster('us','fable-watch') where character_slug='xelra-fable' and last_login is not null) or exists(select 1 from public.armory_roster('us','fable-watch') where character_slug='novra-fable' and last_login is not null) then raise exception 'roster last login'; end if;
   if not exists(select 1 from public.armory_guild('us','fable-watch')) then raise exception 'guild read'; end if;
   if (select count(*) from public.armory_search('Xe',10))<>1 or exists(select 1 from public.armory_search('X',10)) or exists(select 1 from public.armory_search('Xe%',10)) then raise exception 'character search'; end if;
   if (select count(*) from public.armory_search_guilds('Fa',10))<>1 then raise exception 'guild search'; end if;

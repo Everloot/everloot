@@ -23,7 +23,8 @@ export type BadgeProps =
   | { tone: "quality"; quality: Quality; children?: ReactNode }
   | { tone: "blizzard" };
 
-const BASE = "inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-xs";
+// Sans: a badge holds words ("Confirmed by 3 installs", "Epic"); its figures stay tabular.
+const BASE = "inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium tabular-nums";
 
 export default function Badge(props: BadgeProps) {
   switch (props.tone) {
