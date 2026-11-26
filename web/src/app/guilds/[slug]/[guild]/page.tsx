@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { armoryGuildPath } from "@/lib/armory";
+import { armoryGuildOf } from "@/lib/guild-merge";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -77,6 +79,9 @@ export default async function GuildPage(props: Params) {
   }
   const { page, board, members } = loaded;
   const { summary, ranks } = page;
+  // One page per guild: when the armory has this guild, its armory page is the guild's page and shows what is here.
+  const armory = await armoryGuildOf(summary.realm, summary.guildName);
+  if (armory) permanentRedirect(armoryGuildPath(armory.region, armory.slug));
   const faction = factionLabel(summary.faction);
   const lastActivity = [summary.latestKillAt?.slice(0, 10), summary.lastSeen].filter((d): d is string => Boolean(d)).sort().at(-1);
   const officerRoster = board?.roster ?? [];

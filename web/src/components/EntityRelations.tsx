@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { CLIENT_SKILLS } from "@kb/client-layer-file";
 import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "@kb/edges";
+import { itemSet, itemSetHref } from "@/lib/item-sets";
 import { professionHrefById } from "@/lib/professions";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import GameIcon from "./game/GameIcon";
@@ -10,7 +11,7 @@ import Badge, { UNCONFIRMED_TITLE } from "./ui/Badge";
 /** A spell's icon URL, when the page has the asset manifest. Items get none here: their icons follow the reported-items rule. */
 export type SpellIconFor = (spellId: number) => string | undefined;
 
-/** Where an entity has a page on this site; null where it has none yet (spells, sets, icons). */
+/** Where an entity has a page on this site; null where it has none yet (spells, icons). */
 function hrefFor(kind: EdgeKind, id: number, rel: Rel): string | null {
   if (kind === "item") return `/database/items/${id}`;
   if (kind === "npc") return rel === "sold_by" ? `/database/vendors/${id}` : `/database/npcs/${id}`;
@@ -22,6 +23,8 @@ function hrefFor(kind: EdgeKind, id: number, rel: Rel): string | null {
     return zone ? zoneHref(zone.mapId, zone.name) : null;
   }
   if (kind === "skill") return professionHrefById(id) ?? "/tools/professions";
+  // A set the item set file lists; a development leftover it leaves out has no page.
+  if (kind === "item_set") return itemSet(id) ? itemSetHref(id) : null;
   return null;
 }
 

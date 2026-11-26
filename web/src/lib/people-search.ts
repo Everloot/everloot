@@ -1,12 +1,14 @@
 import { unstable_cache } from "next/cache";
 import { className, PLAYER_SEARCH_TAG } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
-import { armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
+import { ARMORY_RULESETS, armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
+import { sameGuild } from "./guild-merge";
 import { armoryStore, type ArmoryGuildHit, type ArmoryHit, type SitePeople, type SitePlayerHit } from "./armory-store";
 import { GUILD_SEARCH_TAG, guildPath, guildSearchPrefix, guildsOn, loadGuildSearch } from "./guilds";
 import { playerPagesOn, playerPath, searchPrefix } from "./player-pages";
 import type { PeopleSearch, PersonGroup, PersonResult } from "./people-search-types";
 import { playerStore } from "./player-store";
+import { sightingPairs } from "./character-lookup";
 
 /**
  * Characters and guilds for the site's own search (/search and the header type-ahead), from the same lookups
@@ -96,22 +98,34 @@ export async function peopleSearch(raw: string, limit = PEOPLE_LIMIT, lookup?: (
   const guild = guildsOn() ? guildSearchPrefix(text) : null;
   const armoryGuild = armoryOn() ? guildSearchPrefix(text) : null;
   const one = name || fullName || armoryGuild ? await oneRead(text) : null;
-  const [players, armory, guilds] = await Promise.all([
-    name ? (one ? one.players.map((p) => playerRow(p, q)) : orNone(async () => (await searchPlayers(name.toLowerCase())).map((p) => playerRow(p, q)))) : null,
-    fullName ? orNone(async () => {
+  const [seenHits, armoryHits, guilds] = await Promise.all([
+    name ? (one ? one.players : orNone(() => searchPlayers(name.toLowerCase()))) : null,
+    fullName ? orNone<Parameters<typeof armoryRow>[0]>(async () => {
       const stored = one ? one.armory : await armoryStore().search(fullName, LOOKUP_CAP);
       const found = !stored.length && lookup ? await lookup(text) : null;
-      return (found ? [found] : stored).map((h) => armoryRow(h, fullName));
+      return found ? [found] : stored;
     }) : null,
-    guild ? orNone(async () => (await searchGuildsKept(guild.toLowerCase())).map((g) => ({
+    // An addon guild the armory answered too is the armory's row (guild-merge.ts's rule), as its page redirects there.
+    guild ? orNone(async () => (await searchGuildsKept(guild.toLowerCase())).filter((g) => !inArmory(g, armoryGuild && one ? one.guilds : [])).map((g) => ({
       type: "guild" as const, label: g.guildName, href: guildPath(g.realm, g.guildName),
       meta: g.membersSeen === null ? g.realm : `${g.realm} · ${g.membersSeen.toLocaleString("en-US")} ${g.membersSeen === 1 ? "member" : "members"} seen`,
       exact: g.guildName.toLowerCase() === q, ...(g.faction ? { faction: g.faction } : {}),
     }))) : null,
   ]);
+  // A sighting the armory certainly has (lib/character-lookup.ts) is the armory's row: one row, the one page. Only when
+  // both answers are whole, as a cut answer may have left a namesake out.
+  const whole = seenHits && armoryHits && seenHits.length < LOOKUP_CAP && armoryHits.length < LOOKUP_CAP;
+  const joined = whole ? sightingPairs(seenHits, armoryHits) : new Map();
+  const players = seenHits && seenHits.filter((p) => !joined.has(p)).map((p) => playerRow(p, q));
+  const armory = armoryHits && fullName && armoryHits.map((h) => armoryRow(h, fullName));
   const characterLookups = [players, armory].filter((l): l is PersonResult[] => l !== null);
   const guildLookups = [guilds, armoryGuild && one ? one.guilds.map((g) => armoryGuildRow(g, q)) : null].filter((l): l is PersonResult[] => l !== null);
   return { characters: characterLookups.length ? group(characterLookups, limit) : EMPTY, guilds: guildLookups.length ? group(guildLookups, limit) : EMPTY };
+}
+
+/** Whether an addon guild is one of the armory guilds the search found. */
+function inArmory(g: { realm: string; guildName: string }, armory: readonly ArmoryGuildHit[]): boolean {
+  return armory.some((a) => sameGuild(g, { region: a.region, slug: a.slug, rulesetId: ARMORY_RULESETS.find((r) => r.label === a.ruleset)?.id ?? -1 }));
 }
 
 /** The one read, or null before its migration (and in development) or when it fails (logged), for the separate reads to answer. */
@@ -119,7 +133,7 @@ async function oneRead(text: string): Promise<SitePeople | null> {
   try { return await armoryStore().people(text, LOOKUP_CAP); } catch (err) { console.error("site search: the characters and guilds read failed", err); return null; }
 }
 
-/** A lookup's rows, or null when it failed (logged), so the group is built from the lookups that answered. */
-async function orNone(read: () => Promise<PersonResult[]>): Promise<PersonResult[] | null> {
+/** A lookup's answer, or null when it failed (logged), so the group is built from the lookups that answered. */
+async function orNone<T>(read: () => Promise<T[]>): Promise<T[] | null> {
   try { return await read(); } catch (err) { console.error("site search: character or guild lookup failed", err); return null; }
 }

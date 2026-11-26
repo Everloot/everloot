@@ -25,6 +25,7 @@ import { disenchantLua } from "../disenchant-lua.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
+import { writeClientItemSets } from "../client-item-sets.js";
 import { writeClientCollections } from "../client-collections.js";
 import { writeCatalogs } from "../client-catalog.js";
 import { writeClientLayer } from "../client-layer.js";
@@ -99,6 +100,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));
+        writeClientItemSets(snapshot, join(root, GAME_DATA_DIR, "client-item-sets.json"));
         writeClientCollections(snapshot, join(root, GAME_DATA_DIR, "client-collections.json"));
       },
       dispose: () => rmSync(work, { recursive: true, force: true }),

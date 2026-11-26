@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ query: vi.fn(), facts: vi.fn(), caches: [] as 
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown, ...args: unknown[]) => { state.caches.push(args); return fn; } }));
 vi.mock("./supabase/server", () => ({ authQuery: state.query, getUser: () => { throw new Error("Public progression must not read sessions"); } }));
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: state.facts }));
-import { loadGuildProgression, loadGuildProgressionRanking, loadCharacterProgression, loadRosterProgression } from "./progression";
+import { loadGuildProgression, loadGuildProgressionRanking, loadCharacterProgression, loadInstanceClears, loadRosterProgression } from "./progression";
 import { createCloudProgressionStore, progressionStore } from "./progression-store";
 
 const kills = [{ instanceMapId: 33, encounterId: 2748, lastKillAt: "2026-11-18T01:00:00Z" }];
@@ -73,6 +73,7 @@ test("public reads use five-minute caches invalidated by character and guild hid
   expect(state.caches).toEqual([
     [["public-boss-kills"], { revalidate: 300, tags: ["players", "guilds"] }],
     [["public-boss-kill-region"], { revalidate: 300, tags: ["players", "guilds"] }],
+    [["public-instance-clears"], { revalidate: 300, tags: ["players", "guilds"] }],
     [["public-guild-progression-ranking"], { revalidate: 300, tags: ["players", "guilds"] }],
   ]);
 });
@@ -80,4 +81,27 @@ test("unconfigured storage is unavailable and the cloud adapter rejects malforme
   await expect(progressionStore({}).region(null)).rejects.toThrow("unavailable");
   state.query.mockResolvedValue({ kills });
   await expect(createCloudProgressionStore(state.query).characters([])).rejects.toThrow();
+});
+test("a character's dungeons and raids keep the history's kill counts and first kills", async () => {
+  state.query.mockResolvedValue([{ region: "us", slug: slugs[0], kills: [{ ...kills[0], difficulty: 1, firstKillAt: "2026-11-17T01:00:00Z", killCount: 4 }] }]);
+  const { dungeons } = await loadCharacterProgression("us", slugs[0]);
+  expect(dungeons.synced).toBe(true);
+  expect(dungeons.instances.map((r) => r.id)).toEqual([33]);
+  expect(dungeons.instances[0]!.bosses[0]).toMatchObject({ id: 2748, killed: true, kills: 4, firstKillDay: "2026-11-17", lastKillDay: "2026-11-18" });
+  state.query.mockRejectedValue(new Error("down"));
+  expect((await loadCharacterProgression("us", slugs[0])).dungeons).toEqual({ synced: false, summary: null, instances: [] });
+});
+test("instance clears stay dark until their switch is on, then read one instance's public histories", async () => {
+  const clears = [{ region: "us", slug: "mira-dawn", name: "Mira", surname: "Dawn", kills: [{ ...kills[0], difficulty: 1, firstKillAt: "2026-11-17T01:00:00Z", killCount: 2 }] }];
+  state.query.mockResolvedValue(clears);
+  vi.stubEnv("EVERLOOT_INSTANCE_CLEARS", "");
+  expect(await loadInstanceClears(33)).toBeNull();
+  expect(state.query).not.toHaveBeenCalled();
+  vi.stubEnv("EVERLOOT_INSTANCE_CLEARS", "1");
+  vi.stubEnv("EVERLOOT_ARMORY", "1"); // the clears link armory pages
+  expect((await loadInstanceClears(33))?.bosses[0]).toEqual({ id: 2748, name: "Rethilgore", characters: 1, kills: 2 });
+  expect(state.query.mock.calls[0][0]).toBe("rpc/public_instance_clears");
+  expect(JSON.parse(state.query.mock.calls[0][1].body)).toEqual({ p_map: 33 });
+  state.query.mockRejectedValue(new Error("migration not applied"));
+  expect(await loadInstanceClears(33)).toBeNull();
 });

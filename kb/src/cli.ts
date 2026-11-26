@@ -28,6 +28,7 @@ import { writeClientDisenchant } from "./client-disenchant.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
+import { writeClientItemSets } from "./client-item-sets.js";
 import { writeClientCollections } from "./client-collections.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
@@ -233,6 +234,9 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
   client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
     (every quest line with its quest ids in order. Pages and search, as above)
+  client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
+    (every item set with its pieces, its bonuses as pieces needed and spell id, and the skill a crafted set asks
+    for. Ids and numbers only: set names stay in private storage (game-names). Pages only)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -801,6 +805,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
       const table = writeClientQuestLines(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
+      return 0;
+    }
+    case "client-item-sets": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-item-sets.json";
+      const table = writeClientItemSets(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.sets.length} item sets -> ${path}`);
       return 0;
     }
     case "client-collections": {

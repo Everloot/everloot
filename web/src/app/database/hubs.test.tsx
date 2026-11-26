@@ -52,8 +52,8 @@ test("game-file lists sit under From the game files, player-fed lists under Seen
   store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
   const page = renderToStaticMarkup(await DatabasePage());
   const files = block(page, "From the game files");
-  for (const href of ["spells", "achievements", "factions", "titles", "quest-chains", "mounts", "pets", "toys", "currencies", "zones", "instances", "terrain"]) expect(files, href).toContain(`<a href="/database/${href}"`);
-  expect(files.match(/<a href=/g)).toHaveLength(12);
+  for (const href of ["spells", "achievements", "factions", "titles", "quest-chains", "item-sets", "mounts", "pets", "toys", "currencies", "zones", "instances", "terrain"]) expect(files, href).toContain(`<a href="/database/${href}"`);
+  expect(files.match(/<a href=/g)).toHaveLength(13);
   const players = block(page, "Seen by players");
   for (const href of ["npcs", "quests", "vendors", "objects", "drops"]) expect(players, href).toContain(`<a href="/database/${href}"`);
   expect(players).not.toContain('href="/database/spells"');

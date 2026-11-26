@@ -21,23 +21,36 @@ type NavSwitches = { guilds?: boolean; players?: boolean; profiles?: boolean; sa
 // The catalogue's groups live in data/tools.ts so the home page lists the same tools.
 export { TOOL_GROUPS };
 
-/** The community pages the bar links directly, ahead of its menus, so they never sit in Lookup too. */
-const COMMUNITY_HREFS = ["/players", "/guilds", "/rankings"];
+/** The catalogue's Lookup tools that are about money and gear, not people: they sit in Tools, ahead of the planners. */
+const MARKET_HREFS = ["/tools/auctions", "/tools/bags", "/tools/disenchanting"];
 
 /**
- * The top bar, in order: the community links (Players and Guilds when their switches are on, then Rankings), Lookup
- * (live data), Database (reference from the game files and uploads), Tools (planners), Guides (static reference),
- * Chat, and Profile (the player's own pages, and the lists kept in this browser). The phone menu shows the same items
- * as groups. Only existing pages are linked; hidden tools are left out.
+ * The top bar (docs/design/direction.md): Players and Guilds when their switches are on, then five menus and one link, in
+ * order. Community (the people pages: Players and
+ * Guilds when their switches are on, Rankings, the census and addons players run), Database (reference from the game
+ * files and uploads), Tools (market tools, then planners), Guides (static reference), Chat, and Profile (the player's
+ * own pages, and the lists kept in this browser). The phone menu shows the same menus as groups. Only existing pages
+ * are linked; hidden tools are left out.
  */
 export function navItems({ guilds = false, players = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
   const groups = toolGroups(guilds);
   const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
+  const lookup = catalogue("Lookup");
+  const people = lookup.filter((link) => !MARKET_HREFS.includes(link.href) && link.href !== "/rankings" && link.href !== "/guilds");
   return [
+    // Players and Guilds also stand in the bar itself (owner, 11/25): the character and guild pages are what most
+    // visitors look for. Community still lists them, so the phone menu keeps them in its Community group.
     ...(players ? [{ label: "Players", href: "/players" }] : []),
     ...(guilds ? [{ label: "Guilds", href: "/guilds" }] : []),
-    { label: "Rankings", href: "/rankings" },
-    { label: "Lookup", links: catalogue("Lookup").filter((link) => !COMMUNITY_HREFS.includes(link.href)) },
+    {
+      label: "Community",
+      links: [
+        ...(players ? [{ label: "Players", href: "/players" }] : []),
+        ...(guilds ? [{ label: "Guilds", href: "/guilds" }] : []),
+        { label: "Rankings", href: "/rankings" },
+        ...people,
+      ],
+    },
     {
       label: "Database",
       links: [
@@ -50,7 +63,7 @@ export function navItems({ guilds = false, players = false, savedBuilds = false,
         { label: "World map", href: "/map" },
       ],
     },
-    { label: "Tools", links: [...catalogue("Tools"), { label: "All tools", href: "/tools" }] },
+    { label: "Tools", links: [...lookup.filter((link) => MARKET_HREFS.includes(link.href)), ...catalogue("Tools"), { label: "All tools", href: "/tools" }] },
     // Guides lists the guides that exist today. The class guides list joins once a guide is reviewed (lib/guides.ts
     // publishedGuides), so the menu never opens on an empty list.
     {
@@ -106,15 +119,15 @@ const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-f
 /** Below md, how many links a phone menu group shows before its More…. */
 const PHONE_LINKS = 3;
 
-/** The phone menu: the community links as Community, each top bar menu as a group, then More with the other single
- *  links (Chat), Docs and About. */
+/** The phone menu: each top bar menu as a group, in the bar's order, then More with the single links (Chat), Docs and
+ *  About. */
 export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[] }[] {
-  const singles = items.flatMap((item) => (item.links ? [] : [{ label: item.label, href: item.href }]));
-  const community = singles.filter((link) => COMMUNITY_HREFS.includes(link.href));
+  // A single link a group already lists (Players and Guilds, in Community) is not repeated in More.
+  const grouped = new Set(items.flatMap((item) => item.links?.map((l) => l.href) ?? []));
+  const singles = items.flatMap((item) => (item.links || grouped.has(item.href) ? [] : [{ label: item.label, href: item.href }]));
   return [
-    { label: "Community", links: community },
     ...items.flatMap((item) => (item.links ? [{ label: item.label, links: item.links }] : [])),
-    { label: "More", links: [...singles.filter((link) => !community.includes(link)), { label: "Docs", href: "/docs" }, { label: "About", href: "/about" }] },
+    { label: "More", links: [...singles, { label: "Docs", href: "/docs" }, { label: "About", href: "/about" }] },
   ];
 }
 
@@ -129,8 +142,8 @@ function SearchIcon() {
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
  * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself. Profile always lists
- * Settings. `guilds` is EVERLOOT_GUILDS or the armory: the bar then links Guilds and Lookup drops the guild board.
- * `players` is EVERLOOT_PLAYER_PAGES or the armory: the bar then starts with Players, the one character search.
+ * Settings. `guilds` is EVERLOOT_GUILDS or the armory: Community then links Guilds instead of the guild board.
+ * `players` is EVERLOOT_PLAYER_PAGES or the armory: Community then starts with Players, the one character search.
  * `reviewedGuides` is true once kb/guides holds a reviewed guide: Guides then starts with the guides list.
  */
 export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false, players = false, reviewedGuides = false }: {
@@ -242,14 +255,14 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       if (searchOpen) { setSearchOpen(false); searchButton.current?.focus(); }
     }}>
       {/* The data column's width and gutters (globals.css), so the logo lines up with the data tables. */}
-      <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
+      <div className="mx-auto flex h-header max-w-data items-center gap-1 px-4 sm:gap-3 lg:gap-4 lg:px-6">
         <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg focus-visible:outline-offset-[-2px]" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
           <Icon name="diamond" className="text-accent" />
           everloot
         </Link>
 
-        {/* With Players, Guilds and Rankings the items need ~1120 px; below 1280 px the Menu button carries them. */}
+        {/* Six items; below 1280 px the Menu button carries them, and from 1280 px Menu goes, since it would repeat them. */}
         <nav ref={bar} aria-label="Primary" onKeyDown={barKeys} className="hidden shrink-0 items-center text-sm font-medium xl:flex">
           {items.map((item) => {
             const on = current === item.label;
@@ -302,7 +315,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           </form>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <button
             ref={searchButton}
             type="button"
@@ -312,10 +325,11 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             onClick={() => setSearchOpen(!searchOpen)}
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-fg-2 hover:text-accent focus-visible:outline-offset-[-2px] xl:hidden"
           ><SearchIcon /></button>
-          {/* Below 1536 px the right group has no room for both builds beside the community links; the menu panel shows them. */}
+          {/* From 1280 px the bar holds Players and Guilds, and the search field needs the room: the build chip shows
+              from 1536 px. Below 1280 the menu panel shows both builds, and the footer shows them at every width. */}
           <GameVersionLabel className="hidden shrink-0 2xl:block" />
           <AccountControls savedBuilds={savedBuilds} profiles={profiles} accountSwitching={accountSwitching} />
-          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn min-h-8 shrink-0 px-3 text-sm 2xl:hidden">
+          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn btn-sm shrink-0 xl:hidden">
             {open ? "Close" : "Menu"}
           </button>
         </div>
@@ -336,7 +350,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
 
       {open && (
         // Fixed from under the bar to the bottom of the window, so the open menu covers the page instead of showing it beneath.
-        <nav id="site-navigation" aria-label="Site menu" className="pop fixed inset-x-0 bottom-0 top-header overflow-y-auto overscroll-contain bg-panel 2xl:hidden">
+        <nav id="site-navigation" aria-label="Site menu" className="pop fixed inset-x-0 bottom-0 top-header overflow-y-auto overscroll-contain bg-panel xl:hidden">
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
@@ -349,7 +363,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                 className="h-9 w-full min-w-0 bg-transparent text-base text-fg placeholder:text-muted focus:outline-none"
               />
             </form>
-            {/* Community holds the bar's direct links, then the top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
+            {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
                 report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
               {phoneGroups(items).map((group) => {
@@ -359,7 +373,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                 const expanded = moreOpen.includes(group.label) || rest.some((link) => link.href === place?.href);
                 return (
                 <div key={group.label}>
-                  <p className="mb-1 px-3 font-mono text-xs text-muted">{group.label}</p>
+                  <p className="mb-1 px-3 text-xs font-medium text-muted">{group.label}</p>
                   <ul id={`${menuId(group.label)}-phone`}>
                     {group.links.map((link, i) => (
                       <li key={link.href} className={i < PHONE_LINKS || expanded ? undefined : "hidden md:block"}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>

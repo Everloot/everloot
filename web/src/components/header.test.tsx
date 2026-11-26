@@ -24,10 +24,10 @@ const topItems = (nav = primary) => [...nav.matchAll(/<(?:a|button) [^>]*class="
 const menuHrefs = (label: string, items = navItems()) => items.find((i) => i.label === label)!.links!.map((l) => l.href);
 const hidden = tools.filter((t) => t.hidden).map(toolHref);
 
-test("the top bar links directly to Rankings and Chat and opens menus for the other sections", () => {
-  expect(topItems()).toEqual(["Rankings", "Lookup", "Database", "Tools", "Guides", "Chat", "Profile"]);
+test("the top bar is six items: five menus and Chat, the one direct link (docs/design/direction.md)", () => {
+  expect(topItems()).toEqual(["Community", "Database", "Tools", "Guides", "Chat", "Profile"]);
   expect(primary).toMatch(/<a href="\/chat"[^>]*>Chat<\/a>/);
-  for (const id of ["lookup", "database", "tools", "guides", "profile"]) {
+  for (const id of ["community", "database", "tools", "guides", "profile"]) {
     expect(primary).toMatch(new RegExp(`<button id="${id}-menu-button" type="button" aria-expanded="false" aria-controls="${id}-menu" aria-haspopup="true"`));
   }
 });
@@ -36,28 +36,25 @@ test("the bar's items show from 1280 px, where Players, Guilds and Rankings fit 
   expect(html).toMatch(/<nav aria-label="Primary" class="hidden shrink-0 items-center text-sm font-medium xl:flex">/);
 });
 
-test("Players and Guilds join Rankings as direct links when their routes are enabled", () => {
+test("Players and Guilds stand in the bar when their routes are enabled; Community holds them too, with Rankings, the census and addons", () => {
   const enabled = renderToStaticMarkup(<Header players guilds />);
   const nav = enabled.match(/<nav aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
-  expect(topItems(nav).slice(0, 3)).toEqual(["Players", "Guilds", "Rankings"]);
-  for (const href of ["/players", "/guilds", "/rankings"]) {
-    expect(nav).toMatch(new RegExp(`<a href="${href}"[^>]*border-b-2`));
-    expect(nav.split(`href="${href}"`)).toHaveLength(2);
-  }
+  expect(topItems(nav)).toEqual(["Players", "Guilds", "Community", "Database", "Tools", "Guides", "Chat", "Profile"]);
+  expect(menuHrefs("Community", navItems({ players: true, guilds: true }))).toEqual(["/players", "/guilds", "/rankings", "/census", "/addons"]);
+  // Players and Guilds: the bar's link and Community's; Rankings only in Community.
+  for (const href of ["/players", "/guilds"]) expect(nav.split(`href="${href}"`)).toHaveLength(3);
+  expect(nav.split(`href="/rankings"`)).toHaveLength(2);
+  // Without the guild routes the Guild board stands in for Guilds.
+  expect(menuHrefs("Community")).toEqual(["/rankings", "/census", "/tools/guild-board", "/addons"]);
   expect(primary).not.toMatch(/href="\/(?:players|guilds)"/);
-});
-
-test("Lookup keeps the census, market tools, addons and the Guild board fallback", () => {
-  expect(menuHrefs("Lookup")).toEqual(["/census", "/tools/guild-board", "/tools/auctions", "/tools/bags", "/tools/disenchanting", "/addons"]);
-  expect(menuHrefs("Lookup", navItems({ guilds: true }))).toEqual(["/census", "/tools/auctions", "/tools/bags", "/tools/disenchanting", "/addons"]);
 });
 
 test("Database holds the reference pages and the map", () => {
   expect(menuHrefs("Database")).toEqual(["/database", "/database/items", "/database/npcs", "/database/quests", "/database/zones", "/database/spells", "/map"]);
 });
 
-test("Tools holds the planners, most used first, then the card page", () => {
-  expect(menuHrefs("Tools")).toEqual(["/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
+test("Tools holds the market tools, then the planners, then the card page", () => {
+  expect(menuHrefs("Tools")).toEqual(["/tools/auctions", "/tools/bags", "/tools/disenchanting", "/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
 });
 
 test("Guides holds the guides that exist: dungeons and raids, Herbalism gathering, two docs guides, Legacy perks, lore and changes; the guides list only once one is reviewed", () => {
@@ -82,12 +79,11 @@ test("Farming, Collections and Upload are hidden until polished: no menu, phone 
   }
 });
 
-test("the phone menu puts Community first and keeps Chat, Docs and About in More", () => {
+test("the phone menu lists the bar's menus in order and keeps Chat, Docs and About in More", () => {
   const items = navItems({ players: true, guilds: true });
   const groups = phoneGroups(items);
-  expect(groups.map((g) => g.label)).toEqual(["Community", "Lookup", "Database", "Tools", "Guides", "Profile", "More"]);
-  expect(groups[0].links.map((l) => l.href)).toEqual(["/players", "/guilds", "/rankings"]);
-  for (const g of groups.slice(1, -1)) expect(g.links).toEqual(items.find((i) => i.label === g.label)!.links);
+  expect(groups.map((g) => g.label)).toEqual(["Community", "Database", "Tools", "Guides", "Profile", "More"]);
+  for (const g of groups.slice(0, -1)) expect(g.links).toEqual(items.find((i) => i.label === g.label)!.links);
   expect(groups.at(-1)!.links.map((l) => l.href)).toEqual(["/chat", "/docs", "/about"]);
 });
 
@@ -98,10 +94,10 @@ test("the item holding the page is marked, by its longest matching link", () => 
   expect(currentItem("/tools/talents/mage")).toBe("Tools");
   expect(currentItem("/tools/gold-ledger")).toBe("Profile");
   expect(currentItem("/tools/builds")).toBe("Profile");
-  expect(currentItem("/tools/auctions/nightslayer")).toBe("Lookup");
+  expect(currentItem("/tools/auctions/nightslayer")).toBe("Tools");
   expect(currentItem("/guilds/eu/realm/guild")).toBe("Guilds");
   expect(currentItem("/players/us/realm/name")).toBe("Players");
-  expect(currentItem("/rankings/classes")).toBe("Rankings");
+  expect(currentItem("/rankings/classes")).toBe("Community");
   expect(currentItem("/lore/npcs")).toBe("Guides");
   expect(currentItem("/chat")).toBe("Chat");
   expect(currentItem("/about")).toBeUndefined();
@@ -133,16 +129,23 @@ test("Get the addon is the primary pill and leads to /addon", () => {
   expect(html).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*"><span class="sm:hidden">Download<\/span><span class="hidden sm:inline">Get the addon<\/span><\/a>/);
 });
 
-test("the bar stays 44 px with centered search and shows the build label inline at 1536 px", () => {
+test("the bar stays 44 px with centered search and shows the build label inline from 1280 px, where Menu goes", () => {
   expect(DATA_SIZE.header).toBe(44);
   const bar = html.match(/<header [^>]*>\s*<div class="([^"]*)"/)?.[1] ?? "";
   expect(bar.split(" ")).toContain("h-header");
   expect(bar).not.toContain("min-h-16");
   // The search sits in its own growing slot, centred between the nav and the account area.
   expect(html).toMatch(/<div class="[^"]*\bflex-1\b[^"]*\bjustify-center\b[^"]*"><form [^>]*role="search"/);
+  // The build chip waits for 1536 px, so Players, Guilds and the search field fit from 1280; the footer always has it.
   expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 2xl:block\b[^"]*"><div class="[^"]*rounded-full[^"]*"><a [^>]*>files read /);
+  const footer = renderToStaticMarkup(<Footer />);
+  expect(footer).toMatch(/<a [^>]*href="\/changes\?show=builds[^"]*"[^>]*>files read /);
+  expect(footer).toMatch(/>newest seen /);
   // Tighter nav items.
   expect(primary).toMatch(/<a href="\/chat"[^>]*class="[^"]*\bpx-2\b/);
+  // Menu repeats the bar, so it shows only while the bar is hidden; on a phone the bar keeps the page's 16 px gutter.
+  expect(html).toMatch(/<button [^>]*aria-controls="site-navigation"[^>]*class="btn btn-sm [^"]*\bxl:hidden\b/);
+  expect(bar.split(" ")).toContain("px-4");
 });
 
 test("search is in the bar: a GET form to the site search, named Search Everloot", () => {
@@ -165,10 +168,10 @@ test("Plans and Alts on this device are in Profile, not Tools, and private in th
   for (const href of ["/tools/builds", "/tools/alts"]) expect(tools.find((t) => toolHref(t) === href)).toMatchObject({ private: true });
 });
 
-test("every shown catalogue tool with a group is in its menu, and Database and Chat are top bar items", () => {
+test("every shown catalogue tool with a group is in exactly one top bar menu, and Database and Chat are top bar items", () => {
+  const menus = navItems().filter((i) => i.links);
   for (const tool of tools.filter((t) => t.group && !t.hidden)) {
-    const destinations = tool.slug === "rankings" ? navItems().map((item) => item.href) : menuHrefs(tool.group!);
-    expect(destinations, tool.slug).toContain(toolHref(tool));
+    expect(menus.filter((m) => m.links!.some((l) => l.href === toolHref(tool))), tool.slug).toHaveLength(1);
     expect(html, tool.slug).toContain(`href="${toolHref(tool)}"`);
   }
   expect(tools.filter((t) => !t.group).map((t) => t.slug)).toEqual(["database", "chat"]);

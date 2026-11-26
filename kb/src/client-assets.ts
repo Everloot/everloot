@@ -481,7 +481,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   // Icons: one file per file data id, whoever asks for it.
   const wantedIcons = new Set<number>([
     ...iconIdOf.values(), ...classIcon.values(), ...[...treeIcons.values()].flat(), ...professionIcon.values(),
-    ...spellIconOf.values(), ...familyIconOf.values(), ...currencyIconOf.values(), ...petIconOf.values(), ...(itemSet?.iconOf.values() ?? []),
+    ...spellIconOf.values(), ...familyIconOf.values(), ...currencyIconOf.values(), ...petIconOf.values(), ...(itemSet?.iconOf.values() ?? []), ...(itemSet?.iconOnly.values() ?? []),
   ].filter((id) => id > 0));
   // Not listed in the manifest: pages find an icon by the name an entry gives, and the list would be thousands long.
   const icons: Record<string, z.infer<typeof File>> = {};
@@ -524,7 +524,8 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   }
 
   // Item shards, into the private folder: they hold every named item, released or not, so they never go to
-  // the public bucket. An item records its icon only when the icon file was extracted.
+  // the public bucket. An item records its icon only when the icon file was extracted. Items the files give only an
+  // icon for (no named ItemSparse row) are `{ i }` entries beside them.
   let items: ItemIndex | null = null;
   let itemsWithIcon = 0;
   if (itemSet) {
@@ -535,7 +536,8 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     }
     mkdirSync(join(privateDir, "items"), { recursive: true });
     const shards: Record<string, z.infer<typeof DataFile>> = {};
-    for (const [shard, records] of shardRecords(itemSet.records)) {
+    const iconOnly = new Map([...itemSet.iconOnly].filter(([, file]) => icons[String(file)]));
+    for (const [shard, records] of shardRecords(itemSet.records, iconOnly)) {
       const body = Buffer.from(JSON.stringify(records));
       writeFileSync(join(privateDir, "items", `${shard}.json`), body);
       shards[String(shard)] = { file: `items/${shard}.json`, bytes: body.length, sha256: sha(body) };

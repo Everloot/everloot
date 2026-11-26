@@ -1,6 +1,8 @@
 import { CENSUS_RACES } from "@kb/census";
 import { guildSlug, type GuildProgress } from "@kb/guilds";
 import { memberKey } from "@/lib/guild-alts";
+import { armoryGuildPath } from "@/lib/armory";
+import { armoryGuildOf } from "@/lib/guild-merge";
 import { guildPath, guildsOn, loadGuildPage, type GuildMember } from "@/lib/guilds";
 import type { Player } from "@/lib/player-pages";
 import { memberCountLine } from "@/app/guilds/parts";
@@ -88,10 +90,12 @@ export async function characterGuild(seen: Player, factsOn: boolean = characterG
       present: board.present.some((n) => n.trim().toLowerCase() === lower),
     }
     : null;
+  // One page per guild: the armory's, when it has this guild.
+  const armory = await armoryGuildOf(page.summary.realm, page.summary.guildName);
   return {
     guildName: page.summary.guildName,
     realm: page.summary.realm,
-    path: guildPath(page.summary.realm, page.summary.guildName),
+    path: armory ? armoryGuildPath(armory.region, armory.slug) : guildPath(page.summary.realm, page.summary.guildName),
     members: memberCountLine(board, members.length),
     progression: page.progression,
     guildmates: others
