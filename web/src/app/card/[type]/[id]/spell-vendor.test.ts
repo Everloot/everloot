@@ -11,7 +11,7 @@ import { PRIVATE_MALFORMED, PRIVATE_UNREACHABLE } from "@/lib/game-assets";
 import { edgeTtl } from "@/lib/cf-edge-cache";
 import { GET } from "./route";
 
-const call = (type: string, id = "10") => GET(new Request(`https://everloot.app/database/card/${type}/${id}`), { params: Promise.resolve({ type, id }) });
+const call = (type: string, id = "10") => GET(new Request(`https://everloot.app/card/${type}/${id}`), { params: Promise.resolve({ type, id }) });
 const three = (make: (installId: string) => object) => ["a", "b", "c"].map(make);
 beforeEach(() => {
   vi.unstubAllEnvs();
@@ -32,7 +32,7 @@ test.each(["spell", "vendor"])("a complete %s card is cached and identical with 
   expect(edgeTtl(res)).toBe(3600);
   expect(res.headers.get("cdn-cache-control")).toBe("max-age=3600");
   const body = await res.json();
-  const signedIn = await GET(new Request(`https://everloot.app/database/card/${type}/10`, { headers: { cookie: "session=private", authorization: "Bearer private" } }), { params: Promise.resolve({ type, id: "10" }) });
+  const signedIn = await GET(new Request(`https://everloot.app/card/${type}/10`, { headers: { cookie: "session=private", authorization: "Bearer private" } }), { params: Promise.resolve({ type, id: "10" }) });
   expect(await signedIn.json()).toEqual(body);
   expect(mocks.corpus).not.toHaveBeenCalled();
   if (type === "spell") expect(body.card).toMatchObject({ type, title: "Blizzard", icon: "https://assets.everloot.app/b/icons/10.webp", lines: ["Deals [?] damage."], foot: "Found in game files, unconfirmed · build 70450" });

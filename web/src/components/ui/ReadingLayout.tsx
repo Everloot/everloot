@@ -12,7 +12,7 @@ export function RailFacts({ items }: { items: { label: string; value: ReactNode 
     <dl data-rail-facts className="space-y-2">
       {items.map((item) => (
         <div key={item.label}>
-          <dt className="font-mono text-xs text-muted">{item.label}</dt>
+          <dt className="text-xs font-medium text-muted">{item.label}</dt>
           <dd className="text-fg-2 [overflow-wrap:anywhere]">{item.value}</dd>
         </div>
       ))}
@@ -36,7 +36,7 @@ export default function ReadingLayout({ items = [], meta, children }: { items?: 
         {meta && <div data-reading-meta className="rounded-card border border-line bg-panel p-4 lg:border-0 lg:bg-transparent lg:p-0">{meta}</div>}
         {items.length > 0 && (
           <nav aria-label="On this page" className={`rounded-card border border-line bg-panel p-4 lg:border-0 lg:bg-transparent lg:p-0 ${meta ? "mt-4 lg:mt-6" : ""}`}>
-            <p className="font-mono text-xs text-muted">On this page</p>
+            <p className="text-xs font-medium text-muted">On this page</p>
             <ol className="mt-2 grid grid-cols-2 gap-x-4 lg:grid-cols-1 lg:border-l lg:border-line">
               {items.map((item) => (
                 <li key={item.id} className="min-w-0">

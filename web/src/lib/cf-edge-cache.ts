@@ -43,13 +43,13 @@ export function isPrivatePath(pathname: string): boolean {
 }
 
 /**
- * The site's hover cards (app/database/card/[type]/[id]): JSON that reads no cookie and no header. A signed-in visitor,
+ * The site's hover cards (app/card/[type]/[id], and the old /database/card path): JSON that reads no cookie and no header. A signed-in visitor,
  * or one Cloudflare has cleared after a challenge, sends cookies with every same-site fetch, and a cookie bypasses the
  * shared cache, so their cards were rendered on every hover. The entry takes the credentials off these requests before
  * the lookup and before the handler, so the card cannot depend on what it never sees. Matched on the path as sent: a
  * spelling this does not match keeps its credentials and bypasses the cache, as before.
  */
-const CREDENTIAL_FREE_PATH = /^\/database\/card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
+const CREDENTIAL_FREE_PATH = /^\/(?:database\/)?card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
 
 /**
  * The public Auction House pages read only the market rollup, its stored history and item names: no cookie, no

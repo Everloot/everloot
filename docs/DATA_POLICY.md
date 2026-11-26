@@ -474,6 +474,15 @@ The rules:
 - An item no source names keeps "Item N". The game server sends those names while the game runs, so they come
   from the addon's uploads, after 3 installs agree. A category page where fewer than half the rows have a name
   stays out of search.
+- Icons of items the files give only an icon for (added 2026-11-25, at Carlos's request that gear show its icon, not
+  a question mark). Forever's `Item` table lists about 12,600 items in build 1.60.1.71091 whose `ItemSparse` row
+  (name, quality, tooltip) the server sends while the game runs; for those the files hold only the icon
+  (`Item.IconFileDataID`). The private item folder keeps that icon beside the tooltips, and a page shows it,
+  with the quiet unconfirmed marker, where it would show the item's tooltip (the rule above: an agreed name, a
+  public drop or a name from a source), and on a character's gear, which Blizzard's armory reports equipped and so
+  is in the game. The gear's card there takes the name and quality from the armory, the icon from the files,
+  and says so. No name, tooltip line, drop rate or price comes from this; an id no rule shows keeps "Item N" and the
+  question mark.
 - Pages only. The data downloads, the API and the MCP server carry no item names and no tooltip facts for these
   items, as before; a test checks that their code does not read the names. The embeddable cards keep the
   three-install rule.
@@ -497,6 +506,26 @@ and tooltip facts, the same ones its page shows:
   Blizzard credit above. The icon is a link to our asset storage, not a copy in the response.
 - **Same spoiler and takedown rules** as the pages. The downloads, the rest of the API and the MCP
   server still carry no icons or tooltip text.
+
+**Fourth extension: model pictures.** Decided 2026-11-25 by Carlos, who approved the amendment in
+[ASSETS](ASSETS.md) ("Model pictures"): model pictures are handled like the icons. They are drawn from the game
+files, never committed to git, shown on pages only and credited to Blizzard. The first set is items with a model
+of their own and creatures whose display is not a dressed humanoid. Only what is live gets a picture. The rules
+above also cover:
+
+- **Still pictures of creature and item models**, drawn by our own renderer from the model, skin and texture
+  files of the public client, read by file data id from the client tables and the model's own chunks like the
+  icons: unencrypted files only, no key, no listfile. One picture per display, in its standing pose, on a
+  transparent background, with nothing added.
+- **Only what is live.** Pictures are drawn only for an item that 3 installs have reported and for the display
+  of an NPC the site lists. The id lists come from the same gates the pages use, so nothing found only in the
+  files gets a picture. An item's picture shows only where its page may already show the item, and a creature's
+  only on the page of an NPC the site lists.
+- **Pages only, like the icons.** The pictures sit in the public asset bucket under names made from a hash,
+  credited on every page that shows them, and never go into the API, the MCP server or the data downloads. The
+  model, skin and texture files themselves are never stored or served.
+- **Not covered**: dressed humanoid NPCs, armour shown on a character, and an interactive 3D view, which would
+  serve the model files themselves. Each needs its own decision.
 
 **Quest titles from the game files and the Warcraft Wiki.** *Proposed 2026-10-20; decided 2026-10-21
 by Carlos, and widened the same day to every quest the wiki titles.* The game files list quests by id
@@ -538,6 +567,13 @@ the item pages. They come from the game files alone, so:
   One without a name keeps "item set N" or "spell N".
 - Pages only, in the same private storage, made by the same command. In build 1.60.1.70450: 536 sets, all
   named; 31,939 spells, 31,926 named.
+- *Added 2026-11-25.* Each set has its own page (`/database/item-sets/<id>`) and a list. What a set holds comes
+  from a committed game-data file, `web/src/data/game-data/client-item-sets.json`, with ids and numbers only:
+  the piece item ids, each bonus's spell id and pieces needed, and the skill line and rank a crafted set asks for.
+  No names are in it; a set with no name or a development leftover's name is left out of it. The page shows the
+  set and bonus names from the private file above, and its pieces' names and icons under the item name rule. A
+  set page is indexed and listed in the sitemap only when the names file names the set. Search does not read set
+  names, as it does not read spell names.
 
 **The talent catalog.** The talent calculator at `/tools/talents` uses our own catalog, read from
 the public client by a maintainer, not taken from any other site. The catalog is the trait node
@@ -655,6 +691,25 @@ text stay on pages.* The index is built from the same committed files, outside t
 `search_knowledge`, `search`, `get_by_name`, `get_entity` and `fetch` read it beside the release. Every such
 answer carries the label and the build, the game-data credit, and a link to a page that exists on the site: only
 the factions the game shows are indexed, and statistics are not achievements.
+
+**Mounts, companion pets, currencies and toys.** *Proposed 2026-11-25 in the pull request that adds them (the
+maintainer review).* `/database/mounts`, `/database/pets`, `/database/currencies` and `/database/toys` list what the
+game files list, with a page for each mount, companion pet and currency. The rules:
+
+- Mounts read the committed `client-mounts.json`; the rest read `client-collections.json`, written by
+  `npm run kb -- client-collections` from `CurrencyTypes` and `CurrencyCategory`, `BattlePetSpecies` and `Creature`
+  (the pet's own creature, for its name), and `Toy`, and regenerated by the build watch.
+- It holds ids and names, a currency's category, cap and description, and a pet's creature and summon spell. A
+  currency's description is game text and stays on its page, as for the race traits. A toy keeps its item id only:
+  its name follows the item name rule and its page is the item page.
+- The game's own hidden counters (currencies in the "Hidden" or "Unused" category, or marked `[DNT]`) and entries
+  whose name marks them as development leftovers are left out.
+- Every page is labelled *found in game files, unconfirmed* with its build. A mount is confirmed once 3 installs list
+  its spell in their "Mounts" collection, as on `/tools/collections`; no player report confirms pets, currencies or
+  toys yet.
+- Their icons come from asset storage like the item icons (`currencyIcons`, `petIcons` and the mount spells in
+  `spellIcons`), shown only where the manifest lists one. None of it is in the API, the MCP server or the bulk
+  download.
 
 **Places in a zone and achievement categories.** *Proposed 2026-11-25 in the pull request that adds them (the
 maintainer review).* The rules:
@@ -1036,6 +1091,21 @@ full known boss list count. The Armory and the addon's Collection use the same d
 The feed respects the existing linked-character and hide rules. Desktop replaces the downloaded realm snapshot on
 refresh. The addon suppresses a snapshot when it reaches its two-hour expiry. It leaves the tooltip alone when the
 game cannot confirm the player's name or realm. The snapshot download sends realm names and page offsets.
+
+## Dungeon and raid clears
+
+*Proposed 25 November 2026, in the pull request that adds it (the maintainer review).* The public boss-kill history above
+is also shown as clears. Nothing new is collected. A linked character's armory page lists each instance it has a kill in,
+with every boss the game files list there, killed or not, and for each boss killed its lifetime kill count (summed across
+difficulties) and its first and last kill day. The history already held the counts and first kills; the pages did not
+show them before. A clear is a kill of every listed boss, dated by the day the last of them first fell.
+
+An instance's database page shows counts only, from up to the 500 linked characters with the newest kills there: how
+many have a kill, how many have killed every boss, and each boss's characters and kills. It names no one. The names of
+the characters who cleared it are listed only on `/armory/clears/<instance>`, an armory page with the armory's rules:
+read on every request, ad-free and out of search engines. Hiding a character removes it from that list and the
+character page at once, and from the database page's counts once that page's shared copy expires (an hour). Weekly raid
+lockouts are not part of these views; they stay in the owner-published Raids section.
 
 ## Gear rankings
 

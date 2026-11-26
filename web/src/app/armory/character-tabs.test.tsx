@@ -25,7 +25,7 @@ const full = armoryCharacter({
 // A profile row from before the detail reads: gear and the PvP numbers, nothing else.
 const partial = armoryCharacter({ honorableKills: null, pvpRank: null, equipment: [] });
 
-const render = (c = full) => renderToStaticMarkup(<Tabs label="Sheet" tabs={characterTabs(c, { tips: new Map() })} />);
+const render = (c = full) => renderToStaticMarkup(<Tabs label="Sheet" tabs={characterTabs(c, {})} />);
 const tabIds = (html: string) => [...html.matchAll(/data-tab-panel="([a-z-]+)"/g)].map((m) => m[1]);
 const emptyIds = (html: string) => [...html.matchAll(/data-empty-tab="([a-z-]+)"/g)].map((m) => m[1]);
 
@@ -33,7 +33,7 @@ test("a character with every part stored draws every tab, none of them empty", (
   const html = render();
   expect(tabIds(html)).toEqual(CHARACTER_TABS.map(([id]) => id));
   expect(emptyIds(html)).toEqual([]);
-  expect(html).toContain('href="/database/items/16846"');
+  expect(html).not.toContain('href="/database/items/16846"');
   expect(html).toContain("Unholy Power");
   expect(html).toContain('href="/tools/talents/warlock"');
   expect(html).toContain("Intellect");
@@ -44,9 +44,9 @@ test("a character with every part stored draws every tab, none of them empty", (
   expect(html).toMatch(/>3<\/span> completed quests/);
 });
 
-test("the strip holds Gear to Quests and nothing that waits on the privacy decision", () => {
+test("the strip holds Talents to Progress (the gear is the sheet above it) and nothing that waits on the privacy decision", () => {
   const labels = CHARACTER_TABS.map(([, label]) => label);
-  expect(labels).toEqual(["Gear", "Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Play history", "Progress"]);
+  expect(labels).toEqual(["Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Play history", "Progress"]);
   for (const out of ["Gold", "Completionist", "Alts", "Legacy perks"]) expect(labels).not.toContain(out);
 });
 
@@ -55,7 +55,7 @@ test("Progress always holds the full catalogue and renders only the permitted hi
   const unknown = render();
   expect([...unknown.matchAll(/data-progression-instance=/g)]).toHaveLength(catalogue.length);
   expect(unknown).toContain("no data from this character");
-  const progress = characterTabs(full, { tips: new Map(), progression: {
+  const progress = characterTabs(full, { progression: {
     instances: characterProgression(catalogue, [{ instanceMapId: 33, encounterId: 2748, lastKillAt: at }]),
     links: { 33: "/database/instances/33-shadowfang-keep" },
   } }).find((t) => t.id === "progress")!;
@@ -74,14 +74,14 @@ test("a character with partial data keeps every tab, and each empty one says why
     expect(sentence.match(/[.!?]/g)).toHaveLength(1);
   }
   expect(EMPTY_TAB.talents).toBe("The last read from Blizzard's API did not include talents for this character.");
-  // No paper doll of empty slots when nothing was equipped.
+  // The gear is the page's sheet, never a tab.
   expect(html).not.toContain("data-equipment-slot");
 });
 
-test("gear and PvP from the profile row show without any detail read", () => {
+test("PvP from the profile row shows without any detail read, and the gear is not a tab", () => {
   const html = render(armoryCharacter());
   expect(emptyIds(html)).toEqual(["talents", "stats", "achievements", "professions", "reputations", "quests", "history"]);
-  expect(html).toContain("data-equipment-slot");
+  expect(html).not.toContain("data-equipment-slot");
   expect(html).toContain("1,234");
 });
 
@@ -93,7 +93,7 @@ test("an achievements read with nothing completed says so, not that it was missi
 });
 
 test("play history shows the six ranked counts, an unread one as Not read, then every group with its notes", () => {
-  const panel = characterTabs(full, { tips: new Map(), historyRanks: [{ metric: "fish-caught", rank: 2, of: 40, href: "/armory/rankings/fish-caught?ruleset=2&region=eu" }] })
+  const panel = characterTabs(full, { historyRanks: [{ metric: "fish-caught", rank: 2, of: 40, href: "/armory/rankings/fish-caught?ruleset=2&region=eu" }] })
     .find((t) => t.id === "history")!;
   const html = renderToStaticMarkup(<>{panel.panel}</>);
   for (const text of ["Quests completed", "791", "Fish caught", "1,993", "Dungeons entered", "Character · Consumables", "Bandage used most", "Triage Bandage"]) expect(html, text).toContain(text);

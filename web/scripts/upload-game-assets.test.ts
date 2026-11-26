@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { folderProblems, isPrivateFile, isPublicFile, namesFileCheck, parseUploadArgs, uploadOrder, withRetry } from "./game-assets-upload.mjs";
+import { folderProblems, isPrivateFile, isPublicFile, isRenderFile, missingRemote, namesFileCheck, parseUploadArgs, rendersCheck, uploadOrder, withRetry } from "./game-assets-upload.mjs";
 
 test("arguments: a folder or --snapshot <file>; a flag is never read as the path", () => {
   expect(parseUploadArgs(["../kb/data/assets/b", "--dry-run"])).toMatchObject({ folder: "../kb/data/assets/b", dry: true, snapshot: null, error: null });
@@ -79,4 +79,50 @@ test("--folder sends a names file to the live folder of the same build, never an
   expect(check("wow_classic_beta-70451-0000aaaa")).toMatchObject({ prefix: null, problems: [expect.stringMatching(/not a folder of build/)] });
   expect(check("wow_classic_beta-70450-84bea4239").problems[0]).toMatch(/not a folder of build/);
   expect(check("../x").prefix).toBeNull();
+});
+
+test("--renders <folder> uploads model pictures; --folder names the live build folder", () => {
+  expect(parseUploadArgs(["--renders", "r/wowf-71139-7a16decd", "--dry-run"])).toMatchObject({ renders: "r/wowf-71139-7a16decd", dry: true, folder: null, live: null, error: null });
+  expect(parseUploadArgs(["--renders=r/b", "--folder=wowf-71139-7a16decd-2"])).toMatchObject({ renders: "r/b", live: "wowf-71139-7a16decd-2", error: null });
+  expect(parseUploadArgs(["--renders", "--dry-run"]).error).toMatch(/--renders needs/);
+  expect(parseUploadArgs(["--renders", "r/b", "--snapshot", "s.sqlite"]).error).toMatch(/one of/);
+  expect(parseUploadArgs(["--folder=x", "a"]).error).toMatch(/--folder goes with --renders/);
+});
+
+test("model pictures are hash-named WebP files in the shared renders folder, nothing else", () => {
+  expect(isRenderFile(`renders/${"a".repeat(32)}.webp`)).toBe(true);
+  for (const f of [`renders/${"a".repeat(31)}.webp`, `renders/${"A".repeat(32)}.webp`, `x/renders/${"a".repeat(32)}.webp`, "renders/1.webp", `renders/${"a".repeat(32)}.png`]) expect(isRenderFile(f), f).toBe(false);
+});
+
+const pic = (c: string) => `renders/${c.repeat(32)}.webp`;
+function rendersFolder(files: Record<string, string>, listed: Record<string, string>, extra: Record<string, unknown> = {}) {
+  const out = mkdtempSync(join(tmpdir(), "everloot-renders-"));
+  const root = join(out, "wowf-71139-7a16decd");
+  mkdirSync(join(out, "renders"));
+  mkdirSync(root);
+  for (const [f, body] of Object.entries(files)) writeFileSync(join(out, f), body);
+  const manifest = { schema: "everloot.game-renders/1", build: { version: "1.60.1.71139" }, creatureDisplays: { 501: pic("a") }, itemDisplays: { 700: pic("b") }, ...extra };
+  const checksums = { files: Object.fromEntries(Object.entries(listed).map(([f, body]) => [f, { bytes: body.length, sha256: hash(body) }])) };
+  return { root, manifest, checksums };
+}
+
+test("a renders folder is checked: its pictures are where the manifest says, listed, unchanged and of the right kind", () => {
+  const ok = rendersFolder({ [pic("a")]: "A", [pic("b")]: "B" }, { [pic("a")]: "A", [pic("b")]: "B" });
+  expect(rendersCheck(ok.root, ok.manifest, ok.checksums)).toEqual({ prefix: "wowf-71139-7a16decd", files: [pic("a"), pic("b")], problems: [] });
+  const bad = rendersFolder({ [pic("a")]: "changed" }, { [pic("a")]: "A", "renders/x.webp": "X" });
+  expect(rendersCheck(bad.root, bad.manifest, bad.checksums).problems.sort()).toEqual([
+    `hash differs: ${pic("a")}`, "may not go to this bucket: renders/x.webp", "missing: renders/x.webp", `named in renders.json but not listed: ${pic("b")}`,
+  ]);
+  expect(rendersCheck(ok.root, { ...ok.manifest, schema: "everloot.game-assets/1" }, ok.checksums).problems).toEqual(["renders.json has schema everloot.game-assets/1, expected everloot.game-renders/1"]);
+});
+
+test("renders.json goes to the live folder of the same build only", () => {
+  const ok = rendersFolder({ [pic("a")]: "A", [pic("b")]: "B" }, { [pic("a")]: "A", [pic("b")]: "B" });
+  expect(rendersCheck(ok.root, ok.manifest, ok.checksums, "wowf-71139-7a16decd-2").prefix).toBe("wowf-71139-7a16decd-2");
+  expect(rendersCheck(ok.root, ok.manifest, ok.checksums, "wowf-71200-00000000").problems).toEqual(["--folder wowf-71200-00000000 is not a folder of build wowf-71139-7a16decd"]);
+});
+
+test("only pictures the bucket does not hold yet are sent: a picture's name is the hash of what made it", async () => {
+  const held = new Set([pic("a")]);
+  expect(await missingRemote([pic("a"), pic("b")], async (f: string) => held.has(f))).toEqual([pic("b")]);
 });

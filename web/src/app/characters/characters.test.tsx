@@ -7,15 +7,18 @@ vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT 308 ${to}`); },
+}));
 const players = vi.hoisted(() => ({ store: null as PlayerStore | null }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => players.store }));
 // The names synced facts are drawn with: fixed here, so a published-sections test reads no item or catalog store.
 const factNames = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
 // The armory character, fed in whole: the armory store's own reads are tested in lib/armory-store.test.ts.
-const armory = vi.hoisted(() => ({ character: vi.fn() }));
-vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => ({ character: armory.character }) }));
+const armory = vi.hoisted(() => ({ character: vi.fn(), search: vi.fn(async () => [] as unknown[]) }));
+vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => ({ character: armory.character, search: armory.search }) }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/game-assets")>()), loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
 
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
@@ -471,6 +474,33 @@ describe("one page for a character: the owner's showcase and what the addon saw"
   test("the page is drawn on every request: force-dynamic, with no revalidate window", () => {
     expect(dynamic).toBe("force-dynamic");
     expect("revalidate" in pageModule).toBe(false);
+  });
+
+  test("a sighting the armory has is one page: a permanent redirect there; an uncertain, owned or hidden one is not redirected", async () => {
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    await players.store!.upsert([{ ...SEEN, realm: "EU1 Realm 2 Normal" }]);
+    const p = { ruleset: "forever", realm: "eu1-realm-2-normal", name: "thrallina" };
+    const hit = { region: "eu", slug: "thrallina-ashvale", name: "Thrallina", surname: "Ashvale", level: 60, class: "Shaman", race: "Troll", ruleset: "Normal", guildName: "Night Watch" };
+    const owner = (row: unknown) => auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/public_character" && row ? [row] : []));
+    owner(null);
+    armory.search.mockResolvedValue([hit]);
+    await expect(Page(props(p))).rejects.toThrow("NEXT_REDIRECT 308 /armory/eu/thrallina-ashvale");
+    // Two armory characters with the name in the region: which one the addon saw is not known, so the page stays.
+    armory.search.mockResolvedValue([hit, { ...hit, slug: "thrallina-stone", surname: "Stone" }]);
+    expect(await render(p)).toContain('data-part="sighting"');
+    // The armory off asks it nothing and keeps the page.
+    armory.search.mockClear().mockResolvedValue([hit]);
+    vi.stubEnv("EVERLOOT_ARMORY", "");
+    expect(await render(p)).toContain('data-part="sighting"');
+    expect(armory.search).not.toHaveBeenCalled();
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    // An owner's own page keeps its address: the owner chose what it shows.
+    owner({ ...ROW, realm: "EU1 Realm 2 Normal" });
+    expect(await render(p)).toContain('data-part="showcase"');
+    // A hidden sighting is a 404, never a redirect.
+    owner(null);
+    await players.store!.suppress("EU1 Realm 2 Normal", "Thrallina");
+    await expect(Page(props(p))).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
   test("a sighting alone is a page: the row's facts, where they came from, the hide link and the policy", async () => {
