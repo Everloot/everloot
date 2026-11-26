@@ -32,6 +32,7 @@ import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import EntityComments from "@/components/comments/EntityComments";
 import { loadInstanceClears } from "@/lib/progression";
+import { bossHref } from "@/lib/bosses";
 import type { InstanceClears } from "@/lib/dungeon-clears";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
@@ -105,9 +106,11 @@ export default async function InstancePage(props: Props) {
   // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
   // reads as names with their unconfirmed marker, not rows of [?].
   const bossColumns: SparseColumn<BossRow>[] = [
-    { key: "name", header: "Boss", cell: (b) => (b.filesName
-      ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{b.name}</span>
-      : b.name ?? `Encounter ${b.encounterId}`) },
+    // Each boss links its own page (lib/bosses.ts), by the name this table shows.
+    { key: "name", header: "Boss", cell: (b) => {
+      const name = <Link href={bossHref(b.encounterId, b.name)} className={link}>{b.name ?? `Encounter ${b.encounterId}`}</Link>;
+      return b.filesName ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{name}</span> : name;
+    } },
     { key: "kills", header: "Kills", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
     // Short of 3, the count of installs that reported the encounter so far, beside the files' name: nothing else of theirs.
     { key: "installs", header: "Installs", blank: (b) => !b.boss && !b.reported, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : b.reported ? <AgreementMeter count={b.reported} withText /> : PLACEHOLDER) },
@@ -133,7 +136,7 @@ export default async function InstancePage(props: Props) {
 
   // Loot, per boss: every boss above, with the loot table of each creature 3 installs tie to its encounter, the same
   // table its NPC page shows. A boss with no creature tied yet keeps its line, saying so.
-  const lootBosses = bosses.map((b) => ({ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, npcIds: b.boss?.npcIds ?? [] }));
+  const lootBosses = bosses.map((b) => ({ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, href: bossHref(b.encounterId, b.name), npcIds: b.boss?.npcIds ?? [] }));
   const loot = unreachable || !lootBosses.some((b) => b.npcIds.length) ? null : await loadLootTables();
   const lootTables = new Map(loot && !loot.unreachable ? lootBosses.flatMap((b) => b.npcIds).map((id) => [id, npcLootTable(loot.tables, id)]) : []);
   // Item names (and icons, when the game files have them) for the drop rows; an item nobody named stays "Item N".
@@ -224,7 +227,7 @@ export default async function InstancePage(props: Props) {
           <div className="space-y-4">
             {lootBosses.map((b) => (
               <div key={b.encounterId} data-boss-loot={b.encounterId}>
-                <h3 className="text-cell font-semibold text-fg">{b.name}</h3>
+                <h3 className="text-cell font-semibold text-fg"><Link href={b.href} className={link}>{b.name}</Link></h3>
                 {b.npcIds.length === 0 && (
                   <p className="pt-1 text-meta text-fg-2">Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.</p>
                 )}

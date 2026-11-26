@@ -31,6 +31,8 @@ import { npcIndexable } from "@/lib/indexable";
 import { entityTitle, npcDescription } from "@/lib/entity-meta";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import { bossesOfNpc, bossHref } from "@/lib/bosses";
+import { instanceHref, instanceRows, instanceTitle, loadSightings } from "@/lib/instances";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +112,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const named = title !== `NPC ${npcId}`;
   // The model picture only where the page names the NPC; renders.json lists only NPCs the site lists.
   const picture = named && !unreachable ? (await loadRenders())?.npcs.get(npcId) : undefined;
+  // The bosses 3 installs tie this creature to, each linked to its page and its instance's.
+  const seen = unreachable ? null : await loadSightings();
+  const bosses = seen && !seen.unreachable ? bossesOfNpc(npcId, instanceRows(seen)) : [];
   // The page in three lines: where it is, what players reported, and where the name came from.
   const summary = entitySummary({
     identity: zone
@@ -148,6 +153,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         { label: "Type", value: known(traits.creatureType) },
         { label: "Reaction", value: known(traits.reaction && ({ friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" })[traits.reaction]) },
         { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
+        ...(bosses.length ? [{ label: "Boss", value: <span>{bosses.map((b, i) => (
+          <span key={b.id}>{i > 0 && "; "}<Link href={bossHref(b.id, b.row.name)} className={LINK}>{b.name}</Link> in <Link href={instanceHref(b.instance.instanceMapId, b.instance.name)} className={LINK}>{instanceTitle(b.instance)}</Link></span>
+        ))}</span> }] : []),
         { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
         { label: "Map positions", value: known(page.pins.length || null), numeric: true },
         // Drop rows show from one install; their table labels the agreement tier.

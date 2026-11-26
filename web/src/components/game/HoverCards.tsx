@@ -7,7 +7,7 @@ import { CardPopup, GameCard, type CardContent } from "./GameCard";
 
 // The in-game card on every link to an item, NPC, quest, object, spell or vendor page, or to one of the game-file entry
 // pages (achievement, faction, title, quest chain, zone, dungeon or raid, item set, mount, companion pet, currency,
-// holiday, hunter pet family), mounted once in the root layout. It
+// holiday, hunter pet family, boss), mounted once in the root layout. It
 // listens on the document, so a list, a search result, the type-ahead or a link inside a page needs nothing of
 // its own: any <a href="/database/items/123"> gets the card. A pointer resting on the link for SHOW_DELAY or
 // keyboard focus opens it: the card's frame at once with the name and quality colour the link already shows, filled
@@ -18,11 +18,11 @@ import { CardPopup, GameCard, type CardContent } from "./GameCard";
 
 const PATH = /^\/database\/(items|npcs|quests|objects|spells|vendors|item-sets)\/([1-9]\d{0,9})\/?$/;
 // The game-file entry pages, whose address adds the name's words after the id ("627-explore-dun-morogh").
-const SLUG_PATH = /^\/database\/(achievements|factions|titles|quest-chains|zones|instances|mounts|pets|currencies|holidays|pet-families)\/([1-9]\d{0,9})(?:-[a-z0-9-]*)?\/?$/;
+const SLUG_PATH = /^\/database\/(achievements|factions|titles|quest-chains|zones|instances|mounts|pets|currencies|holidays|pet-families|bosses)\/([1-9]\d{0,9})(?:-[a-z0-9-]*)?\/?$/;
 const TYPE = {
   items: "item", npcs: "npc", quests: "quest", objects: "object", spells: "spell", vendors: "vendor", "item-sets": "item-set",
   achievements: "achievement", factions: "faction", titles: "title", "quest-chains": "chain", zones: "zone", instances: "instance",
-  mounts: "mount", pets: "pet", currencies: "currency", holidays: "holiday", "pet-families": "family",
+  mounts: "mount", pets: "pet", currencies: "currency", holidays: "holiday", "pet-families": "family", bosses: "boss",
 } as const;
 /**
  * How long the pointer rests on a link before its card is asked for and shown, so a pointer crossing a list asks

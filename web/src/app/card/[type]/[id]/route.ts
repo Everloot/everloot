@@ -4,7 +4,7 @@ import { tooltipId, tooltipType } from "@/lib/tooltip";
 /**
  * GET /card/<type>/<id>: item, npc, quest, object, spell, vendor and the game-file entry pages (ENTRY_CARD_TYPES in
  * lib/site-card.ts: achievement, faction, title, chain, zone, instance, item-set, mount, pet, currency, holiday,
- * family). The hover card on the site's own links (components/game/HoverCards)
+ * family, boss). The hover card on the site's own links (components/game/HoverCards)
  * and the chat's item card. Part of the site, not the API, like /search/suggest: it follows the pages' rules
  * (lib/site-card.ts), so other sites get no CORS and search engines a noindex, and it stays out of /api/, which carries
  * no game-file names. It sits outside /database/ because Cloudflare challenges every path there, and a background fetch

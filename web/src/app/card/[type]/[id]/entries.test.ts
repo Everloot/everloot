@@ -53,6 +53,7 @@ const CASES: [type: string, id: number, card: Record<string, unknown>][] = [
   ["currency", 1792, { title: "Honor Points", icon: icon(1792), foot: "Found in game files, unconfirmed" }],
   ["holiday", 62, { title: "Fireworks Spectacular", icon: null, foot: "Found in game files, unconfirmed" }],
   ["family", 1, { title: "Wolf", icon: icon(1), foot: "Found in game files, unconfirmed" }],
+  ["boss", 2732, { title: "Oggleflint", icon: null, foot: "Found in game files, unconfirmed" }],
 ];
 
 test.each(CASES)("a %s card is the page's name, art and a few facts, cached an hour and the same for a signed-in visitor", async (type, id, card) => {
@@ -79,11 +80,12 @@ test("each card's lines say what its page's box and facts say", async () => {
   expect(await lines("currency", 1792)).toEqual(["Honor is gained by killing members of the opposite faction in PvP combat. You can use honor points to purchase special items.", "Maximum: 25,000", "Player vs. Player"]);
   expect(await lines("holiday", 62)).toEqual(["Every year on 4 July at 06:00", "Lasts 18 hours"]);
   expect(await lines("family", 1)).toEqual(["Hunter pet family", "16 spells on its skill line"]);
+  expect(await lines("boss", 2732)).toEqual(["Dungeon boss", "Ragefire Chasm, boss 1 of 4"]);
 });
 
 test.each([
   ["achievement", 999999], ["faction", 999999], ["title", 999999], ["chain", 999999], ["zone", 999999], ["instance", 999999],
-  ["item-set", 999999], ["mount", 999999], ["pet", 999999], ["currency", 999999], ["holiday", 999999], ["family", 999999],
+  ["item-set", 999999], ["mount", 999999], ["pet", 999999], ["currency", 999999], ["holiday", 999999], ["family", 999999], ["boss", 999999],
 ])("an id no %s page shows is a 404, never edge cached", async (type, id) => {
   const res = await call(type, id);
   expect(res.status).toBe(404);

@@ -59,6 +59,7 @@ import CurrencyImage, * as currencyRoute from "./currencies/[id]/opengraph-image
 import FactionImage, * as factionRoute from "./factions/[id]/opengraph-image";
 import HolidayImage, * as holidayRoute from "./holidays/[id]/opengraph-image";
 import InstanceImage, * as instanceRoute from "./instances/[instance]/opengraph-image";
+import BossImage, * as bossRoute from "./bosses/[boss]/opengraph-image";
 import ItemSetImage, * as itemSetRoute from "./item-sets/[id]/opengraph-image";
 import MountImage, * as mountRoute from "./mounts/[id]/opengraph-image";
 import ObjectImage, * as objectRoute from "./objects/[id]/opengraph-image";
@@ -134,6 +135,8 @@ describe("the share card of each database type", () => {
     ["instance", () => InstanceImage({ params: Promise.resolve({ instance: String(instance.instanceMapId) }) }),
       { title: instance.name, type: instance.raid ? "Raid" : instance.raid === false ? "Dungeon" : "Instance",
         facts: [instance.level!.min === instance.level!.max ? `Level ${instance.level!.min}` : `Level ${instance.level!.min}-${instance.level!.max}`, plural(instance.encounters.length, "boss", "bosses")] }],
+    // Storage out of reach: the files' name and order, labelled unconfirmed.
+    ["boss", () => BossImage({ params: Promise.resolve({ boss: "2732-oggleflint" }) }), { title: "Oggleflint", type: "Dungeon boss", facts: ["Ragefire Chasm", "Boss 1 of 4", CLIENT_LABEL] }],
     // Storage out of reach: no reported name, so the id, as the page shows it.
     ["object", () => ObjectImage(props("1617")), { title: "Object 1617", type: "Object", facts: [] }],
     ["vendor", () => VendorImage(props("1247")), { title: "Vendor NPC 1247", type: "Vendor", facts: [] }],
@@ -157,6 +160,7 @@ describe("the share card of each database type", () => {
       () => PetFamilyImage(props("999999")), () => ItemSetImage(props("999999")), () => AchievementImage(props("99999999")), () => FactionImage(props("999999")),
       () => TitleImage(props("999999")), () => ChainImage(props("999999")), () => SpellImage(props("99999999")), () => SpellImage(props("abc")),
       () => ZoneImage({ params: Promise.resolve({ zone: "999999" }) }), () => InstanceImage({ params: Promise.resolve({ instance: "999999" }) }),
+      () => BossImage({ params: Promise.resolve({ boss: "999999" }) }),
       () => ObjectImage(props("1617")), () => VendorImage(props("1247")),
     ];
     for (const draw of draws) await expect(draw()).rejects.toThrow("NEXT_NOT_FOUND");
@@ -164,7 +168,7 @@ describe("the share card of each database type", () => {
   });
 
   it("each route is the shared card size, a PNG, and names its type in the alt text", () => {
-    const routes = [achievementRoute, currencyRoute, factionRoute, holidayRoute, instanceRoute, itemSetRoute, mountRoute, objectRoute, petFamilyRoute, petRoute, chainRoute, spellRoute, titleRoute, vendorRoute, zoneRoute];
+    const routes = [achievementRoute, bossRoute, currencyRoute, factionRoute, holidayRoute, instanceRoute, itemSetRoute, mountRoute, objectRoute, petFamilyRoute, petRoute, chainRoute, spellRoute, titleRoute, vendorRoute, zoneRoute];
     for (const route of routes) {
       expect(route.size).toEqual({ width: 1200, height: 630 });
       expect(route.contentType).toBe("image/png");

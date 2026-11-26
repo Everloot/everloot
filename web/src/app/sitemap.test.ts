@@ -256,6 +256,16 @@ test("each dungeon and raid page is listed, once, as many as the instance index 
   expect(byPath.get("/database/instances/36-deadmines")?.lastModified).toBeUndefined();
 });
 
+test("each boss page is listed, once, one per boss of a listed instance, and the boss index with them", async () => {
+  const { bossEntries, bossHref } = await import("@/lib/bosses");
+  const paths = [...byPath.keys()].filter((p) => p.startsWith("/database/bosses/"));
+  const bosses = bossEntries();
+  expect(bosses.length).toBeGreaterThan(0);
+  expect(paths.sort()).toEqual(bosses.map((b) => bossHref(b.id, b.row.name)).sort());
+  expect(paths).toContain("/database/bosses/2732-oggleflint");
+  expect(byPath.has("/database/bosses")).toBe(true);
+});
+
 test("an instance page entered only from a held-back zone is not listed", async () => {
   const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
   const zoned = (mapId: number) => ["a", "b", "c"].map((installId) => ({ installId, instanceMapId: 9999, name: "Secret Vault", instanceType: "party", mapId, x: 40, y: 40, capturedAt: "2026-10-10T00:00:00.000Z" }));

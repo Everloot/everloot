@@ -12,6 +12,7 @@ import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { currencyEntries, mountEntries, petEntries, toyEntries } from "@/lib/collectibles";
 import { holidayEntries, petFamilyEntries } from "@/lib/world-events";
 import { instanceRows } from "@/lib/instances";
+import { bossEntries } from "@/lib/bosses";
 import { publicZones } from "@/lib/zones";
 import { terrainTypes } from "@/lib/terrain";
 import JsonLd from "@/components/JsonLd";
@@ -98,6 +99,8 @@ export default async function DatabasePage() {
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
     "/database/instances": n(instanceRows().size),
+    // Their bosses, from the same files rows.
+    "/database/bosses": n(bossEntries().length),
     // The terrain types the game files name, like the zone count: it reads the files, not the uploads.
     "/database/terrain": n(terrainTypes().length),
   };

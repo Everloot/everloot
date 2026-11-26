@@ -11,6 +11,7 @@ import { currencyEntries, mountEntries, petEntries } from "./collectibles";
 import { factionInFiles, loadCatalog, titleDisplayName } from "./completion-lists";
 import { instanceRows, levelLabel } from "./instances";
 import { itemSet } from "./item-sets";
+import { bossEntry } from "./bosses";
 import { zonePlaces } from "./places";
 import { holidayEntries, lastsLabel, petFamilyEntries, startLabel } from "./world-events";
 import { placedEntrances, zoneByMapId } from "./zones";
@@ -43,7 +44,7 @@ export type SiteCardType = TooltipType | "spell" | "vendor" | EntryCardType;
  * shows, and a few of its facts. Achievements, factions, titles and quest chains also read the completion rollup, as
  * their pages do, and dungeons and raids the cron's stored view; the rest are the committed game data alone.
  */
-export const ENTRY_CARD_TYPES = ["achievement", "faction", "title", "chain", "zone", "instance", "item-set", "mount", "pet", "currency", "holiday", "family"] as const;
+export const ENTRY_CARD_TYPES = ["achievement", "faction", "title", "chain", "zone", "instance", "item-set", "mount", "pet", "currency", "holiday", "family", "boss"] as const;
 export type EntryCardType = (typeof ENTRY_CARD_TYPES)[number];
 export const isEntryCardType = (v: unknown): v is EntryCardType => (ENTRY_CARD_TYPES as readonly unknown[]).includes(v);
 
@@ -260,6 +261,21 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
         row.encounters.length > 0 && `${plural(row.encounters.length, "boss", "bosses")} in the game files`,
         entrance && `Entrance in ${entrance}`,
       ]), null);
+    }
+    case "boss": {
+      // The cron's stored view, as the instance card reads it: a name 3 installs agree on beside the files'.
+      const set = await loadStoredAggregates({ strict: true });
+      if (!set) return UNAVAILABLE;
+      const asOf = set.dataAsOf && Number.isFinite(Date.parse(set.dataAsOf)) ? new Date(set.dataAsOf) : undefined;
+      const boss = bossEntry(id, instanceRows({ instances: set.instances, ...(asOf ? { asOf } : {}) }));
+      if (!boss) return NO_CARD;
+      const kind = boss.instance.raid === null ? "Boss" : boss.instance.raid ? "Raid boss" : "Dungeon boss";
+      const instance = boss.instance.name ?? `Instance ${boss.instance.instanceMapId}`;
+      return card(boss.name, kept([
+        kind,
+        boss.order === null ? instance : `${instance}, boss ${boss.order} of ${boss.total}`,
+        boss.row.boss && `${plural(boss.row.boss.kills, "kill")} reported`,
+      ]), boss.filesName ? CLIENT_LABEL : null);
     }
     case "item-set": {
       const set = itemSet(id);

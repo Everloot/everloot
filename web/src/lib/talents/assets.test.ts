@@ -122,6 +122,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/instances/page.tsx", "web/src/app/database/zones/page.tsx",
   // A dungeon or raid page's boss loot: the item names and icons of the drop rows, as the NPC page shows them.
   "web/src/app/database/instances/[instance]/page.tsx",
+  // A boss page: its creature's loot (item names and icons), as the instance page shows it, and its model picture.
+  "web/src/app/database/bosses/[boss]/page.tsx",
   // The terrain page: the item names and icons of the gear bound to each terrain type, as the zone pages show them.
   "web/src/app/database/terrain/page.tsx",
   // An item set page: its pieces' names and icons under the item name rule, and the set and bonus spell names and
