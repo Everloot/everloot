@@ -355,3 +355,17 @@ test("vendors sit with the NPCs and spells in a section of their own, each row s
   expect(notes[0]).toContain("Vendor 10");
   expect(notes[1]).toContain("Spell 116");
 });
+
+test("a box with a surface counts each search as that surface's event, never with the text", async () => {
+  const capture = vi.fn();
+  vi.stubGlobal("posthog", { capture });
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await act(async () => root.render(<SearchBar action="/search" label="Search Everloot" id="bar" surface="search-page" />));
+  await key("Thrall");
+  const form = container.querySelector("form")!;
+  form.addEventListener("submit", (e) => e.preventDefault());
+  await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+  expect(capture).toHaveBeenCalledWith("search", { surface: "search-page" });
+  expect(JSON.stringify(capture.mock.calls)).not.toContain("Thrall");
+});
