@@ -27,13 +27,19 @@ export function isPageFetch(headers: Headers): boolean {
 }
 
 /**
+ * A Server Action call. Next posts it to the address of the document that called it, so one posted to an ad-free page
+ * comes from that page's own document (the armory character sheet loads a tab this way) and its answer stays there.
+ */
+const isServerAction = (req: NextRequest) => req.method === "POST" && req.headers.has("next-action");
+
+/**
  * An ad-free page (data/ad-free-paths.json: Blizzard API data) must reach only a document of its own, one that never
  * loaded ads. A client-side move or prefetch fetches the page into the document that asked, which may have, so such
  * a request gets no page at all: a plain, uncached answer that is not an RSC payload, on which Next's router loads
  * the address as a new document. That page load gets the page.
  */
 export function adFreeDocumentOnly(req: NextRequest): NextResponse | null {
-  if (!isAdFreePath(req.nextUrl.pathname) || !isPageFetch(req.headers)) return null;
+  if (!isAdFreePath(req.nextUrl.pathname) || !isPageFetch(req.headers) || isServerAction(req)) return null;
   return new NextResponse("This page loads as a document of its own.", {
     status: 200,
     headers: {

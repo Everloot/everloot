@@ -52,6 +52,9 @@ const pages = {
   submit: async (search: Record<string, string> = {}) => (await import("./submit/page")).default({ searchParams: Promise.resolve(search) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
+/** A character-sheet tab as it loads when opened. */
+const openTab = async (region: string, slug: string, tab: string) =>
+  renderToStaticMarkup(<>{await (await import("./[region]/[slug]/tab-action")).characterTab(region, slug, tab)}</>);
 /** The roster section alone: the top five above it names members too. */
 const roster = (out: string) => out.slice(out.indexOf('aria-labelledby="armory-roster"'));
 
@@ -305,7 +308,68 @@ describe("the character page", () => {
     const numbers = out.slice(0, out.indexOf('role="tablist"'));
     expect(numbers).not.toContain("Fish caught");
     expect(out).toContain('data-tab-panel="history"');
-    expect(out).toContain('href="/armory/rankings/fish-caught?ruleset=2&amp;region=eu"');
+    const tab = await openTab("eu", "velkara-duskmantle", "history");
+    expect(tab).toContain("Fish caught");
+    expect(tab).toContain('href="/armory/rankings/fish-caught?ruleset=2&amp;region=eu"');
+  });
+
+  describe("tabs other than Talents load when opened", () => {
+    const at = "2026-11-09T10:00:00.000Z";
+    beforeEach(() => {
+      mem.putCharacter(armoryCharacter({ details: {
+        revision: 1,
+        talents: { asOf: at, trees: [{ name: "Marksmanship", points: 31, talents: [{ name: "Trueshot Aura", rank: 1 }] }] },
+        achievements: { asOf: at, rows: [{ id: 6, name: "Level 10", completedAt: "2026-10-01T12:00:00.000Z" }] },
+        reputations: { asOf: at, rows: [{ id: 530, name: "Darkspear Trolls", standing: "Exalted", tier: 7 }] },
+      } }));
+    });
+
+    test("the page draws the Talents panel and a loading line in every other, never their content", async () => {
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const panel = (id: string) => out.slice(out.indexOf(`data-tab-panel="${id}"`)).split('role="tabpanel"')[0];
+      expect(panel("talents")).toContain("Trueshot Aura");
+      expect(panel("talents")).not.toContain("data-tab-loading");
+      for (const id of ["stats", "pvp", "achievements", "professions", "reputations", "quests", "history", "progress"]) {
+        expect(panel(id)).toContain(`data-tab-loading="${id}"`);
+      }
+      expect(out).not.toContain("Darkspear Trolls");
+      expect(out).not.toContain('href="/database/achievements/6"');
+      expect(out).not.toContain("data-progression-instance");
+    });
+
+    test("an opened tab holds what the page used to draw in it", async () => {
+      expect(await openTab("eu", "velkara-duskmantle", "reputations")).toContain("Darkspear Trolls");
+      expect(await openTab("eu", "velkara-duskmantle", "achievements")).toContain('href="/database/achievements/6"');
+      expect(await openTab("eu", "velkara-duskmantle", "progress")).toContain("data-progression-instance");
+      const pvp = await openTab("eu", "velkara-duskmantle", "pvp");
+      expect(pvp).toContain("1,234");
+      expect(pvp).toContain('href="/armory/rankings/honorable-kills?ruleset=2&amp;region=eu"');
+      expect(await openTab("eu", "velkara-duskmantle", "quests")).toContain('data-empty-tab="quests"');
+    });
+
+    test("a tab reads the character again, so one hidden after the page loaded shows nothing of it", async () => {
+      await html(pages.character("eu", "velkara-duskmantle"));
+      await mem.hide("eu", "velkara-duskmantle");
+      const tab = await openTab("eu", "velkara-duskmantle", "reputations");
+      expect(tab).toContain("no longer on Everloot");
+      expect(tab).not.toContain("Darkspear Trolls");
+    });
+
+    test("an unknown tab, the switch off, or storage out of reach gives no content", async () => {
+      expect(await openTab("eu", "velkara-duskmantle", "gold")).toBe("");
+      holder.store = broken();
+      expect(await openTab("eu", "velkara-duskmantle", "reputations")).toContain("did not answer");
+      vi.stubEnv("EVERLOOT_ARMORY", "0");
+      expect(await openTab("eu", "velkara-duskmantle", "reputations")).toBe("");
+    });
+
+    test("the page asks the store for the character and its ranks once each", async () => {
+      const character = vi.spyOn(mem, "character");
+      const rank = vi.spyOn(mem, "rank");
+      await html(pages.character("eu", "velkara-duskmantle"));
+      expect(character).toHaveBeenCalledTimes(1);
+      expect(rank).toHaveBeenCalledTimes(1);
+    });
   });
 
   test("a refused Gear Score leaves it out", async () => {

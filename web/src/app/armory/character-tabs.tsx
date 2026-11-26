@@ -46,31 +46,46 @@ export interface SheetParts {
   progression?: ProgressionMatrixProps;
 }
 
-export function characterTabs(c: ArmoryCharacter, parts: SheetParts): TabItem[] {
+/** The tab that opens when the address names none: drawn with the page. */
+export const DEFAULT_TAB: CharacterTabId = CHARACTER_TABS[0][0];
+
+export const isCharacterTab = (id: string): id is CharacterTabId => CHARACTER_TABS.some(([t]) => t === id);
+
+/** One tab's content, or its one-sentence empty line. */
+export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: SheetParts): ReactNode {
   const d = c.details;
-  const pvp: Fact[] = [
-    ...(c.honorableKills !== null ? [{ label: "Honorable kills", value: metricValue("honorable-kills", c.honorableKills), numeric: true }] : []),
-    ...(c.pvpRank !== null ? [{ label: "PvP rank", value: c.pvpRank, numeric: true }] : []),
-  ];
-  const panels: Record<CharacterTabId, ReactNode> = {
-    talents: d?.talents?.trees.length ? <TalentTrees character={c} trees={d.talents.trees} open /> : null,
-    stats: d?.statistics?.rows.length ? <StatList rows={d.statistics.rows} /> : null,
-    pvp: pvp.length ? <Facts label="PvP" items={[...pvp, ...(parts.pvpFacts ?? [])]} /> : null,
-    achievements: !d?.achievements ? null : d.achievements.rows.length
+  switch (id) {
+    case "talents": return d?.talents?.trees.length ? <TalentTrees character={c} trees={d.talents.trees} open /> : <Empty id={id} />;
+    case "stats": return d?.statistics?.rows.length ? <StatList rows={d.statistics.rows} /> : <Empty id={id} />;
+    case "pvp": {
+      const pvp: Fact[] = [
+        ...(c.honorableKills !== null ? [{ label: "Honorable kills", value: metricValue("honorable-kills", c.honorableKills), numeric: true }] : []),
+        ...(c.pvpRank !== null ? [{ label: "PvP rank", value: c.pvpRank, numeric: true }] : []),
+      ];
+      return pvp.length ? <Facts label="PvP" items={[...pvp, ...(parts.pvpFacts ?? [])]} /> : <Empty id={id} />;
+    }
+    case "achievements": return !d?.achievements ? <Empty id={id} /> : d.achievements.rows.length
       ? <Achievements rows={d.achievements.rows} categories={parts.categories ?? new Map()} />
-      : <p className="py-3 text-sm text-fg-2">{NO_ACHIEVEMENTS}</p>,
-    professions: d?.professions?.rows.length ? <ProfessionList rows={d.professions.rows} /> : null,
-    reputations: d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : null,
-    quests: d?.quests ? <QuestCount completed={d.quests.completed} /> : null,
-    history: d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : null,
-    progress: <>
+      : <p className="py-3 text-sm text-fg-2">{NO_ACHIEVEMENTS}</p>;
+    case "professions": return d?.professions?.rows.length ? <ProfessionList rows={d.professions.rows} /> : <Empty id={id} />;
+    case "reputations": return d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : <Empty id={id} />;
+    case "quests": return d?.quests ? <QuestCount completed={d.quests.completed} /> : <Empty id={id} />;
+    case "history": return d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : <Empty id={id} />;
+    case "progress": return <>
       {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">{EMPTY_TAB.progress}</p>}
       <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} />
-    </>,
-  };
+    </>;
+  }
+}
+
+/**
+ * The tab strip. `later` stands in for a tab's content that is not drawn with the page (it loads when the tab opens);
+ * without it every tab is drawn.
+ */
+export function characterTabs(c: ArmoryCharacter, parts: SheetParts, later?: (id: CharacterTabId) => ReactNode): TabItem[] {
   // No count on any tab: a "(0)" tab would leave the strip, and every tab stays so an empty one can say why.
   return CHARACTER_TABS.map(([id, label]) => ({
     id, label,
-    panel: <div className="space-y-3">{panels[id] ?? <Empty id={id} />}</div>,
+    panel: <div className="space-y-3">{later ? later(id) : characterPanel(c, id, parts)}</div>,
   }));
 }

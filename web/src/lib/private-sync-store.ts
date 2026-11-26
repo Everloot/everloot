@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { hashKey, KEY_PATTERN, presentedKey } from "./api-keys";
 import { fail } from "./character-links-store";
 import { isSyncCategory, privateSyncOn, SHOW_SWITCH, sourceRef, SYNC_CATEGORIES, type Fact, type SyncCategory } from "./private-sync";
@@ -105,14 +106,17 @@ export async function ownCharacterFacts(userId: string, linkId: string): Promise
   return rows.flatMap((r) => (isSyncCategory(r.category) ? [{ category: r.category, consented: r.consented === true, fact: storedFact(r) }] : []));
 }
 
-/** The switched-on, consented facts of a public character page; none when the page is a 404. */
-export async function publicCharacterFacts(ruleset: string, realmSlug: string, name: string): Promise<StoredFact[]> {
+/**
+ * The switched-on, consented facts of a public character page; none when the page is a 404. Read once per request
+ * (React cache): the armory page asks for them to see whether the link shares data, then again for the showcase.
+ */
+export const publicCharacterFacts = cache(async (ruleset: string, realmSlug: string, name: string): Promise<StoredFact[]> => {
   const rows = await authQuery<Array<{ category?: unknown; captured_at?: unknown; data?: unknown }>>("rpc/public_character_facts", {
     method: "POST", body: JSON.stringify({ p_ruleset: ruleset, p_realm_slug: realmSlug, p_name: name }),
   });
   if (!Array.isArray(rows)) throw new Error("Invalid facts response");
   return rows.flatMap((r) => { const f = storedFact(r); return f ? [f] : []; });
-}
+});
 
 /**
  * One of the account's links as its owner's sync settings and preview read it: the identity, its status, the page
