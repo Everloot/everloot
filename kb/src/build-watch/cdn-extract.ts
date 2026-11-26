@@ -25,6 +25,7 @@ import { disenchantLua } from "../disenchant-lua.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
+import { writeClientQuestStarts } from "../client-quest-starts.js";
 import { writeClientItemSets } from "../client-item-sets.js";
 import { writeClientSpells } from "../client-spells.js";
 import { writeClientCollections } from "../client-collections.js";
@@ -104,6 +105,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));
+        writeClientQuestStarts(snapshot, join(root, GAME_DATA_DIR, "client-quest-starts.json"));
         writeClientItemSets(snapshot, join(root, GAME_DATA_DIR, "client-item-sets.json"));
         writeClientSpells(snapshot, join(root, GAME_DATA_DIR, "client-spells.json"));
         writeClientCollections(snapshot, join(root, GAME_DATA_DIR, "client-collections.json"));

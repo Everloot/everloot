@@ -28,6 +28,9 @@ import { questIndexable } from "@/lib/indexable";
 import { entityTitle, questDescription } from "@/lib/entity-meta";
 import { chainHref, loadCatalog } from "@/lib/completion-lists";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
+import { CLIENT_QUEST_STARTS, itemsStartingQuest } from "@/data/game-data/client-quest-starts";
+import { loadShownNames } from "@/lib/shown-item-names";
+import { shownItemName } from "@/lib/items";
 import { publicZones, zoneByMapId, zoneHref } from "@/lib/zones";
 import { questTypeLabel, SIDE_LABEL, SIDE_TONE } from "@/lib/world-lists";
 import GameIcon from "@/components/game/GameIcon";
@@ -89,9 +92,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   // Every position 3 installs agree on for the giver and the turn-in NPC, for the map slot; the Givers table is its text.
   const marks: MapMark[] = facts.unreachable ? [] : ([["giver", page.giverNpcId], ["turnin", page.turnInNpcId]] as const).flatMap(([kind, npcId]) =>
     npcId === null ? [] : npcPage(npcId, facts).pins.map((p) => ({ kind, mapId: p.mapId, x: p.x, y: p.y, label: npcs.get(npcId) ?? `NPC ${npcId}`, agreed: true })));
-  const assets = page.rewards.length > 0 || marks.length > 0 ? await loadSiteAssets() : null;
+  // Items the game files say begin the quest, only those the item name rule lets a page show (others may be unreleased).
+  const fileStarters = itemsStartingQuest(page.questId);
+  const shownNames = fileStarters.length ? await loadShownNames() : null;
+  const starters = shownNames ? fileStarters.filter((id) => shownNames.showsTip(id)) : [];
+  const assets = page.rewards.length > 0 || marks.length > 0 || starters.length > 0 ? await loadSiteAssets() : null;
   const mapZones = entityMapZones(marks, assets?.maps);
-  const tips = await loadItemTips(assets, facts.unreachable ? [] : page.rewards);
+  const tips = await loadItemTips(assets, [...(facts.unreachable ? [] : page.rewards), ...starters]);
   const lore = !facts.unreachable && page.title ? await loreFor("quest", page.questId, page.title) : null;
   const trail = [...trailFor("/database/quests")!, { name: title, path: `/database/quests/${page.questId}` }];
   const people: Person[] = facts.unreachable ? [] : [
@@ -167,6 +174,12 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
         </> : known(null) },
         { label: "Start", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
+        ...(starters.length ? [{ label: "Started by", value: <>
+          <span className="inline-flex flex-col gap-1">{starters.map((id) => (
+            <RewardLink key={id} itemId={id} name={shownItemName(id, shownNames!.agreed, shownNames!.matched?.names, tips.get(id))?.name} tip={tips.get(id)} />
+          ))}</span>
+          <span className="block text-muted">{CLIENT_QUEST_STARTS.label} · build {CLIENT_QUEST_STARTS.build.version}</span>
+        </> }] : []),
         { label: "End", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
         { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
       ]}
@@ -232,7 +245,7 @@ const qualityOf = (name: string | undefined): Quality | undefined => {
   return (QUALITIES as readonly string[]).includes(key) ? (key as Quality) : undefined;
 };
 
-/** A reward as the game lists it: the icon in a quality-coloured border and the name in the quality's colour. */
+/** A reward (or an item that begins the quest) as the game lists it: the icon in a quality-coloured border and the name in the quality's colour. */
 function RewardLink({ itemId, name, tip }: { itemId: number; name: string | undefined; tip: { icon: string | null; quality: string } | undefined }) {
   const quality = qualityOf(tip?.quality);
   return (

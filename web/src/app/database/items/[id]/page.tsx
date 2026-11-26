@@ -22,7 +22,8 @@ import { categoryOf } from "@kb/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
-import { FACT_WORD, withReported } from "@/lib/item-names";
+import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
+import { CLIENT_QUEST_STARTS, questStartedBy } from "@/data/game-data/client-quest-starts";
 import { itemTooltip } from "@/lib/item-tooltip";
 import { recipeBySpell } from "@/lib/professions";
 import { itemSetOf } from "@/lib/item-sets";
@@ -136,10 +137,15 @@ export default async function ItemPage(props: Props) {
   // Names for the quests, sets and spells this item relates to, read only for the kinds it has (players' names come first).
   const kinds = new Set(all.map((e) => e.toKind));
   const version = CLIENT_LAYER.build.version;
+  // The quest the game files say the item begins, under the same rule as its tooltip.
+  const fileQuest = tipped ? questStartedBy(itemId) : undefined;
   const [questNames, setNames, spellNames] = await Promise.all([
-    kinds.has("quest") ? loadQuestNames(version) : null, kinds.has("item_set") ? loadItemSetNames(version) : null, kinds.has("spell") ? loadSpellNames(version) : null,
+    kinds.has("quest") || fileQuest !== undefined ? loadQuestNames(version) : null, kinds.has("item_set") ? loadItemSetNames(version) : null, kinds.has("spell") ? loadSpellNames(version) : null,
   ]);
   const gameName = gameNameFor({ quests: questNames, sets: setNames, spells: spellNames });
+  // Shown only with a title the quest title rule allows: a quest without one may be unreleased, and its page a 404.
+  const questTitle = fileQuest !== undefined ? questNames?.names.get(fileQuest)?.name : undefined;
+  const startsQuest = fileQuest !== undefined && questTitle ? { id: fileQuest, name: questTitle } : undefined;
 
   const trail: Crumb[] = [
     ...trailFor("/database/items")!,
@@ -336,6 +342,10 @@ export default async function ItemPage(props: Props) {
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
     ...(sellPrice ? [{ label: "Sell price", value: sellPrice, numeric: true }] : []),
+    ...(startsQuest ? [{ label: "Starts a quest", value: <>
+      <EntityLink kind="quest" id={startsQuest.id} name={startsQuest.name} />
+      <span className="block text-muted">{CLIENT_QUEST_STARTS.label}</span>
+    </> }] : []),
     ...(getFrom.length ? [{ label: "Get it from", value: <span className="inline-flex flex-col gap-1">{getFrom}</span> }] : []),
     ...(facts.unreachable ? [] : [
       { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
@@ -357,7 +367,7 @@ export default async function ItemPage(props: Props) {
       }}
       box={
         // The page draws the icon in its header and says where the name came from in its facts.
-        <GameCard card={{ ...box.card, icon: null, foot: null }} links={box.links} label={`${box.card.title}, from the game files`} />
+        <GameCard card={{ ...box.card, icon: null, foot: null }} links={startsQuest ? { ...box.links, [BEGINS_QUEST]: `/database/quests/${startsQuest.id}` } : box.links} label={`${box.card.title}, from the game files`} />
       }
       facts={quickFacts}
       notices={(isDevelopmentItemName(name?.name) || (!reported.unreachable && Boolean(reported.progress?.length))) && <>

@@ -7,6 +7,15 @@ const data = vi.hoisted(() => ({
   confirmations: true,
   chains: [] as { questLineId: number; name: string; questIds: number[]; confirmed: boolean; reporters: number }[],
   tips: new Map<number, { name: string; icon: string | null; quality: string; color: string }>(),
+  starters: [] as number[],
+  shown: new Set<number>(),
+}));
+vi.mock("@/data/game-data/client-quest-starts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/data/game-data/client-quest-starts")>()),
+  itemsStartingQuest: (questId: number) => (questId === 8 ? data.starters : []),
+}));
+vi.mock("@/lib/shown-item-names", () => ({
+  loadShownNames: async () => ({ agreed: new Map([[500, "Sealed Orders"]]), matched: null, showsTip: (id: number) => data.shown.has(id) }),
 }));
 vi.mock("@/lib/completion-lists", () => ({
   loadCatalog: async () => ({ chains: data.chains, dataAsOf: "2026-11-10T00:00:00Z", confirmations: data.confirmations }),
@@ -33,6 +42,8 @@ beforeEach(() => {
   data.chains = [];
   data.confirmations = true;
   data.tips = new Map();
+  data.starters = [];
+  data.shown = new Set();
   data.facts ={ npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" };
 });
 
@@ -190,4 +201,27 @@ test("a long chain shows its ends and this quest's neighbours, and counts the st
   for (const id of [2, 5, 11, 19]) expect(flow).not.toContain(`href="/database/quests/${id}"`);
   expect(flow).toContain("4 more");
   expect(flow).toContain("9 more");
+});
+
+test("an item the game files say begins the quest is listed as Started by, marked as from the game files", async () => {
+  expect(await html()).not.toContain(">Started by</dt>");
+  data.starters = [500];
+  data.shown = new Set([500]);
+  data.tips = new Map([[500, { name: "Sealed Orders", icon: "/icons/orders.webp", quality: "Common", color: "#fff" }]]);
+  const started = fact(await html(), "Started by");
+  expect(started).toMatch(/<a[^>]*href="\/database\/items\/500"[^>]*>Sealed Orders<\/a>/);
+  expect(started).toContain("/icons/orders.webp");
+  expect(started).toContain("Found in game files, unconfirmed");
+});
+
+test("Started by sits beside an agreed giver, and an item held back by the item name rule stays hidden", async () => {
+  data.facts.quests = ["a", "b", "c"].map((id) => sighting(id, { giverNpcId: 10 }));
+  data.starters = [500, 501];
+  data.shown = new Set([500]);
+  const out = await html();
+  expect(fact(out, "Start")).toContain('href="/database/npcs/10"');
+  expect(fact(out, "Started by")).toContain('href="/database/items/500"');
+  expect(out).not.toContain("/database/items/501");
+  data.shown = new Set();
+  expect(await html()).not.toContain(">Started by</dt>");
 });
