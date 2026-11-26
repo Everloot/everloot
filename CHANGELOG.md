@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).
 - Site: item and NPC pages show the model picture from the game files beside the quick facts, where the page already names the item or NPC.
 - Site: zone pages gain a Places tab with the subzones and the points of interest the game files name, each point linked to its spot on the map, and the achievement list groups by the categories the game files name; labelled found in game files, unconfirmed.
 - Site: the database lists holidays and world events (when each starts and how long it lasts) and hunter pet families (icon and the spells on each family's skill line) from the game files, each with its own page, in search and the sitemap; labelled found in game files, unconfirmed.

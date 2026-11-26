@@ -191,6 +191,8 @@ async function art(from: (assets: Assets) => string | undefined): Promise<string
   return from(assets) ?? null;
 }
 
+const failed = (icon: string | null | typeof UNAVAILABLE): icon is typeof UNAVAILABLE => typeof icon === "object" && icon !== null;
+
 /** A card of one of the game-file entry pages, under that page's rules: a 404 where the page is a 404. */
 async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResult> {
   const card = (title: string, lines: string[], foot: string | null, icon: string | null = null): SiteCardResult =>
@@ -275,7 +277,7 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
       const mount = mountEntries()?.find((m) => m.id === id);
       if (!mount) return NO_CARD;
       const icon = await art((a) => a.spellIcons.get(mount.spellId));
-      if (icon === UNAVAILABLE) return icon;
+      if (failed(icon)) return icon;
       // Whether 3 installs confirm a mount is read from the whole corpus, which a card never reads: the card says neither.
       return card(mount.name, kept(["Mount", mount.ridingSkill && `Requires Riding (${mount.ridingSkill})`]), null, icon);
     }
@@ -283,13 +285,13 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
       const pet = petEntries()?.find((p) => p.id === id);
       if (!pet) return NO_CARD;
       const icon = await art((a) => a.petIcons.get(id));
-      return icon === UNAVAILABLE ? icon : card(pet.name, ["Companion pet"], CLIENT_LABEL, icon);
+      return failed(icon) ? icon : card(pet.name, ["Companion pet"], CLIENT_LABEL, icon);
     }
     case "currency": {
       const currency = currencyEntries()?.find((c) => c.id === id);
       if (!currency) return NO_CARD;
       const icon = await art((a) => a.currencyIcons.get(id));
-      if (icon === UNAVAILABLE) return icon;
+      if (failed(icon)) return icon;
       return card(currency.name, kept([currency.description, currency.max && `Maximum: ${currency.max.toLocaleString("en-US")}`, currency.category]), CLIENT_LABEL, icon);
     }
     case "holiday": {
@@ -302,7 +304,7 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
       const family = petFamilyEntries()?.find((f) => f.id === id);
       if (!family) return NO_CARD;
       const icon = await art((a) => a.familyIcons.get(id));
-      return icon === UNAVAILABLE ? icon : card(family.name, ["Hunter pet family", `${plural(family.spellIds.length, "spell")} on its skill line`], CLIENT_LABEL, icon);
+      return failed(icon) ? icon : card(family.name, ["Hunter pet family", `${plural(family.spellIds.length, "spell")} on its skill line`], CLIENT_LABEL, icon);
     }
   }
 }

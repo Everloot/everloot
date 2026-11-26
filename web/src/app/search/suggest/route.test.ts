@@ -19,6 +19,8 @@ vi.mock("@/lib/shown-item-names", async (importOriginal) => ({
 vi.mock("@/lib/game-assets", () => ({
   loadQuestNames: async () => ({ names: mocks.quests }),
   loadItemNames: async () => ({ names: mocks.matched }),
+  // No spell or item set names file here: the type-ahead has no spell rows.
+  loadSpellNames: async () => null, loadItemSetNames: async () => null,
   PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
   unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,

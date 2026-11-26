@@ -12,7 +12,7 @@ import { QUALITY_TEXT, qualityOf } from "./quality";
  * GET /search/people. Characters and guilds have no id; their `note` says who and where.
  */
 export interface Suggestion {
-  type: "item" | "npc" | "quest" | "object" | "zone" | "instance" | "character" | "guild" | "all"; id?: number; label: string; href: string;
+  type: "item" | "npc" | "vendor" | "quest" | "object" | "spell" | "zone" | "instance" | "character" | "guild" | "all"; id?: number; label: string; href: string;
   quality?: number | null; icon?: string; note?: string;
   /** A character or guild whose name is the text (from /search/people); a database row is exact when its label is the text. */
   exact?: boolean;
@@ -20,7 +20,7 @@ export interface Suggestion {
   class?: string; faction?: string;
 }
 
-const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", zone: "Zone", instance: "Instance", character: "Character", guild: "Guild", all: "Search" };
+const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", vendor: "Vendor", quest: "Quest", object: "Object", spell: "Spell", zone: "Zone", instance: "Instance", character: "Character", guild: "Guild", all: "Search" };
 /** The row's right-hand note: a dungeon or raid says which and its level, a character or guild who and where; the rest their type and id. */
 const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.id === undefined || row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
 /** An item's quality colour, a character's class colour; plain text for the rest. */
@@ -50,8 +50,9 @@ export const SECTIONS = [
   { key: "characters", label: "Characters", types: ["character"] },
   { key: "guilds", label: "Guilds", types: ["guild"] },
   { key: "items", label: "Items", types: ["item"] },
-  { key: "places", label: "Zones & NPCs", types: ["zone", "instance", "npc"] },
+  { key: "places", label: "Zones & NPCs", types: ["zone", "instance", "npc", "vendor"] },
   { key: "other", label: "Quests & objects", types: ["quest", "object"] },
+  { key: "spells", label: "Spells", types: ["spell"] },
 ] as const satisfies readonly { key: string; label: string; types: readonly Suggestion["type"][] }[];
 
 /** The rows grouped into their sections, empty ones left out, each keeping the order it arrived in. */

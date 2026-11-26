@@ -412,3 +412,58 @@ test.each(["zone", "instance"] as const)("all %s matches remain reachable with t
   const bounded = (await siteSearch("a", { only, limit: 1e9 }))[0];
   expect(bounded.results.length).toBeLessThanOrEqual(50);
 });
+
+test("spells are found by the names the spell list shows, passed in by the page, exact id first", async () => {
+  const { siteSearch } = await import("./site-search");
+  const spells = new Map([[133, "Fireball"], [143, "Fireball"], [2136, "Fire Blast"], [10, "Blizzard"]]);
+  const group = (await siteSearch("fireball", { spells })).find((g) => g.type === "spell")!;
+  expect(group.heading).toBe("Spells");
+  expect(group.results.map((r) => [r.label, r.href, r.exact])).toEqual([["Fireball", "/database/spells/133", true], ["Fireball", "/database/spells/143", true]]);
+  expect((await siteSearch("2136", { spells })).find((g) => g.type === "spell")!.results[0]).toMatchObject({ label: "Fire Blast", href: "/database/spells/2136", exact: true });
+  // No names passed (the API's callers): no spell group.
+  expect((await siteSearch("fireball")).find((g) => g.type === "spell")).toBeUndefined();
+});
+
+test("vendors are found by the NPC names the vendor list shows, among the vendors it lists only", async () => {
+  mocks.names.npcs = new Map([[10, "Gina MacGregor"], [11, "Gina's Brother"], [12, "Gina Lang"]]);
+  const { siteSearch } = await import("./site-search");
+  const vendors = new Set([10, 12, 99]);
+  const group = (await siteSearch("gina", { vendors })).find((g) => g.type === "vendor")!;
+  expect(group.heading).toBe("Vendors");
+  expect(group.results.map((r) => [r.label, r.href])).toEqual([["Gina Lang", "/database/vendors/12"], ["Gina MacGregor", "/database/vendors/10"]]);
+  // An unnamed vendor is found by its id, under the vendor list's label.
+  expect((await siteSearch("99", { vendors })).find((g) => g.type === "vendor")!.results[0]).toMatchObject({ label: "Vendor NPC 99", href: "/database/vendors/99", exact: true });
+  // A promise that settles to no ids (the stored names file without the list) gives no group.
+  expect((await siteSearch("gina", { vendors: Promise.resolve(undefined) })).find((g) => g.type === "vendor")).toBeUndefined();
+});
+
+test("item sets are found by the set names the set pages show, and any set the game files list by its id", async () => {
+  const { siteSearch } = await import("./site-search");
+  const itemSets = new Map([[1, "Ironfeather Armor"], [41, "Dal'Rend's Arms"]]);
+  const group = (await siteSearch("ironfeather", { itemSets })).find((g) => g.type === "item-set")!;
+  expect(group.heading).toBe("Item sets");
+  expect(group.results).toEqual([{ label: "Ironfeather Armor", href: "/database/item-sets/1", note: "id 1", exact: false, id: 1 }]);
+  expect((await siteSearch("1", { itemSets: new Map() })).find((g) => g.type === "item-set")!.results[0]).toMatchObject({ label: "Item set 1", href: "/database/item-sets/1", exact: true });
+});
+
+test.each(["spell", "vendor", "item-set"] as const)("a search scoped to %s pages through its matches", async (only) => {
+  mocks.names.npcs = new Map(Array.from({ length: 9 }, (_, i) => [i + 1, `Trial ${i}`]));
+  const names = new Map(Array.from({ length: 9 }, (_, i) => [i + 1, `Trial ${i}`]));
+  const { siteSearch, isResultScope } = await import("./site-search");
+  expect(isResultScope(only)).toBe(true);
+  const opts = { spells: names, itemSets: names, vendors: new Set(names.keys()) };
+  const first = await siteSearch("trial", { ...opts, only, page: 1, limit: 8 });
+  const next = await siteSearch("trial", { ...opts, only, page: 2, limit: 8 });
+  expect(first.map((g) => g.type)).toEqual([only]);
+  expect(first[0].total).toBe(9);
+  expect(next[0].results.map((r) => r.label)).toEqual(["Trial 8"]);
+});
+
+test("the unscoped type-ahead suggests spells and vendors from the names passed in; a scoped box does not", async () => {
+  mocks.names.npcs = new Map([[10, "Frostmane Vendor"]]);
+  const { suggest } = await import("./site-search");
+  const rows = await suggest("frost", undefined, mocks.names, { tolerant: true, spells: new Map([[116, "Frostbolt"]]), vendors: new Set([10]) });
+  expect(rows).toContainEqual({ type: "spell", id: 116, label: "Frostbolt", href: "/database/spells/116" });
+  expect(rows).toContainEqual({ type: "vendor", id: 10, label: "Frostmane Vendor", href: "/database/vendors/10" });
+  expect((await suggest("frost", "npc", mocks.names, { tolerant: true, spells: new Map([[116, "Frostbolt"]]), vendors: new Set([10]) })).map((r) => r.type)).toEqual(["npc"]);
+});
