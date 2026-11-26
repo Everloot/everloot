@@ -154,6 +154,13 @@ body:has([data-chat-page]) > footer {
 body:has([data-chat-page]) [data-report-pill] {
   display: none;
 }
+/* From md the bug pill floats bottom-left; the page end keeps its height free so the footer's last row never sits under it. */
+@media (min-width: 48rem) {
+  body:has([data-report-pill]) > footer {
+    padding-bottom: 4.5rem;
+  }
+}
+
 
 html,
 body {

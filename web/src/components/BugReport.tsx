@@ -55,14 +55,15 @@ export default function BugReport() {
         aria-haspopup="dialog"
         title="Report a bug"
         data-report-pill
-        className="fixed bottom-[var(--report-bottom)] left-4 z-40 hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas md:inline-flex"
+        className="group fixed bottom-[var(--report-bottom)] left-4 z-40 hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel text-sm text-accent transition-colors hover:border-accent hover:bg-canvas hover:px-3 focus-visible:px-3 md:inline-flex"
         style={{ "--report-bottom": clearance } as React.CSSProperties}
         onClick={show}
       >
         <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="m9 3 1 2m5-2-1 2M8 9a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0V9Zm0 3h8m-4 0v7M4 7l4 3m12-3-4 3M3 13h5m8 0h5M4 19l4-3m12 3-4-3" />
         </svg>
-        <span>Report a bug</span>
+        {/* A 44 px icon at rest, so it sits in the page gutter instead of over headings and rows; the words show on hover or keyboard focus. */}
+        <span className="sr-only group-hover:not-sr-only group-focus-visible:not-sr-only">Report a bug</span>
       </button>
       <dialog
         ref={dialog}
