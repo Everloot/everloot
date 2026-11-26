@@ -340,18 +340,18 @@ test("a zone page shows the terrain types the game files give it and the gear wh
   expect(section).toContain('href="/database/zones/1429-elwynn-forest"');
 });
 
-test("a zone page shows its map art as the header icon and its map first in the side column; with no art, no icon and the outline", async () => {
+test("a zone page shows its map art as the header icon and its map in the map slot; with no art, no icon and the outline in the side column", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
   const rect = { left: 0, top: 0, right: 1, bottom: 1 };
   art.assets = { maps: [{ uiMapId: 1436, kind: "zone", name: "Westfall", continentId: 0, heldBack: false, url: "https://a.test/maps/1436.webp", smallUrl: "https://a.test/maps/1436-small.webp", rect }] };
   const page = await html(ZonePage(props("1436-westfall")));
   const header = page.split("data-entity-header")[1]?.split("</header>")[0] ?? "";
   expect(header).toContain('src="https://a.test/maps/1436-small.webp"');
-  // The map with its pins is the zone's box, first in the side column (the top band's place on a phone).
-  const box = page.split('class="entity-box')[1] ?? "";
-  expect(box.indexOf("data-zone-preview")).toBeGreaterThan(-1);
-  expect(box).toContain('href="https://a.test/maps/1436.webp"');
-  expect(page.match(/data-zone-preview/g)).toHaveLength(1);
+  // With art, the map with its pins is the map slot, and the side column has no second copy of it.
+  const map = page.split('data-slot="map"')[1] ?? "";
+  expect(map).toContain('src="https://a.test/maps/1436.webp"');
+  expect(map).toContain("left:40%;top:50%");
+  expect(page).not.toContain("data-zone-preview");
   art.assets = null;
   const plain = await html(ZonePage(props("1436-westfall")));
   expect(plain.split("data-entity-header")[1]?.split("</header>")[0]).not.toContain("data-game-icon");
