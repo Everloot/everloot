@@ -7,7 +7,7 @@ import { FAMILIES } from "@/data/families";
 import { ARMORY_REGIONS, ARMORY_RULESETS, armoryGuildPath, armoryOn, metricValue, regionLabel } from "@/lib/armory";
 import type { ArmoryGuildRow } from "@/lib/armory-store";
 import {
-  GUILD_DIRECTORY_PAGE, GUILD_SORTS, guildDirectoryHref, guildDirectoryQuery, loadGuildDirectory, rulesetSlug, type GuildDirectoryQuery,
+  GUILD_DIRECTORY_PAGE, GUILD_SORTS, guildDirectoryHref, guildDirectoryQuery, loadGuildDirectory, rulesetSlug, type GuildDirectoryQuery, type GuildSortSlug,
 } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
@@ -19,7 +19,7 @@ import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { GuildSummary } from "@kb/guilds";
 import { LADDER_PAGE } from "@kb/guilds";
-import { ArmoryCredit, newest, NOINDEX, RegionRuleset, Unreachable } from "../armory/parts";
+import { ArmoryCredit, newest, NOINDEX, RegionChip, Unreachable } from "../armory/parts";
 import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rulesetLabel } from "./parts";
 
 export const dynamic = "force-dynamic";
@@ -90,19 +90,33 @@ const searchColumns: Column<GuildSummary>[] = [
 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
 
+/** The directory's count columns, each the header link for its own order (highest first). */
+const SORT_OF_COLUMN: Record<string, GuildSortSlug> = { read: "members", il: "item-level", l60: "level-60" };
+
 function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
   const all: Column<ArmoryGuildRow>[] = [
-    { key: "name", header: "Guild", cell: (g) => <span className="inline-flex flex-wrap items-center gap-2"><Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link>{g.recruiting && <span className="rounded-control border border-edge px-2 py-1 text-meta text-fg-2">Recruiting</span>}</span> },
-    { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
+    // Short shared classes (globals.css): this cell repeats on every row.
+    { key: "name", header: "Guild", cell: (g) => <><Link href={armoryGuildPath(g.region, g.slug)} className="dir-name">{g.name}</Link>{g.recruiting && <> <span className="rounded-control border border-edge px-2 py-1 text-meta text-fg-2">Recruiting</span></>}</> },
+    { key: "where", header: "Region", nowrap: true, cell: (g) => <><RegionChip region={g.region} /> {g.ruleset}</> },
     { key: "faction", header: "Faction", nowrap: true, cell: (g) => g.faction },
     { key: "roster", header: "Roster", numeric: true, cell: (g) => number(g.memberCount) },
-    { key: "read", header: "Members read", numeric: true, cell: (g) => number(g.membersRead) },
-    { key: "il", header: "Avg item level", numeric: true, cell: (g) => (g.averageItemLevel === null ? muted("Not read") : metricValue("item-level", g.averageItemLevel)) },
-    { key: "l60", header: "Level 60", numeric: true, cell: (g) => number(g.level60) },
-    { key: "at", header: "Last read", numeric: true, cell: (g) => <span className="font-mono tabular-nums">{day(g.fetchedAt)}</span> },
+    { key: "read", header: "Members read", numeric: true, sortable: true, cell: (g) => number(g.membersRead) },
+    { key: "il", header: "Avg item level", numeric: true, sortable: true, cell: (g) => (g.averageItemLevel === null ? muted("Not read") : metricValue("item-level", g.averageItemLevel)) },
+    { key: "l60", header: "Level 60", numeric: true, sortable: true, cell: (g) => number(g.level60) },
+    // Numeric cells already set figures in mono (dt-num).
+    { key: "at", header: "Last read", numeric: true, cell: (g) => day(g.fetchedAt) },
   ];
   // Before the directory's migration only the name, region, faction and roster size are known.
   return counted ? all : all.filter((c) => ["name", "where", "faction", "roster"].includes(c.key));
+}
+
+/** The phone line: what the folded columns hold. */
+function directoryMeta(g: ArmoryGuildRow, counted: boolean): string {
+  return [
+    `${regionLabel(g.region)} ${g.ruleset}`, g.faction,
+    counted ? `${number(g.membersRead)} of ${number(g.memberCount)} read` : `${number(g.memberCount)} on the roster`,
+    counted && g.averageItemLevel !== null ? `ilvl ${metricValue("item-level", g.averageItemLevel)}` : "",
+  ].filter(Boolean).join(" · ");
 }
 
 function directoryControls(d: GuildDirectoryQuery): FilterControl[] {
@@ -243,7 +257,9 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     columns={directoryColumns(dir.state === "ready")}
                     rows={dir.rows}
                     rowKey={(g) => `${g.region}/${g.slug}`}
-                    meta={(g) => `${regionLabel(g.region)} ${g.ruleset} · ${number(g.memberCount)} on the roster`}
+                    meta={(g) => directoryMeta(g, dir.state === "ready")}
+                    sort={dir.state === "ready" ? { key: Object.keys(SORT_OF_COLUMN).find((k) => SORT_OF_COLUMN[k] === d.sort)!, direction: "desc" } : undefined}
+                    sortHref={dir.state === "ready" ? (key) => guildDirectoryHref({ ...d, page: 1, sort: SORT_OF_COLUMN[key]! }) : undefined}
                   />}
               <p className="text-meta text-muted" data-disbanded-note>Disbanded guilds are left out of this list and its counts.</p>
             </section>

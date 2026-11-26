@@ -371,7 +371,7 @@ test("the spell list has a class filter in the URL, each class in its colour, an
 test("the instance list folds on a phone: the other columns as one line under the name", async () => {
   const all = await html(InstanceList(search()));
   const rfc = all.split("<tr").find((r) => r.includes('href="/database/instances/389')) ?? "";
-  expect(rfc).toMatch(/class="text-cell-2 text-muted sm:hidden">Dungeon · Level 13/);
+  expect(rfc).toMatch(/class="dt-meta">Dungeon · Level 13/);
 });
 
 beforeEach(() => { links.length = 0; });

@@ -20,8 +20,10 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import {
   Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl,
 } from "@/components/ui";
+import { loadSiteAssets } from "@/lib/game-assets";
 import { className, classText, playerRobots, raceName } from "./player-view";
-import { ArmoryCredit, newest } from "../armory/parts";
+import { ClassIconStyle, ClassMark, classIcons, type ClassIcons } from "./class-icons";
+import { ArmoryCredit, newest, RegionChip } from "../armory/parts";
 
 export const dynamic = "force-dynamic";
 
@@ -33,26 +35,31 @@ export async function generateMetadata(props: { searchParams: Promise<PlayerSear
   };
 }
 
-const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+const link = "lnk";
 /** The most rows the name lookup returns when the directory is not there: the players store's own cap, and the armory search's. */
 const LIMIT = 25;
 /** How many of the latest reads the page offers before a search. */
 const RECENT = 10;
 
-type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number | null; fetchedAt?: string };
+type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number | null; fetchedAt?: string; region?: string; ruleset?: string };
 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
-const day = (iso: string | undefined | null) => <span className="font-mono tabular-nums">{iso?.slice(0, 10) ?? ""}</span>;
+// Numeric cells already set figures in mono (dt-num), so a day there is plain text.
+const day = (iso: string | undefined | null) => iso?.slice(0, 10) ?? "";
 
-/** The name in its class colour, linking the character's one page (the armory's when it has one), and its hide link. */
-function NameCell({ row }: { row: DirectoryRow }) {
+/**
+ * The class icon and the name in its class colour, linking the character's one page (the armory's when it has one),
+ * then its hide link. Short shared classes (globals.css), since this cell repeats on every row.
+ */
+function NameCell({ row, icons }: { row: DirectoryRow; icons: ClassIcons }) {
   const joined = row.sources.length > 1;
   return (
-    <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-      <Link href={row.href} className={`${classText(row.classToken)} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{row.name}</Link>
-      {joined && <span className="whitespace-nowrap rounded-control border border-edge px-1.5 text-meta text-fg-2">{SOURCE_LABEL.addon}</span>}
-      <Link href={row.hideHref} className="text-xs text-muted hover:underline underline-offset-4">Hide</Link>
-    </span>
+    <>
+      <ClassMark token={row.classToken} icons={icons} />
+      <Link href={row.href} className={`${classText(row.classToken)} dir-name`}>{row.name}</Link>
+      {joined && <> <span className="whitespace-nowrap rounded-control border border-edge px-1.5 text-meta text-fg-2">{SOURCE_LABEL.addon}</span></>}
+      {" "}<Link href={row.hideHref} className="dir-hide">Hide</Link>
+    </>
   );
 }
 
@@ -66,25 +73,27 @@ const SORT_OF_COLUMN: Record<string, (typeof PLAYER_SORTS)[number]> = Object.fro
  * The table's columns. `guildHref` makes a guild a link to that guild's members in this list; addon sightings carry
  * no gear and no Blizzard guild, so their table leaves those out.
  */
-function columns(guildHref: ((guild: string) => string) | null): Column<DirectoryRow>[] {
+function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcons): Column<DirectoryRow>[] {
   const all: (Column<DirectoryRow> & { armory?: true })[] = [
-    { key: "name", header: "Name", sortable: true, cell: (r) => <NameCell row={r} /> },
+    { key: "name", header: "Name", sortable: true, cell: (r) => <NameCell row={r} icons={icons} /> },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => r.level },
-    { key: "who", header: "Race and class", nowrap: true, cell: (r) => `${raceName(r.race)} ${className(r.classToken)}` },
+    // The class is the name's colour and icon (and words on the phone line), so this column is the race alone.
+    { key: "race", header: "Race", nowrap: true, cell: (r) => raceName(r.race) },
     {
       key: "guild", header: "Guild",
       cell: (r) => r.guild === null ? muted("None seen") : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
     },
     { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted("Not read") : metricValue("item-level", r.itemLevel) },
     { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted("Not read") : metricValue("gear-score", r.gearScore) },
-    { key: "realm", header: "Realm", nowrap: true, cell: (r) => r.where },
+    { key: "realm", header: "Realm", nowrap: true, cell: (r) => (r.region ? <><RegionChip region={r.region} /> {r.ruleset}</> : r.where) },
     { key: "seen", header: guildHref ? "Last read" : "Last seen", numeric: true, sortable: true, cell: (r) => day(r.fetchedAt ?? r.lastSeen) },
   ];
   return guildHref ? all : all.filter((c) => !c.armory).map((c) => ({ ...c, sortable: false }));
 }
 
+/** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${r.where} · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -152,7 +161,7 @@ function keptFields(d: PlayerDirectoryQuery): [string, string][] {
 }
 
 /** A list of the latest reads, before any search: the crawler's newest rows, hidden characters already out. */
-function Recent({ rows }: { rows: ArmoryDirectoryRow[] }) {
+function Recent({ rows, icons }: { rows: ArmoryDirectoryRow[]; icons: ClassIcons }) {
   return (
     <section aria-labelledby="players-recent" className="space-y-3">
       <SectionHeading id="players-recent" note="The characters the armory read from Blizzard's API most recently.">Just read</SectionHeading>
@@ -160,7 +169,7 @@ function Recent({ rows }: { rows: ArmoryDirectoryRow[] }) {
         dense
         caption="Characters read most recently"
         columns={[
-          { key: "name", header: "Name", cell: (r) => <Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(classTokenOfName(r.class))} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{r.name} {r.surname}</Link> },
+          { key: "name", header: "Name", cell: (r) => <><ClassMark token={classTokenOfName(r.class)} icons={icons} /><Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(classTokenOfName(r.class))} dir-name`}>{r.name} {r.surname}</Link></> },
           { key: "who", header: "Character", cell: (r) => `Level ${r.level} ${r.race} ${r.class}` },
           { key: "at", header: "Read", numeric: true, cell: (r) => day(r.fetchedAt) },
         ]}
@@ -173,7 +182,7 @@ function Recent({ rows }: { rows: ArmoryDirectoryRow[] }) {
 }
 
 /** The highest item level read in each class, each linking its character and that class's board. */
-function BestOfClass({ rows }: { rows: ArmoryBoardRow[] }) {
+function BestOfClass({ rows, icons }: { rows: ArmoryBoardRow[]; icons: ClassIcons }) {
   return (
     <section aria-labelledby="players-best" className="space-y-3">
       <SectionHeading id="players-best" note={<>The highest item level read for each class. <Link href={armoryBoardPath("item-level")} className={link}>All item level rankings</Link></>}>
@@ -183,7 +192,7 @@ function BestOfClass({ rows }: { rows: ArmoryBoardRow[] }) {
         dense
         caption="Highest item level of each class"
         columns={[
-          { key: "class", header: "Class", nowrap: true, cell: (r) => <span className={classText(classTokenOfName(r.class))}>{r.class}</span> },
+          { key: "class", header: "Class", nowrap: true, cell: (r) => <><ClassMark token={classTokenOfName(r.class)} icons={icons} /><span className={classText(classTokenOfName(r.class))}>{r.class}</span></> },
           { key: "name", header: "Character", cell: (r) => <Link href={armoryCharacterPath(r.region, r.slug)} className={link}>{r.name} {r.surname}</Link> },
           { key: "value", header: "Item level", numeric: true, cell: (r) => metricValue("item-level", r.value) },
           { key: "board", header: "Board", cell: (r) => <Link href={armoryBoardHref("item-level", { region: null, ruleset: null, class: r.class })} className={link}>{r.class} board</Link> },
@@ -213,12 +222,15 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
   const active = activeDirectoryFilters(d);
   // Before a search or a filter the page also offers what is already public elsewhere: the latest reads and the boards' tops.
   const landing = armory && !q && active === 0 && d.page === 1;
-  const [players, loaded, recent, best] = await Promise.all([
+  const [players, loaded, recent, best, assets] = await Promise.all([
     prefix ? read(() => searchPlayers(prefix.toLowerCase())) : [] as Player[],
     armory ? read(async () => ({ page: await armoryStore().directory(d) })) : undefined,
     landing ? read(async () => (await armoryStore().directory({ ...playerDirectoryQuery({}), sort: "fetched_at", limit: RECENT, offset: 0 }))?.rows ?? []) : null,
     landing ? read(() => armoryStore().topPerClass("item_level", null, null)) : null,
+    // The class icons, from the cached asset manifest the class pages read; without it names keep their colour alone.
+    loadSiteAssets(),
   ]);
+  const icons = classIcons(assets);
   const directory = loaded?.page;
   // Keep the old name lookup usable while the directory's database function awaits the owner's approval.
   const fallback = directory === null && fullName ? await read(() => armoryStore().search(fullName, LIMIT)) : [];
@@ -230,7 +242,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
   const rows: DirectoryRow[] = armory ? hits.map((h) => ({ ...byKey.get(`armory/${h.region}/${h.slug}`)!,
     gearScore: "gearScore" in h ? (h as ArmoryDirectoryRow).gearScore : null,
     itemLevel: "itemLevel" in h ? (h as ArmoryDirectoryRow).itemLevel : null,
-    fetchedAt: "fetchedAt" in h ? (h as ArmoryDirectoryRow).fetchedAt : undefined })) : merged;
+    fetchedAt: "fetchedAt" in h ? (h as ArmoryDirectoryRow).fetchedAt : undefined, region: h.region, ruleset: h.ruleset })) : merged;
   const sightings = armory ? merged.filter((r) => !r.sources.includes("armory")) : [];
   const unreachable = players === null || loaded === null || fallback === null;
   const count = rows.length + sightings.length;
@@ -248,6 +260,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
     <Container width="data">
       <article className="space-y-6">
         <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Find a player", url: absoluteUrl("/players") }} />
+        <ClassIconStyle icons={icons} />
         <PageHeader
           trail={trailFor("/players") ?? undefined}
           title="Find a player"
@@ -303,7 +316,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                 dense
                 nofollow
                 caption={q ? `Characters matching ${q}` : "Blizzard profiles"}
-                columns={armory ? columns(guildHref) : columns(null)}
+                columns={armory ? columns(guildHref, icons) : columns(null, icons)}
                 rows={rows}
                 rowKey={(r) => r.key}
                 meta={rowMeta}
@@ -321,7 +334,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
             {sightings.length > 0 && <>
               <h3 className="text-h2-sm text-fg">Seen by the addon</h3>
               <p className="text-meta text-fg-2">Name matches from addon sightings. The filters apply to Blizzard profiles above; these sightings have no gear read. Dates here are the day last seen.</p>
-              <DataTable dense caption="Addon name matches" columns={columns(null)} rows={sightings} rowKey={(r) => r.key} meta={rowMeta} />
+              <DataTable dense caption="Addon name matches" columns={columns(null, icons)} rows={sightings} rowKey={(r) => r.key} meta={rowMeta} />
             </>}
             {capped && <p className="text-sm text-muted">Type more of the name to narrow it down.</p>}
           </section>
@@ -329,8 +342,8 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
 
         {((recent && recent.length > 0) || (best && best.length > 0)) && (
           <div className="grid gap-6 lg:grid-cols-2">
-            {recent && recent.length > 0 && <Recent rows={recent} />}
-            {best && best.length > 0 && <BestOfClass rows={best} />}
+            {recent && recent.length > 0 && <Recent rows={recent} icons={icons} />}
+            {best && best.length > 0 && <BestOfClass rows={best} icons={icons} />}
           </div>
         )}
       </article>

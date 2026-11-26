@@ -106,6 +106,8 @@ const SHOWS_ART = new Set([
   "web/src/app/classes/[class]/page.tsx", "web/src/app/classes/[class]/spells/page.tsx",
   // Lightweight armory equipment icons and race/class portrait fallback.
   "web/src/app/armory/profile.tsx", "web/src/app/armory/[region]/[slug]/page.tsx",
+  // The player directory's 16 px class icons beside each name (one style rule per class).
+  "web/src/app/players/page.tsx", "web/src/app/players/class-icons.tsx",
   // Two characters' equipment side by side, with the same icons and tooltips.
   "web/src/app/armory/compare/page.tsx",
   // Approved entity share icons use the same page art switch and item visibility rule.

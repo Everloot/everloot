@@ -15,6 +15,8 @@ vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => 
 const holder = vi.hoisted(() => ({ store: null as PlayerStore | null, armory: null as ArmoryStore | null }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => holder.store }));
 vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => holder.armory }));
+const assets = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/game-assets")>()), loadSiteAssets: async () => assets.value }));
 
 const player = { name: "Thrallina", realm: "Forever Pioneer", race: "Scourge", class: "SHAMAN", level: 24, guild: "Night Watch", seen: "2026-10-20" };
 
@@ -25,7 +27,7 @@ beforeEach(async () => {
   armory = createMemoryArmoryStore(() => new Date("2026-11-10T00:00:00Z"));
   holder.armory = armory;
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); assets.value = null; });
 
 const on = () => vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
 
@@ -112,6 +114,35 @@ describe("player directory", () => {
     expect(html).toContain('href="/players?min=60&amp;max=60"');
     for (const name of ["q", "guild"]) expect(html).toContain(`name="${name}"`);
     expect(seen).not.toHaveBeenCalled();
+  });
+
+  test("a row reads like a tracker's: class icon and colour on the name, race on its own, region as a chip, one short class per row", async () => {
+    assets.value = { classes: new Map([["hunter", { name: "Hunter", icon: "https://assets.test/icons/hunter.webp" }], ["mage", { name: "Mage", icon: "https://bad.test/x.webp)}</style><script>" }]]), professions: new Map() };
+    armory.putCharacter(armoryCharacter());
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", gearScore: 1, class: "Mage", race: "Gnome" }));
+    const html = await page();
+    const table = html.slice(html.indexOf('id="player-results"'));
+    // One rule per class in one style block; a URL that could break out of it is left out, and that class draws no icon.
+    expect(html).toContain('.ci-hunter{background-image:url("https://assets.test/icons/hunter.webp")}');
+    expect(html).not.toContain("bad.test");
+    expect(table).toContain('<i class="ci ci-hunter" role="img" aria-label="Hunter" title="Hunter"></i><a href="/armory/eu/velkara-duskmantle" class="text-class-hunter dir-name">');
+    expect(table).toMatch(/<a href="\/armory\/eu\/arla-quill" class="text-class-mage dir-name">/);
+    expect(table).not.toContain("ci-mage");
+    // Race is its own column; the class is the colour and the icon, and the phone line still says it in words.
+    expect(table).toMatch(/<th[^>]*><span[^>]*>Race<\/span><\/th>/);
+    expect(table).toMatch(/<td class="dt-td dt-nowrap dt-fold">Troll<\/td>/);
+    expect(table).toContain("Level 60 Troll Hunter");
+    expect(table).toContain('data-region="eu"');
+    expect(table).toContain('<tr class="dt-tr">');
+    expect(table).toContain('class="dt-meta"');
+  });
+
+  test("a full page of 50 profiles stays light: under 760 bytes of markup a row (1,059 before)", async () => {
+    for (let i = 0; i < 50; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, name: "Quill", surname: `Venn${i}`, gearScore: i }));
+    const html = await page({ sort: "level" });
+    const body = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
+    expect(body.match(/<tr /g)).toHaveLength(50);
+    expect(body.length / 50).toBeLessThan(760);
   });
 
   test("parses filters for the store and keeps all of them in paging and menu links", async () => {

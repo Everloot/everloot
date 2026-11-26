@@ -56,9 +56,10 @@ function Menu({ c: given, rel }: { c: Extract<FilterControl, { type: "menu" }>; 
       <ul className="pop z-30 mt-1 max-h-80 min-w-52 overflow-y-auto rounded-control border border-edge bg-panel p-1 sm:absolute sm:left-0 sm:top-full">
         {c.options.map((o, i) => (
           <li key={i}>
-            <Link href={o.href} rel={rel} aria-current={o.on ? "true" : undefined} className="flex min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg">
+            {/* Short shared classes (globals.css): a bar holds dozens of these choices. */}
+            <Link href={o.href} rel={rel} aria-current={o.on ? "true" : undefined} className="fm-opt">
               {c.multi && <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-control border ${o.on ? "border-accent bg-accent" : "border-edge"}`} />}
-              <span className={`min-w-0 flex-1 truncate ${o.on && !c.multi ? "text-fg" : ""} ${o.className ?? ""}`} style={o.style}>{o.label}</span>
+              <span className={["fm-lbl", o.on && !c.multi ? "text-fg" : "", o.className ?? ""].filter(Boolean).join(" ")} style={o.style}>{o.label}</span>
               {o.count !== undefined && <span className="tabular-nums text-muted">{o.count.toLocaleString("en-US")}</span>}
               {o.on && <span className="sr-only">(selected)</span>}
             </Link>

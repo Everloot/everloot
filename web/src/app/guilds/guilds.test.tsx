@@ -270,6 +270,23 @@ test("a recruiting profile adds its badge in the guild directory's existing name
   } finally { directory.recruiting = false; }
 });
 
+test("the guild directory sorts from its headers, reads well on a phone and keeps each row light", async () => {
+  on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); directory.recruiting = true;
+  try {
+    const html = await hub();
+    const table = html.slice(html.indexOf('id="directory"'));
+    // Members read is the default sort: its header says so, and the other counts are links to their own order.
+    expect(table).toMatch(/<th[^>]*aria-sort="descending"[^>]*><a href="\/guilds"[^>]*>Members read/);
+    expect(table).toContain('href="/guilds?sort=item-level"');
+    expect(table).toContain('href="/guilds?sort=level-60"');
+    expect(await hub({ sort: "item-level", region: "us" })).toMatch(/aria-sort="descending"[^>]*><a href="\/guilds\?region=us&amp;sort=item-level"/);
+    // The phone line carries what the folded columns hold.
+    expect(table).toContain("US Normal · Alliance · 1 of 12 read · ilvl 30");
+    expect(table).toContain('<a href="/armory/us/guilds/star-watch" class="dir-name">Star Watch</a>');
+    expect(table).toContain('<tr class="dt-tr">');
+  } finally { directory.recruiting = false; }
+});
+
 test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {
   on();
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");

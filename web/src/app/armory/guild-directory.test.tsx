@@ -327,8 +327,8 @@ describe("the guild activity strip", () => {
 
   test("the folded phone row names the rank", async () => {
     const out = roster(await html(pages.guild("eu", "ember-wardens")));
-    expect(out).toMatch(/sm:hidden[^"]*">[^<]*Guild Master/);
-    expect(out).toMatch(/sm:hidden[^"]*">[^<]*Rank 1/);
+    expect(out).toMatch(/class="dt-meta">[^<]*Guild Master/);
+    expect(out).toMatch(/class="dt-meta">[^<]*Rank 1/);
   });
 });
 
@@ -448,8 +448,8 @@ describe("the guild home", () => {
 
   test("the folded phone line is level and rank alone", async () => {
     const out = roster(await html(pages.guild("eu", "ember-wardens")));
-    expect(out).toMatch(/sm:hidden[^"]*">Level 41 · Guild Master</);
-    expect(out).toMatch(/sm:hidden[^"]*">Level 60 · Rank 1</);
+    expect(out).toMatch(/class="dt-meta">Level 41 · Guild Master</);
+    expect(out).toMatch(/class="dt-meta">Level 60 · Rank 1</);
   });
 
   test("a level spread strip sits above the roster, each band linking to the roster filtered to it", async () => {
