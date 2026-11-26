@@ -18,7 +18,7 @@ test("lists each build's changes newest first, linking the build on /changes", (
   expect(html.indexOf("1.60.1.201")).toBeLessThan(html.indexOf("1.60.1.200"));
   expect(html).toContain('href="/changes?show=builds&amp;q=1.60.1.201"');
   expect(html).toContain("Changed in build");
-  expect(html.replace(/<[^>]+>/g, "")).toContain("Effect 1 base points: 5 → 8");
+  expect(html).toMatch(/Effect 1 base points: (?:<[^>]*>)*5(?:<[^>]*>)* → (?:<[^>]*>)*8/);
   expect(html).toContain("Tooltip text changed");
 });
 
