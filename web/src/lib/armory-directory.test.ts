@@ -2,14 +2,30 @@ import { expect, test, vi } from "vitest";
 import { armoryCharacter } from "./armory.fixture";
 import { createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 import { StorageError } from "./supabase/server";
-import { playerDirectoryQuery, playerDirectoryHref } from "./armory-directory";
+import { activeDirectoryFilters, levelBandOf, PLAYER_LEVEL_BANDS, playerDirectoryQuery, playerDirectoryHref } from "./armory-directory";
 
 test("directory filters parse repeated values, reject unknown choices and keep paging in the URL", () => {
   const q = playerDirectoryQuery({ q: [" Vel ", "other"], class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: " Ember ", sort: "item-level", page: "2" });
-  expect(q).toMatchObject({ prefix: "vel", class: "Hunter", race: "Troll", faction: "Horde", region: "eu", rulesetId: 2, minLevel: 40, maxLevel: 60, guildPrefix: "Ember", sort: "item_level", limit: 25, offset: 25, page: 2 });
+  expect(q).toMatchObject({ prefix: "vel", class: "Hunter", race: "Troll", faction: "Horde", region: "eu", rulesetId: 2, minLevel: 40, maxLevel: 60, guildPrefix: "Ember", sort: "item_level", limit: 50, offset: 50, page: 2 });
   expect(playerDirectoryHref(q, 3)).toContain("page=3");
   expect(playerDirectoryHref(q, 3)).toContain("class=HUNTER");
   expect(playerDirectoryQuery({ class: "bogus", race: "bogus", region: "xx", ruleset: "999", faction: "none", sort: "bad", min: "-1", max: "999", page: "2.5" })).toMatchObject({ class: null, race: null, region: null, rulesetId: null, faction: null, sort: "gear_score", minLevel: null, maxLevel: null, page: 1, offset: 0 });
+});
+
+test("the page size is one of the shared list sizes, kept in the URL only when it is not the default", () => {
+  expect(playerDirectoryQuery({ per: "100", page: "3" })).toMatchObject({ limit: 100, offset: 200, per: 100 });
+  for (const per of ["7", "50", "abc", "1000"]) expect(playerDirectoryQuery({ per })).toMatchObject({ limit: 50, per: undefined });
+  expect(playerDirectoryHref(playerDirectoryQuery({ per: "100" }), 2)).toBe("/players?per=100&page=2");
+  expect(playerDirectoryHref(playerDirectoryQuery({ sort: "level" }), 1)).toBe("/players?sort=level");
+  expect(playerDirectoryHref(playerDirectoryQuery({}), 1)).toBe("/players");
+});
+
+test("level bands match the address's range, and the active count leaves out the name and the default sort", () => {
+  expect(PLAYER_LEVEL_BANDS[0]).toEqual({ label: "60", min: 60, max: 60 });
+  expect(levelBandOf(playerDirectoryQuery({ min: "40", max: "49" }))?.label).toBe("40–49");
+  expect(levelBandOf(playerDirectoryQuery({ min: "41", max: "49" }))).toBeNull();
+  expect(activeDirectoryFilters(playerDirectoryQuery({ q: "vel" }))).toBe(0);
+  expect(activeDirectoryFilters(playerDirectoryQuery({ class: "HUNTER", min: "40", max: "49", guild: "Ember", sort: "level" }))).toBe(4);
 });
 
 test("memory directory filters, sorts nulls last, pages and excludes hidden characters", async () => {
@@ -43,7 +59,7 @@ test("cloud directory sends each filter, validates numeric rows and recovers tot
   const filter = playerDirectoryQuery({ q: "Vel", class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: "Ember", sort: "item-level", page: "2" });
   expect(await store.directory(filter)).toMatchObject({ total: 26, rows: [{ rulesetId: 2, itemLevel: 57.41, gearScore: 61.2 }] });
   expect(query.mock.calls[0]![0]).toBe("rpc/armory_directory");
-  expect(JSON.parse(String(query.mock.calls[0]![1]?.body))).toEqual({ p_prefix: "vel", p_class: "Hunter", p_race: "Troll", p_faction: "Horde", p_region: "eu", p_ruleset_id: 2, p_min_level: 40, p_max_level: 60, p_guild_prefix: "Ember", p_sort: "item_level", p_limit: 25, p_offset: 25 });
+  expect(JSON.parse(String(query.mock.calls[0]![1]?.body))).toEqual({ p_prefix: "vel", p_class: "Hunter", p_race: "Troll", p_faction: "Horde", p_region: "eu", p_ruleset_id: 2, p_min_level: 40, p_max_level: 60, p_guild_prefix: "Ember", p_sort: "item_level", p_limit: 50, p_offset: 50 });
   query.mockResolvedValueOnce([]);
   expect(await store.directory({ ...filter, offset: 50 })).toEqual({ total: 26, rows: [] });
   expect(JSON.parse(String(query.mock.calls.at(-1)![1]?.body))).toMatchObject({ p_limit: 1, p_offset: 0 });
