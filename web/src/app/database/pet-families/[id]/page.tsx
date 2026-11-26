@@ -7,7 +7,7 @@ import { DataTable, Tabs, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { parseSegment } from "@/lib/completion-lists";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { pageMetadata } from "@/lib/seo";
 import { petFamiliesBuild, petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { CLIENT_LABEL } from "@kb/edges";

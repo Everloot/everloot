@@ -20,7 +20,7 @@ import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
 import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";

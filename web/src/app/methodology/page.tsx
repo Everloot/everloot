@@ -4,7 +4,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { WIKI_URL } from "@/components/LoreSource";
 import { CURRENT_VERSION } from "@/lib/game-version";
 import { loadSiteAssets } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { guildsOn } from "@/lib/guild-switch";
 import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { playerPagesOn } from "@/lib/player-pages";

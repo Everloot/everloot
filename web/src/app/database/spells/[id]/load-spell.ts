@@ -1,7 +1,7 @@
 import { edgesFrom, edgesTo } from "@kb/edges";
 import { loadEdges } from "@/lib/edges";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { loadSpellTalents } from "@/lib/talents/spell-talents";
 import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
 

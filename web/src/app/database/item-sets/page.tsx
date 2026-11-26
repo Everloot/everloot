@@ -6,7 +6,7 @@ import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { loadItemSetNames } from "@/lib/game-assets";
 import { itemSetClasses, itemSetHref, ITEM_SETS, ITEM_SETS_BUILD, ITEM_SETS_PATH } from "@/lib/item-sets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_LABEL } from "@kb/edges";
 import { byRank, ListNote, listHref, listMetadata, listQuery, NameCell, nameMatches, nextSort, NoMatches, paged, pageParams, Respelled, sortRows, type ListQuery, type Search } from "../list-parts";
 

@@ -29,7 +29,7 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { DATABASE_GROUPS } from "@/lib/database-home";
 import { instanceRows } from "@/lib/instances";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import DatabasePage from "./(hub)/page";
 
 beforeEach(() => {

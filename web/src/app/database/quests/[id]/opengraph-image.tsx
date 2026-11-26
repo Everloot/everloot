@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { questPage } from "@kb/world-pages";
 import { AGREEMENT_NEEDED } from "@/components/ui/AgreementMeter";
 import { loadQuestNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CARD_SIZE, renderEntityCard } from "@/lib/og-card";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { unknownQuest } from "../../unknown";

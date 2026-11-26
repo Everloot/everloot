@@ -10,7 +10,8 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 
 import { GET } from "./route";
 import { GET as categoriesGET } from "./categories/route";
-import { CLIENT_LAYER, CLIENT_TAXONOMY } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import { CLIENT_TAXONOMY } from "@/lib/items";
 import { itemCategoriesResponse, itemsResponse } from "@everloot/protocol";
 
 const req = (query = "") => new Request(`https://everloot.app/api/items${query}`);

@@ -8,7 +8,8 @@ import { itemIndexable, npcIndexable, objectIndexable, questIndexable, spellInde
 import { instanceHref, instanceRows } from "./instances";
 import { bossEntries, bossHref } from "./bosses";
 import { itemSetHref, ITEM_SETS } from "./item-sets";
-import { CLIENT_LAYER, shownItemName } from "./items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import { shownItemName } from "./items";
 import { loadObjectFacts } from "./objects";
 import { loadWorldFacts } from "./rollup-compute";
 import { loadShownNames } from "./shown-item-names";

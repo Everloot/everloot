@@ -8,7 +8,7 @@ import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
 import { CLASSES } from "@/design/tokens";
 import { classLabel, hasClassContext, parseClassContext, switchClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { CLIENT_LABEL } from "@kb/edges";
 import {

@@ -2,7 +2,7 @@ import type { TokenKind } from "@kb/wiki/page";
 import { entityHref } from "@/components/EntityLink";
 import { factionHref, loadCatalog } from "@/lib/completion-lists";
 import { loadQuestNames } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames, tokenNamer } from "@/lib/shown-item-names";
 import { inlinesOf, type WikiPage } from "@/lib/wiki";
@@ -27,7 +27,7 @@ export async function resolveTokens(page: Pick<WikiPage, "blocks">): Promise<Map
   const [shown, world, questWiki, catalog] = await Promise.all([
     ids.item.size ? loadShownNames() : null,
     ids.npc.size || ids.quest.size ? loadWorldFacts() : null,
-    ids.quest.size ? loadQuestNames(CLIENT_LAYER.build.version) : null,
+    ids.quest.size ? loadQuestNames(gameBuild.version) : null,
     ids.faction.size ? loadCatalog() : null,
   ]);
   const nameOf = tokenNamer({ shown, world, questWiki });

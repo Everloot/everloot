@@ -7,7 +7,7 @@ import { EMPTY, EmptyTab, EntityPage, LINK } from "../../entity";
 import EntityChanges, { changesFor } from "../../entity-changes";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
-import { CLIENT_LAYER } from "@/lib/items";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
 import type { Edge, Rel } from "@kb/edges";
 import { entityLabel } from "@kb/edges";
 import { trailFor } from "@/lib/breadcrumbs";

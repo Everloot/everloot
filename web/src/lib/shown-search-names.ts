@@ -1,5 +1,5 @@
 import { loadItemNames, loadItemSetNames, loadQuestNames, loadSpellNames, PRIVATE_UNREACHABLE } from "@/lib/game-assets";
-import { CLIENT_LAYER } from "@/lib/items";
+import gameBuild from "@/data/game-data/build-version.json";
 import { loadNames, type Names } from "@/lib/names";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadStoredSearchNames } from "@/lib/search-names-store";
@@ -14,7 +14,7 @@ import { publicVendors } from "@/lib/world-lists";
 /** The shown item, NPC, object and quest names, with one world read serving the agreed names and the wiki match. */
 export async function loadShownSearchNames(shownRead: Promise<ShownNames> = loadShownNames(), worldRead: ReturnType<typeof loadWorldFacts> = loadWorldFacts()): Promise<Names> {
   const [agreed, shown, quests, world, npcWiki] = await Promise.all([
-    loadNames(shownRead.then((shown) => shown.facts), worldRead), shownRead, loadQuestNames(CLIENT_LAYER.build.version), worldRead, loadWikiEntityNames("npc"),
+    loadNames(shownRead.then((shown) => shown.facts), worldRead), shownRead, loadQuestNames(gameBuild.version), worldRead, loadWikiEntityNames("npc"),
   ]);
   return shownSearchNames({ agreed, shown, quests, world, npcWiki });
 }
@@ -30,7 +30,7 @@ export interface SearchShown { names: Names; showsTip: (id: number) => boolean; 
 
 /** The spell and item set names the pages show, from the private name files; a file that is not there leaves its group out. */
 async function pageFileNames(): Promise<Pick<SearchShown, "spells" | "itemSets">> {
-  const [spells, sets] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), loadItemSetNames(CLIENT_LAYER.build.version)]);
+  const [spells, sets] = await Promise.all([loadSpellNames(gameBuild.version), loadItemSetNames(gameBuild.version)]);
   return { ...(spells ? { spells: spells.names } : {}), ...(sets ? { itemSets: sets.names } : {}) };
 }
 
@@ -48,7 +48,7 @@ export async function loadSearchShown(): Promise<SearchShown> {
     const vendors = world.unreachable ? {} : { vendors: new Set(publicVendors(world).map((v) => v.vendorNpcId)) };
     return { names, showsTip: (await shown).showsTip, ...files, ...vendors };
   }
-  const [read, quests, npcWiki] = await Promise.all([loadItemNames(CLIENT_LAYER.build.version), loadQuestNames(CLIENT_LAYER.build.version), loadWikiEntityNames("npc")]);
+  const [read, quests, npcWiki] = await Promise.all([loadItemNames(gameBuild.version), loadQuestNames(gameBuild.version), loadWikiEntityNames("npc")]);
   const matched = read === PRIVATE_UNREACHABLE ? null : read;
   return {
     names: shownSearchNamesFromStored(stored, { matched, quests, npcWiki }),
