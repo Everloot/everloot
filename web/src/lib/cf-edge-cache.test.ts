@@ -435,6 +435,21 @@ test.each(["/card/spell", "/card/vendor", "/database/card/spell"])("only the exa
   }
 });
 
+test("an approved screenshot's file drops credentials, so signed-in visitors share the edge copy; its other routes keep them", () => {
+  const cookie = { cookie: "a=1" };
+  const file = withoutCredentials(new Request("https://everloot.app/screenshots/file/0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11", { headers: cookie }));
+  expect(file.headers.has("cookie")).toBe(false);
+  expect(edgeCacheable(file)).toBe(true);
+  for (const url of [
+    "https://everloot.app/screenshots/review/0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11", "https://everloot.app/screenshots/mine?type=item&id=1",
+    "https://everloot.app/screenshots/file/0B6F1C1E-3F43-4A4E-9A51-3D2A1F0C9E11", "https://everloot.app/screenshots/file/x/../../mine",
+    "https://everloot.app/screenshots/file/0b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e11/extra",
+  ]) {
+    const req = new Request(url, { headers: cookie });
+    expect(withoutCredentials(req), url).toBe(req);
+  }
+});
+
 test("only the card route drops credentials: a page, a card spelled another way or a POST keeps them and bypasses the cache", () => {
   const cookie = { cookie: "a=1" };
   for (const url of ["https://everloot.app/database/items/2589", "https://everloot.app/card/item/2589/extra", "https://everloot.app/%63ard/item/2589", "https://everloot.app/card/item/02589", "https://everloot.app/database/card/item/02589", "https://everloot.app/me"]) {

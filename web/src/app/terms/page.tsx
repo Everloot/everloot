@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
 import { COMMENT_LIMITS } from "@/lib/comments-shared";
+import { SCREENSHOT_LIMITS } from "@/lib/screenshots-shared";
 import { CC_BY_SA, CONTACT_EMAIL, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
 import { REPO_URL } from "@/lib/source";
 import { longDate } from "@/data/wow-forever";
@@ -23,6 +24,7 @@ const SECTIONS: TocItem[] = [
   { id: "player-pages", label: "Player pages" },
   { id: "uploads", label: "Your uploads" },
   { id: "comments", label: "Comments" },
+  { id: "screenshots", label: "Screenshots" },
   { id: "accounts", label: "Accounts and Battle.net sign-in" },
   { id: "api", label: "API, MCP server and keys" },
   { id: "licences", label: "Content and licences" },
@@ -127,6 +129,25 @@ export default function TermsPage() {
               Links may go only to everloot.app and the well-known WoW sites the comment box lists. You can edit a comment for{" "}
               {COMMENT_LIMITS.editMinutes} minutes after posting and delete it at any time. Players can report a comment, and
               we may hide or remove any comment, or stop an account from commenting, without notice.
+            </p>
+          </Section>
+
+          <Section id="screenshots">
+            <p>
+              Where the site offers them, a signed-in player with a profile handle can upload screenshots for item, quest, NPC,
+              spell, zone and instance pages. Upload only screenshots you took yourself in the game. By uploading, you confirm
+              that, and you give us a worldwide, free, non-exclusive licence to store the screenshot, save a smaller copy of it,
+              and show it on that page on everloot.app, credited to your handle, for as long as it stays up. You keep whatever
+              rights you have in it. A game screenshot shows Blizzard&apos;s art, which stays Blizzard&apos;s; we show it under
+              the same fan-site terms as the other game art on the site, with the same credit.
+            </p>
+            <p>
+              Nothing you upload shows until a moderator approves it, and we may reject or remove any screenshot without
+              notice. Keep chat, real names, other players&apos; names and anything that identifies a real person out of the
+              picture; spoilers of unreleased content are rejected. We save a WebP copy at most {SCREENSHOT_LIMITS.maxSide} px wide
+              with the file&apos;s hidden details (camera, place, editing app) removed, and keep nothing else of the file you
+              sent. You can upload {SCREENSHOT_LIMITS.perDay} a day and delete your own at any time. Screenshots are not part of
+              the open data and are not offered through the API, the MCP server, chat answers, exports or sitemaps.
             </p>
           </Section>
 

@@ -14,7 +14,7 @@ const visible = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, "")
 test("/terms covers uploads, keys, trademarks, takedown, warranty and governing law, each under a linkable heading", async () => {
   const { default: Terms } = await import("./terms/page");
   const html = renderToStaticMarkup(<Terms />);
-  for (const id of ["uploads", "comments", "accounts", "api", "licences", "trademarks", "takedown", "warranty", "law", "changes"]) {
+  for (const id of ["uploads", "comments", "screenshots", "accounts", "api", "licences", "trademarks", "takedown", "warranty", "law", "changes"]) {
     expect(html, id).toContain(`id="${id}"`);
   }
   const text = visible(html);

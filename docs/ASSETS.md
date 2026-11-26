@@ -263,6 +263,14 @@ item and NPC pages read `renders.json` in a later change.
 
 **Next build.** Run `render-ids.mts` again (the gates grow as players report), then `client-renders`, and
 compare the counts with the last run. A jump in `encrypted` or `failed` means Blizzard changed something.
+## Player screenshots
+
+Player screenshots (`docs/DATA_POLICY.md`, "Screenshots"; off until `EVERLOOT_SCREENSHOTS=1`) are pictures of the game
+that players upload, not files our extractor reads, so none of the steps above apply to them. They contain Blizzard's
+art all the same. *Decided 2026-11-25 by Carlos:* they are shown under the same fan-site terms as the other game art on
+this page: on the site's pages only, never in the API, the MCP server or the data downloads, and credited. The gallery
+names the uploader by handle, and under the pictures says the game art is Blizzard's, shown as fan-site use, and that
+Everloot is not affiliated with Blizzard; the footer's "Game data and art © Blizzard Entertainment" is on those pages too. They live in their own private bucket (`SCREENSHOTS`), never in the asset bucket and never in git.
 
 ## Game versions: Live, PTR and Beta
 
