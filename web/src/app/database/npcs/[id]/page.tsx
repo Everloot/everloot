@@ -154,9 +154,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
       null,
       now,
     ),
-    named: Boolean(page.name),
+    nameFrom: shown.fromWiki ? "wiki" : page.name ? "players" : "none",
   });
-  if (shown.fromWiki) summary[2] = NAME_FROM.wiki + ".";
 
   return (
     <EntityPage

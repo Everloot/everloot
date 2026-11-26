@@ -77,15 +77,7 @@ export function itemSummary(i: ItemSummaryInput): string[] {
   if (i.uses > 0) known.push(`${plural(i.uses, "recipe uses", "recipes use")} it`);
   bullets.push(known.length ? `${known.join(", and ")}.` : "No vendor or recipe is known to carry it yet.");
 
-  bullets.push(
-    i.nameFrom === "players"
-      ? "Players agree on the name."
-      : i.nameFrom === "wiki"
-        ? "The name is shown from the Warcraft Wiki; players have not reported it yet."
-        : i.nameFrom === "files"
-          ? "The name is shown from the game files; players have not reported it yet."
-          : "It has no agreed name yet: that needs three installs reporting the same one.",
-  );
+  bullets.push(nameLine(i.nameFrom));
 
   return bullets;
 }
@@ -109,14 +101,20 @@ export function reportedLine(parts: (string | null)[], dataAsOf: string | null, 
   return `Players reported ${said.join(" and ")}${asOf ? ` (${asOf})` : ""}.`;
 }
 
-/** The line that says where the name came from, in the site's own words. */
-export function nameLine(named: boolean): string {
-  return named ? "Players agree on the name." : "It has no agreed name yet: that needs three installs reporting the same one.";
+/** The line that says where the name came from, in the site's own words: the same source the page's title uses. */
+export function nameLine(from: NameFrom): string {
+  return from === "players"
+    ? "Players agree on the name."
+    : from === "wiki"
+      ? "The name is shown from the Warcraft Wiki; players have not reported it yet."
+      : from === "files"
+        ? "The name is shown from the game files; players have not reported it yet."
+        : "It has no agreed name yet: that needs three installs reporting the same one.";
 }
 
 /** The pages that are not items: what it is, what players reported, and where the name came from. */
-export function entitySummary(i: { identity: string; observed: string; named: boolean }): string[] {
-  return [i.identity, i.observed, nameLine(i.named)];
+export function entitySummary(i: { identity: string; observed: string; nameFrom: NameFrom }): string[] {
+  return [i.identity, i.observed, nameLine(i.nameFrom)];
 }
 
 /**

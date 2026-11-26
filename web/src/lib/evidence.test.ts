@@ -101,15 +101,24 @@ describe("the lines the other entity pages carry", () => {
   });
 
   test("the three lines a page carries", () => {
-    expect(entitySummary({ identity: "Seen in Elwynn Forest", observed: "Players reported 1 map position.", named: true })).toEqual([
+    expect(entitySummary({ identity: "Seen in Elwynn Forest", observed: "Players reported 1 map position.", nameFrom: "players" })).toEqual([
       "Seen in Elwynn Forest",
       "Players reported 1 map position.",
       "Players agree on the name.",
     ]);
   });
 
+  test("a name from the game files or the wiki says so, never that players agree", () => {
+    expect(entitySummary({ identity: "Spell 12042", observed: "The files say nothing about what it creates.", nameFrom: "files" })[2]).toBe(
+      "The name is shown from the game files; players have not reported it yet.",
+    );
+    expect(entitySummary({ identity: "A quest", observed: "No player has reported it yet.", nameFrom: "wiki" })[2]).toBe(
+      "The name is shown from the Warcraft Wiki; players have not reported it yet.",
+    );
+  });
+
   test("a name nobody agrees on says what it takes", () => {
-    expect(entitySummary({ identity: "A quest", observed: "No player has reported it yet.", named: false })[2]).toBe(
+    expect(entitySummary({ identity: "A quest", observed: "No player has reported it yet.", nameFrom: "none" })[2]).toBe(
       "It has no agreed name yet: that needs three installs reporting the same one.",
     );
   });

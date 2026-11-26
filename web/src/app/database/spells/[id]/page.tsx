@@ -168,9 +168,9 @@ export default async function SpellPage(props: Props) {
     observed: creates.length
       ? `The files say it creates ${creates.length} ${creates.length === 1 ? "item" : "items"}${costs.length ? ` and costs ${costs.length} ${costs.length === 1 ? "reagent" : "reagents"}` : ""}.`
       : "The files say nothing about what it creates.",
-    named: Boolean(name) && !fromWiki,
+    // Spell names come from the game files' names (or their tooltips); a wiki name only when the files have none.
+    nameFrom: fromWiki ? "wiki" : name ? "files" : "none",
   });
-  if (fromWiki) summary[2] = NAME_FROM.wiki + ".";
 
   // Every relation here is the game files' own, so an empty one is not something a player report could fill: the tab
   // is left out rather than shown with the agreement meter and "Get the addon". When the files relate nothing to the
@@ -300,9 +300,9 @@ export default async function SpellPage(props: Props) {
         ...(numbers && mechanicName(numbers) ? [{ label: "Mechanic", value: mechanicName(numbers)! }] : []),
         { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
         { label: "Build", value: build },
-        // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
-        { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
-        { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
+        // Counts from the files; a spell that creates or costs nothing leaves the row out, as every empty fact above does.
+        ...(creates.length ? [{ label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true }] : []),
+        ...(costs.length ? [{ label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true }] : []),
       ]}
       summary={summary}
       main={tabs.length

@@ -109,8 +109,14 @@ test("a spell the files relate to nothing gets one plain line naming the build, 
   expect(page).not.toContain('role="tab"');
   expect(page).not.toContain("Get the addon");
   expect(page).not.toContain("data-agreement");
-  // The quick facts count from the files too: a zero, not a meter waiting on a report.
-  expect(page).toContain(">0</span>");
+  // A spell that creates and costs nothing leaves those quick facts out, as every other empty fact is, rather than a "0".
+  expect(page).not.toMatch(/>Creates(?:<[^>]*>)*\s*0/);
+  expect(page).not.toMatch(/>Costs(?:<[^>]*>)*\s*0/);
+  expect(page).not.toContain(">Creates<");
+  expect(page).not.toContain(">Costs<");
+  // The name comes from the game files, so the summary says so rather than that players agree on it.
+  expect(page).toContain("The name is shown from the game files; players have not reported it yet.");
+  expect(page).not.toContain("Players agree on the name.");
 });
 
 test("a named spell is titled like the other database pages, with the brand added once by the layout", async () => {

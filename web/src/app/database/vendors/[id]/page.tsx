@@ -75,7 +75,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
     observed: facts.unreachable ? STORAGE_UNREACHABLE
       : reportedParts.some(Boolean) ? `${reportedLine(reportedParts, facts.dataAsOf ?? null, Date.now())} Each has three installs agreeing.`
       : reportedLine([], null, Date.now()),
-    named: Boolean(vendorName),
+    nameFrom: vendorName ? "players" : "none",
   });
 
   return (
