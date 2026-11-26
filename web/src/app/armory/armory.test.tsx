@@ -184,7 +184,9 @@ describe("the character page", () => {
       const out = await html(pages.character("eu", "velkara-duskmantle"));
       const strip = out.slice(out.indexOf("data-character-facts"), out.indexOf("data-paper-doll"));
       expect(out.indexOf("data-character-facts")).toBeGreaterThan(-1);
-      const pairs = [...strip.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, "")]);
+      // The text between the tags of each <dd>, read rather than stripped.
+      const textOf = (markup: string) => [...`>${markup}<`.matchAll(/>([^<]*)</g)].map((t) => t[1]).join("");
+      const pairs = [...strip.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textOf(m[2])]);
       expect(pairs).toEqual([
         ["Item level", "57.41"], ["Gear Score", "61.2"], ["Honorable kills", "1,234"],
         ["Achievements", "3"], ["Quests completed", "4"], ["Last read", "3 days ago"],
