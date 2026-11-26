@@ -2,13 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "@kb/world-pages";
 
-const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn() }));
+const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn(), sightings: vi.fn() }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: mocks.world, computeRollups: mocks.rollup, loadItemFacts: mocks.items,
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
 }));
 vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
 vi.mock("@/lib/game-renders", () => ({ loadRenders: mocks.renders }));
+// The dungeon and raid reports: none unless a test ties this NPC to a boss.
+vi.mock("@/lib/instances", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/instances")>()), loadSightings: mocks.sightings }));
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
@@ -34,6 +36,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.wiki.mockResolvedValue(null);
   mocks.renders.mockResolvedValue(null);
+  mocks.sightings.mockResolvedValue({ unreachable: false, instances: { entrances: [], encounters: [] } });
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
     npcs: installs.map((installId) => ({ installId, npcId: 1125, name: installId, mapId: 0, x: 0, y: 0, level: 55, reaction: "friendly", creatureType: "Humanoid", rank: "normal", capturedAt: at })),
@@ -238,4 +241,14 @@ test("an NPC the page shows no name for gets no picture, and renders.json is not
   facts.unreachable = true;
   expect(await html()).not.toContain("data-model-picture");
   expect(mocks.renders).not.toHaveBeenCalled();
+});
+
+test("an NPC 3 installs tie to a boss encounter links that boss's page; others name no boss", async () => {
+  expect(fact(await html(), "Boss")).toBeUndefined();
+  // SYNTHETIC: three installs killed Oggleflint in Ragefire Chasm and tie this NPC to it.
+  const encounters = installs.map((installId) => ({ installId, encounterId: 2732, name: "Oggleflint", instanceMapId: 389, success: true, npcIds: [1125], capturedAt: at }));
+  mocks.sightings.mockResolvedValue({ unreachable: false, asOf: new Date("2026-11-10T00:00:00Z"), instances: { entrances: [], encounters } });
+  const boss = fact(await html(), "Boss");
+  expect(boss).toContain('href="/database/bosses/2732-oggleflint"');
+  expect(boss).toContain('href="/database/instances/389-ragefire-chasm"');
 });

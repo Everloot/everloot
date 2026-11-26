@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: the database lists work as one system: each row starts with the entity's icon and its name in its colour (item quality, a faction's side, a quest's side, a set's classes), columns run name, numbers, where, status, id, a Rows choice of 25, 50 or 100 sits beside the pager (?per=), more columns sort in the URL, the spell list filters by class, game-file lists lead with the unconfirmed mark, and the dungeon list folds into one line per row on a phone.
+- Site: boss pages, one per dungeon and raid encounter at /database/bosses: the instance and order from the game files, the creature players tie to it, its loot, kills and linked characters' kill counts, linked from instance and NPC pages, search, the sitemap and hover cards.
 - Site: NPC, object, quest, vendor and zone pages draw their agreed positions on the zone's map above the tabs, one zone at a time with a switcher, a legend and a link to the world map.
 - Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.
 - Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.

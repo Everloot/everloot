@@ -55,7 +55,7 @@ const OVERVIEW_LIMIT = 5;
  * Wiki, tools, docs and classes have no list that takes a query; the lore archive has its own list under `in=lore`.
  */
 const LIST_OF: Record<ResultScope, string> = {
-  item: "/database/items", npc: "/database/npcs", quest: "/database/quests", object: "/database/objects", zone: "/database/zones", instance: "/database/instances",
+  item: "/database/items", npc: "/database/npcs", quest: "/database/quests", object: "/database/objects", zone: "/database/zones", instance: "/database/instances", boss: "/database/bosses",
   vendor: "/database/vendors", spell: "/database/spells", "item-set": "/database/item-sets",
   achievement: "/database/achievements", faction: "/database/factions", title: "/database/titles", chain: "/database/quest-chains",
   mount: "/database/mounts", pet: "/database/pets", currency: "/database/currencies",

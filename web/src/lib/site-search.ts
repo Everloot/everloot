@@ -12,6 +12,7 @@ import type { SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
+import { bossEntries, bossHref, type BossEntry } from "./bosses";
 import { laterExpansionPages, loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { byPhrase, byTypo, byWords, rank, respelling, type Match } from "./name-match";
 import { loadNames, type Names } from "./names";
@@ -28,7 +29,7 @@ export { byTypo, editDistance } from "./name-match";
  * the item is in the build.
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
-export type SearchType = "class" | "item" | "npc" | "vendor" | "quest" | "object" | "spell" | "achievement" | "faction" | "title" | "chain" | "item-set" | "mount" | "pet" | "currency" | "holiday" | "family" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
+export type SearchType = "class" | "item" | "npc" | "vendor" | "quest" | "object" | "spell" | "achievement" | "faction" | "title" | "chain" | "item-set" | "mount" | "pet" | "currency" | "holiday" | "family" | "zone" | "instance" | "boss" | "guide" | "lore" | "tool" | "doc";
 /**
  * `total` counts every match; `results` holds the first `limit` of them. `respelled` is how the typo fallback read the
  * query ("linen cloth" for "lnen clth"), on every group when it fired.
@@ -38,17 +39,17 @@ export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
-  class: "Classes", item: "Items", npc: "NPCs", vendor: "Vendors", quest: "Quests", object: "Objects", spell: "Spells", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", "item-set": "Item sets", mount: "Mounts", pet: "Companion pets", currency: "Currencies", holiday: "Holidays and world events", family: "Hunter pet families", zone: "Zones", instance: "Dungeons and raids", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
+  class: "Classes", item: "Items", npc: "NPCs", vendor: "Vendors", quest: "Quests", object: "Objects", spell: "Spells", achievement: "Achievements", faction: "Factions", title: "Titles", chain: "Quest chains", "item-set": "Item sets", mount: "Mounts", pet: "Companion pets", currency: "Currencies", holiday: "Holidays and world events", family: "Hunter pet families", zone: "Zones", instance: "Dungeons and raids", boss: "Bosses", guide: "Wiki", lore: "Lore archive", tool: "Tools", doc: "Docs",
 };
 /** The lore group's heading when its pages hold only some of the asked words. */
 export const LORE_SOME_WORDS = "Lore archive, some of your words";
-const ORDER: SearchType[] = ["class", "item", "npc", "vendor", "quest", "object", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance", "guide", "lore", "tool", "doc"];
+const ORDER: SearchType[] = ["class", "item", "npc", "vendor", "quest", "object", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance", "boss", "guide", "lore", "tool", "doc"];
 /** The types a search can be scoped to (`/search?q=…&in=item`); `in=lore` is the lore archive's own list. */
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
 export const isScope = (v: unknown): v is Scope => (SCOPES as readonly unknown[]).includes(v);
 /** These groups keep search's matching rules and page within search rather than a database list. */
-export const PAGED_SCOPES = ["vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance"] as const;
+export const PAGED_SCOPES = ["vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "mount", "pet", "currency", "holiday", "family", "zone", "instance", "boss"] as const;
 export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
 export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
 export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
@@ -133,6 +134,17 @@ function instanceHits(match: Match): (SearchResult & { id: number; r: number })[
     const note = [row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon", level && `level ${level}`].filter(Boolean).join(", ");
     return [{ label: instanceTitle(row), href: instanceHref(row.instanceMapId, row.name), note, exact: r === 0, id: row.instanceMapId, r }];
   }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label));
+}
+
+let bossList: BossEntry[] | undefined;
+/** The bosses of the listed instances (lib/bosses.ts) by name or encounter id, the note naming the instance. */
+function bossHits(match: Match, id: number | null): (SearchResult & { r: number })[] {
+  bossList ??= bossEntries();
+  const hit = (b: BossEntry, exact: boolean, r: number) => ({ label: b.name, href: bossHref(b.id, b.row.name), note: `Boss in ${instanceTitle(b.instance)}`, exact, id: b.id, r });
+  const exact = id === null ? undefined : bossList.find((b) => b.id === id);
+  const out = exact ? [hit(exact, true, -1)] : [];
+  for (const { entry, exact: same, r } of byName(bossList, match)) if (entry.id !== id) out.push(hit(entry, same, r));
+  return out;
 }
 
 /** Released zones on the map by name, best first, as the zone group of /search lists them. */
@@ -287,6 +299,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
     if (!only || paged) {
       if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
       if (want("instance")) hits.set("instance", instanceHits(match));
+      if (want("boss")) hits.set("boss", bossHits(match, id));
       // Mounts, companion pets and currencies the game files list, by name or id.
       if (want("mount")) hits.set("mount", fileHits(mountEntries(), match, id, mountHref));
       if (want("pet")) hits.set("pet", fileHits(petEntries(), match, id, petHref));
@@ -400,7 +413,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
 
 /** The things a player meets in the game: their groups lead the page. */
 const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone", "instance"]);
-const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "guide"]);
+const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "boss", "vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "guide"]);
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,

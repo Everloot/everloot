@@ -14,7 +14,7 @@ import { TALENT_CLASSES, loadCatalog as loadTalentCatalog } from "@/lib/talents/
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, categoryNamedEnough, itemsHref } from "@/lib/items";
 import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
-import { instancePaths } from "@/lib/database-sitemap";
+import { bossPaths, instancePaths } from "@/lib/database-sitemap";
 import { currencyEntries, currencyHref, mountEntries, mountHref, petEntries, petHref } from "@/lib/collectibles";
 import { holidayEntries, holidayHref, petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { loadSightings } from "@/lib/instances";
@@ -64,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   // A zone's coverage page once players have confirmed something there, as its own robots ask.
   const coverageRoutes = publicZones().filter((z) => hasConfirmed(contents.get(z.mapId))).map(zoneCoverageHref);
   // Each dungeon and raid page, under the rule its page states (lib/database-sitemap.ts).
-  const instanceRoutes = instancePaths(seen);
+  const instanceRoutes = [...instancePaths(seen), ...bossPaths(seen)];
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
   const catalog = await loadCatalog();
   const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
