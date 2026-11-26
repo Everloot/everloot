@@ -30,9 +30,12 @@ import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import {
-  hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneHref, zoneMapHref,
-  type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
+  creatureLevels, hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneFlightMasters, zoneHref, zoneMapHref,
+  type ZoneEntrance, type ZoneFaction, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
+import { SIDE_LABEL, SIDE_TONE } from "@/lib/world-lists";
+import type { NpcRank } from "@kb/world-pages";
+import type { Fact } from "@/components/ui/Facts";
 import { zoneLore } from "@/lib/zone-lore";
 import { gearFor, TERRAIN_BUILD, TERRAIN_PATH, zoneTerrain } from "@/lib/terrain";
 import TerrainGearTable from "@/components/TerrainGearTable";
@@ -80,6 +83,15 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 const position = (x: number, y: number) => `${x}, ${y}`;
+
+/** Whose land the game files say the zone is; contested stays plain, as a quest for both sides does. */
+const TERRITORY: Record<ZoneFaction, { label: string; tone: string }> = {
+  alliance: { label: "Alliance territory", tone: "text-faction-alliance" },
+  horde: { label: "Horde territory", tone: "text-faction-horde" },
+  contested: { label: "Contested territory", tone: "text-fg-2" },
+};
+/** A rank badge for anything above normal, as on the NPC page. */
+const RANK_LABELS: Record<NpcRank, string> = { normal: "Normal", elite: "Elite", rare: "Rare", rare_elite: "Rare elite", boss: "Boss" };
 
 export default async function ZonePage(props: Props) {
   const { zone: segment } = await props.params;
@@ -161,7 +173,13 @@ export default async function ZonePage(props: Props) {
   const empty = (message: string) => <div className="px-4 sm:px-6"><EmptyTab message={message} players={false} action={null} /></div>;
 
   const npcColumns = (kind: "npcs" | "vendors"): Column<ZoneNpc>[] => [
-    { key: "name", header: "Name", cell: (n) => <Link href={`/database/${kind}/${n.npcId}`} className={link}>{nameOf(n)}</Link> },
+    { key: "name", header: "Name", cell: (n) => (
+      <span className="inline-flex flex-wrap items-center gap-x-2">
+        <Link href={`/database/${kind}/${n.npcId}`} className={link}>{nameOf(n)}</Link>
+        {n.rank && n.rank !== "normal" && <Badge tone="neutral">{RANK_LABELS[n.rank]}</Badge>}
+      </span>
+    ) },
+    { key: "level", header: "Level", numeric: true, cell: (n) => n.level ?? "–" },
     { key: "at", header: "Position", numeric: true, cell: (n) => position(n.x, n.y) },
     { key: "installs", header: "Installs", cell: (n) => <AgreementMeter count={n.reporters} /> },
   ];
@@ -177,6 +195,8 @@ export default async function ZonePage(props: Props) {
       </>;
     } },
     { key: "level", header: "Level", numeric: true, cell: (q) => q.level ?? "–" },
+    // The side 3 installs agree it is offered to, in its faction's colour; a dash while unagreed.
+    { key: "side", header: "Side", cell: (q) => (q.side ? <span className={SIDE_TONE[q.side]}>{SIDE_LABEL[q.side]}</span> : "–") },
     { key: "giver", header: "Giver", cell: (q) => npcLink(q.giverNpcId) },
     { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId) },
   ];
@@ -230,10 +250,11 @@ export default async function ZonePage(props: Props) {
     { key: "seen", header: "Last seen", cell: (t) => dayLabel(t.lastSeen) },
   ];
 
+  // Most useful first: what to do here, who is here, who sells; a tab with no rows is left out (Tabs).
   const all: TabItem[] = [
+    { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty(EMPTY.zoneQuests)} /> },
     { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneNpcs)} /> },
     { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneVendors)} /> },
-    { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty(EMPTY.zoneQuests)} /> },
     // The loot tables could not be read (the world facts could): the tab says so, with no count and no empty-list copy.
     loot.unreachable
       ? { id: "items", label: "Items", panel: <p data-items-unreadable className="px-4 py-3 text-meta text-fg-2 sm:px-6">Items could not be read right now. They are unrecorded here, not none. Try again in a minute.</p> }
@@ -243,8 +264,8 @@ export default async function ZonePage(props: Props) {
         {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" below /></div>}
         {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
       </> },
-    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty(EMPTY.zoneTreasures)} /> },
+    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
   ];
   // The named places the game files list in the zone: points of interest at their spot, then the subzones.
   const places = zonePlaces(zone.mapId);
@@ -280,6 +301,35 @@ export default async function ZonePage(props: Props) {
   // Storage down: an empty list would read as "nobody has seen anything", so only the game-file lists stay.
   const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons" || t.id === "places") : all;
 
+  // The zone at a glance. The game files give its entrances and flight masters; the counts are what 3 installs agreed on,
+  // a row only for a kind with one (no row is not "none"), and none at all while storage is down.
+  const levels = creatureLevels(npcs);
+  const flights = zoneFlightMasters(zone.mapId);
+  const counted = facts.unreachable ? [] : ([["NPCs", npcs.length], ["Vendors", vendors.length], ["Quests", quests.length], ["Objects", treasures.length]] as const).filter(([, n]) => n > 0);
+  const quickFacts: Fact[] = [
+    ...(entrances.length ? [{ label: "Dungeons and raids", value: (
+      <span data-zone-instances>
+        {entrances.flatMap((e) => entranceLinks(e)).map(({ name, id }, i) => (
+          <span key={`${name}-${i}`}>{i > 0 && ", "}{id ? <Link href={instanceHref(id, name)} className={link}>{name}</Link> : name}</span>
+        ))}
+      </span>
+    ) }] : []),
+    ...(flights.length ? [{ label: "Flight masters", value: (
+      <span data-zone-flights>
+        {flights.map((n, i) => (
+          <span key={n.id}>
+            {i > 0 && " · "}<span>{n.name}</span>
+            {(n.faction === "alliance" || n.faction === "horde") && <span> (<span className={SIDE_TONE[n.faction]}>{SIDE_LABEL[n.faction]}</span>)</span>}
+          </span>
+        ))}
+      </span>
+    ) }] : []),
+    ...counted.map(([label, n]) => ({ label, value: n, numeric: true })),
+    ...(farmLinks.length ? [{ label: "Farming and gathering", value: (
+      <span data-farm-links>{farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}</span>
+    ) }] : []),
+  ];
+
   return (
     <EntityPage
       name={zone.name}
@@ -291,6 +341,9 @@ export default async function ZonePage(props: Props) {
         icon: <EntityIcon src={art?.smallUrl ?? art?.url} cover />,
         meta: [
           <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
+          zone.faction ? <span key="territory" className={TERRITORY[zone.faction].tone}>{TERRITORY[zone.faction].label}</span> : null,
+          // The game files give a zone no level range; this is the creatures' levels players agree on, and says so.
+          levels ? <span key="levels">{`Creatures ${levels.min === levels.max ? levels.min : `${levels.min}–${levels.max}`}`}<span className="text-muted"> (agreed NPC levels)</span></span> : null,
           <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
           wiki ? <Link key="wiki" href={wikiHref(wiki.slug)} className={link}>Wiki</Link> : null,
         ],
@@ -300,6 +353,7 @@ export default async function ZonePage(props: Props) {
         ],
         aside: <Link href={zoneMapHref(zone.mapId)} className="ctl inline-flex items-center border border-edge px-3 text-control text-fg-2 hover:text-fg">Open on the map</Link>,
       }}
+      facts={quickFacts.length > 0 && quickFacts}
       notices={facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
       // Without map art for the map slot, the zone's box: its outline with the pins on it, first in the side column
       // (under the title on a phone).
@@ -331,12 +385,6 @@ export default async function ZonePage(props: Props) {
             </div>
           )}
           <Tabs label={`Known in ${zone.name}`} tabs={tabs} empty={empty(noEntrance)} />
-          {farmLinks.length > 0 && (
-            <p data-farm-links className="mt-3 text-meta text-fg-2">
-              Farming and gathering:{" "}
-              {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
-            </p>
-          )}
         </section>
       }
       related={<>

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { WorldMapData } from "@kb/world-map-data";
 import type { WorldFacts } from "@kb/world-pages";
 import { WORLD_MAP } from "./world-map";
-import { hasContent, parseZoneSegment, placedEntrances, publicZones, zoneByMapId, zoneContents, zoneHref, zoneMapHref, zoneSlug } from "./zones";
+import { creatureLevels, hasContent, parseZoneSegment, placedEntrances, publicZones, zoneByMapId, zoneContents, zoneFlightMasters, zoneHref, zoneMapHref, zoneSlug } from "./zones";
 
 // SYNTHETIC data in the shape of the generated file; the numbers and names are made up.
 const data: WorldMapData = {
@@ -13,7 +13,7 @@ const data: WorldMapData = {
     { id: 1, name: "Kalimdor", bounds: { top: 12000, bottom: -11000, left: 17000, right: -19000 } },
   ],
   zones: [
-    { uiMapId: 1429, name: "Synthetic Forest", continentId: 0, bounds: { top: -7940, bottom: -10254, left: 1535, right: -1935 } },
+    { uiMapId: 1429, name: "Synthetic Forest", continentId: 0, bounds: { top: -7940, bottom: -10254, left: 1535, right: -1935 }, faction: "alliance" },
     { uiMapId: 1411, name: "Synthetic Dunes", continentId: 1, bounds: { top: 1800, bottom: -1700, left: -2000, right: -7250 } },
   ],
   heldBackZones: [
@@ -24,7 +24,12 @@ const data: WorldMapData = {
     { mapId: 389, name: "Synthetic Chasm", raid: false, continentId: 1, worldX: 1500, worldY: -4423.4 },
     { mapId: 99, name: "Synthetic Spire", raid: true, continentId: 1, worldX: 5000, worldY: -2000 },
   ],
-  flightNodes: [],
+  flightNodes: [
+    { id: 2, name: "Synthetic Keep, Forest", continentId: 0, worldX: -9000, worldY: 0, uiMapId: 1429, faction: "alliance" },
+    { id: 3, name: "Abbey Rest, Forest", continentId: 0, worldX: -9100, worldY: 10, uiMapId: 1429, faction: "both" },
+    { id: 4, name: "Dune Camp", continentId: 1, worldX: 0, worldY: -4000, uiMapId: 1411, faction: "horde" },
+    { id: 5, name: "Unplaced Roost", continentId: 1, worldX: 0, worldY: -4100 },
+  ],
   flightPaths: [],
   warnings: [],
 };
@@ -57,6 +62,17 @@ describe("zone addresses", () => {
     expect(zoneByMapId(2482, data)).toBeUndefined();
     expect(zoneByMapId(1411, data)).toMatchObject({ name: "Synthetic Dunes", continentName: "Kalimdor" });
   });
+
+  test("a zone carries the side the game files give its territory, and none when they give none", () => {
+    expect(zoneByMapId(1429, data)).toMatchObject({ faction: "alliance" });
+    expect(zoneByMapId(1411, data)).not.toHaveProperty("faction");
+  });
+
+  test("the flight masters the game files put in a zone, by name; one placed nowhere is in none", () => {
+    expect(zoneFlightMasters(1429, data).map((n) => [n.name, n.faction])).toEqual([["Abbey Rest, Forest", "both"], ["Synthetic Keep, Forest", "alliance"]]);
+    expect(zoneFlightMasters(1411, data).map((n) => n.name)).toEqual(["Dune Camp"]);
+    expect(zoneFlightMasters(2482, data)).toEqual([]);
+  });
 });
 
 describe("zoneContents", () => {
@@ -65,7 +81,7 @@ describe("zoneContents", () => {
   test("an NPC needs 3 installs on the zone's map; two are not enough", () => {
     const facts: WorldFacts = { ...empty, npcs: [...three(100, "Guard Orin", 1429, 40, 50), sighting("install-a", 101, "Lone Wolf", 1429, 10, 10), sighting("install-b", 101, "Lone Wolf", 1429, 10, 10)] };
     const forest = zoneContents(facts, data).get(1429)!;
-    expect(forest.npcs).toEqual([{ npcId: 100, name: "Guard Orin", x: 40, y: 50, reporters: 3, vendor: false }]);
+    expect(forest.npcs).toEqual([{ npcId: 100, name: "Guard Orin", x: 40, y: 50, reporters: 3, vendor: false, level: null, rank: null, reaction: null }]);
     expect(zoneContents(facts, data).get(1411)!.npcs).toEqual([]);
   });
 
@@ -76,7 +92,7 @@ describe("zoneContents", () => {
 
   test("a quest sits in the zone where its agreed giver stands, with its agreed level", () => {
     const facts: WorldFacts = { ...empty, npcs: three(100, "Guard Orin", 1429, 40, 50), quests: ["a", "b", "c"].map((i) => quest(`install-${i}`, 7, 100, 4)) };
-    expect(zoneContents(facts, data).get(1429)!.quests).toEqual([{ questId: 7, title: "Quest 7", level: 4, giverNpcId: 100, turnInNpcId: null }]);
+    expect(zoneContents(facts, data).get(1429)!.quests).toEqual([{ questId: 7, title: "Quest 7", level: 4, giverNpcId: 100, turnInNpcId: null, side: null }]);
     expect(zoneContents(facts, data).get(1411)!.quests).toEqual([]);
     const twoOnly: WorldFacts = { ...facts, quests: ["a", "b"].map((i) => quest(`install-${i}`, 7, 100)) };
     expect(zoneContents(twoOnly, data).get(1429)!.quests).toEqual([]);
@@ -120,6 +136,29 @@ describe("zoneContents", () => {
     const two = zoneContents(empty, data, { instances: { entrances: instances.entrances.filter((e) => e.installId !== "install-c"), encounters: instances.encounters.slice(0, 2) }, sightings: sightings.slice(0, 2) }).get(1429)!;
     expect(two.entrances).toEqual([{ names: ["Synthetic Stockade"], instanceMapIds: [34], raid: false, x: 19.8, y: 35.5, files: true, confirmed: null, lastSeen: null, bosses: [] }]);
     expect(two.treasures).toEqual([]);
+  });
+
+  test("an NPC carries the level, rank and reaction 3 installs agree on; two are not enough", () => {
+    const traits = (installId: string, level: number) => ({ ...sighting(installId, 300, "Old Boar", 1429, 30, 30), level, rank: "elite" as const, reaction: "hostile" as const });
+    const agreed = zoneContents({ ...empty, npcs: ["a", "b", "c"].map((i) => traits(`install-${i}`, 9)) }, data).get(1429)!.npcs[0];
+    expect(agreed).toMatchObject({ npcId: 300, level: 9, rank: "elite", reaction: "hostile" });
+    const split = zoneContents({ ...empty, npcs: [traits("install-a", 9), traits("install-b", 9), { ...sighting("install-c", 300, "Old Boar", 1429, 30, 30) }] }, data).get(1429)!.npcs[0];
+    expect(split).toMatchObject({ npcId: 300, level: null, rank: null, reaction: null });
+  });
+
+  test("a quest carries the side 3 installs agree it is offered to", () => {
+    const sided = (installId: string, faction: "alliance" | "horde") => ({ ...quest(installId, 8, 100), faction });
+    const facts: WorldFacts = { ...empty, npcs: three(100, "Guard Orin", 1429, 40, 50), quests: ["a", "b", "c"].map((i) => sided(`install-${i}`, "alliance")) };
+    expect(zoneContents(facts, data).get(1429)!.quests[0]).toMatchObject({ questId: 8, side: "alliance" });
+    const two: WorldFacts = { ...facts, quests: [sided("install-a", "horde"), sided("install-b", "horde"), quest("install-c", 8, 100)] };
+    expect(zoneContents(two, data).get(1429)!.quests[0]).toMatchObject({ questId: 8, side: null });
+  });
+
+  test("the creature levels are the agreed levels of the NPCs that are not friendly, and none without one", () => {
+    const npc = (level: number | null, reaction: "friendly" | "neutral" | "hostile" | null) => ({ npcId: 1, name: null, x: 0, y: 0, reporters: 3, vendor: false, level, rank: null, reaction });
+    expect(creatureLevels([npc(5, "hostile"), npc(12, "neutral"), npc(55, "friendly"), npc(8, null), npc(null, "hostile")])).toEqual({ min: 5, max: 12 });
+    expect(creatureLevels([npc(7, "hostile")])).toEqual({ min: 7, max: 7 });
+    expect(creatureLevels([npc(55, "friendly"), npc(null, "hostile")])).toBeNull();
   });
 
   test("held-back zones are not in the result at all", () => {

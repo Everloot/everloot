@@ -22,6 +22,8 @@
  *   (LFGDungeons has no `MapID` in this build). An instance the files give no level for has none here.
  * - Difficulty: the build's own difficulty names and group sizes, by id ("Normal", "40 Player"); MapDifficulty
  *   joins each instance map to the difficulties it has. Both default to empty in older committed files.
+ * - AreaTable `FactionGroupMask`, of the area a zone's whole-map assignment shows: whose territory the zone is
+ *   (`zoneFaction`). The files give zones no level range: their AreaTable and UiMap `ContentTuningID` are 0.
  * - AreaTable and TerrainArea (derived at extraction, terrain-area.ts): the zone each entrance and flight master
  *   is in. An area's `ParentAreaID` chain reaches the area a zone's UiMapAssignment names (`AreaID`). For an
  *   entrance, the area that starts the chain is the outdoor area named after the instance on the entrance's
@@ -47,7 +49,11 @@ export const WORLD_MAP_TABLES = ["Map", "UiMap", "UiMapAssignment", "TaxiNodes",
 export const ORIGINAL_ZONE_UI_MAP_IDS = { min: 1411, max: 1458 } as const;
 
 const Rect = z.object({ left: z.number(), top: z.number(), right: z.number(), bottom: z.number() });
-const ZoneRow = z.object({ uiMapId: z.number().int(), name: z.string(), continentId: z.number().int(), bounds: Rect });
+const ZoneRow = z.object({
+  uiMapId: z.number().int(), name: z.string(), continentId: z.number().int(), bounds: Rect,
+  /** Whose territory the zone is (`zoneFaction`). Absent when the files give no mask, and in files made before the field. */
+  faction: z.enum(["alliance", "horde", "contested"]).optional(),
+});
 export const WorldMapData = z.object({
   schema: z.literal(WORLD_MAP_SCHEMA),
   source: z.object({
@@ -223,10 +229,12 @@ export function buildWorldMapData(
 
   const zones: WorldMapData["zones"] = [];
   const heldBackZones: WorldMapData["zones"] = [];
+  const areaRows = get("AreaTable");
   for (const u of uiMaps.values()) {
     const id = Number(u.ID), at = placed.get(id);
     if (u.Type !== UI_MAP_ZONE || !at || !continentIds.has(at.mapId) || typeof u.Name_lang !== "string") continue;
-    const row = { uiMapId: id, name: u.Name_lang, continentId: at.mapId, bounds: at.rect };
+    const faction = zoneFaction(areaRows?.get(at.areaId)?.FactionGroupMask);
+    const row = { uiMapId: id, name: u.Name_lang, continentId: at.mapId, bounds: at.rect, ...(faction ? { faction } : {}) };
     if (id < ORIGINAL_ZONE_UI_MAP_IDS.min || id > ORIGINAL_ZONE_UI_MAP_IDS.max) heldBackZones.push(row);
     else zones.push(row);
   }
@@ -322,6 +330,17 @@ export function thinLine(points: [number, number][], tolerance: number): [number
   }
   if (far <= tolerance) return [points[0]!, points[points.length - 1]!];
   return [...thinLine(points.slice(0, at + 1), tolerance).slice(0, -1), ...thinLine(points.slice(at), tolerance)];
+}
+
+/**
+ * AreaTable `FactionGroupMask` of the area a zone shows: 2 the Alliance's territory, 4 the Horde's; 0 (neither) or
+ * both bits is contested, as the game's zone text has it. No mask gives nothing.
+ */
+export function zoneFaction(mask: unknown): "alliance" | "horde" | "contested" | undefined {
+  const m = num(mask);
+  if (m === null) return undefined;
+  const alliance = (m & 2) !== 0, horde = (m & 4) !== 0;
+  return alliance === horde ? "contested" : alliance ? "alliance" : "horde";
 }
 
 /** TaxiNodes `Flags`: bit 1 shows a node on the Alliance flight map, bit 2 on the Horde one. */
