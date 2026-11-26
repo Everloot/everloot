@@ -1,7 +1,5 @@
 import { dropTierLabel } from "@kb/drop-rollup";
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -15,9 +13,9 @@ import { loadObjectFacts } from "@/lib/objects";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
+import { DataTable, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
-import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { unknownObject } from "../../unknown";
 
@@ -75,54 +73,42 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   });
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/objects/${page.objectId}`, identifier: `object:${page.objectId}` })} />
-        <EntityHeader trail={trail} title={title} meta={["Object", "chest, herb, ore vein or fishing pool"]} />
-        <EntityTop
-          box={<TooltipFrame name={title} label={`${title}, as players saw it`} />}
-          facts={!facts.unreachable && (
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Loot windows", value: known(windows), numeric: true },
-                { label: "Items seen", value: known(page.zero ? "None" : page.drops.length || null), numeric: true },
-                { label: "Map positions", value: known(page.pins?.length || null), numeric: true },
-              ]}
-            />
-          )}
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData report={{ type: "Object", id: page.objectId, path: `/database/objects/${page.objectId}` }}
-            text={[`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n")}
-            jsonHref={!facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined}
-          />
-        </EntitySidebar>
-        <Tabs
-          label={`${title}: relations`}
-          tabs={[{
-            // No rates yet but loot on record (none with an item, short of 3 installs, or outside the rates): no count, so the tab and its line stay.
-            id: "drops", label: "Drops", count: facts.unreachable || (!page.drops.length && (page.zero || page.queued || pending)) ? undefined : page.drops.length,
-            panel: facts.unreachable ? <Unreachable />
-              : <>
-                {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />
-                  : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {dropTierLabel(page.zero.reporters)}.</p>
-                  : <EmptyTab message={page.queued ? EMPTY.queued : EMPTY.drops("this object")} />}
-                {pending}
-              </>,
-          }, {
-            id: "map", label: "Map", count: facts.unreachable ? undefined : pins.length,
-            panel: facts.unreachable ? <Unreachable />
-              : pins.length ? <PinTable caption={`Where players saw ${title} on the minimap`} rows={pins} rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} />
-              : <EmptyTab message={EMPTY.position} />,
-          }]}
-        />
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-        </div>
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: `/database/objects/${page.objectId}`, identifier: `object:${page.objectId}` }}
+      header={{ trail, title, meta: ["Object", "chest, herb, ore vein or fishing pool"] }}
+      box={<TooltipFrame name={title} label={`${title}, as players saw it`} />}
+      facts={!facts.unreachable && [
+        { label: "Loot windows", value: known(windows), numeric: true },
+        { label: "Items seen", value: known(page.zero ? "None" : page.drops.length || null), numeric: true },
+        { label: "Map positions", value: known(page.pins?.length || null), numeric: true },
+      ]}
+      summary={summary}
+      main={<Tabs
+        label={`${title}: relations`}
+        tabs={[{
+          // No rates yet but loot on record (none with an item, short of 3 installs, or outside the rates): no count, so the tab and its line stay.
+          id: "drops", label: "Drops", count: facts.unreachable || (!page.drops.length && (page.zero || page.queued || pending)) ? undefined : page.drops.length,
+          panel: facts.unreachable ? <Unreachable />
+            : <>
+              {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />
+                : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {dropTierLabel(page.zero.reporters)}.</p>
+                : <EmptyTab message={page.queued ? EMPTY.queued : EMPTY.drops("this object")} />}
+              {pending}
+            </>,
+        }, {
+          id: "map", label: "Map", count: facts.unreachable ? undefined : pins.length,
+          panel: facts.unreachable ? <Unreachable />
+            : pins.length ? <PinTable caption={`Where players saw ${title} on the minimap`} rows={pins} rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} />
+            : <EmptyTab message={EMPTY.position} />,
+        }]}
+      />}
+      related={<LoreSection match={lore} />}
+      openData={{
+        report: { type: "Object", id: page.objectId, path: `/database/objects/${page.objectId}` },
+        text: [`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n"),
+        jsonHref: !facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined,
+      }}
+    />
   );
 }

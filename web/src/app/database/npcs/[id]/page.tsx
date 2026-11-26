@@ -1,8 +1,6 @@
 import { loadWikiEntityNames, shownNpcName } from "@/lib/wiki-entity-names";
 import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -15,8 +13,8 @@ import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-com
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
+import { DataTable, Tabs, TooltipFrame } from "@/components/ui";
+import { EMPTY, EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
@@ -129,103 +127,97 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   if (shown.fromWiki) summary[2] = NAME_FROM.wiki + ".";
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/npcs/${npcId}`, identifier: `npc:${npcId}` })} />
-        <EntityHeader trail={trail} title={shown.fromWiki ? <a href={shown.wikiPage} title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></a> : title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
-        <EntityTop railMap
-          // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
-          box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
-            <TooltipFrame name={title} label={`${title}, as players saw it`}>
-              <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>
-            </TooltipFrame>
-          ))}
-          facts={!unreachable && (
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Reported name", value: known(page.name, npcNameReporters(npcId, facts)) },
-                { label: "Level", value: known(traits.level), numeric: true },
-                { label: "Type", value: known(traits.creatureType) },
-                { label: "Reaction", value: known(traits.reaction && ({ friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" })[traits.reaction]) },
-                { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
-                { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
-                { label: "Map positions", value: known(page.pins.length || null), numeric: true },
-                // Drop rows show from one install; their table labels the agreement tier.
-                { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
-              ]}
-            />
-          )}
-        />
-        <EntitySidebar>
-          <ModelPicture picture={picture} name={title} />
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData report={{ type: "NPC", id: npcId, path: `/database/npcs/${npcId}` }}
-            text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
-            jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
-          />
-        </EntitySidebar>
-        <Tabs
-          className="mt-6"
-          label={`${title}: relations`}
-          tabs={[
-            {
-              // No rates yet but loot windows on record (short of 3 installs, none with an item, or outside the rates):
-              // no count, so the tab and its line stay.
-              id: "drops", label: "Drops", count: unreachable || (!dropped.length && (lootTable.state !== "none" || pending)) ? undefined : dropped.length,
-              panel: unreachable ? <Unreachable />
-                : <>
-                  <NpcLootPanel
-                    table={lootTable}
-                    title={title}
-                    dataAsOf={loot.dataAsOf}
-                    item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
-                  />
-                  {pending}
-                </>,
-            },
-            {
-              // Reports short of 3 installs fill the meter: no count, so the tab and its meter stay.
-              id: "goods", label: "Goods", count: unreachable || (!goods.length && goodsReported) ? undefined : goods.length,
-              panel: unreachable ? <Unreachable />
-                : goods.length ? <>
-                  <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>
-                  <VendorGoods title={title} offers={goods} tips={tips} items={names} evidence={goodsEvidence} />
-                </>
-                : <EmptyTab reported={goodsReported} message={EMPTY.goods} />,
-            },
-            {
-              id: "quests", label: "Quests", count: unreachable || (!quests.length && questsReported) ? undefined : quests.length,
-              panel: unreachable ? <Unreachable />
-                : quests.length ? <DataTable
-                  dense
-                  caption={`Quests ${title} gives and takes`}
-                  columns={[
-                    { key: "role", header: "Role", cell: (q) => q.role },
-                    { key: "quest", header: "Quest", cell: (q) => <EntityLink kind="quest" id={q.questId} name={q.title} /> },
-                    { key: "reported", header: "Reported", cell: (q) => q.reported },
-                  ]}
-                  rows={quests}
-                  rowKey={(q) => `${q.questId}-${q.role}`}
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: `/database/npcs/${npcId}`, identifier: `npc:${npcId}` }}
+      header={{
+        trail,
+        title: shown.fromWiki ? <a href={shown.wikiPage} title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></a> : title,
+        meta: ["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null],
+      }}
+      railMap
+      // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
+      box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
+        <TooltipFrame name={title} label={`${title}, as players saw it`}>
+          <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>
+        </TooltipFrame>
+      ))}
+      facts={!unreachable && [
+        { label: "Reported name", value: known(page.name, npcNameReporters(npcId, facts)) },
+        { label: "Level", value: known(traits.level), numeric: true },
+        { label: "Type", value: known(traits.creatureType) },
+        { label: "Reaction", value: known(traits.reaction && ({ friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" })[traits.reaction]) },
+        { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
+        { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
+        { label: "Map positions", value: known(page.pins.length || null), numeric: true },
+        // Drop rows show from one install; their table labels the agreement tier.
+        { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
+      ]}
+      media={picture && <ModelPicture picture={picture} name={title} />}
+      summary={summary}
+      main={<Tabs
+        label={`${title}: relations`}
+        tabs={[
+          {
+            // No rates yet but loot windows on record (short of 3 installs, none with an item, or outside the rates):
+            // no count, so the tab and its line stay.
+            id: "drops", label: "Drops", count: unreachable || (!dropped.length && (lootTable.state !== "none" || pending)) ? undefined : dropped.length,
+            panel: unreachable ? <Unreachable />
+              : <>
+                <NpcLootPanel
+                  table={lootTable}
+                  title={title}
+                  dataAsOf={loot.dataAsOf}
+                  item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
                 />
-                : <EmptyTab reported={questsReported} message={EMPTY.quests} />,
-            },
-            {
-              id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,
-              panel: unreachable ? <Unreachable />
-                : page.pins.length ? <PinTable caption={`Where ${title} stands`} rows={page.pins} rowKey={(p) => String(p.mapId)} />
-                : <EmptyTab message={EMPTY.position} />,
-            },
-          ]}
-        />
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-          {!unreachable && (page.name !== null || dropped.length > 0 || zero !== undefined) && <AdSlot slot="inContent" />}
-        </div>
-        <EntityScreenshots type="npc" id={npcId} name={title} />
-        <EntityComments type="npc" id={npcId} />
-      </EntityLayout>
-    </Container>
+                {pending}
+              </>,
+          },
+          {
+            // Reports short of 3 installs fill the meter: no count, so the tab and its meter stay.
+            id: "goods", label: "Goods", count: unreachable || (!goods.length && goodsReported) ? undefined : goods.length,
+            panel: unreachable ? <Unreachable />
+              : goods.length ? <>
+                <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>
+                <VendorGoods title={title} offers={goods} tips={tips} items={names} evidence={goodsEvidence} />
+              </>
+              : <EmptyTab reported={goodsReported} message={EMPTY.goods} />,
+          },
+          {
+            id: "quests", label: "Quests", count: unreachable || (!quests.length && questsReported) ? undefined : quests.length,
+            panel: unreachable ? <Unreachable />
+              : quests.length ? <DataTable
+                dense
+                caption={`Quests ${title} gives and takes`}
+                columns={[
+                  { key: "role", header: "Role", cell: (q) => q.role },
+                  { key: "quest", header: "Quest", cell: (q) => <EntityLink kind="quest" id={q.questId} name={q.title} /> },
+                  { key: "reported", header: "Reported", cell: (q) => q.reported },
+                ]}
+                rows={quests}
+                rowKey={(q) => `${q.questId}-${q.role}`}
+              />
+              : <EmptyTab reported={questsReported} message={EMPTY.quests} />,
+          },
+          {
+            id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,
+            panel: unreachable ? <Unreachable />
+              : page.pins.length ? <PinTable caption={`Where ${title} stands`} rows={page.pins} rowKey={(p) => String(p.mapId)} />
+              : <EmptyTab message={EMPTY.position} />,
+          },
+        ]}
+      />}
+      related={<>
+        <LoreSection match={lore} />
+        {!unreachable && (page.name !== null || dropped.length > 0 || zero !== undefined) && <AdSlot slot="inContent" />}
+      </>}
+      screenshots={<EntityScreenshots type="npc" id={npcId} name={title} />}
+      comments={<EntityComments type="npc" id={npcId} />}
+      openData={{
+        report: { type: "NPC", id: npcId, path: `/database/npcs/${npcId}` },
+        text: [`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n"),
+        jsonHref: !facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined,
+      }}
+    />
   );
 }

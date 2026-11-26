@@ -217,7 +217,7 @@ test("a named NPC with a model picture shows it in the side column: lazy, sized,
   mocks.renders.mockResolvedValue({ npcs: new Map([[1125, MODEL]]), items: new Map() });
   const out = await html();
   const sidebar = out.split("data-entity-sidebar")[1] ?? "";
-  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Hogger" width="512" height="512" loading="lazy"`));
+  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-slot="media"><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Hogger" width="512" height="512" loading="lazy"`));
 });
 
 test("no picture for the NPC, or no renders.json: nothing in its place", async () => {
