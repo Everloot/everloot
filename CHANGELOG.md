@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: the home page opens on live data under the hero: the newest facts to reach three installs (with item icons and quality colours), the top of the guild ladder and this week's census class shares with the top movers. Each panel says so on its own when its read fails. Start here is one row of five, and the trust figures' labels are sans.
+- Site: an armory guild page opens on its summary (roster, members read, level 60s, average item level) and a one-row class bar, lists the top five by item level, folds instances with no kills behind one line, and names rank 0 Guild Master.
 - Site: a character page opens on the verdict: a facts strip (item level, Gear Score, honorable kills, achievements, quests, read age), rank badges with their region and ruleset, spec cards and profession bars above the gear; an empty dungeons-and-raids section is one line.
 - Site: NPC pages read like a database entry: level, rank badge, type, reaction and zone link under the name; tabs in order Drops, Sells, Starts, Ends, Boss, Map with empty ones left out; drop and goods items in their quality colour, and the drops table sorts by item, count or rate. The NPC list shows ranks as badges and links zones.
 - Site: quest pages show the side in its faction colour, the type (group, dungeon, raid) and category in the header, Start and End NPCs, rewards with icons in their quality colour, and the quest chain as a row of steps with this quest marked.
