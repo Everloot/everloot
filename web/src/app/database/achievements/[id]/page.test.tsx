@@ -135,3 +135,11 @@ test("with the player rollup unreadable, confirmation is unrecorded, never uncon
   expect(confirmedLine(out)).toContain("Unrecorded");
   expect(out).not.toContain("Not confirmed yet");
 });
+
+test("an achievement page sits in the wide-screen entity layout, In short and Open data in its side column", async () => {
+  const out = await html("5-two-steps");
+  expect(out).toContain('class="entity-layout');
+  const side = out.split("data-entity-sidebar")[1] ?? "";
+  expect(side).toContain("In short");
+  expect(side).toContain("data-open-data");
+});

@@ -79,8 +79,9 @@ export function EmptyTab({ message, reported = 0, players = true, action = GET_T
 }
 
 /**
- * What an empty player-data tab says on the NPC, vendor, quest and object pages: what is missing, then the 3-install
- * rule that would fill it, so no tab stops at "yet." without saying why. One table, so the pages word it alike.
+ * What an empty tab says on every entity page: what is missing, then the 3-install rule that would fill it (or, for
+ * what only the game files could give, that they give nothing), so no tab stops at "yet." without saying why. One
+ * table, shown through EmptyTab, so the pages word it alike.
  */
 export const EMPTY = {
   position: "No agreed position yet. A pin needs 3 installs at the same spot.",
@@ -91,6 +92,29 @@ export const EMPTY = {
   /** `what` is "this NPC", "this object", or "this" for an item's sources. */
   drops: (what: string) => `Nobody has looted ${what} in Forever yet. Rates show from one install, with reported, verified or confirmed labels.`,
   queued: "Observed, not yet public: fewer than 3 installs so far.",
+  // Zone lists: what players place in a zone.
+  zoneNpcs: "No agreed NPC position here yet. A pin needs 3 installs at the same spot.",
+  zoneVendors: "No vendor here has prices 3 installs agree on yet.",
+  zoneQuests: "No agreed giver or turn-in here yet. Each shows once 3 installs report it.",
+  zoneItems: "No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.",
+  zoneTreasures: "No agreed treasure position here yet. A pin needs 3 installs at the same spot.",
+  // Instance tabs.
+  bosses: "No boss has 3 installs reporting it here yet, and the game files list none.",
+  bossLoot: "No loot to show yet: no boss is known here. Loot shows per boss once 3 installs report the boss and the creature they fought.",
+  /** `reported` is the installs that zoned in so far. */
+  entrance: (reported: number) => (reported > 0
+    ? `No entrance is confirmed yet. ${reported} ${reported === 1 ? "install has" : "installs have"} zoned in, and 3 installs must agree on the place.`
+    : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place."),
+  /** `name` is the instance's name in the quest log; null when it has none. */
+  instanceQuests: (name: string | null) => (name === null
+    ? "Not reported yet: this instance has no name to match the quest log by."
+    : `Not reported yet: no quest has 3 installs filing it under ${name} in the quest log.`),
+  // Relations only the game files could fill: a plain line with no meter (EmptyTab players={false}).
+  /** `build` is the client build that was read. */
+  files: (build: string) => `The game files list nothing here (build ${build}).`,
+  criteria: "The criteria show once three installs report the same full list.",
+  factionQuests: "No quest is linked to this faction yet. A quest shows once 3 installs report it, and the reputation it gives is in none of the game files read so far.",
+  titleRewards: "No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it.",
 } as const;
 
 /** What a player-data tab says when storage cannot be read: unrecorded, never zero. */
@@ -154,6 +178,21 @@ export function ModelPicture({ picture, name }: { picture: ModelPictureFile | nu
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={picture.url} alt={`Model of ${name}`} width={picture.size} height={picture.size} loading="lazy" decoding="async" className="block aspect-square h-auto w-full rounded-control border border-line bg-panel object-contain" />
     </div>
+  );
+}
+
+/**
+ * The top band's picture for a page with no tooltip of its own (an instance's loading screen): the game's art as it
+ * is, at the tooltip box's width, cropped to 16:9 like the wiki's dungeon pages. The page passes it only when the
+ * upload has the art, so there is never an empty frame.
+ */
+export function EntityArt({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+  return (
+    <figure data-entity-art className="w-full sm:max-w-tip">
+      {/* The picture from the asset bucket as it is; next/image would only proxy it. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} width={width} height={height} decoding="async" className="block aspect-video h-auto w-full rounded-control border border-line bg-panel object-cover" />
+    </figure>
   );
 }
 

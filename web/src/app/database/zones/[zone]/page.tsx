@@ -8,7 +8,7 @@ import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "./ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, Disclosure, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, Disclosure, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
@@ -41,7 +41,8 @@ import { instanceRows } from "@/lib/instances";
 import { zonePlaces, type ZonePoi } from "@/lib/places";
 import { CLIENT_LABEL } from "@kb/edges";
 import { UNAVAILABLE } from "@/lib/lore";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
+import { EMPTY, EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
@@ -228,20 +229,20 @@ export default async function ZonePage(props: Props) {
   ];
 
   const all: TabItem[] = [
-    { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty("No NPC has a confirmed position here yet. A pin needs 3 installs on the same map.")} /> },
-    { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty("No vendor here has prices 3 installs agree on yet.")} /> },
-    { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty("No quest has a confirmed giver or turn-in here yet.")} /> },
+    { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneNpcs)} /> },
+    { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneVendors)} /> },
+    { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty(EMPTY.zoneQuests)} /> },
     // The loot tables could not be read (the world facts could): the tab says so, with no count and no empty-list copy.
     loot.unreachable
       ? { id: "items", label: "Items", panel: <p data-items-unreadable className="px-4 py-3 text-meta text-fg-2 sm:px-6">Items could not be read right now. They are unrecorded here, not none. Try again in a minute.</p> }
       : { id: "items", label: "Items", count: items.length, panel: <>
         {items.length > 0 && <div className="px-4 pb-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
-        <DataTable dense caption={`Items players looted from confirmed NPCs and objects in ${zone.name}`} columns={itemColumns} rows={shownItems} rowKey={(i) => String(i.itemId)} empty={empty("No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.")} />
+        <DataTable dense caption={`Items players looted from confirmed NPCs and objects in ${zone.name}`} columns={itemColumns} rows={shownItems} rowKey={(i) => String(i.itemId)} empty={empty(EMPTY.zoneItems)} />
         {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
         {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
       </> },
     { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
-    { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },
+    { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty(EMPTY.zoneTreasures)} /> },
   ];
   // The named places the game files list in the zone: points of interest at their spot, then the subzones.
   const places = zonePlaces(zone.mapId);
@@ -276,6 +277,7 @@ export default async function ZonePage(props: Props) {
         {/* The entity title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
         <EntityHeader
           title={zone.name}
+          icon={<EntityIcon src={art?.smallUrl ?? art?.url} cover />}
           meta={[
             <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
             <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
@@ -291,10 +293,8 @@ export default async function ZonePage(props: Props) {
         {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
 
         <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
-          {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
-          <OpenData report={{ type: "Zone", id: zone.mapId, path: canonical }} className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
-          <div className="mb-6">
+          {/* The zone's box: its map with the pins on it, first in the side column (under the title on a phone). */}
+          <div className="entity-box mb-6">
             <ZonePreview
               name={zone.name}
               width={shape.bounds.left - shape.bounds.right}
@@ -304,6 +304,9 @@ export default async function ZonePage(props: Props) {
               entrances={entrances}
             />
           </div>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+          {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
+          <OpenData report={{ type: "Zone", id: zone.mapId, path: canonical }} className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
         </EntitySidebar>
 
         <div className="space-y-6">
@@ -314,7 +317,7 @@ export default async function ZonePage(props: Props) {
             {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
             {!facts.unreachable && !hasConfirmed(here) && items.length === 0 && gathered.length === 0 && (
               <div className="mb-4">
-                <EmptyState
+                <EmptyTab
                   message={`Players have not confirmed anything in ${zone.name} yet.${entrances.length ? " The dungeon and raid entrances here are read from the game files." : ""} A fact appears when 3 installs agree on it, and until then the lists below stay empty on purpose.`}
                 />
               </div>

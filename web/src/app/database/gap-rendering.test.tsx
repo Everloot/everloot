@@ -121,11 +121,15 @@ test("the drops list shows the sample range and few-windows mark for 3 of 4", as
   expect(drops).toContain("95% Wilson");
 });
 
-test("every empty player-data tab on the NPC, vendor, quest and object pages names the 3-install rule, from one table", () => {
-  const sentences = Object.entries(EMPTY).filter(([key]) => key !== "drops").map(([, m]) => (typeof m === "function" ? m("this NPC") : m));
+test("every empty player-data tab on the entity pages names the 3-install rule, from one table", () => {
+  // The lines that take an argument are checked below; the game files' own lines (a spell's relations, an achievement's
+  // criteria list) say what the files give, not an install rule.
+  const apart = new Set(["drops", "entrance", "instanceQuests", "files", "criteria"]);
+  const sentences = Object.entries(EMPTY).filter(([key]) => !apart.has(key)).map(([, m]) => m as string);
   expect(EMPTY.drops("this NPC")).toContain("one install");
-  for (const sentence of sentences) expect(sentence).toContain("3 installs");
-  for (const file of ["npcs/[id]/page.tsx", "vendors/[id]/page.tsx", "quests/[id]/page.tsx", "objects/[id]/page.tsx", "loot-tables.tsx"]) {
+  for (const sentence of [...sentences, EMPTY.entrance(0), EMPTY.entrance(2), EMPTY.instanceQuests("Ragefire Chasm")]) expect(sentence).toContain("3 installs");
+  expect(EMPTY.files("1.60.1.70532")).toBe("The game files list nothing here (build 1.60.1.70532).");
+  for (const file of ["npcs/[id]/page.tsx", "vendors/[id]/page.tsx", "quests/[id]/page.tsx", "objects/[id]/page.tsx", "loot-tables.tsx", "spells/[id]/page.tsx", "factions/[id]/page.tsx", "titles/[id]/page.tsx", "achievements/[id]/page.tsx"]) {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");
     const messages = [...source.matchAll(/<EmptyTab\b[^>]*?\bmessage=(\{[^}]*\}|"[^"]*")/g)].map(([, m]) => m);
     expect(messages.length, file).toBeGreaterThan(0);
