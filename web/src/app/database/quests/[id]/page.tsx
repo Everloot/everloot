@@ -30,6 +30,7 @@ import { entityTitle, questDescription } from "@/lib/entity-meta";
 import { chainHref, loadCatalog } from "@/lib/completion-lists";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
+import EntityComments from "@/components/comments/EntityComments";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +206,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <LoreSection match={lore} />
           {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
         </div>
+        <EntityComments type="quest" id={page.questId} />
       </EntityLayout>
     </Container>
   );

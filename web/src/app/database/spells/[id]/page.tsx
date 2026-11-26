@@ -17,6 +17,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
 import { loadSpellTalents, type SpellTalent } from "@/lib/talents/spell-talents";
 import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
+import EntityComments from "@/components/comments/EntityComments";
 
 /**
  * A spell page. The spell is the game's own data: its name, its text and its relations all come
@@ -222,6 +223,7 @@ export default async function SpellPage(props: Props) {
         {tabs.length
           ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
           : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
+        <EntityComments type="spell" id={spellId} />
       </EntityLayout>
     </Container>
   );

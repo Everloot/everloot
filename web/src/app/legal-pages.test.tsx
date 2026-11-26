@@ -14,7 +14,7 @@ const visible = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, "")
 test("/terms covers uploads, keys, trademarks, takedown, warranty and governing law, each under a linkable heading", async () => {
   const { default: Terms } = await import("./terms/page");
   const html = renderToStaticMarkup(<Terms />);
-  for (const id of ["uploads", "accounts", "api", "licences", "trademarks", "takedown", "warranty", "law", "changes"]) {
+  for (const id of ["uploads", "comments", "accounts", "api", "licences", "trademarks", "takedown", "warranty", "law", "changes"]) {
     expect(html, id).toContain(`id="${id}"`);
   }
   const text = visible(html);
@@ -32,6 +32,9 @@ test("/terms states the retention and limit numbers the code enforces, not other
   const { KEYS_PER_ACCOUNT } = await import("@/lib/api-keys");
   const text = visible(renderToStaticMarkup(<Terms />));
   expect(text).toContain(`${KEYS_PER_ACCOUNT} keys`);
+  // Comments: the author keeps the words and gives a licence to show them on the site, outside the open data.
+  expect(text).toContain("You keep the rights to what you write");
+  expect(text).toContain("not part of the open data");
 });
 
 test("/privacy names who is responsible, lists your rights, keeps retention periods in step with the code, and anchors the choices section", async () => {

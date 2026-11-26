@@ -32,6 +32,7 @@ import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
+import EntityComments from "@/components/comments/EntityComments";
 import { loadInstanceClears } from "@/lib/progression";
 import type { InstanceClears } from "@/lib/dungeon-clears";
 
@@ -358,6 +359,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <LoreSection match={lore} />
+          <EntityComments type="instance" id={row.instanceMapId} />
         </div>
       </article>
     </Container>
