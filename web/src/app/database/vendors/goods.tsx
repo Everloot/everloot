@@ -18,7 +18,8 @@ export function VendorGoods({ title, offers, tips, items, evidence }: {
       columns={[
         { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} quality={qualityNamed(tips.get(o.itemId)?.quality)} /></ItemTip> },
         { key: "price", header: "Price", numeric: true, cell: (o: VendorOffer) => <Coins copper={o.priceCopper} /> },
-        { key: "stock", header: "Stock", numeric: true, cell: (o: VendorOffer) => stockLabel(o) },
+        // Words in the text face; only a stock count is a figure.
+        { key: "stock", header: "Stock", nowrap: true, cell: (o: VendorOffer) => o.limitedStock !== null ? <>stock <span className="font-mono tabular-nums">{o.limitedStock}</span></> : stockLabel(o) },
         ...(evidence ? [{ key: "reported", header: "Reported", cell: evidence }] : [
           { key: "installs", header: "Installs", numeric: true, cell: (o: VendorOffer) => o.reporters },
         ]),

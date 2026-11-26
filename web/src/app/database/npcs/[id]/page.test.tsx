@@ -83,6 +83,32 @@ test("the tabs with rows link agreed goods and the quests it starts and ends wit
   expect(mocks.items).toHaveBeenCalledTimes(1);
 });
 
+test("the summary counts the traits players agree on, and never says nobody reported an NPC it shows them for", async () => {
+  const out = await html();
+  expect(out).not.toContain("No player has reported it yet.");
+  expect(out).toContain("Players agree on its level, type, reaction and rank.");
+  facts.npcs = facts.npcs.slice(0, 2);
+  expect(await html()).toContain("No player has reported it yet.");
+});
+
+test("one drop is counted in the singular", async () => {
+  mocks.rollup.mockResolvedValue({ rates: [{ sourceNpcId: 1125, itemId: 117, kills: 10, drops: 1, rate: 0.1, reporters: 3, public: true }], measuredZeros: [], stats: { unreachable: false } });
+  const out = await html();
+  expect(out).toContain("Players reported 1 item drop.");
+  facts.quests = quest(10, "giverNpcId");
+  expect(await html()).toContain("Players reported 1 item drop and 1 quest.");
+});
+
+test("a mob with no agreed position takes its zone from where 3 installs looted its kills", async () => {
+  facts.kills = installs.slice(0, 2).map((installId) => ({ installId, npcId: 1125, mapId: 1431 }));
+  expect(fact(await html(), "Zone")).toBeUndefined();
+  facts.kills.push({ installId: "three", npcId: 1125, mapId: 1431 });
+  const out = await html();
+  expect(fact(out, "Zone")).toContain('href="/database/zones/1431-duskwood"');
+  expect(fact(out, "Zone")).toContain("where 3 installs looted its kills");
+  expect(out).toContain("Killed in Duskwood");
+});
+
 test("empty and below-threshold tabs explain the three-install rule without publishing reports", async () => {
   for (const count of [0, 1, 2]) {
     facts.vendors = goods(count);
