@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: boss pages, one per dungeon and raid encounter at /database/bosses: the instance and order from the game files, the creature players tie to it, its loot, kills and linked characters' kill counts, linked from instance and NPC pages, search, the sitemap and hover cards.
+- Site: NPC, object, quest, vendor and zone pages draw their agreed positions on the zone's map above the tabs, one zone at a time with a switcher, a legend and a link to the world map.
 - Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.
 - Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.
 - Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).

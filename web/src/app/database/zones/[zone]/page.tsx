@@ -5,6 +5,8 @@ import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "./ZonePreview";
+import EntityMap from "../../EntityMap";
+import { entityMapZones, type MapMark } from "../../entity-map";
 import {
   AgreementMeter, Badge, Card, DataTable, Disclosure, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
@@ -246,6 +248,15 @@ export default async function ZonePage(props: Props) {
   ];
   // The named places the game files list in the zone: points of interest at their spot, then the subzones.
   const places = zonePlaces(zone.mapId);
+  // The map slot: everything the tabs place, on the zone's art. Agreed pins filled; entrances only the game files
+  // place, and the places they name, hollow.
+  const marks: MapMark[] = [
+    ...(here?.npcs ?? []).map((n): MapMark => ({ kind: n.vendor ? "vendor" : "npc", mapId: zone.mapId, x: n.x, y: n.y, label: nameOf(n), agreed: true })),
+    ...treasures.map((t): MapMark => ({ kind: "object", mapId: zone.mapId, x: t.x, y: t.y, label: t.name ?? `Object ${t.objectId}`, agreed: true })),
+    ...entrances.map((e): MapMark => ({ kind: "entrance", mapId: zone.mapId, x: e.x, y: e.y, label: e.names.join(", "), agreed: e.confirmed !== null })),
+    ...(places?.pois ?? []).flatMap((p): MapMark[] => (p.x !== null && p.y !== null ? [{ kind: "place", mapId: zone.mapId, x: p.x, y: p.y, label: p.name, agreed: false }] : [])),
+  ];
+  const mapZones = entityMapZones(marks, assets?.maps);
   if (places && (places.pois.length || places.subzones.length)) {
     const poiColumns: Column<ZonePoi>[] = [
       { key: "name", header: "Name", cell: (p) => p.name },
@@ -290,8 +301,9 @@ export default async function ZonePage(props: Props) {
         aside: <Link href={zoneMapHref(zone.mapId)} className="ctl inline-flex items-center border border-edge px-3 text-control text-fg-2 hover:text-fg">Open on the map</Link>,
       }}
       notices={facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
-      // The zone's box: its map with the pins on it, first in the side column (under the title on a phone).
-      media={
+      // Without map art for the map slot, the zone's box: its outline with the pins on it, first in the side column
+      // (under the title on a phone).
+      media={mapZones.length === 0 &&
         <div className="entity-box mb-6">
           <ZonePreview
             name={zone.name}
@@ -304,6 +316,7 @@ export default async function ZonePage(props: Props) {
         </div>
       }
       summary={summary}
+      map={mapZones.length > 0 && <EntityMap name={zone.name} zones={mapZones} />}
       main={
         <section aria-labelledby="known">
           <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
