@@ -771,6 +771,20 @@ maintainer review).* The rules:
   the API, the MCP server or the bulk download.
 - Quest categories (`QuestSort`, 39 names) are not published: nothing in the files ties a quest to one.
 
+**Achievement icons, sides and rewards.** *Proposed 2026-11-26 in the pull request that adds them (the maintainer
+review).* `client-achievements.json` also carries, where the `Achievement` row gives them, the icon's file id, the one
+side that can earn it (`Faction` 0 Horde, 1 Alliance), the reward line (`Reward_lang`) and the reward item
+(`RewardItemID`). The rules:
+
+- The achievement pages show them, and the list shows the icons and groups the achievements by the files' category
+  tree with how many achievements and points each holds. The reward line is game text and stays on the page, as for
+  the descriptions; the reward item links to its item page under the item name rule.
+- The icons come from asset storage like the currency icons (`achievementIcons`), shown only where the manifest lists one.
+- The files tie no achievement to a title (`CharTitles` has no achievement column), and no achievement in build 71139
+  names another as the one it follows (`Supercedes` is 0 on every row), so the pages show neither.
+- Labelled *found in game files, unconfirmed* with the build. None of it is in the API, the MCP server or the bulk
+  download. How many characters earned an achievement is Blizzard's character data and is not on these pages.
+
 **Build changes, beta builds included.** Decided 2026-10-18, the same way Wowhead and other
 datamining sites work: when Blizzard ships a new build, a reviewed pull request records what
 changed in the tables we read, and that change list may be public in the PR text and committed in

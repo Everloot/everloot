@@ -140,6 +140,8 @@ export const AssetManifest = z.object({
   currencyIcons: z.record(z.string(), z.string()).default({}),
   /** Companion pet species id -> icon name (BattlePetSpecies.IconFileDataID), for the companion pet pages. */
   petIcons: z.record(z.string(), z.string()).default({}),
+  /** Achievement id -> icon name (Achievement.IconFileID), for the achievement list and pages. */
+  achievementIcons: z.record(z.string(), z.string()).default({}),
   /** By UiMap id: the map's own picture and the world rectangle it covers, so the site lays it under the zone outlines. */
   maps: z.record(z.string(), File.extend({
     /** The same picture at most MAP_SMALL_MAX px, for the zoomed-out view; null if it could not be made. */
@@ -469,6 +471,9 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   for (const row of list(get("CurrencyTypes"))) if (num(row.InventoryIconFileID) > 0) currencyIconOf.set(num(row.ID), num(row.InventoryIconFileID));
   const petIconOf = new Map<number, number>();
   for (const row of list(get("BattlePetSpecies"))) if (num(row.IconFileDataID) > 0) petIconOf.set(num(row.ID), num(row.IconFileDataID));
+  // Achievements: their icon, by achievement id.
+  const achievementIconOf = new Map<number, number>();
+  for (const row of list(get("Achievement"))) if (num(row.IconFileID) > 0) achievementIconOf.set(num(row.ID), num(row.IconFileID));
 
   // Items: tooltip facts for every named item (or the allowlist), and their icons.
   // Their Use and Equip lines are the spells' descriptions, resolved like the talents'.
@@ -481,7 +486,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   // Icons: one file per file data id, whoever asks for it.
   const wantedIcons = new Set<number>([
     ...iconIdOf.values(), ...classIcon.values(), ...[...treeIcons.values()].flat(), ...professionIcon.values(),
-    ...spellIconOf.values(), ...familyIconOf.values(), ...currencyIconOf.values(), ...petIconOf.values(), ...(itemSet?.iconOf.values() ?? []), ...(itemSet?.iconOnly.values() ?? []),
+    ...spellIconOf.values(), ...familyIconOf.values(), ...currencyIconOf.values(), ...petIconOf.values(), ...achievementIconOf.values(), ...(itemSet?.iconOf.values() ?? []), ...(itemSet?.iconOnly.values() ?? []),
   ].filter((id) => id > 0));
   // Not listed in the manifest: pages find an icon by the name an entry gives, and the list would be thousands long.
   const icons: Record<string, z.infer<typeof File>> = {};
@@ -521,6 +526,11 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   for (const [id, file] of petIconOf) {
     const name = iconName(file);
     if (name) petIcons[String(id)] = name;
+  }
+  const achievementIcons: AssetManifest["achievementIcons"] = {};
+  for (const [id, file] of achievementIconOf) {
+    const name = iconName(file);
+    if (name) achievementIcons[String(id)] = name;
   }
 
   // Item shards, into the private folder: they hold every named item, released or not, so they never go to
@@ -734,7 +744,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   const manifest = AssetManifest.parse({
     schema: ASSET_SCHEMA, label: LABEL,
     build: { product: build.product, buildId: build.buildId, version: build.version, buildConfig: build.buildConfig, extractedAt: new Date().toISOString() },
-    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, currencyIcons, petIcons, maps, spellTips, loadingScreens, races, factions, poi, logo,
+    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, currencyIcons, petIcons, achievementIcons, maps, spellTips, loadingScreens, races, factions, poi, logo,
     counts: {
       ...stats, tooltipsResolved: resolved, tooltipsUnresolved: unresolvedCount, tooltipsEmpty: empty,
       itemsRecorded: items?.count ?? 0, itemsWithIcon, mapsExtracted: Object.keys(maps).length, mapsSkipped: skippedMaps.length,

@@ -33,7 +33,17 @@ const ClientAchievement = z.object({
   statistic: z.literal(true).optional(),
   /** Its category (`Achievement.Category`, a key of `categories`); absent when the files give none. */
   category: z.number().int().optional(),
+  /** Its icon's file id (`Achievement.IconFileID`); absent when the files give none. */
+  icon: z.number().int().optional(),
+  /** The one side that can earn it (`Achievement.Faction` 0 Horde, 1 Alliance); absent when both can. */
+  faction: z.enum(["Horde", "Alliance"]).optional(),
+  /** The files' reward line (`Achievement.Reward_lang`), game text for the page only; absent when blank. */
+  reward: z.string().optional(),
+  /** The item it rewards (`Achievement.RewardItemID`); absent when none. */
+  rewardItem: z.number().int().optional(),
 });
+
+const FACTIONS = { 0: "Horde", 1: "Alliance" } as const;
 
 /** An `Achievement_Category` row: its name and the category it sits under (absent at the top). */
 const Category = z.object({ name: z.string(), parent: z.number().int().optional() });
@@ -123,6 +133,8 @@ export function buildClientAchievements(snapshotPath: string): ClientAchievement
       const title = typeof row.Title_lang === "string" ? row.Title_lang.trim() : "";
       if (!title) continue;
       const description = typeof row.Description_lang === "string" ? row.Description_lang.trim() : "";
+      const reward = typeof row.Reward_lang === "string" ? row.Reward_lang.trim() : "";
+      const faction = FACTIONS[Number(row.Faction) as keyof typeof FACTIONS];
       const criteria = typeof row.Criteria_tree === "number" && row.Criteria_tree > 0
         ? criteriaOf(row.Criteria_tree, new Map([...tree].map(([id, r]) => [id, r as unknown as TreeRow])))
         : [];
@@ -133,6 +145,10 @@ export function buildClientAchievements(snapshotPath: string): ClientAchievement
         ...(description ? { description } : {}),
         ...(Number(row.Flags ?? 0) & ACHIEVEMENT_COUNTER ? { statistic: true } : {}),
         ...(Number(row.Category) > 0 ? { category: Number(row.Category) } : {}),
+        ...(Number(row.IconFileID) > 0 ? { icon: Number(row.IconFileID) } : {}),
+        ...(faction ? { faction } : {}),
+        ...(reward ? { reward } : {}),
+        ...(Number(row.RewardItemID) > 0 ? { rewardItem: Number(row.RewardItemID) } : {}),
       });
     }
   }
