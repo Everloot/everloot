@@ -507,6 +507,26 @@ and tooltip facts, the same ones its page shows:
 - **Same spoiler and takedown rules** as the pages. The downloads, the rest of the API and the MCP
   server still carry no icons or tooltip text.
 
+**Fourth extension: model pictures.** Decided 2026-11-25 by Carlos, who approved the amendment in
+[ASSETS](ASSETS.md) ("Model pictures"): model pictures are handled like the icons. They are drawn from the game
+files, never committed to git, shown on pages only and credited to Blizzard. The first set is items with a model
+of their own and creatures whose display is not a dressed humanoid. Only what is live gets a picture. The rules
+above also cover:
+
+- **Still pictures of creature and item models**, drawn by our own renderer from the model, skin and texture
+  files of the public client, read by file data id from the client tables and the model's own chunks like the
+  icons: unencrypted files only, no key, no listfile. One picture per display, in its standing pose, on a
+  transparent background, with nothing added.
+- **Only what is live.** Pictures are drawn only for an item that 3 installs have reported and for the display
+  of an NPC the site lists. The id lists come from the same gates the pages use, so nothing found only in the
+  files gets a picture. An item's picture shows only where its page may already show the item, and a creature's
+  only on the page of an NPC the site lists.
+- **Pages only, like the icons.** The pictures sit in the public asset bucket under names made from a hash,
+  credited on every page that shows them, and never go into the API, the MCP server or the data downloads. The
+  model, skin and texture files themselves are never stored or served.
+- **Not covered**: dressed humanoid NPCs, armour shown on a character, and an interactive 3D view, which would
+  serve the model files themselves. Each needs its own decision.
+
 **Quest titles from the game files and the Warcraft Wiki.** *Proposed 2026-10-20; decided 2026-10-21
 by Carlos, and widened the same day to every quest the wiki titles.* The game files list quests by id
 (`QuestV2`) but carry no titles. A quest's title may be shown on its page, in the quest lists and where an item
