@@ -334,7 +334,7 @@ export default async function ItemPage(props: Props) {
         <EntitySidebar>
           <ModelPicture picture={picture} name={title} />
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
+          <OpenData report={{ type: "Item", id: itemId, path: `/database/items/${itemId}` }}
             text={[
               `${title} (item ${itemId})`,
               ...tooltipLines,

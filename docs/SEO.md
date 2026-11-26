@@ -11,8 +11,9 @@ the owner can do. Written after the 2026-10-17 audit.
   `web/src/lib/seo.ts` for a new page: a page's `openGraph`, `twitter` and `alternates` replace the layout's, so
   each page must state them in full.
 - **Social cards.** `/opengraph-image` for the site; text-only cards for the talent class pages, raid, map and
-  changes, and for each item, NPC and quest page (name, type and the installs line; an unknown id is a 404 there
-  too) (`web/src/lib/og-card.tsx`). No Blizzard art.
+  changes, and for every database entity page: name, type and the installs line on item, NPC and quest pages, name,
+  type and up to three of the page's facts on the others (`web/src/app/database/share-image.ts`). An unknown id is a
+  404 there too (`web/src/lib/og-card.tsx`). No Blizzard art.
 - **Structured data.** All of it is built in `web/src/lib/jsonld.ts` from the values the page shows. No ratings,
   no `license` on game data, no game build as `softwareVersion`, no FAQPage, Person or speakable. The Dataset on
   /database appears only once uploads exist.

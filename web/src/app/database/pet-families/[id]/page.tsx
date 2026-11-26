@@ -28,7 +28,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const family = entryOf((await props.params).id);
   if (!family) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${family.name} (hunter pet family)`, description: `The ${family.name} hunter pet family in WoW: Forever and the abilities on its skill line. ${CLIENT_LABEL}.`, path: petFamilyHref(family.id, family.name) }),
+    ...pageMetadata({ title: `${family.name} (hunter pet family)`, description: `The ${family.name} hunter pet family in WoW: Forever and the abilities on its skill line. ${CLIENT_LABEL}.`, path: petFamilyHref(family.id, family.name), image: `${petFamilyHref(family.id, family.name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -84,7 +84,7 @@ export default async function PetFamilyPage(props: Props) {
           )}
         />
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData text={[`${family.name} (hunter pet family ${family.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
+        <OpenData report={{ type: "Hunter pet family", id: family.id, path }} text={[`${family.name} (hunter pet family ${family.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
         <Tabs
           label={`${family.name}: relations`}
           tabs={[{

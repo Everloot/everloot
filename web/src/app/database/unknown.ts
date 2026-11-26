@@ -1,5 +1,6 @@
 import type { Edge } from "@kb/edges";
 import { categoryOf } from "@kb/item-taxonomy";
+import type { ObjectFacts, ObjectPage } from "@kb/object-page";
 import { pendingForNpc } from "@kb/pending-loot";
 import { agreedNpcsOf } from "@kb/world-pages";
 import { CLIENT_TAXONOMY } from "@/lib/items";
@@ -40,3 +41,11 @@ export function unknownNpc(npcId: number, facts: Awaited<ReturnType<typeof loadW
 export function unknownQuest(questId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>, wiki: { names: { has(questId: number): boolean } } | null): boolean {
   return !facts.unreachable && wiki !== null && !wiki.names.has(questId) && !facts.quests.some((r) => r.questId === questId);
 }
+
+/** An object no loot window or minimap sighting came from, public or not: a 404 (uploads are the only list of objects). */
+export const unknownObject = (page: ObjectPage, facts: ObjectFacts, unreachable: boolean) => !unreachable && !page.drops.length && !page.zero && !page.queued
+  && !page.pendingLoot && !(facts.sightings ?? []).some((r) => r.objectId === page.objectId);
+
+/** An NPC no vendor row names: a 404 (uploads are the only list of vendors). Unreachable storage rules nothing out. */
+export const unknownVendor = (vendorNpcId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>) =>
+  !facts.unreachable && !facts.vendors.some((r) => r.vendorNpcId === vendorNpcId);

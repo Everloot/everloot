@@ -39,6 +39,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: `${title} (item set)`,
       description: `The ${title} item set in WoW: Forever: its ${plural(set.items.length, "piece")} and ${plural(set.bonuses.length, "set bonus", "set bonuses")}. ${CLIENT_LABEL}.`,
       path: itemSetHref(set.id),
+      image: `${itemSetHref(set.id)}/opengraph-image`,
     }),
     // A set the names file names is a page with something to say; one known only by its id is not indexed.
     robots: { index: Boolean(name), follow: true },
@@ -157,7 +158,7 @@ export default async function ItemSetPage(props: Props) {
         />
         <EntitySidebar>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData text={[`${title} (item set ${set.id})`, ...summary, ...set.bonuses.map(bonusLine), `Source: https://everloot.app${path}`].join("\n")} />
+          <OpenData report={{ type: "Item set", id: set.id, path }} text={[`${title} (item set ${set.id})`, ...summary, ...set.bonuses.map(bonusLine), `Source: https://everloot.app${path}`].join("\n")} />
         </EntitySidebar>
         <Tabs label={`${title}: pieces and bonuses`} tabs={tabs} className="mt-6" />
         <p className="mt-6 text-meta text-muted">{GAME_DATA_CREDIT}</p>

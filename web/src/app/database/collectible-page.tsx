@@ -22,7 +22,7 @@ export interface Fact { label: string; value: ReactNode; numeric?: boolean }
 /** A page's metadata: indexed, its description ending on the unconfirmed label unless players confirmed it. */
 export function collectibleMetadata({ name, kind, path, confirmed = false, about }: { name: string; kind: string; path: string; confirmed?: boolean; about: string }): Metadata {
   return {
-    ...pageMetadata({ title: `${name} (${kind})`, description: `${about}${confirmed ? "" : ` ${CLIENT_LABEL}.`}`, path }),
+    ...pageMetadata({ title: `${name} (${kind})`, description: `${about}${confirmed ? "" : ` ${CLIENT_LABEL}.`}`, path, image: `${path}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -50,7 +50,7 @@ export function CollectiblePage({ list, path, name, kind, id, icon, confirmed = 
         />
         <EntityTop box={<TooltipFrame name={name} label={label}>{box}</TooltipFrame>} facts={<Facts layout="list" label={`${name}: quick facts`} items={facts} />} />
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData text={[`${name} (${kind.toLowerCase()} ${id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
+        <OpenData report={{ type: kind, id, path }} text={[`${name} (${kind.toLowerCase()} ${id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
       </article>
     </Container>
   );
