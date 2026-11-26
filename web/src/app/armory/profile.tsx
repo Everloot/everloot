@@ -136,8 +136,8 @@ export function TalentTrees({ character: c, trees, open = false }: { character: 
     {build && !build.ok && <p className="text-sm text-fg-2">Shown as a list: {build.reason}</p>}
     <div className="divide-y divide-line">
       {trees.map((tree) => <div key={tree.name} className="py-3">
-        <p className="flex justify-between gap-3 text-sm text-fg"><span>{tree.name}</span><span className="font-mono tabular-nums">{tree.points} points</span></p>
-        {tree.talents.length > 0 && <details open={open} className="mt-2 text-sm text-fg-2"><summary className="min-h-11 cursor-pointer py-2">Talent details</summary><ul className="space-y-1">{tree.talents.map((talent) => <li key={talent.name} className="flex justify-between gap-3"><span>{talent.name}</span><span className="font-mono tabular-nums">Rank {talent.rank}</span></li>)}</ul></details>}
+        <p className="flex justify-between gap-3 text-sm text-fg"><span>{tree.name}</span><span><span className="font-mono tabular-nums">{tree.points}</span> points</span></p>
+        {tree.talents.length > 0 && <details open={open} className="mt-2 text-sm text-fg-2"><summary className="min-h-11 cursor-pointer py-2">Talent details</summary><ul className="space-y-1">{tree.talents.map((talent) => <li key={talent.name} className="flex justify-between gap-3"><span>{talent.name}</span><span className="shrink-0">Rank <span className="font-mono tabular-nums">{talent.rank}</span></span></li>)}</ul></details>}
       </div>)}
     </div>
     {classSlug && <p className="text-sm"><Link href={`/tools/talents/${classSlug}`} className={link}>Plan a build in the talent calculator</Link></p>}
