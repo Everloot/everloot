@@ -17,6 +17,8 @@ import {
 import { armoryStore, type ArmoryGuild, type ArmoryMember } from "@/lib/armory-store";
 import { armoryGuildHidden, GUILD_DIRECTORY_PATH, guildReadDue, guildSubmitHref, rosterSummary, type RosterSummary } from "@/lib/armory-guilds";
 import { addonGuildOf } from "@/lib/guild-merge";
+import { guildProfileStore } from "@/lib/guild-profile-store";
+import { loadGuildProgression } from "@/lib/progression";
 import type { GuildMember, GuildPageData } from "@/lib/guilds";
 import { playerStore } from "@/lib/player-store";
 import { className, classText } from "@/app/players/player-view";
@@ -202,6 +204,11 @@ function sightings(roster: readonly ArmoryMember[], addon: readonly GuildMember[
 export default async function ArmoryGuildPage(props: { params: Promise<Params>; searchParams?: Promise<Search> }) {
   if (!armoryOn()) notFound();
   const { region, slug } = await props.params;
+  // The guild profile is keyed by the address alone, so its read starts with the guild's (one round trip less); for a
+  // missing or hidden guild its answer is never used. The section still awaits it, so a failure shows as it did.
+  const key = slugFromSegment(slug);
+  const profileRead = key !== null && isArmoryRegion(region) && validArmorySlug(key) ? (async () => guildProfileStore().profile(region, key))() : undefined;
+  profileRead?.catch(() => {});
   const read = await load(region, slug);
   if (read === null) notFound();
   if (read === "unreachable") {
@@ -218,6 +225,9 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
   const { guild: g, roster } = read;
   const path = armoryGuildPath(g.region, g.slug);
   const view = rosterView((await props.searchParams) ?? {});
+  // The progression section reads only the roster: it starts now, beside the addon guild search, instead of after it.
+  const progressionRead = loadGuildProgression(roster.map((m) => ({ ...m, region: g.region })));
+  progressionRead.catch(() => {});
   const [addon, crest] = await Promise.all([addonGuildOf(g), GuildCrest({ crest: g.crest, region: g.region, faction: g.faction })]);
   const seen = sightings(roster, addon?.members ?? []);
   const rows: Row[] = roster.map((m) => ({ m, token: classTokenOfId(m.classId), seen: seen.get(m.name.toLowerCase()) ?? null }));
@@ -239,7 +249,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
         <SummaryStrip guild={g} members={roster} summary={summary} activity={<ActivityStrip members={roster} now={now} href={(active) => href({ active })} />} />
-        <GuildProfile guild={g} />
+        <GuildProfile guild={g} profile={profileRead} />
         <TopItemLevels region={g.region} rows={rows} />
 
         <section aria-labelledby="armory-roster" className="space-y-3">
@@ -265,7 +275,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
           )}
         </section>
 
-        <GuildProgression members={roster} region={g.region} />
+        <GuildProgression members={roster} region={g.region} progress={progressionRead} />
         {addon && <AddonSection addon={addon} />}
         <Summary members={roster} summary={summary} />
 

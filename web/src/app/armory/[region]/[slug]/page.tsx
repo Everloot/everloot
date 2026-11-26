@@ -6,7 +6,9 @@ import { Badge, Card, Container, PageHeader, SectionHeading, Tabs } from "@/comp
 import ShowcaseSections from "@/components/showcase/ShowcaseSections";
 import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
-import { armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, regionLabel } from "@/lib/armory";
+import {
+  armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion, regionLabel, slugFromSegment, validArmorySlug,
+} from "@/lib/armory";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { loadEquippedTips } from "@/lib/equipped-item-tips";
 import { publicArmoryLink } from "@/lib/armory-links";
@@ -27,6 +29,26 @@ export const dynamic = "force-dynamic";
 
 type Params = { region: string; slug: string };
 
+/** The page's reads that need only the region and slug; null for an address that is not a character's. */
+function addressReads(region: string, segment: string) {
+  const slug = slugFromSegment(segment);
+  if (!isArmoryRegion(region) || slug === null || !validArmorySlug(slug)) return null;
+  const progressionRead = loadProgression(region, slug);
+  // Observed here so a page that ends in a 404 before awaiting it leaves no unhandled rejection; the page still awaits it.
+  progressionRead.catch(() => {});
+  // A slug is the first name and surname in lower case (characterSlugOf), so the addon-sighting search, which asks by
+  // first name and matches in lower case, can start now. The page uses it only when the name read agrees.
+  const name = slug.split("-")[0]!;
+  return {
+    name,
+    sightingRead: addonSighting({ region, slug, name }),
+    ranksRead: loadRanks(region, slug),
+    linkRead: publicArmoryLink(region, slug).catch(() => null),
+    assetsRead: loadSiteAssets().catch(() => null),
+    progressionRead,
+  };
+}
+
 export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
   if (!armoryOn()) return NOT_FOUND_METADATA;
   const { region, slug } = await props.params;
@@ -43,6 +65,9 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
 export default async function ArmoryCharacterPage(props: { params: Promise<Params>; searchParams?: Promise<{ refresh?: string }> }) {
   if (!armoryOn()) notFound();
   const { region, slug } = await props.params;
+  // The reads keyed by the address alone start with the character read instead of after it: one storage round trip
+  // less. The character read still decides everything; for a missing or hidden one their answers are never used.
+  const early = addressReads(region, slug);
   const c = await load(region, slug);
   if (c === null) notFound();
   if (c === "unreachable") {
@@ -60,16 +85,17 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const fullName = `${c.name} ${c.surname}`;
   // Every read the first screen needs starts at once; none waits on another it does not use. A tab other than the
   // default one loads its own reads when it opens (./later-tab.tsx).
-  const linkRead = publicArmoryLink(c.region, c.slug).catch(() => null);
-  const assetsRead = loadSiteAssets().catch(() => null);
+  // The character's own region and slug are the address's (the store matches on both), so the early reads are its reads.
+  const { name, sightingRead, ranksRead, linkRead, assetsRead, progressionRead } = early ?? addressReads(c.region, c.slug)!;
+  const sighting = c.name.normalize("NFC").toLowerCase() === name ? sightingRead : addonSighting(c);
   const [ranks, associated, addon, assets, tips, progression, seen, defaultParts, search] = await Promise.all([
-    loadRanks(c.region, c.slug),
+    ranksRead,
     linkRead,
     linkRead.then((a) => (a?.sharesData ? addonProfile(a.identity).catch(() => null) : null)),
     assetsRead,
     assetsRead.then((a) => loadEquippedTips(a, c.equipment)),
-    loadProgression(c.region, c.slug),
-    addonSighting(c),
+    progressionRead,
+    sighting,
     tabParts(c, DEFAULT_TAB),
     props.searchParams,
   ]);
