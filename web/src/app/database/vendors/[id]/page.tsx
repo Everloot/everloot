@@ -21,6 +21,8 @@ import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { unknownVendor } from "../../unknown";
+import EntityMap from "../../EntityMap";
+import { entityMapZones } from "../../entity-map";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,8 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const title = vendorName ? `${vendorName} (vendor)` : `Vendor NPC ${page.vendorNpcId}`;
   // A vendor is an NPC: its lore page is its NPC's, under the same rule.
   const lore = vendorName ? await loreFor("npc", page.vendorNpcId, vendorName) : null;
+  // The map slot draws where the vendor stands; the pin table below is its text.
+  const mapZones = entityMapZones(places.map((p) => ({ kind: "vendor", mapId: p.mapId, x: p.x, y: p.y, label: title, agreed: true })), assets?.maps);
   const trail = [...trailFor("/database/vendors")!, { name: title, path: `/database/vendors/${page.vendorNpcId}` }];
   // The page in three lines: what it is, what players reported (prices and positions) with the agreement and the date
   // of the uploads, and where the name came from. Storage down: unrecorded, never "no prices".
@@ -93,6 +97,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         { label: "Map positions", value: known(places.length || null), numeric: true },
       ]}
       summary={summary}
+      map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
       main={<Tabs
         label={`${title}: relations`}
         tabs={[
