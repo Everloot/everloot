@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DataTable, Facts, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
 import { EMPTY, EmptyTab, EntityPage, LINK } from "../../entity";
+import EntityChanges, { changesFor } from "../../entity-changes";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -162,6 +163,8 @@ export default async function SpellPage(props: Props) {
   ].filter((t): t is TabItem => t !== null);
 
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
+  // What the build watch recorded about this spell, build by build; the slot stays out when it never changed.
+  const changes = changesFor({ kind: "spell", id: spellId });
 
   return (
     <EntityPage
@@ -189,6 +192,7 @@ export default async function SpellPage(props: Props) {
       main={tabs.length
         ? <Tabs label={`${title}: relations`} tabs={tabs} />
         : <EmptyTab message={EMPTY.files(build)} players={false} action={null} />}
+      changes={changes.length ? <EntityChanges changes={changes} name={title} /> : undefined}
       screenshots={<EntityScreenshots type="spell" id={spellId} name={title} />}
       comments={<EntityComments type="spell" id={spellId} />}
       openData={{

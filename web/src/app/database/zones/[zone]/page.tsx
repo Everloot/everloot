@@ -43,6 +43,7 @@ import { EntityIcon } from "@/components/game/EntityIcon";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
+import EntityChanges, { changesFor } from "../../entity-changes";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,8 @@ export default async function ZonePage(props: Props) {
   const here = zoneContents(facts.unreachable ? { npcs: [], quests: [], vendors: [] } : facts, undefined, facts.unreachable ? {} : seen).get(zone.mapId);
   const lore = await zoneLore(zone.mapId, zone.name);
   const shape = WORLD_MAP.zones.find((z) => z.uiMapId === zone.mapId)!;
+  // The zone's own map changes, build by build (by its map id); the slot stays out when it never changed.
+  const changes = changesFor({ kind: "zone", id: zone.mapId });
   const assets = await loadSiteAssets();
   const art = assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) ?? null;
 
@@ -369,6 +372,7 @@ export default async function ZonePage(props: Props) {
         )}
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
       </>}
+      changes={changes.length ? <EntityChanges changes={changes} name={zone.name} /> : undefined}
       screenshots={<EntityScreenshots type="zone" id={zone.mapId} name={zone.name} />}
       comments={<EntityComments type="zone" id={zone.mapId} />}
       // No per-zone JSON is served, so no Raw JSON link: the copy text is the record.
