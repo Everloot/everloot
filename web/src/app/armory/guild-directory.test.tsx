@@ -23,6 +23,17 @@ vi.mock("next/navigation", () => ({
 const holder = vi.hoisted(() => ({ store: null as ArmoryStore | null }));
 vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => holder.store }));
 
+/** Class and race icons as the census reads them; empty unless a test sets them. */
+const icons = vi.hoisted(() => ({ map: {} as Record<string, string> }));
+vi.mock("@/lib/census-media", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/census-media")>()), censusIcons: async () => icons.map }));
+
+/** What the addon knows of the guild; undefined reads the real store. */
+const addon = vi.hoisted(() => ({ data: undefined as unknown }));
+vi.mock("@/lib/guild-merge", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/guild-merge")>();
+  return { ...real, addonGuildOf: (g: Parameters<typeof real.addonGuildOf>[0]) => (addon.data === undefined ? real.addonGuildOf(g) : Promise.resolve(addon.data as never)) };
+});
+
 const held = globalThis as typeof globalThis & { __everlootPlayers?: unknown };
 let mem: MemoryArmoryStore;
 beforeEach(() => {
@@ -39,7 +50,7 @@ beforeEach(() => {
   holder.store = mem;
   vi.stubEnv("EVERLOOT_ARMORY", "1");
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); held.__everlootPlayers = undefined; });
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); held.__everlootPlayers = undefined; icons.map = {}; addon.data = undefined; });
 
 const pages = {
   directory: async (search: Record<string, string> = {}) => (await import("../guilds/page")).default({ searchParams: Promise.resolve(search) }),
@@ -50,6 +61,8 @@ const pages = {
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
 /** The roster section alone: the top five above it names members too. */
 const roster = (out: string) => out.slice(out.indexOf('aria-labelledby="armory-roster"'));
+/** The roster table alone, without the addon's table below it. */
+const rosterTable = (out: string) => { const r = roster(out); return r.slice(0, r.indexOf("</table>")); };
 
 describe("the guild directory", () => {
   test("is a 404 on /guilds with the armory and guild switches off", async () => {
@@ -373,6 +386,83 @@ describe("the guild home", () => {
     const second = await html(pages.guild("eu", "ember-wardens", { sort: "name", dir: "asc", p: "2" }));
     expect(second).toContain("Member50 Hold");
     expect(second).not.toContain("Member49 Hold");
+  });
+
+  test("the roster columns run name, level, race and class, rank, item level, last login", async () => {
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    const heads = [...out.slice(0, out.indexOf("</thead>")).matchAll(/<th[^>]*>(?:\s*<[^>]*>)*\s*([A-Z][a-z ]+)/g)].map((m) => m[1].trim());
+    expect(heads).toEqual(["Character", "Level", "Race and class", "Rank", "Item level", "Last login"]);
+  });
+
+  test("rank names come from the officers' roster where it agrees, else Guild Master or Rank n", async () => {
+    const member = (name: string, rank: string | null) => ({ name, realm: "EU1 Realm 2 Normal", class: "HUNTER", level: 60, rank, lastSeen: null, path: null, alts: [] });
+    addon.data = {
+      page: { progression: [], summary: { realm: "EU1 Realm 2 Normal" } }, board: null, namesWithheld: false, dataAsOf: null,
+      members: [member("Velkara", "Raider"), member("Brannoc", "Chieftain")],
+    };
+    const out = rosterTable(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toContain(">Raider<");
+    expect(out).toContain(">Chieftain<");
+    expect(out).not.toContain(">Guild Master<");
+    // Torvin's rank (2) has no name in the officers' roster.
+    expect(out).toContain(">Rank 2<");
+  });
+
+  test("two different names for one rank leave it by number", async () => {
+    mem.putGuild(armoryGuild(), [
+      { characterSlug: "velkara-duskmantle", name: "Velkara", surname: "Duskmantle", level: 60, classId: 3, raceId: 8, rank: 1 },
+      { characterSlug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", level: 44, classId: 1, raceId: 2, rank: 1 },
+    ]);
+    const member = (name: string, rank: string) => ({ name, realm: "EU1 Realm 2 Normal", class: "HUNTER", level: 60, rank, lastSeen: null, path: null, alts: [] });
+    addon.data = { page: { progression: [], summary: { realm: "x" } }, board: null, namesWithheld: false, dataAsOf: null, members: [member("Velkara", "Raider"), member("Torvin", "Officer")] };
+    const out = rosterTable(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).not.toContain(">Raider<");
+    expect(out).toContain(">Rank 1<");
+  });
+
+  test("race and class carry their icons when the media is read, and the names alone when not", async () => {
+    icons.map = { HUNTER: "https://render.worldofwarcraft.com/us/icons/56/hunter.jpg", Troll: "https://render.worldofwarcraft.com/us/icons/56/troll.jpg" };
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toMatch(/<img[^>]*src="https:\/\/render\.worldofwarcraft\.com\/us\/icons\/56\/troll\.jpg"[^>]*>(?:\s*<[^>]*>)*\s*Troll Hunter/);
+    expect(out).toContain('src="https://render.worldofwarcraft.com/us/icons/56/hunter.jpg"');
+    icons.map = {};
+    expect(roster(await html(pages.guild("eu", "ember-wardens")))).not.toContain("<img");
+  });
+
+  test("the level menu offers At 60 and Below 60; below 60 keeps the rest of the view", async () => {
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toContain('href="/armory/eu/guilds/ember-wardens?level=below-60"');
+    const below = roster(await html(pages.guild("eu", "ember-wardens", { level: "below-60", sort: "level", dir: "desc" })));
+    expect(below).toContain("Torvin Ashbrook");
+    expect(below).toContain("Brannoc Tide");
+    expect(below).not.toContain("Velkara Duskmantle</a>");
+    expect(below.indexOf("Torvin")).toBeLessThan(below.indexOf("Brannoc"));
+  });
+
+  test("a sort menu reaches every sort on a phone, where only the name column shows", async () => {
+    const full = roster(await html(pages.guild("eu", "ember-wardens", { class: "hunter" })));
+    const out = full.slice(full.indexOf('data-filter="sort"'), full.indexOf("</details>", full.indexOf('data-filter="sort"')));
+    expect(out).toContain("Sort");
+    for (const sort of ["level", "item-level", "last-login"]) expect(out).toContain(`href="/armory/eu/guilds/ember-wardens?class=hunter&amp;sort=${sort}&amp;dir=desc"`);
+  });
+
+  test("the folded phone line is level and rank alone", async () => {
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toMatch(/sm:hidden[^"]*">Level 41 · Guild Master</);
+    expect(out).toMatch(/sm:hidden[^"]*">Level 60 · Rank 1</);
+  });
+
+  test("a level spread strip sits above the roster, each band linking to the roster filtered to it", async () => {
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    const strip = out.slice(out.indexOf("data-guild-levels"), out.indexOf('aria-labelledby="armory-roster"'));
+    expect(out.indexOf("data-guild-levels")).toBeGreaterThan(out.indexOf("data-guild-summary"));
+    expect(out.indexOf("data-guild-levels")).toBeLessThan(out.indexOf('aria-labelledby="armory-roster"'));
+    expect(strip).toContain('aria-label="Level spread: at 60 1, 40–49 2"');
+    expect(strip).toMatch(/href="\/armory\/eu\/guilds\/ember-wardens\?level=60"[^>]*>(?:\s*<[^>]*>)*\s*1(?:\s*<[^>]*>)*\s*At 60/);
+    expect(strip).toMatch(/href="\/armory\/eu\/guilds\/ember-wardens\?level=40-49"[^>]*>(?:\s*<[^>]*>)*\s*2(?:\s*<[^>]*>)*\s*40–49/);
+    // Empty bands are left out of the strip.
+    expect(strip).not.toContain("level=1-9");
+    expect(strip).not.toMatch(/opacity|gradient/);
   });
 
   test("shows what the addon saw of the guild: its members seen and their last sighting", async () => {
