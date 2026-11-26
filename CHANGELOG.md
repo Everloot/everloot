@@ -305,6 +305,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: the "Report a bug" button is a small icon in the corner that shows its words on hover or focus, and the page end keeps room for it, so it no longer covers headings, rows or footer links.
 - Site: item, NPC, zone and instance pages load 12 to 15 kB less compressed script (the switched-off comments and screenshots code no longer rides along), and screen readers get distinct names for search boxes and tables plus map links whose name starts with the words on screen.
 - Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).

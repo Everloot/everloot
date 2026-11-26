@@ -106,6 +106,22 @@ test("the pill is hidden below md on every page, chat included, and sits bottom-
   }
 });
 
+test("from md the pill is a compact icon whose label shows only on hover or keyboard focus", () => {
+  const label = trigger().querySelector("span")!;
+  expect(label.textContent).toBe("Report a bug");
+  const classes = label.className.split(" ");
+  expect(classes).toContain("sr-only");
+  expect(classes).toContain("group-hover:not-sr-only");
+  expect(classes).toContain("group-focus-visible:not-sr-only");
+  expect(trigger().className.split(" ")).toContain("group");
+  expect(trigger().getAttribute("aria-label")).toBe("Report a bug");
+});
+
+test("the page end reserves the pill's height from md, so the footer's last row is never under it", () => {
+  const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+  expect(globals).toMatch(/@media \(min-width: 48rem\) \{\s*body:has\(\[data-report-pill\]\) > footer \{\s*padding-bottom: 4\.5rem;/);
+});
+
 test("on /chat the pill steps aside at every width: the chat's toolbar and the menu open the report there", () => {
   // From md the pill would cover the composer's corner, and from lg the conversation rail's last rows.
   expect(trigger().hasAttribute("data-report-pill")).toBe(true);
