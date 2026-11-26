@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { agreedNpc, npcPage, questPage } from "@kb/world-pages";
+import { agreedNpc, npcPage, questPage, questTraits } from "@kb/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -28,7 +28,12 @@ import { questIndexable } from "@/lib/indexable";
 import { entityTitle, questDescription } from "@/lib/entity-meta";
 import { chainHref, loadCatalog } from "@/lib/completion-lists";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
-import { zoneByMapId, zoneHref } from "@/lib/zones";
+import { publicZones, zoneByMapId, zoneHref } from "@/lib/zones";
+import { questTypeLabel, SIDE_LABEL, SIDE_TONE } from "@/lib/world-lists";
+import GameIcon from "@/components/game/GameIcon";
+import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
+import { QUALITIES } from "@/design/tokens";
+import QuestChainFlow from "@/components/QuestChainFlow";
 import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
@@ -59,6 +64,14 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const [facts, wiki] = await Promise.all([loadWorldFacts(), loadQuestNames(CLIENT_LAYER.build.version)]);
   const page = questPage(Number(params.id), facts);
   if (unknownQuest(page.questId, facts, wiki)) notFound();
+  // Side, category and type (tag, group size), each once 3 installs agree; nothing guessed from the title or giver.
+  const traits = facts.unreachable ? questTraits([]) : questTraits(facts.quests.filter((r) => r.questId === page.questId && r.installId.trim()), facts);
+  const typeLabel = questTypeLabel(traits);
+  const categoryZone = traits.category ? publicZones().find((z) => z.name === traits.category) : undefined;
+  const sideChip = traits.side && <span key="side" className={SIDE_TONE[traits.side]}>{SIDE_LABEL[traits.side]}</span>;
+  const category = traits.category && (categoryZone
+    ? <Link key="category" href={zoneHref(categoryZone.mapId, categoryZone.name)} className={LINK}>{traits.category}</Link>
+    : traits.category);
   // Where players saw the giver and the turn-in NPC stand, as map links, when 3 installs agree.
   const where = (npcId: number | null) => {
     const pin = npcId === null || facts.unreachable ? undefined : npcPage(npcId, facts).pins.find((p) => pinLink(p.mapId, p.x, p.y));
@@ -82,8 +95,8 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const lore = !facts.unreachable && page.title ? await loreFor("quest", page.questId, page.title) : null;
   const trail = [...trailFor("/database/quests")!, { name: title, path: `/database/quests/${page.questId}` }];
   const people: Person[] = facts.unreachable ? [] : [
-    ...(page.giverNpcId !== null ? [{ role: "Giver", npcId: page.giverNpcId, map: where(page.giverNpcId) }] : []),
-    ...(page.turnInNpcId !== null ? [{ role: "Turn-in", npcId: page.turnInNpcId, map: where(page.turnInNpcId) }] : []),
+    ...(page.giverNpcId !== null ? [{ role: "Start", npcId: page.giverNpcId, map: where(page.giverNpcId) }] : []),
+    ...(page.turnInNpcId !== null ? [{ role: "End", npcId: page.turnInNpcId, map: where(page.turnInNpcId) }] : []),
   ];
   const npcLink = (id: number) => <EntityLink kind="npc" id={id} name={npcs.get(id)} />;
   const catalog = await loadCatalog();
@@ -93,7 +106,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const position = chain?.questIds.indexOf(page.questId) ?? -1;
   const previous = chain?.questIds[position - 1];
   const next = chain?.questIds[position + 1];
-  const giverPin = people.find((p) => p.role === "Giver")?.map;
+  const giverPin = people.find((p) => p.role === "Start")?.map;
   const zone = giverPin ? zoneByMapId(giverPin.mapId) : undefined;
   const zoneDate = giverPin && page.giverNpcId !== null ? agreedNpc(page.giverNpcId, facts)?.pinDates.find(([mapId]) => mapId === giverPin.mapId)?.[1] : undefined;
   const chainDate = chain?.confirmed ? catalog?.dataAsOf : CLIENT_QUEST_LINES.build.extractedAt;
@@ -123,21 +136,27 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         trail,
         title,
         meta: [
-          "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
+          "Quest", !facts.unreachable && page.level !== null ? `Level ${page.level}` : null, sideChip, typeLabel || null, category, named ? <span key="id" className="tabular-nums">ID {page.questId}</span> : null,
           // A title from the wiki carries the quiet unconfirmed marker; its source is a tooltip, never a printed label.
           wikiTitle ? <Badge key="wiki" tone="files">{`${GAME_NAME_TITLE.wiki.toLowerCase()}, unconfirmed`}</Badge> : null,
         ],
       }}
-      // No box without an agreed level: the quick facts' Level row carries its meter, and a frame with only the
-      // title would repeat the heading.
-      box={!facts.unreachable && page.level !== null && (
+      // No box without an agreed level, side, type or category: a frame with only the title would repeat the heading.
+      box={!facts.unreachable && (page.level !== null || traits.side || typeLabel || traits.category) && (
         <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
-          <p>Level {page.level}</p>
+          {page.level !== null && <p>Level {page.level}</p>}
+          {typeLabel && <p>{typeLabel}</p>}
+          {sideChip && <p>{sideChip}</p>}
+          {traits.category && <p>{traits.category}</p>}
         </TooltipFrame>
       )}
       facts={!facts.unreachable && [
         { label: "Reported title", value: known(page.title) },
         { label: "Level", value: known(page.level), numeric: true },
+        { label: "Side", value: known(sideChip || null) },
+        // Most quests carry no tag, so a missing type is not news: the row shows only when 3 installs agree on one.
+        ...(typeLabel ? [{ label: "Type", value: typeLabel }] : []),
+        { label: "Category", value: known(category || null) },
         { label: "Chain", value: chain ? <>
           <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
           {chains.length > 1 && <span> (also in {chains.length - 1} other {chains.length === 2 ? "chain" : "chains"})</span>}
@@ -149,31 +168,34 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
           <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
         </> : <>Not reported yet {known(null)}</> },
-        { label: "Giver", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
-        { label: "Turn-in", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
+        { label: "Start", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
+        { label: "End", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
         { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
       ]}
       summary={summary}
       map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
-      main={<Tabs
+      main={<>{chain && (
+        <QuestChainFlow questIds={chain.questIds} current={page.questId} name={chain.name} href={chainHref(chain.questLineId, chain.name)} nameOf={questName} truncated={chain.truncated} />
+      )}<Tabs
         label={`${title}: relations`}
         tabs={[
           {
             id: "rewards", label: "Rewards", count: facts.unreachable ? undefined : page.rewards.length,
             panel: facts.unreachable ? <Unreachable />
-              : page.rewards.length ? (
+              : page.rewards.length ? (<>
                 <DataTable
                   dense
                   caption={`Rewards of ${title}`}
-                  columns={[{ key: "item", header: "Item", cell: (itemId: number) => <EntityLink kind="item" id={itemId} name={items.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} /> }]}
+                  columns={[{ key: "item", header: "Item", cell: (itemId: number) => <RewardLink itemId={itemId} name={items.get(itemId) ?? tips.get(itemId)?.name} tip={tips.get(itemId)} /> }]}
                   rows={page.rewards}
                   rowKey={String}
                 />
-              )
+                <p className="mt-2 text-meta text-muted">Items players received for this quest. The reports don&apos;t say which rewards were a choice.</p>
+              </>)
               : <EmptyTab message={EMPTY.rewards} />,
           },
           {
-            id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
+            id: "givers", label: "Start and end", count: facts.unreachable ? undefined : people.length,
             panel: facts.unreachable ? <Unreachable />
               : people.length ? (
                 <DataTable
@@ -191,7 +213,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
               : <EmptyTab message={EMPTY.givers} />,
           },
         ]}
-      />}
+      /></>}
       related={<>
         <LoreSection match={lore} />
         {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
@@ -204,5 +226,21 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         jsonHref: !facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined,
       }}
     />
+  );
+}
+
+const qualityOf = (name: string | undefined): Quality | undefined => {
+  const key = name?.toLowerCase() ?? "";
+  return (QUALITIES as readonly string[]).includes(key) ? (key as Quality) : undefined;
+};
+
+/** A reward as the game lists it: the icon in a quality-coloured border and the name in the quality's colour. */
+function RewardLink({ itemId, name, tip }: { itemId: number; name: string | undefined; tip: { icon: string | null; quality: string } | undefined }) {
+  const quality = qualityOf(tip?.quality);
+  return (
+    <span className="inline-flex items-center gap-2">
+      {tip?.icon ? <GameIcon src={tip.icon} size={24} quality={quality} /> : null}
+      <Link href={`/database/items/${itemId}`} prefetch={false} className={`${quality ? QUALITY_TEXT[quality] : "text-fg"} underline decoration-edge underline-offset-4 hover:decoration-fg`}>{name || `Item ${itemId}`}</Link>
+    </span>
   );
 }
