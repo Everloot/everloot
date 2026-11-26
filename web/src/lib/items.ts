@@ -2,6 +2,7 @@ import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "@kb/
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "@kb/item-taxonomy";
 import { byRank, nameMatches, PER_PAGE } from "@/app/database/list-parts";
+import { parsePer, perParam } from "@/lib/page-size";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
 
@@ -155,6 +156,8 @@ export interface CategoryQuery {
   unnamed?: boolean;
   /** Absent: named items first, those players have seen leading, A to Z by name (sortItems). */
   sort?: { key: ItemSort; desc: boolean };
+  /** Rows on a page when not the default (?per=, lib/page-size.ts). */
+  per?: number;
   page: number;
 }
 
@@ -189,7 +192,7 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
   const quality = list(one("quality"), [...QUALITY_SLUGS, UNRECORDED]);
   const src = list(one("src"), SOURCE_SLUGS) as SourceSlug[] | undefined | null;
   const crafted = flag("crafted"), reagent = flag("reagent"), set = flag("set"), seen = flag("seen"), dev = flag("dev"), unnamed = flag("unnamed");
-  const skill = one("skill"), sort = one("sort"), page = one("page");
+  const skill = one("skill"), sort = one("sort"), page = one("page"), per = parsePer(one("per"));
   const ilvl = levels(one("ilvl")), req = levels(one("req")), bind = one("bind");
   if (slot === null || quality === null || src === null || crafted === null || reagent === null || set === null || seen === null || dev === null || unnamed === null || ilvl === null || req === null) return null;
   if (skill !== undefined && !itemFacets().professions.some((p) => p.slug === skill)) return null;
@@ -197,6 +200,7 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
   const sorted = sort === undefined ? undefined : /^(-?)([a-z]+)$/.exec(sort);
   if (sort !== undefined && (!sorted || !(ITEM_SORTS as readonly string[]).includes(sorted[2]))) return null;
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
+  if (per === null) return null;
   const text = one("q")?.trim().slice(0, 60);
   return {
     ...(text ? { q: text } : {}),
@@ -205,6 +209,7 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
     ...(skill ? { skill } : {}),
     ...(ilvl ? { ilvl } : {}), ...(req ? { req } : {}), ...(bind ? { bind } : {}),
     ...(sorted ? { sort: { key: sorted[2] as ItemSort, desc: sorted[1] === "-" } } : {}),
+    ...(per ? { per } : {}),
     page: page === undefined ? 1 : Number(page),
   };
 }
@@ -228,6 +233,7 @@ export function itemsHref(classSlug?: string, subclassSlug?: string, q: Partial<
   if (q.dev) params.set("dev", "1");
   if (q.unnamed) params.set("unnamed", "1");
   if (q.sort) params.set("sort", `${q.sort.desc ? "-" : ""}${q.sort.key}`);
+  if (perParam(q.per)) params.set("per", perParam(q.per)!);
   if (q.page && q.page > 1) params.set("page", String(q.page));
   // Commas read better in a shared link than %2C, and are safe in a query string.
   const s = params.toString().replace(/%2C/g, ",");

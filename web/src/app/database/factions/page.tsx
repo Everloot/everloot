@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { FactionEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
-import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
-  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
-  sortParam, sortRows, Unreadable, type ListQuery, type Search,
+  ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
+  pageParams, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
 const META = { title: "WoW Forever Faction List", description: "Reputation factions in WoW: Forever by name, header and ID. From the game files; confirmed once three installs report each the same way.", path: "/database/factions" };
@@ -16,6 +14,9 @@ export const dynamic = "force-dynamic";
 const SORTS = ["name", "header", "id"] as const;
 type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
+
+/** A faction under the Alliance's or the Horde's header wears that side's colour (the faction colours are that fact's own). */
+const sideTone = (header?: string) => (header && /\bAlliance\b/.test(header) ? "text-faction-alliance" : header && /\bHorde\b/.test(header) ? "text-faction-horde" : "text-fg");
 
 interface FactionQuery extends ListQuery<Sort> { header?: string }
 
@@ -28,13 +29,13 @@ function factionQuery(search: Search): FactionQuery | null {
 }
 
 const href = (q: Partial<FactionQuery>) => listHref("/database/factions", [
-  ["q", q.q], ["header", q.header], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ["header", q.header], ...pageParams(q),
 ]);
 const filters = (q: FactionQuery) => Number(Boolean(q.q)) + Number(Boolean(q.header));
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = factionQuery((await props.searchParams) ?? {});
-  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort && !q!.per, q?.page);
 }
 
 export default async function FactionListPage(props: { searchParams?: Promise<Search> }) {
@@ -51,16 +52,14 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
   const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.factionId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<FactionQuery>) => href({ ...q, page: 1, ...over });
 
   const dash = <span className="text-muted">—</span>;
   const columns: Column<Listed<FactionEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={factionHref(x.factionId, x.name)} tone={sideTone(x.header)}>{x.name}</NameCell> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
-    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
+    { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
   ];
 
@@ -74,7 +73,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
     },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "faction" : "factions"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Faction pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "faction" : "factions"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Faction pages" />;
   const chips = [
     ...(q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []),
     ...(q.header ? [{ label: `Header: ${q.header}`, href: here({ header: undefined }) }] : []),

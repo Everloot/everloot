@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadCatalog, titleDisplayName, titleHref, type Listed } from "@/lib/completion-lists";
-import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
-  confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
-  sortParam, sortRows, Unreadable, type ListQuery, type Search,
+  ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
+  pageParams, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
 const META = { title: "WoW Forever Title List", description: "Player titles in WoW: Forever by name and ID. From the game files; confirmed once three installs report each the same way.", path: "/database/titles" };
@@ -18,12 +16,12 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/titles", [
-  ["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ...pageParams(q),
 ]);
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
-  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per, q?.page);
 }
 
 export default async function TitleListPage(props: { searchParams?: Promise<Search> }) {
@@ -38,18 +36,16 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const matched = all.filter((x) => !text || (id !== null ? x.titleId === id : ranked!.has(x)));
   const sort = q.sort ?? DEFAULT_SORT;
   const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.titleId), sort.desc, (x) => x.titleId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Listed<TitleEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={titleHref(x.titleId, x.name)} className={LINK}>{titleDisplayName(x.name)}</Link> },
-    { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={titleHref(x.titleId, x.name)}>{titleDisplayName(x.name)}</NameCell> },
+    { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "title" : "titles"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Title pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "title" : "titles"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Title pages" />;
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = !catalog ? <Unreadable />
     : q.q ? <NoMatches noun="titles" chips={chips} clearHref="/database/titles" />

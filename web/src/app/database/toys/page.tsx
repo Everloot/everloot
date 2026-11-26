@@ -24,7 +24,7 @@ export default async function ToyListPage(props: { searchParams?: Promise<Search
     <CollectibleList
       path={META.path} title="Toys" noun={["toy", "toys"]} rows={rows} search={(await props.searchParams) ?? {}}
       note="Every toy the game files list. A toy is an item, so each links its item page and is named as that page names it."
-      columns={[{ key: "item", header: "Item", numeric: true, cell: (r) => <span className="font-mono text-cell-2 text-muted">{r.itemId}</span> }]}
+      columns={[{ key: "item", header: "Item", numeric: true, cell: (r) => <span className="text-fg-2">{r.itemId}</span> }]}
     />
   );
 }

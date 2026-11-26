@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { CLIENT_LABEL } from "@kb/edges";
-import { LINK } from "./entity";
-import { byRank, listHref, listMetadata, listQuery, nameMatches, nextSort, NoMatches, PER_PAGE, Respelled, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "./list-parts";
+import { byRank, ListNote, listHref, listMetadata, listQuery, NameCell, nameMatches, nextSort, NoMatches, paged, pageParams, Respelled, sortRows, Unreadable, type ListQuery, type Search } from "./list-parts";
 
 // The lists of mounts, companion pets, currencies and toys: the game files' entries, named and linked, filtered by
 // name or id and paged like the other database lists. Each row links its own page (a toy, its item page).
 
-export interface CollectibleRow { id: number; name: string; href: string }
+export interface CollectibleRow { id: number; name: string; href: string; icon?: string | null }
+
+/** A column between the name and the id; with `sortBy` its header sorts the list (?sort=<key>). */
+export type CollectibleColumn<R> = Column<R> & { sortBy?: (row: R) => string | number | null };
 
 const SORTS = ["name", "id"] as const;
-type Sort = (typeof SORTS)[number];
+type Sort = string;
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 export interface CollectibleListProps<R extends CollectibleRow> {
@@ -20,24 +21,23 @@ export interface CollectibleListProps<R extends CollectibleRow> {
   /** The game files' rows, or null when the file could not be read. */
   rows: R[] | null;
   /** Columns between the name and the id. */
-  columns?: Column<R>[];
+  columns?: CollectibleColumn<R>[];
   /** One line under the title: where the list comes from and what confirms an entry. */
   note: string;
   search: Search;
 }
 
-const hrefOf = (path: string) => (q: Partial<ListQuery<Sort>>) => listHref(path, [
-  ["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
-]);
+const hrefOf = (path: string) => (q: Partial<ListQuery<Sort>>) => listHref(path, [["q", q.q], ...pageParams(q)]);
 
-/** The list's robots and canonical: indexed only unfiltered, unsorted, each page under its own URL. */
+/** The list's robots and canonical: indexed only unfiltered, unsorted, at its own page size, each page under its own URL. */
 export function collectibleListMetadata(meta: { title: string; description: string; path: string }, search: Search): Metadata {
   const q = listQuery(search, SORTS);
-  return listMetadata(meta, Boolean(q) && !q!.q && !q!.sort, q?.page);
+  return listMetadata(meta, Boolean(q) && !q!.q && !q!.sort && !q!.per, q?.page);
 }
 
 export function CollectibleList<R extends CollectibleRow>({ path, title, noun, rows: all, columns = [], note, search }: CollectibleListProps<R>) {
-  const q = listQuery(search, SORTS);
+  const sortable = columns.filter((c) => c.sortBy);
+  const q = listQuery(search, [...SORTS, ...sortable.map((c) => c.key)]);
   if (!q) notFound();
   const href = hrefOf(path);
   const rows0 = all ?? [];
@@ -46,18 +46,17 @@ export function CollectibleList<R extends CollectibleRow>({ path, title, noun, r
   const { ranked, respelled } = nameMatches(rows0, text, id, (x) => x.name);
   const matched = rows0.filter((x) => !text || (id !== null ? x.id === id : ranked!.has(x)));
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.id), sort.desc, (x) => x.id), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const by = sortable.find((c) => c.key === sort.key)?.sortBy;
+  const rows = byRank(sortRows(matched, (x) => (by ? by(x) : sort.key === "name" ? x.name.toLowerCase() : x.id), sort.desc, (x) => x.id), ranked, Boolean(q.sort));
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
   const cols: Column<R>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={x.href} className={LINK}>{x.name}</Link> },
-    ...columns,
+    { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={x.href} icon={x.icon}>{x.name}</NameCell> },
+    ...columns.map((c) => ({ ...c, sortable: Boolean(c.sortBy) })),
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.id },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? noun[0] : noun[1]} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label={`${title} pages`} />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? noun[0] : noun[1]} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label={`${title} pages`} />;
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   const empty = all === null ? <Unreadable>The game files could not be read just now, so this list is unrecorded.</Unreadable>
     : q.q ? <NoMatches noun={noun[1]} chips={chips} clearHref={path} />
@@ -68,7 +67,7 @@ export function CollectibleList<R extends CollectibleRow>({ path, title, noun, r
     <Container width="data">
       <article>
         <DataTitle title={title} aside={strip} />
-        <p data-list-note className="mb-2 text-meta text-muted">{note} {CLIENT_LABEL}.</p>
+        <ListNote files>{note} {CLIENT_LABEL}.</ListNote>
         <FilterBar
           label={`${title} filters`}
           search={{ action: path, value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}

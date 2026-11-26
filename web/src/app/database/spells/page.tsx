@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import ClassContextChip from "@/components/classes/ClassContextChip";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import Badge from "@/components/ui/Badge";
+import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
-import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
-import { loadSpellNames } from "@/lib/game-assets";
+import { CLASSES } from "@/design/tokens";
+import { classLabel, hasClassContext, parseClassContext, switchClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
+import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { loadCatalog } from "@/lib/talents/catalogs";
-import { LINK } from "../entity";
+import { CLIENT_LABEL } from "@kb/edges";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, Unreadable,
+  ListNote, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, paged, pageParams, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -26,7 +28,7 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const href = (q: Partial<ListQuery<Sort>>, context: ClassContext | null = null) => withClassContext(listHref("/database/spells", [
-  ["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ...pageParams(q),
 ]), context);
 
 /** The spells a class's talent catalog names, which may be none; null only when the catalog cannot be read. */
@@ -41,7 +43,7 @@ async function talentCatalogSpells(slug: ClassSlug): Promise<Set<number> | null>
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const search = (await props.searchParams) ?? {};
   const q = listQuery(search, SORTS);
-  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !hasClassContext(search), q?.page);
+  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per && !hasClassContext(search), q?.page);
 }
 
 export default async function SpellListPage(props: { searchParams?: Promise<Search> }) {
@@ -54,7 +56,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   // role narrow nothing; a catalog that cannot be read leaves the skill lines to narrow by.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
-  const [names, talents] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), context ? talentCatalogSpells(context.classSlug) : null]);
+  const [names, talents, assets] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), context ? talentCatalogSpells(context.classSlug) : null, loadSiteAssets()]);
   const all = names?.names ?? new Map<number, string>();
   const lines = context ? CLIENT_CLASS_SPELLS.classes[context.classSlug]?.spells ?? [] : [];
   const mine = context ? new Set([...lines, ...(talents ?? [])]) : null;
@@ -66,20 +68,29 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
     .map(([spellId, name]) => ({ spellId, name }));
   const sort = q.sort ?? DEFAULT_SORT;
   const sorted = sortRows(rows, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.spellId), sort.desc, (x) => x.spellId);
-  const pages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = sorted.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(sorted, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over }, context);
   const className = context ? classLabel(context.classSlug) : "";
   const subset = mine ? `${className} spells in the game files` : null;
   const clear = withClassContext("/database/spells", context);
 
   const columns: Column<(typeof rows)[number]>[] = [
-    { key: "name", header: "Spell", sortable: true, cell: (x) => <a href={`/database/spells/${x.spellId}`} className={LINK}>{x.name}</a> },
+    { key: "name", header: "Spell", sortable: true, cell: (x) => <NameCell href={`/database/spells/${x.spellId}`} icon={assets?.spellIcons.get(x.spellId)}>{x.name}</NameCell> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.spellId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }, context).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={sorted.length} noun={sorted.length === 1 ? "spell" : "spells"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page }, context)} label="Spell pages" />;
+  const strip = <ResultStrip total={sorted.length} noun={sorted.length === 1 ? "spell" : "spells"} page={q.page} perPage={per} href={(page) => href({ ...q, page }, context)} sizeHref={(n) => href({ ...q, per: n, page: 1 }, context)} label="Spell pages" />;
+  // The class menu puts a class context on the list, or takes it off; a class picks its own colour (the class picker rule).
+  const plain = withoutClassContext("/database/spells", search);
+  const controls: FilterControl[] = [{
+    type: "menu", key: "class", label: "Class",
+    options: [
+      { label: "All classes", href: withoutClassContext("/database/spells", { ...search, page: undefined }), on: !context, reset: true },
+      ...CLASSES.filter((c) => CLIENT_CLASS_SPELLS.classes[c]).map((c) => ({
+        label: classLabel(c), className: CLASS_TEXT[c], href: switchClassContext(plain, { classSlug: c }), on: context?.classSlug === c,
+      })),
+    ],
+  }];
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
   // The names are the game files' own: a list with none was not read, and no addon upload fills it.
   const unread = <Unreadable>{`The spell names for build ${CLIENT_LAYER.build.version} could not be read.`}</Unreadable>;
@@ -92,10 +103,11 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
     <Container width="data">
       <article>
         <DataTitle title="Spells" aside={strip} />
+        <ListNote files>{`Every spell the game files name for build ${CLIENT_LAYER.build.version}. ${CLIENT_LABEL}.`}</ListNote>
         <FilterBar
           label="Spell filters"
           search={{ action: "/database/spells", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}
-          controls={[]}
+          controls={controls}
           active={q.q ? 1 : 0}
           clearHref={clear}
         />
@@ -123,6 +135,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
             empty={empty}
           />
         </div>
+        {pages > 1 && <div className="mt-2">{strip}</div>}
       </article>
     </Container>
   );

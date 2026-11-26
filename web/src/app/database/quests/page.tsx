@@ -13,7 +13,7 @@ import { loadShownNames } from "@/lib/shown-item-names";
 import { bareQuestRow, publicQuests, SIDE_LABEL, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
-  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
+  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -26,6 +26,8 @@ const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const SIDES: Record<string, QuestSide> = { alliance: "alliance", horde: "horde", both: "both" };
 const TAG_LABEL: Record<QuestTag, string> = { group: "Group", dungeon: "Dungeon", raid: "Raid", pvp: "PvP" };
+/** A side is a faction fact: Alliance and Horde wear their colour, a quest for both sides stays plain. */
+const SIDE_TONE: Record<QuestSide, string> = { alliance: "text-faction-alliance", horde: "text-faction-horde", both: "text-fg" };
 const groupLabel = (x: QuestRow) => [x.tag && TAG_LABEL[x.tag], x.suggestedGroup !== null && `${x.suggestedGroup} players`].filter(Boolean).join(", ");
 
 interface QuestQuery extends ListQuery<Sort> { level?: { min: number; max: number }; rewards?: boolean; category?: string; side?: string }
@@ -42,13 +44,13 @@ function questQuery(search: Search): QuestQuery | null {
 }
 
 const href = (q: Partial<QuestQuery>) => listHref("/database/quests", [
-  ["q", q.q], ["level", rangeParam(q.level)], ["rewards", q.rewards ? "1" : undefined], ["category", q.category], ["side", q.side], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined],
+  ["q", q.q], ["level", rangeParam(q.level)], ["rewards", q.rewards ? "1" : undefined], ["category", q.category], ["side", q.side], ...pageParams(q),
 ]);
 const filters = (q: QuestQuery) => Number(Boolean(q.q)) + Number(Boolean(q.level)) + Number(Boolean(q.rewards)) + Number(Boolean(q.category)) + Number(Boolean(q.side));
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = questQuery((await props.searchParams) ?? {});
-  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort, q?.page);
+  return listMetadata(META, Boolean(q) && filters(q!) === 0 && !q!.sort && !q!.per, q?.page);
 }
 
 export default async function QuestListPage(props: { searchParams?: Promise<Search> }) {
@@ -76,9 +78,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
     : sort.key === "category" ? x.category?.toLowerCase() ?? null : sort.key === "side" ? x.side : sort.key === "group" ? x.suggestedGroup
     : sort.key === "giver" ? npcKey(x.giverNpcId) : sort.key === "turnin" ? npcKey(x.turnInNpcId) : sort.key === "rewards" ? x.rewards.length : x.questId;
   const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.questId), ranked, Boolean(q.sort));
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<QuestQuery>) => href({ ...q, page: 1, ...over });
 
   // Reward icons and names under the item lists' rule: art only for items players reported or the wiki names.
@@ -95,15 +95,17 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
       const wiki = !x.title && titleOf(x);
       // Where a title comes from is in the link's hover card (and words for a screen reader), never a printed label.
       // The screen reader words follow the link, so its text is the title alone.
-      return <>
-        <Link prefetch={false} href={`/database/quests/${x.questId}`} className={LINK}>{titleOf(x) ?? `Quest ${x.questId}`}</Link>
-        {wiki && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
-      </>;
+      return (
+        <NameCell href={`/database/quests/${x.questId}`} after={wiki && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}>
+          {titleOf(x) ?? `Quest ${x.questId}`}
+        </NameCell>
+      );
     } },
+    // What kind of quest (side, group), its level, where it is and who gives it, what it pays, its id.
+    { key: "side", header: "Side", sortable: true, cell: (x) => (x.side ? <span className={SIDE_TONE[x.side]}>{SIDE_LABEL[x.side]}</span> : dash), blank: (x) => !x.side },
+    { key: "group", header: "Group", sortable: true, cell: (x) => groupLabel(x) || dash, blank: (x) => !groupLabel(x) },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (x) => x.level ?? dash, blank: (x) => x.level === null },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category ?? dash, blank: (x) => x.category === null },
-    { key: "side", header: "Side", sortable: true, cell: (x) => (x.side ? SIDE_LABEL[x.side] : dash), blank: (x) => !x.side },
-    { key: "group", header: "Group", sortable: true, cell: (x) => groupLabel(x) || dash, blank: (x) => !groupLabel(x) },
     { key: "giver", header: "Giver", sortable: true, cell: (x) => npc(x.giverNpcId), blank: (x) => x.giverNpcId === null },
     { key: "turnin", header: "Turn-in", sortable: true, cell: (x) => npc(x.turnInNpcId), blank: (x) => x.turnInNpcId === null },
     {
@@ -113,7 +115,8 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
             const icon = tips.get(rid)?.icon;
             return icon
               ? <Link prefetch={false} key={rid} href={`/database/items/${rid}`} aria-label={itemName(rid)}><GameIcon src={icon} size={24} /></Link>
-              : <Link prefetch={false} key={rid} href={`/database/items/${rid}`} className={`${LINK} mr-2`}>{itemName(rid)}</Link>;
+              // A name with no icon wears its quality colour where the tooltip facts give one.
+              : <Link prefetch={false} key={rid} href={`/database/items/${rid}`} className={`${LINK} mr-2`} style={tips.get(rid) ? { color: tips.get(rid)!.color } : undefined}>{itemName(rid)}</Link>;
           })}
         </span>
       ),
@@ -144,7 +147,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
     { type: "toggle", key: "rewards", label: "Has rewards", href: here({ rewards: q.rewards ? undefined : true }), on: Boolean(q.rewards) },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "quest" : "quests"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Quest pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "quest" : "quests"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Quest pages" />;
   const chips = [
     ...(q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []),
     ...(q.level ? [{ label: `Level ${rangeParam(q.level)}`, href: here({ level: undefined }) }] : []),
@@ -182,7 +185,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
             rowKey={(x) => String(x.questId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => [x.level !== null && `Level ${x.level}`, x.category, x.side && SIDE_LABEL[x.side], x.giverNpcId !== null && `From ${npcs.get(x.giverNpcId) ?? `NPC ${x.giverNpcId}`}`, x.rewards.length > 0 && `${x.rewards.length} reward${x.rewards.length === 1 ? "" : "s"}`, `ID ${x.questId}`].filter(Boolean).join(" · ")}
+            meta={(x) => [x.side && SIDE_LABEL[x.side], x.level !== null && `Level ${x.level}`, x.category, x.giverNpcId !== null && `From ${npcs.get(x.giverNpcId) ?? `NPC ${x.giverNpcId}`}`, x.rewards.length > 0 && `${x.rewards.length} reward${x.rewards.length === 1 ? "" : "s"}`, `ID ${x.questId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         )}</div>

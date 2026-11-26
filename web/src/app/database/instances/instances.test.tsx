@@ -55,7 +55,8 @@ test("the list has a Level column and starts with the lowest level; a range the 
   const col = headers.indexOf("Level");
   expect(cells(html, "/database/instances/389-ragefire-chasm")[col]).toBe("13");
   expect(cells(html, "/database/instances/409-molten-core")[col]).toBe("60");
-  expect(cells(html, "/database/instances/249-onyxia-s-lair")[col]).toBe("–");
+  // The empty mark is the em dash, as on every list.
+  expect(cells(html, "/database/instances/249-onyxia-s-lair")[col]).toBe("—");
 });
 
 test("an instance's page title is the database pages' own: the name, then WoW Forever and its kind", async () => {

@@ -14,8 +14,11 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_
 const wiki = vi.hoisted(() => ({ titles: null as Map<number, { name: string; wikiPage: string }> | null }));
 // The game files' spell names (unread unless a test sets them).
 const files = vi.hoisted(() => ({ spells: null as { version: string; names: Map<number, string> } | null }));
+// The asset manifest (none unless a test sets one).
+const art = vi.hoisted(() => ({ assets: null as unknown }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
+  loadSiteAssets: async () => art.assets,
   loadSpellNames: async () => files.spells,
   loadQuestNames: async () => (wiki.titles ? { version: "x", wiki: { name: "Warcraft Wiki", url: "https://warcraft.wiki.gg" }, names: wiki.titles } : null),
 }));
@@ -54,6 +57,7 @@ const places = (page: string, kind: string) => [...(page.split("<tbody>")[1] ?? 
 
 beforeEach(() => wiki.titles = null);
 beforeEach(() => files.spells = null);
+beforeEach(() => art.assets = null);
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: `2026-10-10T00:00:${String(n++ % 60).padStart(2, "0")}.000Z` }));
 
 test("the NPC list shows the agreed level, reaction, zone and drops, and filters and sorts by them in the URL", async () => {
@@ -266,7 +270,11 @@ test("the instance list filters by name or id and sorts by name, type or level i
   const none = await html(InstanceList(search({ q: "zzz" })));
   expect(none).toContain("No instances match these filters.");
   expect(none).not.toContain("data-empty-state");
-  for (const bad of [{ sort: "zone" }, { sort: "bosses" }, { page: "999" }] as Record<string, string>[]) {
+  // Bosses and the entrance's zone sort too; a column with no single order does not.
+  const byBosses = places(await html(InstanceList(search({ sort: "-bosses" }))), "instances");
+  expect(byBosses.indexOf(409)).toBeLessThan(byBosses.indexOf(389));
+  expect(places(await html(InstanceList(search({ sort: "zone" }))), "instances")).toHaveLength(plain.length);
+  for (const bad of [{ sort: "guide" }, { sort: "confirmed" }, { page: "999" }] as Record<string, string>[]) {
     await expect(html(InstanceList(search(bad))), JSON.stringify(bad)).rejects.toThrow("NEXT_NOT_FOUND");
   }
   expect((await instanceMetadata(search())).robots).toBeUndefined();
@@ -306,6 +314,63 @@ test("the spell list with no names read says the build's names could not be read
   }
   files.spells = { version: "x", names: new Map([[133, "Fireball"]]) };
   expect(await html(SpellList(search({ q: "frost" })))).toContain("No spells match these filters.");
+});
+
+/** The column headers, in order. */
+const heads = (page: string) => [...(page.split("<thead>")[1]?.split("</thead>")[0] ?? "").matchAll(/<th[^>]*>(?:<[^>]+>)*([^<]+)/g)].map((m) => m[1]);
+
+test("every list orders its columns the same way: name and kind, key numbers, where, status, id", async () => {
+  expect(heads(await html(NpcList(search())))).toEqual(["Name", "Type", "Rank", "Reaction", "Level", "Drops", "Zone", "ID"]);
+  expect(heads(await html(QuestList(search())))).toEqual(["Name", "Side", "Group", "Level", "Category", "Giver", "Rewards", "ID"]);
+  expect(heads(await html(VendorList(search())))).toEqual(["Vendor", "Items", "Zone", "ID"]);
+  expect(heads(await html(InstanceList(search())))).toEqual(["Name", "Type", "Level", "Bosses", "Entered from", "Entrance confirmed", "Guide"]);
+});
+
+test("a quest's side wears its faction colour; both sides stay plain", async () => {
+  const all = await html(QuestList(search()));
+  expect(all).toMatch(/class="[^"]*text-faction-alliance[^"]*">Alliance</);
+  expect(all).toMatch(/>Both</);
+  expect(all).not.toMatch(/text-faction-[a-z]+[^"]*">Both</);
+});
+
+test("a list's page size is in the URL: ?per= picks 25, 50 or 100, and sorting and paging keep it", async () => {
+  // 52 NPCs with names: more than the smallest page.
+  const many = Array.from({ length: 52 }, (_, k) => three.map((i) => sight(i, 1000 + k, `Kobold ${k}`, 5, "hostile"))).flat();
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records: [...records, ...many], dataAsOf: "2026-10-10T00:02:00.000Z" });
+  const plain = await html(NpcList(search()));
+  expect(plain).toContain("data-page-sizes");
+  expect(plain).toContain('href="/database/npcs?per=25"');
+  expect(plain).toContain('href="/database/npcs?per=100"');
+  const small = await html(NpcList(search({ per: "25" })));
+  expect(rows(small, "npcs")).toHaveLength(25);
+  expect(small).toContain('href="/database/npcs?per=25&amp;page=2"');
+  expect(small).toContain('href="/database/npcs?sort=name&amp;per=25"');
+  expect(rows(await html(NpcList(search({ per: "100" }))), "npcs")).toHaveLength(54);
+  await expect(html(NpcList(search({ per: "30" })))).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(html(NpcList(search({ per: "100", page: "2" })))).rejects.toThrow("NEXT_NOT_FOUND");
+  // Another size is not the plain list: noindex, canonical page 1.
+  expect((await npcMetadata(search({ per: "100" }))).robots).toMatchObject({ index: false, follow: true });
+});
+
+test("the spell list has a class filter in the URL, each class in its colour, and a spell's icon where the art exists", async () => {
+  files.spells = { version: "x", names: new Map([[133, "Fireball"], [10, "Blizzard"], [71, "Defensive Stance"]]) };
+  art.assets = { spellIcons: new Map([[10, "https://a.test/icons/135857.webp"]]), maps: [], loadingScreens: new Map() };
+  const all = await html(SpellList(search()));
+  expect(all).toContain('data-filter="class"');
+  expect(all).toContain('href="/database/spells?class=mage"');
+  expect(all).toMatch(/text-class-mage[^>]*>Mage</);
+  expect(all).toContain('src="https://a.test/icons/135857.webp"');
+  const mage = await html(SpellList(search({ class: "mage" })));
+  // Defensive Stance is a warrior's: the mage list leaves it out.
+  expect(rows(mage, "spells")).toEqual([10, 133]);
+  // The menu's button names the class it is on.
+  expect(mage).toContain('Class: <span class="text-fg">Mage</span>');
+});
+
+test("the instance list folds on a phone: the other columns as one line under the name", async () => {
+  const all = await html(InstanceList(search()));
+  const rfc = all.split("<tr").find((r) => r.includes('href="/database/instances/389')) ?? "";
+  expect(rfc).toMatch(/class="text-cell-2 text-muted sm:hidden">Dungeon · Level 13/);
 });
 
 beforeEach(() => { links.length = 0; });

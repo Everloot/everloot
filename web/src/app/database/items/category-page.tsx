@@ -16,12 +16,11 @@ import { classLabel, hasClassContext, parseClassContext, withClassContext, witho
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
 import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
-import GameIcon from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
-import { Respelled, LEVEL_BRACKETS, PER_PAGE } from "../list-parts";
+import { Respelled, LEVEL_BRACKETS, NameCell, paged } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -58,7 +57,7 @@ export const NAME_TITLE: Record<NameSource, string> = { ...NAME_FROM, files: UNC
  * The plain list, on any page, is its own canonical; a filter, a sort, a name search or a class context is noindex
  * and points its canonical at page 1 of the plain list.
  */
-const isPlain = (q: CategoryQuery, search: Search) => activeFilters(q) === 0 && !q.sort && !q.dev && !q.unnamed && !hasClassContext(search);
+const isPlain = (q: CategoryQuery, search: Search) => activeFilters(q) === 0 && !q.sort && !q.per && !q.dev && !q.unnamed && !hasClassContext(search);
 
 export const ALL_ITEMS = {
   title: "WoW Forever Items by Category",
@@ -154,9 +153,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && (gone(row[0]) || !fits(row))), 0);
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const { shown, pages, per } = paged(rows, q);
   const { assets, tips } = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
   // The icon column, with the game's question mark where a row has no icon, only with the asset files.
@@ -181,26 +178,30 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         // A shown name carries its own quality colour; otherwise the game files' quality colours the row.
         const colour = name?.color ? "" : c.quality && c.quality.id <= 5 ? QUALITY_TEXT[qualityOf(c.quality.id)] : "text-fg";
         const unconfirmed = name?.source === "files";
+        // Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
+        // link's text is the name alone), never a printed label; a name only the game files give carries the quiet
+        // unconfirmed marker.
         return (
-          <span className="flex min-w-0 items-center gap-2">
-            {unknownIcon && <GameIcon src={tip?.icon || unknownIcon} size={24} quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined} />}
-            {/* Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
-                link's text is the name alone), never a printed label; a name only the game files give carries the
-                quiet unconfirmed marker. */}
-            <Link prefetch={false} href={`/database/items/${row[0]}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
-              {name?.name ?? `Item ${row[0]}`}
-            </Link>
-            {name && name.source !== "files" && <span className="sr-only"> ({NAME_TITLE[name.source].toLowerCase()})</span>}
-            {unconfirmed && <Badge tone="files" />}
-          </span>
+          <NameCell
+            href={`/database/items/${row[0]}`}
+            icon={unknownIcon && (tip?.icon || unknownIcon)}
+            quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined}
+            tone={colour}
+            style={name?.color ? { color: name.color } : undefined}
+            after={name && name.source !== "files" && <span className="sr-only"> ({NAME_TITLE[name.source].toLowerCase()})</span>}
+            files={unconfirmed}
+          >
+            {name?.name ?? `Item ${row[0]}`}
+          </NameCell>
         );
       },
     },
-    // Levels from the tooltip facts: blank for an item that shows none, and for "no required level".
-    { key: "ilvl", header: "Item level", numeric: true, sortable: true, cell: (row) => tips.get(row[0])?.level || <span className="text-muted">—</span> },
-    { key: "req", header: "Req. level", numeric: true, sortable: true, cell: (row) => tips.get(row[0])?.required || <span className="text-muted">—</span> },
+    // What it is (type, slot), its levels from the tooltip facts, where players found it, its id.
     ...(sub ? [] : [{ key: "type", header: "Type", sortable: true, cell: (row: ItemRow) => describe(T, row).subclass?.name ?? "None" }]),
     { key: "slot", header: "Slot", sortable: true, cell: (row) => slotOf(row[3])?.name ?? <span className="text-muted">—</span> },
+    // Blank for an item that shows none, and for "no required level".
+    { key: "ilvl", header: "Item level", numeric: true, sortable: true, cell: (row) => tips.get(row[0])?.level || <span className="text-muted">—</span> },
+    { key: "req", header: "Req. level", numeric: true, sortable: true, cell: (row) => tips.get(row[0])?.required || <span className="text-muted">—</span> },
     { key: "seen", header: "Source", sortable: true, cell: (row) => sourceOf(row) ?? <span className="text-muted">—</span>, blank: (row) => !seen.from.has(row[0]) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (row) => row[0] },
   ];
@@ -286,7 +287,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The name box keeps every other filter (not the page) as hidden fields.
   const keep = Object.fromEntries(new URLSearchParams(link(undefined, undefined, { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
   const pageHref = (page: number) => link(cls?.slug, sub?.slug, { ...q, page });
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "item" : "items"} page={q.page} perPage={PER_PAGE} href={pageHref} label="Item pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "item" : "items"} page={q.page} perPage={per} href={pageHref} sizeHref={(n) => link(cls?.slug, sub?.slug, { ...q, per: n, page: 1 })} label="Item pages" />;
   const active = activeFilters(q);
 
   const chips = [
@@ -380,7 +381,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             // The default order (named items first) is no one column, so no header shows an arrow for it.
             sort={q.sort ? { key: q.sort.key, direction: q.sort.desc ? "desc" : "asc" } : undefined}
             sortHref={(key, dir) => here({ sort: { key: key as NonNullable<CategoryQuery["sort"]>["key"], desc: dir === "desc" } })}
-            meta={(row) => [tips.get(row[0])?.level ? `Item level ${tips.get(row[0])!.level}` : null, slotOf(row[3])?.name, sub ? null : describe(T, row).subclass?.name, sourceOf(row)].filter(Boolean).join(" · ")}
+            meta={(row) => [sub ? null : describe(T, row).subclass?.name, slotOf(row[3])?.name, tips.get(row[0])?.level ? `Item level ${tips.get(row[0])!.level}` : null, sourceOf(row)].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

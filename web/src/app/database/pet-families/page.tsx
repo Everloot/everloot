@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle } from "@/components/ui";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { pageMetadata } from "@/lib/seo";
 import { petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { CLIENT_LABEL } from "@kb/edges";
-import { LINK } from "../entity";
-import { Unreadable } from "../list-parts";
+import { ListNote, NameCell, Unreadable } from "../list-parts";
 
 export const metadata: Metadata = pageMetadata({
   title: "WoW Forever Hunter Pet Families",
@@ -24,21 +21,13 @@ export default async function PetFamilyListPage() {
     <Container width="data">
       <article>
         <DataTitle title="Hunter pet families" />
-        <p data-list-note className="mb-2 text-meta text-muted">Every family a hunter can tame, as the game files list it: the families that eat. A warlock&apos;s demons are left out. {CLIENT_LABEL}.</p>
+        <ListNote files>Every family a hunter can tame, as the game files list it: the families that eat. A warlock&apos;s demons are left out. {CLIENT_LABEL}.</ListNote>
         <DataTable
           dense
           caption={`Hunter pet families in the game files: ${rows?.length ?? 0}`}
           columns={[
             {
-              key: "name", header: "Name", cell: (f) => {
-                const icon = assets?.familyIcons.get(f.id);
-                return (
-                  <span className="inline-flex items-center gap-2">
-                    {icon && <GameIcon src={icon} size={20} />}
-                    <Link prefetch={false} href={petFamilyHref(f.id, f.name)} className={LINK}>{f.name}</Link>
-                  </span>
-                );
-              },
+              key: "name", header: "Name", cell: (f) => <NameCell href={petFamilyHref(f.id, f.name)} icon={assets?.familyIcons.get(f.id)}>{f.name}</NameCell>,
             },
             { key: "abilities", header: "Spells on its skill line", numeric: true, cell: (f) => f.spellIds.length },
             { key: "id", header: "ID", numeric: true, cell: (f) => f.id },
