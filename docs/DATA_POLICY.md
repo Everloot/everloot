@@ -726,6 +726,21 @@ rules:
 - Every page is labelled *found in game files, unconfirmed* with its build; no player report confirms either yet.
   The family icons are the existing `familyIcons` in asset storage. None of it is in the API, the MCP server or the
   bulk download.
+**Places in a zone and achievement categories.** *Proposed 2026-11-25 in the pull request that adds them (the
+maintainer review).* The rules:
+
+- The zone pages' Places tab reads `client-places.json` (`npm run kb -- client-places`, from `AreaTable`, `AreaPOI`
+  and `UiMapAssignment`): each zone's subzones (the areas whose parent chain reaches the area the zone shows) and the
+  points of interest the world map labels, with their world position. A page lists only the points whose own area
+  leads to the zone: zone rectangles overlap, so a point with no area is left out, never guessed. Only zones the map
+  draws have a page, so a held-back zone's places stay hidden as the map rule says.
+- `client-achievements.json` now carries each achievement's category id and the category names from
+  `Achievement_Category`. This reverses the earlier note that category names come only from player reports: the
+  71091 files name all 56. `/database/achievements` groups and filters by them, and a category players report for a
+  confirmed achievement still wins.
+- Both are labelled *found in game files, unconfirmed* with their build. Ids, names and positions only. Neither is in
+  the API, the MCP server or the bulk download.
+- Quest categories (`QuestSort`, 39 names) are not published: nothing in the files ties a quest to one.
 
 **Build changes, beta builds included.** Decided 2026-10-18, the same way Wowhead and other
 datamining sites work: when Blizzard ships a new build, a reviewed pull request records what

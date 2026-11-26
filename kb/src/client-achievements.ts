@@ -31,7 +31,12 @@ const ClientAchievement = z.object({
   criteria: z.array(CriterionSchema),
   /** A statistic the game keeps (a counter, `Achievement.Flags` bit 1), not an achievement to earn; absent otherwise. */
   statistic: z.literal(true).optional(),
+  /** Its category (`Achievement.Category`, a key of `categories`); absent when the files give none. */
+  category: z.number().int().optional(),
 });
+
+/** An `Achievement_Category` row: its name and the category it sits under (absent at the top). */
+const Category = z.object({ name: z.string(), parent: z.number().int().optional() });
 
 export const ClientAchievements = z.object({
   schema: z.literal(ACHIEVEMENTS_SCHEMA),
@@ -43,8 +48,9 @@ export const ClientAchievements = z.object({
   }),
   /** Every achievement keyed by its id, in id order in the file. */
   achievements: z.record(z.string(), ClientAchievement),
-  /** Where the names of achievement categories live: player uploads; the files carry only the id. */
-  note: z.literal("criteria and text are the game files'; category names come from player reports"),
+  /** Every category the files name (`Achievement_Category`), keyed by its id, in id order in the file. */
+  categories: z.record(z.string(), Category).default({}),
+  note: z.literal("criteria, text and category names are the game files'"),
 });
 export type ClientAchievements = z.infer<typeof ClientAchievements>;
 export type ClientAchievement = z.infer<typeof ClientAchievement>;
@@ -52,11 +58,13 @@ export type ClientCriterion = z.infer<typeof CriterionSchema>;
 
 /** criteria.json-style one achievement per line, so a new build's file reads as a line diff in review. */
 export function serializeClientAchievements(table: ClientAchievements): string {
-  const { achievements, ...head } = table;
+  const { achievements, categories, ...head } = table;
   const top = JSON.stringify(head, null, 1).replace(/\n}$/, "");
-  const ids = Object.keys(achievements).sort((a, b) => Number(a) - Number(b));
-  const rows = (pair: [string, ClientAchievement]) => `  ${JSON.stringify(pair[0])}: ${JSON.stringify(pair[1])}`;
-  return `${top},\n "achievements": {\n${ids.map((id) => rows([id, achievements[id] as ClientAchievement])).join(",\n")}\n }\n}\n`;
+  const block = (key: string, record: Record<string, unknown>) => {
+    const ids = Object.keys(record).sort((a, b) => Number(a) - Number(b));
+    return ` ${JSON.stringify(key)}: {\n${ids.map((id) => `  ${JSON.stringify(id)}: ${JSON.stringify(record[id])}`).join(",\n")}\n }`;
+  };
+  return `${top},\n${block("categories", categories)},\n${block("achievements", achievements)}\n}\n`;
 }
 
 export interface TreeRow { ID: number; Parent: number; OrderIndex: number; Description_lang: string | null; Amount: number }
@@ -90,6 +98,18 @@ export function criteriaOf(rootId: number, tree: Map<number, TreeRow>): ClientCr
   return out;
 }
 
+/** The named categories by id; a parent of -1 or 0 is the top. */
+export function categoriesOf(rows: Map<number, Record<string, unknown>> | undefined): ClientAchievements["categories"] {
+  const out: ClientAchievements["categories"] = {};
+  for (const [id, row] of [...(rows ?? [])].sort(([a], [b]) => a - b)) {
+    const name = typeof row.Name_lang === "string" ? row.Name_lang.trim() : "";
+    if (!name) continue;
+    const parent = Number(row.Parent);
+    out[id] = parent > 0 ? { name, parent } : { name };
+  }
+  return out;
+}
+
 export function buildClientAchievements(snapshotPath: string): ClientAchievements {
   const meta = readClientMeta(snapshotPath);
   const present = new Set(readClientTables(snapshotPath));
@@ -112,6 +132,7 @@ export function buildClientAchievements(snapshotPath: string): ClientAchievement
         criteria,
         ...(description ? { description } : {}),
         ...(Number(row.Flags ?? 0) & ACHIEVEMENT_COUNTER ? { statistic: true } : {}),
+        ...(Number(row.Category) > 0 ? { category: Number(row.Category) } : {}),
       });
     }
   }
@@ -119,7 +140,8 @@ export function buildClientAchievements(snapshotPath: string): ClientAchievement
     schema: ACHIEVEMENTS_SCHEMA, label: CLIENT_LABEL, credit: GAME_DATA_CREDIT,
     build: { product: meta.product, buildId: meta.buildId, version: meta.version, buildConfig: meta.buildConfig, definitions: meta.definitions, extractedAt: meta.extractedAt },
     achievements: out,
-    note: "criteria and text are the game files'; category names come from player reports",
+    categories: categoriesOf(get("Achievement_Category")),
+    note: "criteria, text and category names are the game files'",
   });
 }
 

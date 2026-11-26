@@ -32,6 +32,7 @@ import { writeClientItemSets } from "./client-item-sets.js";
 import { writeClientCollections } from "./client-collections.js";
 import { writeClientHolidays } from "./client-holidays.js";
 import { writeClientPetFamilies } from "./client-pet-families.js";
+import { writeClientPlaces } from "./client-places.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -244,6 +245,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
   client-holidays <snapshot.sqlite> [--out ../web/src/data/game-data/client-holidays.json]
   client-pet-families <snapshot.sqlite> [--out ../web/src/data/game-data/client-pet-families.json]
+  client-places <snapshot.sqlite> [--out ../web/src/data/game-data/client-places.json]
     (every quest line with its quest ids in order. Pages and search, as above)
   client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
     (every item set with its pieces, its bonuses as pieces needed and spell id, and the skill a crafted set asks
@@ -844,6 +846,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-pet-families.json";
       const table = writeClientPetFamilies(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.families.length} hunter pet families -> ${path}`);
+      return 0;
+    }
+    case "client-places": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-places.json";
+      const table = writeClientPlaces(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.subzones.length} subzones, ${table.pois.length} points of interest -> ${path}`);
       return 0;
     }
     case "client-diff": {

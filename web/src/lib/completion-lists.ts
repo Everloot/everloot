@@ -40,7 +40,9 @@ function baseEntries() {
     readable(() => {
       for (const [id, a] of Object.entries(CLIENT_ACHIEVEMENTS.achievements)) {
         if (a.statistic) continue;
-        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category: "", points: a.points, criteriaCount: a.criteria.length, confirmed: false, reporters: 0 });
+        // The category the files name for it (found in game files, unconfirmed, like the rest of the entry); "" when none.
+        const category = a.category === undefined ? "" : CLIENT_ACHIEVEMENTS.categories[String(a.category)]?.name ?? "";
+        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category, points: a.points, criteriaCount: a.criteria.length, confirmed: false, reporters: 0 });
       }
       return CLIENT_ACHIEVEMENTS.achievements;
     }),
