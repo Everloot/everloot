@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
-import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
+import { AgreementMeter, Container, DataTable, Facts, GET_THE_ADDON, InShort, OpenData, QUALITY_TEXT, type Column, type Fact, type Quality } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import type { ModelPicture as ModelPictureFile } from "@/lib/game-renders";
-import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
+import { breadcrumbJsonLd, entityPageJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 
@@ -26,7 +27,7 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
   const emitJsonLd = trail.length > 1 && page && !trailFor(page.path);
   const parts = meta.filter((m) => m !== null && m !== undefined && m !== false && m !== "");
   return (
-    <header data-page-header data-entity-header className={`mb-4 flex min-w-0 items-center gap-3 ${aside ? "flex-wrap" : ""}`.trim()}>
+    <header data-slot="header" data-page-header data-entity-header className={`mb-4 flex min-w-0 items-center gap-3 ${aside ? "flex-wrap" : ""}`.trim()}>
       {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
       {icon}
       <div className={aside ? "min-w-0 flex-[1_1_16rem]" : "min-w-0"}>
@@ -48,9 +49,9 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
  * show) leaves the facts alone at the same width.
  */
 export function EntityTop({ box, facts, railMap = false }: { box: ReactNode; facts: ReactNode; railMap?: boolean }) {
-  if (!box) return facts ? <section aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
+  if (!box) return facts ? <section data-slot="top" aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
   return (
-    <div className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
+    <div data-slot="top" className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
       <div className="entity-box min-w-0">{box}</div>
       <section aria-label="Quick facts" className="min-w-0">{facts}</section>
     </div>
@@ -203,5 +204,76 @@ export function EntityLayout({ children }: { children: ReactNode }) {
 
 /** Existing page blocks keep their DOM order below xl, without duplicate maps or links. */
 export function EntitySidebar({ children }: { children: ReactNode }) {
-  return <div data-entity-sidebar className="entity-sidebar contents xl:block xl:min-w-0 xl:[overflow-wrap:anywhere]">{children}</div>;
+  return <div data-slot="side" data-entity-sidebar className="entity-sidebar contents xl:block xl:min-w-0 xl:[overflow-wrap:anywhere]">{children}</div>;
+}
+
+/**
+ * The slots of an entity page, in the order every page renders them (each one a `data-slot`). `side` holds `media`
+ * then `summary`: the xl rail, inline under the top band below xl. A slot with nothing in it renders nothing.
+ */
+export const ENTITY_SLOTS = ["header", "top", "notices", "side", "media", "summary", "main", "related", "map", "changes", "screenshots", "comments", "footer"] as const;
+
+/**
+ * The one template every database entity page fills, so they all read alike: the header (icon, name, type line), the
+ * top band (tooltip box or art, and the quick facts), any notices about them, the side column (a model picture or map,
+ * then In short), the main tabs, related (lore, more sections), map, changes, screenshots, comments, and last the
+ * open-data row with its Report wrong data link and any credit line. Pages pass what they have; they never reorder.
+ */
+export function EntityPage({
+  name, degraded, jsonLd, header, box, railMap, facts, notices, media, summary, main, related, map, changes, screenshots, comments, openData, credit,
+}: {
+  /** The plain name, for the quick facts' label. */
+  name: string;
+  /** Marks the render for the short edge cache when a read failed (EdgeDegraded). */
+  degraded?: boolean;
+  jsonLd?: Parameters<typeof entityPageJsonLd>[0] | null;
+  header: Parameters<typeof EntityHeader>[0];
+  box?: ReactNode;
+  railMap?: boolean;
+  facts?: Fact[] | null | false;
+  notices?: ReactNode;
+  media?: ReactNode;
+  /** The In short lines. */
+  summary?: readonly string[];
+  main?: ReactNode;
+  related?: ReactNode;
+  map?: ReactNode;
+  /** This entity's changes across builds: a later lane fills it. */
+  changes?: ReactNode;
+  screenshots?: ReactNode;
+  comments?: ReactNode;
+  openData?: Parameters<typeof OpenData>[0] | null | false;
+  credit?: ReactNode;
+}) {
+  const inShort = summary && summary.length > 0;
+  return (
+    <Container width="data">
+      {degraded !== undefined && <EdgeDegraded when={degraded} />}
+      {jsonLd && <JsonLd data={entityPageJsonLd(jsonLd)} />}
+      <EntityLayout>
+        <EntityHeader {...header} />
+        <EntityTop box={box} railMap={railMap} facts={facts && <Facts layout="list" label={`${name}: quick facts`} items={facts} />} />
+        {notices && <div data-slot="notices">{notices}</div>}
+        {(media || inShort) && (
+          <EntitySidebar>
+            {media && <div data-slot="media">{media}</div>}
+            {inShort && <div data-slot="summary"><InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} /></div>}
+          </EntitySidebar>
+        )}
+        {main && <div data-slot="main" className="mt-6">{main}</div>}
+        {related && <div data-slot="related" className="mt-6 space-y-6 empty:hidden">{related}</div>}
+        {map && <div data-slot="map">{map}</div>}
+        {changes && <div data-slot="changes">{changes}</div>}
+        {screenshots && <div data-slot="screenshots">{screenshots}</div>}
+        {comments && <div data-slot="comments">{comments}</div>}
+        {(openData || credit) && (
+          // flow-root: OpenData's own top margin adds to this one in the grid and in the flow alike.
+          <div data-slot="footer" className="mt-3 flow-root">
+            {openData && <OpenData {...openData} />}
+            {credit}
+          </div>
+        )}
+      </EntityLayout>
+    </Container>
+  );
 }
