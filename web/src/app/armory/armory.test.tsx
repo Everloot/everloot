@@ -25,8 +25,24 @@ vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOrigi
 const sightings = vi.hoisted(() => ({ store: null as PlayerStore | null }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => sightings.store }));
 
+/** The order the guild page's later reads start in. */
+const started = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/progression", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/progression")>();
+  return { ...real, loadGuildProgression: (...a: Parameters<typeof real.loadGuildProgression>) => { started.push("progression"); return real.loadGuildProgression(...a); } };
+});
+vi.mock("@/lib/guild-merge", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/guild-merge")>();
+  return { ...real, addonGuildOf: (...a: Parameters<typeof real.addonGuildOf>) => { started.push("addon"); return real.addonGuildOf(...a); } };
+});
+vi.mock("@/lib/guild-profile-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/guild-profile-store")>()),
+  guildProfileStore: () => ({ profile: async () => { started.push("profile"); return null; }, access: async () => null }),
+}));
+
 let mem: MemoryArmoryStore;
 beforeEach(() => {
+  started.length = 0;
   sightings.store = createMemoryPlayerStore();
   mem = createMemoryArmoryStore(() => new Date("2026-11-10T00:00:00Z"));
   mem.putCharacter(armoryCharacter());
@@ -370,6 +386,35 @@ describe("the character page", () => {
       expect(character).toHaveBeenCalledTimes(1);
       expect(rank).toHaveBeenCalledTimes(1);
     });
+
+    test("the ranks read starts with the character read, not after it", async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      const read = mem.character.bind(mem);
+      const character = vi.spyOn(mem, "character").mockImplementation(async (region, slug) => { await gate; return read(region, slug); });
+      const rank = vi.spyOn(mem, "rank");
+      const search = vi.spyOn(mem, "search");
+      vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+      const page = html(pages.character("eu", "velkara-duskmantle"));
+      await vi.waitFor(() => expect(character).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 0));
+      expect(rank).toHaveBeenCalledTimes(1);
+      // The addon-sighting search asks by the first name, which the address carries in lower case.
+      expect(search).toHaveBeenCalledTimes(1);
+      expect(search.mock.calls[0]![0].toLowerCase()).toBe("velkara");
+      release();
+      expect(await page).toContain("Velkara");
+      expect(rank).toHaveBeenCalledTimes(1);
+      expect(search).toHaveBeenCalledTimes(1);
+    });
+
+    test("a character whose address does not start with its name is still searched for by its name", async () => {
+      mem.putCharacter(armoryCharacter({ slug: "odd-address", name: "Mirela", surname: "Vane" }));
+      vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+      const search = vi.spyOn(mem, "search");
+      await html(pages.character("eu", "odd-address"));
+      expect(search.mock.calls.map((c) => c[0].toLowerCase())).toContain("mirela");
+    });
   });
 
   test("a refused Gear Score leaves it out", async () => {
@@ -404,6 +449,18 @@ describe("the character page", () => {
 });
 
 describe("the guild page", () => {
+  test("the profile read starts with the guild read, and progression beside the addon guild search", async () => {
+    const read = mem.guild.bind(mem);
+    vi.spyOn(mem, "guild").mockImplementation(async (region, slug) => { started.push("guild"); return read(region, slug); });
+    await html(pages.guild("eu", "ember-wardens"));
+    expect(started.indexOf("profile")).toBeLessThan(started.indexOf("guild"));
+    expect(started).toContain("addon");
+    expect(started.indexOf("progression")).toBeGreaterThan(-1);
+    expect(started.indexOf("progression")).toBeLessThan(started.indexOf("addon"));
+    expect(started.indexOf("profile")).toBeGreaterThan(-1);
+    expect(started.indexOf("profile")).toBeLessThan(started.indexOf("addon"));
+  });
+
   test("lists the roster by rank, links stored members and says Unknown for an id it does not know", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     expect(out).toContain("Ember Wardens");
