@@ -15,9 +15,9 @@ import { link } from "./parts";
 
 // The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the character's
 // summary in the model's place between them.
-const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
-const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
-const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
+export const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
+export const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
+export const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
 const qualityName = (q: string | null | undefined): Quality | undefined => QUALITIES.find((x) => x === q?.toLowerCase());
 const quality = (q: string | null) => QUALITY_TEXT[qualityName(q) as Quality] ?? "text-fg";
 const ICON = 40;
