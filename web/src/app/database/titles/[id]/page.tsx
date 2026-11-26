@@ -57,7 +57,7 @@ export default async function TitlePage(props: Props) {
     ? entitySummary({
       identity: "A character title in WoW: Forever.",
       observed: entry.confirmed ? "Players reported holding it, three installs agreeing." : "No player has reported holding it yet.",
-      named: entry.confirmed,
+      nameFrom: entry.confirmed ? "players" : "none",
     })
     : [];
   const listed = titleInFiles(id);

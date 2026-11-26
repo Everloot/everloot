@@ -60,7 +60,7 @@ export default async function FactionPage(props: Props) {
     ? entitySummary({
       identity: `${entry.major ? "A major faction" : files?.header ? "A header of the reputation pane" : "A reputation faction"}${under ? ` under ${under}` : ""} in WoW: Forever.`,
       observed: entry.confirmed ? "Players reported it in their reputation pane, three installs agreeing." : "No player has reported it in a reputation pane yet.",
-      named: entry.confirmed,
+      nameFrom: entry.confirmed ? "players" : "none",
     })
     : [];
   const inFiles = files

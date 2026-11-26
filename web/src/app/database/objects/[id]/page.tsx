@@ -74,7 +74,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
       null,
       Date.now(),
     ),
-    named: title !== `Object ${page.objectId}`,
+    nameFrom: title !== `Object ${page.objectId}` ? "players" : "none",
   });
 
   return (

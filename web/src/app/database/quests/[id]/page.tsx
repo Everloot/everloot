@@ -112,6 +112,8 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const chainDate = chain?.confirmed ? catalog?.dataAsOf : CLIENT_QUEST_LINES.build.extractedAt;
 
   const named = title !== `Quest ${page.questId}`;
+  // The title's own source: players' agreed title, else the Warcraft Wiki's, else none.
+  const nameFrom = reported ? "players" : wikiTitle ? "wiki" : "none";
   // The page in three lines: what it is, what players reported, and where the title came from.
   const summary = entitySummary({
     identity: [
@@ -124,7 +126,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
       null,
       Date.now(),
     ),
-    named,
+    nameFrom,
   });
 
   return (

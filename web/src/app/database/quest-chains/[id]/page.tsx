@@ -59,7 +59,7 @@ export default async function QuestChainPage(props: Props) {
       : catalog?.confirmations
         ? `Found in game files, unconfirmed: ${entry.reporters} of 3 installs have reported it${asOf ? ` (${asOf})` : ""}.`
         : "Found in game files, unconfirmed; player reports could not be read just now.",
-    named: entry.confirmed,
+    nameFrom: entry.confirmed ? "players" : "none",
   }) : [];
   // Not confirmed is not "not reported": some installs may have reported it (the line above counts them), and when the
   // reports could not be read the page cannot say either.
