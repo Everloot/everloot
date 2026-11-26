@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: the database lists work as one system: each row starts with the entity's icon and its name in its colour (item quality, a faction's side, a quest's side, a set's classes), columns run name, numbers, where, status, id, a Rows choice of 25, 50 or 100 sits beside the pager (?per=), more columns sort in the URL, the spell list filters by class, game-file lists lead with the unconfirmed mark, and the dungeon list folds into one line per row on a phone.
+- Site: item tooltips read like the game's: reported armour, stats, resistances and DPS in white, and a set piece lists its set's pieces and bonuses under the set's name (linked on the item page). The hover card and the item page's box now come from one builder.
 - Site: boss pages, one per dungeon and raid encounter at /database/bosses: the instance and order from the game files, the creature players tie to it, its loot, kills and linked characters' kill counts, linked from instance and NPC pages, search, the sitemap and hover cards.
 - Site: NPC, object, quest, vendor and zone pages draw their agreed positions on the zone's map above the tabs, one zone at a time with a switcher, a legend and a link to the world map.
 - Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.

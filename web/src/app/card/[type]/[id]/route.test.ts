@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 // Players agree on one item name (19019) and one quest; the name rule shows a wiki-matched item (647) and a
 // wiki quest title (176). Item 5 is in the game files only: no card, as on its page.
 const mocks = vi.hoisted(() => ({
-  wiki: vi.fn(), items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(), store: vi.fn(),
+  wiki: vi.fn(), items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(), store: vi.fn(), spells: vi.fn(),
 }));
 vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: mocks.wiki }));
 vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
@@ -16,7 +16,8 @@ vi.mock("@/lib/game-assets", () => ({
     if (store) return (await vi.importActual<typeof import("@/lib/game-assets")>("@/lib/game-assets")).readItemTips(assets, ids, store);
     return { tips: await mocks.tips(assets, ids), icons: new Map(), unreachable: mocks.tipsDown(), degraded: false };
   },
-  PRIVATE_UNREACHABLE: Symbol.for("unreachable"),
+  readSpellNames: mocks.spells,
+  PRIVATE_UNREACHABLE: Symbol.for("unreachable"), PRIVATE_MALFORMED: Symbol.for("malformed"),
 }));
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: mocks.shown }));
 
@@ -45,6 +46,7 @@ beforeEach(() => {
   mocks.assets.mockReset().mockResolvedValue({ base: "https://assets.everloot.app/b", version: "70450", label: "Found in game files, unconfirmed" });
   mocks.tipsDown.mockReset().mockReturnValue(false);
   mocks.store.mockReset().mockReturnValue(null);
+  mocks.spells.mockReset().mockResolvedValue({ names: new Map([[1301126, "Synthetic Bonus"]]) });
   mocks.tips.mockReset().mockImplementation(async (_a: unknown, ids: number[]) => new Map(ids.includes(647) ? [[647, TIP]] : []));
   mocks.quests.mockReset().mockResolvedValue({ names: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]) });
   const agreed = new Map([[19019, "Thunderfury"]]);
@@ -271,4 +273,29 @@ test("a shard that is not a shard is a 503, not a card without its game file lin
 test("a record for the item that is not a record is a 503, not a card without its game file lines", async () => {
   privateFolder({ "647": { n: 1 } });
   expectUnavailable(await call("item", "647"));
+});
+
+// Set 1 of the committed game data: pieces 11729, 11726, 11728, 11731, 11730 and 277117; bonuses at 2, 3, 4 and 5 pieces.
+test("a set piece's card lays its set out under the set's name: the pieces by the name rule, the bonuses by spell name", async () => {
+  const matched = new Map([[11729, { name: "Synthetic Gloves", color: "#a335ee", wikiPage: null, source: "wiki" }], [11726, { name: "Synthetic Chest", color: "#a335ee", wikiPage: null, source: "wiki" }]]);
+  mocks.shown.mockResolvedValue({ facts: { unreachable: false }, agreed: new Map(), matched: { names: matched }, showsTip: (id: number) => matched.has(id) });
+  mocks.names.mockResolvedValue({ names: matched });
+  mocks.tips.mockImplementation(async () => new Map([[11729, { ...TIP, name: "Synthetic Gloves", lines: ["Hands · Plate", "Set: Synthetic Set"], why: [] }]]));
+  const res = await call("item", "11729");
+  expect(res.status).toBe(200);
+  const { card } = await res.json();
+  expect(card.lines).toEqual([
+    "Hands · Plate", "Synthetic Set (0/6)", "  Synthetic Gloves", "  Synthetic Chest", "  Item 11728", "  Item 11731", "  Item 11730", "  Item 277117",
+    "(2) Set: Synthetic Bonus", "(3) Set: Spell 9331", "(4) Set: Spell 1301123", "(5) Set: Spell 1314795",
+  ]);
+  // The card takes no pointer: no links in it.
+  expect(card.links).toBeUndefined();
+
+  // The bonus names are the private spell names file's: a failed read is a 503 nobody keeps, never "Spell N" cached.
+  for (const failed of [Symbol.for("unreachable"), Symbol.for("malformed")]) {
+    mocks.spells.mockResolvedValue(failed);
+    const down = await call("item", "11729");
+    expect(down.status).toBe(503);
+    expect(down.headers.get("CDN-Cache-Control")).toBe("no-store");
+  }
 });
