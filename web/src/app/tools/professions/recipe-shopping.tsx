@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Card, CopyButton, Input } from "@/components/ui";
 import type { SearchRecipe } from "@/lib/profession-planner";
@@ -111,7 +112,7 @@ export default function RecipeShopping({ recipe, initialCrafts }: { recipe: Sear
         {!valid && <p role="status">Enter a whole number from 1 to 999 crafts.</p>}
         <ul className="divide-y divide-line border-y border-line">
           {materials.map((r, index) => <li key={`${r.itemId}:${index}`} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2">
-            <span className="min-w-0 break-words">{r.amount !== null ? `${r.amount} × ` : ""}{r.name}</span>
+            <span className="min-w-0 break-words">{r.amount !== null ? `${r.amount} × ` : ""}<Link href={`/database/items/${r.itemId}`} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{r.name}</Link></span>
             {current?.rows && <span className="text-right text-meta text-muted">{r.quote
               ? `${r.amount !== null ? formatCopper(r.quote[2] * r.amount) + " · " : ""}${formatCopper(r.quote[2])} each · ${r.quote[5]}${r.quote[8] > 2 ? " (stale)" : ""}`
               : "No quote"}</span>}

@@ -4,15 +4,16 @@ import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
 import { characterProgression, progressionCatalogue } from "@kb/progression";
-import { Achievements, Equipment, NO_ACHIEVEMENTS, PlayHistoryView, ProfessionList, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
+import { Achievements, NO_ACHIEVEMENTS, PlayHistoryView, ProfessionList, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
 
 /**
- * The character sheet's tabs: one per part of a Blizzard profile the armory stores. Every tab is drawn, so the strip is
+ * The character sheet's tabs: one per part of a Blizzard profile the armory stores, below the gear sheet (which is the
+ * page's own, not a tab). Every tab is drawn, so the strip is
  * the same on every sheet; a part the last read did not bring says so in one sentence rather than leaving a gap.
  * Gold, Completionist and Alts wait on #1275. Progress lists the files and synced boss kills publicly for everyone. Legacy perks waits on a stored field.
  */
 export const CHARACTER_TABS = [
-  ["gear", "Gear"], ["talents", "Talents"], ["stats", "Stats"], ["pvp", "PvP"],
+  ["talents", "Talents"], ["stats", "Stats"], ["pvp", "PvP"],
   ["achievements", "Achievements"], ["professions", "Professions"], ["reputations", "Reputations"], ["quests", "Quests"],
   ["history", "Play history"], ["progress", "Progress"],
 ] as const;
@@ -22,7 +23,6 @@ const notRead = (what: string) => `The last read from Blizzard's API did not inc
 
 /** What an empty tab says, one sentence each. */
 export const EMPTY_TAB: Record<CharacterTabId, string> = {
-  gear: "Nothing was equipped when this character was last read.",
   talents: notRead("talents"),
   stats: notRead("stats"),
   pvp: notRead("honorable kills or a PvP rank"),
@@ -37,8 +37,6 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
 const Empty = ({ id }: { id: CharacterTabId }) => <p data-empty-tab={id} className="py-3 text-sm text-fg-2">{EMPTY_TAB[id]}</p>;
 
 export interface SheetParts {
-  tips: Parameters<typeof Equipment>[0]["tips"];
-  unknownIcon?: string | null;
   /** Achievement categories that players have confirmed, by achievement id. */
   categories?: ReadonlyMap<number, string>;
   /** Facts for the PvP tab beyond the two numbers, such as the honorable-kills board rank. */
@@ -55,7 +53,6 @@ export function characterTabs(c: ArmoryCharacter, parts: SheetParts): TabItem[] 
     ...(c.pvpRank !== null ? [{ label: "PvP rank", value: c.pvpRank, numeric: true }] : []),
   ];
   const panels: Record<CharacterTabId, ReactNode> = {
-    gear: c.equipment.length ? <Equipment character={c} tips={parts.tips} unknownIcon={parts.unknownIcon} heading={false} /> : null,
     talents: d?.talents?.trees.length ? <TalentTrees character={c} trees={d.talents.trees} open /> : null,
     stats: d?.statistics?.rows.length ? <StatList rows={d.statistics.rows} /> : null,
     pvp: pvp.length ? <Facts label="PvP" items={[...pvp, ...(parts.pvpFacts ?? [])]} /> : null,

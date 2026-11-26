@@ -5,6 +5,7 @@ import { BLIZZARD_CREDIT } from "@/lib/armory";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
 import { createCloudArmoryStore, createMemoryArmoryStore, type ArmoryStore, type MemoryArmoryStore } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 vi.mock("@/components/guild-profile", () => ({ default: () => <section aria-label="Guild profile">Claim or edit this guild</section> }));
 
 vi.mock("@/components/progression/GuildProgression", () => ({ default: () => <section data-guild-progression-hook /> }));
@@ -21,8 +22,12 @@ vi.mock("next/navigation", () => ({
 const holder = vi.hoisted(() => ({ store: null as ArmoryStore | null }));
 vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => holder.store }));
 
+const sightings = vi.hoisted(() => ({ store: null as PlayerStore | null }));
+vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => sightings.store }));
+
 let mem: MemoryArmoryStore;
 beforeEach(() => {
+  sightings.store = createMemoryPlayerStore();
   mem = createMemoryArmoryStore(() => new Date("2026-11-10T00:00:00Z"));
   mem.putCharacter(armoryCharacter());
   mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, itemLevel: 60, gearScore: null, honorableKills: 5, fetchedAt: "2026-11-09T11:30:00.000Z" }));
@@ -104,6 +109,59 @@ describe("the character page", () => {
     expect(out).toContain("Main hand");
     expect(out).toContain('href="/armory/hide?region=eu&amp;name=Velkara&amp;surname=Duskmantle"');
     expect(out).toContain("Read 2026-11-09 10:00 UTC");
+  });
+
+  test("the sheet: gear around the summary above the tabs, the summary's numbers and key stats, and no Gear tab", async () => {
+    mem.putCharacter(armoryCharacter({ details: { revision: 1, statistics: { asOf: "2026-11-09T10:00:00.000Z", rows: [
+      { label: "Health", value: 4512, percent: false }, { label: "Agility", value: 412, percent: false }, { label: "Fire resistance", value: 15, percent: false },
+    ] } } }));
+    const out = await html(pages.character("eu", "velkara-duskmantle"));
+    const at = (s: string) => out.indexOf(s);
+    // Left column, the summary in the model's place, right column, weapons, then the tabs.
+    expect(at('data-equipment-slot="WRIST"')).toBeLessThan(at("data-sheet-summary"));
+    expect(at("data-sheet-summary")).toBeLessThan(at('data-equipment-slot="HANDS"'));
+    expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('role="tablist"'));
+    const summary = out.slice(at("data-sheet-summary"), at('data-equipment-slot="HANDS"'));
+    for (const text of ["57.41", "61.2", "Gear Score", "#2 of 2", "4,512", "412"]) expect(summary).toContain(text);
+    // A stat beyond the key ones stays in the Stats tab only.
+    expect(summary).not.toContain("Fire resistance");
+    expect(out).toContain('data-tab-panel="stats"');
+    expect(out).not.toContain('data-tab-panel="gear"');
+    // The header: faction, region and ruleset, guild.
+    const header = out.slice(0, at("data-paper-doll"));
+    expect(header).toContain("Horde");
+    expect(header).toContain('data-region="eu"');
+    expect(header).toContain('href="/armory/eu/guilds/ember-wardens"');
+  });
+
+  test("the dungeons and raids section has its own named slot, below the gear sheet and above the tabs", async () => {
+    const out = await html(pages.character("eu", "velkara-duskmantle"));
+    const at = (s: string) => out.indexOf(s);
+    const slot = out.slice(at('data-slot="dungeon-raid-progress"'));
+    expect(out).toContain('data-slot="dungeon-raid-progress"');
+    expect(slot).toContain("data-dungeons-raids");
+    expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('data-slot="dungeon-raid-progress"'));
+    expect(at('data-slot="dungeon-raid-progress"')).toBeLessThan(at('role="tablist"'));
+  });
+
+  test("the addon's sighting fills in when the old address would redirect here: the day it was last seen and the guild it saw", async () => {
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+    vi.stubEnv("EVERLOOT_GUILDS", "1");
+    expect(await html(pages.character("eu", "velkara-duskmantle"))).not.toContain('data-part="addon-sighting"');
+    await sightings.store!.upsert([{ name: "Velkara", realm: "EU1 Realm 2 Normal", race: "Troll", class: "HUNTER", level: 58, guild: "Ember Wardens", seen: "2026-11-08" }]);
+    const out = await html(pages.character("eu", "velkara-duskmantle"));
+    const part = out.slice(out.indexOf('data-part="addon-sighting"'));
+    expect(part).toContain("Last seen by the addon");
+    expect(part).toContain("2026-11-08");
+    expect(part).toContain("EU1 Realm 2 Normal");
+    expect(part).toContain('href="/guilds/eu1-realm-2-normal/ember-wardens"');
+    expect(part).toContain('href="/players/opt-out?realm=EU1%20Realm%202%20Normal&amp;name=Velkara"');
+    // The player pages off, or the sighting hidden: nothing from it.
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "0");
+    expect(await html(pages.character("eu", "velkara-duskmantle"))).not.toContain('data-part="addon-sighting"');
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+    await sightings.store!.suppress("EU1 Realm 2 Normal", "Velkara");
+    expect(await html(pages.character("eu", "velkara-duskmantle"))).not.toContain('data-part="addon-sighting"');
   });
 
   test("play history ranks sit in the Play history tab, not with the gear numbers", async () => {
@@ -288,4 +346,14 @@ test("classification filters reach storage, preserve each other in links and lin
   expect(out).toContain('text-class-hunter');
   await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("a character page shows its dungeons and raids where the dungeon progress line was, linked to the full checklist", async () => {
+  const out = await html(pages.character("eu", "velkara-duskmantle"));
+  const section = out.split('aria-labelledby="dungeons-raids"')[1]?.split("</section>")[0] ?? "";
+  expect(section).toContain("Dungeons &amp; raids");
+  expect(section).toContain('href="#progress"');
+  // No storage in this test: no synced history is unknown, never 0 cleared.
+  expect(section).toContain("No boss kills are synced for this character");
+  expect(out.indexOf('aria-labelledby="dungeons-raids"')).toBeLessThan(out.indexOf('id="progress"'));
 });
