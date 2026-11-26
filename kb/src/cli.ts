@@ -28,6 +28,7 @@ import { writeClientDisenchant } from "./client-disenchant.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
+import { writeClientQuestStarts } from "./client-quest-starts.js";
 import { writeClientItemSets } from "./client-item-sets.js";
 import { writeClientSpells } from "./client-spells.js";
 import { writeClientCollections } from "./client-collections.js";
@@ -243,6 +244,8 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+  client-quest-starts <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-starts.json]
+    (which item begins which quest, ItemSparse.StartQuestID. Quest and item pages)
   client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
   client-holidays <snapshot.sqlite> [--out ../web/src/data/game-data/client-holidays.json]
   client-pet-families <snapshot.sqlite> [--out ../web/src/data/game-data/client-pet-families.json]
@@ -823,6 +826,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
       const table = writeClientQuestLines(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
+      return 0;
+    }
+    case "client-quest-starts": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-quest-starts.json";
+      const table = writeClientQuestStarts(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.starts.length} items begin a quest -> ${path}`);
       return 0;
     }
     case "client-item-sets": {

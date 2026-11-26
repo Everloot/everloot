@@ -25,7 +25,7 @@ describe("game versions", () => {
   test("every committed game-data layer names the current build", () => {
     const want = { product: CURRENT_VERSION.product, version: CURRENT_VERSION.build };
     const stamps: [string, { product?: string; version?: string }][] = [];
-    for (const file of ["client-layer.json", "client-digests.json", "spell-values.json", "client-spells.json"]) stamps.push([file, read(file).build]);
+    for (const file of ["client-layer.json", "client-digests.json", "spell-values.json", "client-spells.json", "client-quest-starts.json"]) stamps.push([file, read(file).build]);
     stamps.push(["build-version.json", read("build-version.json")]);
     stamps.push(["item-categories.json", read("item-categories.json").build]);
     stamps.push(["item-facets.json", read("item-facets.json").build]);
