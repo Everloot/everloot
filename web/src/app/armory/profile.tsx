@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import GameIcon from "@/components/game/GameIcon";
 import ItemTip from "@/components/game/ItemTip";
@@ -10,43 +11,58 @@ import type { ItemTip as Tip } from "@/lib/game-assets";
 import type { PlayHistoryRankedKey } from "@kb/armory/details";
 import { link } from "./parts";
 
-// The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the model's place left empty.
+// The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the character's
+// summary in the model's place between them.
 const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
 const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
 const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
 const qualityName = (q: string | null | undefined): Quality | undefined => QUALITIES.find((x) => x === q?.toLowerCase());
 const quality = (q: string | null) => QUALITY_TEXT[qualityName(q) as Quality] ?? "text-fg";
+const ICON = 40;
 
 /**
- * The character's gear. Every equipped slot draws its icon in its quality's border: the item's own art where the game files
- * have it, else the game's question mark (`unknownIcon`, as item pages do); no icon at all without the asset files.
+ * The character's gear as the game's character sheet lays it out. Every equipped slot draws its icon in its quality's
+ * border: the item's own art where the game files have it, else the game's question mark (`unknownIcon`, as item pages
+ * do); no icon at all without the asset files. The icon and the name both link the item page, so the shared hover card
+ * (or the item's own tooltip) opens from either. `center` fills the model's place (the summary on the armory page); on
+ * a phone it comes first and the slots follow as one list. The right column mirrors the left from a wide screen up.
+ * `heading={false}` inside a tab, whose label names it already.
  */
-/** `heading={false}` inside a tab, whose label names it already. */
-export function Equipment({ character: c, tips, unknownIcon = null, heading = true }: { character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; heading?: boolean }) {
+export function Equipment({ character: c, tips, unknownIcon = null, heading = true, center }: {
+  character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; heading?: boolean; center?: ReactNode;
+}) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
-  const slot = (key: string) => {
+  const slot = (key: string, mirror: boolean) => {
     const item = equipped.get(key);
     const tip = item ? tips.get(item.itemId) : undefined;
     const src = tip?.icon ?? unknownIcon;
-    const icon = item && src ? <GameIcon src={src} size={36} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /> : null;
-    const name = item && <Link href={`/database/items/${item.itemId}`} className={`text-sm underline decoration-edge underline-offset-4 hover:decoration-fg ${quality(item.quality)}`}>{item.name}</Link>;
-    return <li key={key} data-equipment-slot={key} className="min-w-0 border-b border-line py-3">
-      <p className="mb-1 text-meta text-muted">{slotLabel(key)}</p>
-      {item ? <div className="flex min-h-11 items-center justify-between gap-3">
-        {tip ? <ItemTip tip={tip} size={36} icon={icon}>{name!}</ItemTip> : <span className="inline-flex items-center gap-1.5 align-middle">{icon}{name}</span>}
-        {item.level !== null && <span className="shrink-0 font-mono text-meta tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}
-      </div> : <p className="flex min-h-11 items-center text-sm text-muted">Not equipped</p>}
+    const href = item ? `/database/items/${item.itemId}` : "";
+    const icon = item && src
+      ? <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0"><GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /></Link>
+      : <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-sm border border-dashed border-line" />;
+    const name = item && <Link href={href} className={`text-cell underline decoration-edge underline-offset-4 [overflow-wrap:anywhere] hover:decoration-fg ${quality(item.quality)}`}>{item.name}</Link>;
+    return <li key={key} data-equipment-slot={key} className={`flex min-h-14 min-w-0 items-center gap-3 rounded-control border border-line bg-panel px-2 py-2 ${mirror ? "lg:flex-row-reverse lg:text-right" : ""}`}>
+      {icon}
+      <div className="min-w-0 flex-1">
+        <p className={`flex items-baseline gap-2 text-cell-2 text-muted ${mirror ? "lg:justify-end" : ""}`}>
+          <span>{slotLabel(key)}</span>
+          {item?.level != null && <span className="font-mono tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}
+        </p>
+        {item ? (tip ? <ItemTip tip={tip} icon={null}>{name!}</ItemTip> : name) : <p className="text-cell text-muted">Not equipped</p>}
+      </div>
     </li>;
   };
   return <section aria-labelledby={heading ? "armory-gear" : undefined} aria-label={heading ? undefined : "Equipment"} className="space-y-3">
     {heading && <SectionHeading id="armory-gear">Equipment</SectionHeading>}
     {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
-    <div data-paper-doll className="grid gap-x-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,1fr)]">
-      <ol aria-label="Left side">{LEFT.map(slot)}</ol>
-      <div aria-hidden="true" data-model-space className="hidden sm:block" />
-      <ol aria-label="Right side">{RIGHT.map(slot)}</ol>
+    <div data-paper-doll className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,19rem)_minmax(0,1fr)]">
+      <ol aria-label="Left side" className="grid content-start gap-2">{LEFT.map((k) => slot(k, false))}</ol>
+      {center
+        ? <div data-model-space className="order-first sm:col-span-2 lg:order-none lg:col-span-1">{center}</div>
+        : <div aria-hidden="true" data-model-space className="hidden lg:block" />}
+      <ol aria-label="Right side" className="grid content-start gap-2">{RIGHT.map((k) => slot(k, true))}</ol>
     </div>
-    <ol aria-label="Weapons" className="grid gap-x-6 sm:grid-cols-3">{WEAPONS.map(slot)}</ol>
+    <ol aria-label="Weapons" className="grid gap-2 sm:grid-cols-3">{WEAPONS.map((k) => slot(k, false))}</ol>
   </section>;
 }
 

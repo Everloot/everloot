@@ -16,7 +16,7 @@ import { assetsBaseUrl } from "./talents/assets";
 import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
 
 /**
- * The hover card on the site's own links to an item, NPC, quest, object, spell or vendor page (GET /database/card/<type>/<id>).
+ * The hover card on the site's own links to an item, NPC, quest, object, spell or vendor page (GET /card/<type>/<id>).
  * It shows what the page's own box shows, under the page's rules: an item's game file tooltip where its page
  * shows it (players reported it, or its name shows under the item name rule), a quest's Warcraft Wiki title
  * where its page shows one, and where a shown name comes from, which the lists used to say in a `title`.
@@ -148,7 +148,7 @@ async function itemCard(id: number): Promise<SiteCardResult> {
   return {
     status: 200,
     body: {
-      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
+      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? files.icons.get(id) ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
       foot: join([name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label]),
     },
   };

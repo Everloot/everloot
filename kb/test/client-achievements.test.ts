@@ -48,21 +48,29 @@ function snapshotWith(tables: ExtractedTable[]): string {
 
 const build = snapshotWith([
   table("Achievement", [
-    [49, { ID: 49, Title_lang: "Storm the Chasm", Description_lang: "Topple the Chasm's keeper", Points: 10, Criteria_tree: 100 }],
+    [49, { ID: 49, Title_lang: "Storm the Chasm", Description_lang: "Topple the Chasm's keeper", Points: 10, Criteria_tree: 100, Category: 96 }],
     [50, { ID: 50, Title_lang: "   ", Points: 5, Criteria_tree: 100 }],
     [51, { ID: 51, Title_lang: "No criteria asked", Points: 0, Criteria_tree: 0, Flags: 524288 }],
     [53, { ID: 53, Title_lang: "Battles won", Points: 0, Criteria_tree: 0, Flags: 524289 }],
     [52, { ID: 52, Title_lang: "Done twice", Points: 0, Criteria_tree: 100 }],
   ]),
   table("CriteriaTree", tree),
+  table("Achievement_Category", [[1, { Name_lang: "Statistics", Parent: -1 }], [92, { Name_lang: "General", Parent: -1 }], [96, { Name_lang: "Quests", Parent: 92 }], [7, { Name_lang: " ", Parent: -1 }]]),
 ]);
+
+test("categories: the files name them, with their parent, and each achievement carries its category id", () => {
+  const out = buildClientAchievements(build);
+  expect(out.categories).toEqual({ "1": { name: "Statistics" }, "92": { name: "General" }, "96": { name: "Quests", parent: 92 } });
+  expect(out.achievements["49"]!.category).toBe(96);
+  expect(out.achievements["51"]).not.toHaveProperty("category");
+});
 
 test("buildClientAchievements: ids keyed, the files' text with reports-style criteria, nameless rows skipped", () => {
   const achievements = buildClientAchievements(build);
   expect(achievements.schema).toBe("everloot.client-achievements/1");
   expect(achievements.build).toMatchObject({ product: "test", version: "1.0.0.70630", definitions: "abc1234" });
   expect(achievements.achievements["49"]).toEqual({
-    title: "Storm the Chasm", description: "Topple the Chasm's keeper", points: 10,
+    title: "Storm the Chasm", description: "Topple the Chasm's keeper", points: 10, category: 96,
     criteria: [{ text: "Win battles" }, { text: "Kill 5 foes", amount: 5 }, { text: "Do half" }],
   });
   expect(achievements.achievements["51"]).toEqual({ title: "No criteria asked", points: 0, criteria: [] });
@@ -78,7 +86,8 @@ test("buildClientAchievements: ids keyed, the files' text with reports-style cri
 test("a snapshot without the two tables still yields a file, empty and labelled", () => {
   const empty = buildClientAchievements(snapshotWith([]));
   expect(empty.achievements).toEqual({});
-  expect(empty.note).toBe("criteria and text are the game files'; category names come from player reports");
+  expect(empty.note).toBe("criteria, text and category names are the game files'");
+  expect(empty.categories).toEqual({});
   expect(empty.label).toBe("Found in game files, unconfirmed");
 });
 
@@ -86,8 +95,8 @@ test("writeClientAchievements writes one achievement per line in id order; the f
   const path = join(mkdtempSync(join(tmpdir(), "kb-ach-out-")), "client-achievements.json");
   const table2 = writeClientAchievements(build, path);
   const text = readFileSync(path, "utf8");
-  const lines = text.split("\n");
-  // One line per achievement id, no id out of order.
+  const lines = text.slice(text.indexOf('"achievements": {')).split("\n");
+  // One line per achievement id, no id out of order (the categories block above keeps its own order).
   const order = lines.map((l) => /^  "(\d+)": /.exec(l)).filter((m) => m).map((m) => Number(m![1]));
   expect(order).toEqual([...order].sort((a, b) => a - b));
   expect(lineCount(text, '  "49": ')).toBe(1);

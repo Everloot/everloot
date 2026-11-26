@@ -27,6 +27,20 @@ test("item records keep what the tables give, and only stat kinds with a share",
   expect([...iconOf]).toEqual([[25, 135274]]);
 });
 
+test("an item the Item table lists without a named ItemSparse row keeps its icon alone, in its shard", () => {
+  // 700 has no ItemSparse row (the server sends it), 601 a blank name, 702 no icon: only the icons are recorded.
+  const tables: Record<string, Rows> = {
+    ItemSparse: itemTables.ItemSparse,
+    Item: t([...itemTables.Item.values(), { ID: 601, IconFileDataID: 133000 }, { ID: 700, IconFileDataID: 135661, ClassID: 2, SubclassID: 15 }, { ID: 702, IconFileDataID: 0 }]),
+  };
+  const set = buildItemSet((n) => tables[n]);
+  expect([...set.records.keys()]).toEqual([25, 600]);
+  expect([...set.iconOnly]).toEqual([[601, 133000], [700, 135661]]);
+  expect([...buildItemSet((n) => tables[n], new Set([700])).iconOnly]).toEqual([[700, 135661]]);
+  const shards = shardRecords(set.records, new Map([[700, 135661]]));
+  expect(shards.get(1)).toEqual({ 600: set.records.get(600), 700: { i: 135661 } });
+});
+
 test("a weapon records the damage inputs its table, level and quality give, and nothing is invented", () => {
   const sparse = (id: number, InventoryType: number, Flags: number[], extra: Record<string, unknown> = {}) =>
     ({ ID: id, Display_lang: `Weapon ${id}`, OverallQualityID: 2, ItemLevel: 20, InventoryType, ItemDelay: 2000, DmgVariance: 0.4, DamageType: 0, Flags, ...extra });

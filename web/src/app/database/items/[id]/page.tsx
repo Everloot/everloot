@@ -41,9 +41,12 @@ import { itemDropSources } from "@kb/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
 import { EntityIcon } from "@/components/game/EntityIcon";
+import { loadItemIcons } from "@/lib/item-icons";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 
@@ -100,6 +103,8 @@ export default async function ItemPage(props: Props) {
   const spellLinked = edges.client.some((e) => e.fromKind === "item" && e.fromId === itemId && e.toKind === "spell");
   const assets = tipped || spellLinked ? await loadSiteAssets() : null;
   const filesTip = tipped ? (await loadItemTips(assets, [itemId])).get(itemId) : undefined;
+  // An item the files give only an icon for (no ItemSparse row: the server sends it) shows that icon, unconfirmed.
+  const filesIcon = tipped && !filesTip ? (await loadItemIcons(assets, [itemId])).get(itemId) : undefined;
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
   const reported = await loadReportedItemFacts(itemId);
   const tip = filesTip && withReported(filesTip, reported);
@@ -294,7 +299,7 @@ export default async function ItemPage(props: Props) {
           trail={trail}
           title={title}
           quality={shownQuality}
-          icon={<EntityIcon item src={tip?.icon ?? (assets ? unknownItemIcon(assets.base) : null)} quality={shownQuality} unconfirmed={!confirmed} />}
+          icon={<EntityIcon item src={tip?.icon ?? filesIcon ?? (assets ? unknownItemIcon(assets.base) : null)} quality={shownQuality} unconfirmed={!confirmed} />}
           meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
         />
         {isDevelopmentItemName(name?.name) && (
@@ -349,6 +354,8 @@ export default async function ItemPage(props: Props) {
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
         </div>
+        <EntityScreenshots type="item" id={itemId} name={title} />
+        <EntityComments type="item" id={itemId} />
       </EntityLayout>
     </Container>
   );

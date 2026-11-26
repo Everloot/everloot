@@ -60,6 +60,23 @@ test("the primary fill's text reads at 4.5:1 or better, at rest and on hover", (
       expect(ratio(tokens[mode].canvas, tokens[mode][fill]), `${mode} ${fill}`).toBeGreaterThanOrEqual(4.5);
 });
 
+test(".btn-sm is the same pill at the control height: 32 px, 13 px text, 12 px sides", () => {
+  const sm = rule(".btn-sm");
+  expect(sm).toContain("min-height: 2rem");
+  expect(sm).toContain("padding: 0 0.75rem");
+  expect(sm).toContain("font-size: 13px");
+  expect(sm).not.toContain("border-radius");
+  // After .btn in the same layer, so its height and sides win.
+  expect(css.indexOf("\n.btn-sm {")).toBeGreaterThan(css.indexOf("\n.btn {"));
+});
+
+test("the header's small pills share .btn-sm instead of their own heights", () => {
+  for (const file of ["components/Header.tsx", "components/AccountControls.tsx"]) {
+    const source = readFileSync(join(src, file), "utf8");
+    expect(source, file).not.toMatch(/btn[^"]*min-h-8/);
+  }
+});
+
 test("no gradient ring is left on the primary", () => {
   expect(css).not.toContain(".btn-primary::before");
   expect(css).not.toContain("--grad-");

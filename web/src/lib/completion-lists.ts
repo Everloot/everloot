@@ -40,7 +40,9 @@ function baseEntries() {
     readable(() => {
       for (const [id, a] of Object.entries(CLIENT_ACHIEVEMENTS.achievements)) {
         if (a.statistic) continue;
-        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category: "", points: a.points, criteriaCount: a.criteria.length, confirmed: false, reporters: 0 });
+        // The category the files name for it (found in game files, unconfirmed, like the rest of the entry); "" when none.
+        const category = a.category === undefined ? "" : CLIENT_ACHIEVEMENTS.categories[String(a.category)]?.name ?? "";
+        achievements.set(Number(id), { achievementId: Number(id), name: a.title, category, points: a.points, criteriaCount: a.criteria.length, confirmed: false, reporters: 0 });
       }
       return CLIENT_ACHIEVEMENTS.achievements;
     }),
@@ -99,10 +101,11 @@ export const loadCatalog = cache(async (): Promise<CompletionCatalog | null> => 
 });
 
 /** `4-ten-quests`: the id, then the name's words. A name with no letters or digits leaves the bare id. */
-function segment(id: number, name: string): string {
+export function idSegment(id: number, name: string): string {
   const words = slugify(name);
   return words ? `${id}-${words}` : String(id);
 }
+const segment = idSegment;
 export const achievementHref = (id: number, name: string) => `/database/achievements/${segment(id, name)}`;
 export const factionHref = (id: number, name: string) => `/database/factions/${segment(id, name)}`;
 /** The `%s` in a game-file title name: where the game puts the character's name. */

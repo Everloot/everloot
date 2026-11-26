@@ -136,6 +136,10 @@ export const AssetManifest = z.object({
   spellIcons: z.record(z.string(), z.string()).default({}),
   /** Pet family id -> icon name (CreatureFamily.IconFileID). */
   familyIcons: z.record(z.string(), z.string()).default({}),
+  /** Currency id -> icon name (CurrencyTypes.InventoryIconFileID), for the currency pages. */
+  currencyIcons: z.record(z.string(), z.string()).default({}),
+  /** Companion pet species id -> icon name (BattlePetSpecies.IconFileDataID), for the companion pet pages. */
+  petIcons: z.record(z.string(), z.string()).default({}),
   /** By UiMap id: the map's own picture and the world rectangle it covers, so the site lays it under the zone outlines. */
   maps: z.record(z.string(), File.extend({
     /** The same picture at most MAP_SMALL_MAX px, for the zoomed-out view; null if it could not be made. */
@@ -440,9 +444,11 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     if (num(row.SpellIconFileID) > 0) professionIcon.set(key, num(row.SpellIconFileID));
   }
 
-  // Spell icons: the raid builder's buff spells, and the spells items are created by or used in on the /database pages.
+  // Spell icons: the raid builder's buff spells, the spells items are created by or used in on the /database pages,
+  // and the spells that teach a mount, for the mount pages.
+  const mountSpells = list(get("Mount")).map((row) => num(row.SourceSpellID)).filter((id) => id > 0);
   const spellIconOf = new Map<number, number>();
-  for (const id of new Set([...(opts.buffSpells ?? []), ...(opts.relationSpells ?? [])])) {
+  for (const id of new Set([...(opts.buffSpells ?? []), ...(opts.relationSpells ?? []), ...mountSpells])) {
     const file = num(misc.get(id)?.SpellIconFileDataID);
     if (file > 0) spellIconOf.set(id, file);
   }
@@ -458,6 +464,11 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   // Pet families: their icon.
   const familyIconOf = new Map<number, number>();
   for (const row of list(get("CreatureFamily"))) if (num(row.IconFileID) > 0) familyIconOf.set(num(row.ID), num(row.IconFileID));
+  // Currencies and companion pets: their icon, by currency and species id.
+  const currencyIconOf = new Map<number, number>();
+  for (const row of list(get("CurrencyTypes"))) if (num(row.InventoryIconFileID) > 0) currencyIconOf.set(num(row.ID), num(row.InventoryIconFileID));
+  const petIconOf = new Map<number, number>();
+  for (const row of list(get("BattlePetSpecies"))) if (num(row.IconFileDataID) > 0) petIconOf.set(num(row.ID), num(row.IconFileDataID));
 
   // Items: tooltip facts for every named item (or the allowlist), and their icons.
   // Their Use and Equip lines are the spells' descriptions, resolved like the talents'.
@@ -470,7 +481,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   // Icons: one file per file data id, whoever asks for it.
   const wantedIcons = new Set<number>([
     ...iconIdOf.values(), ...classIcon.values(), ...[...treeIcons.values()].flat(), ...professionIcon.values(),
-    ...spellIconOf.values(), ...familyIconOf.values(), ...(itemSet?.iconOf.values() ?? []),
+    ...spellIconOf.values(), ...familyIconOf.values(), ...currencyIconOf.values(), ...petIconOf.values(), ...(itemSet?.iconOf.values() ?? []), ...(itemSet?.iconOnly.values() ?? []),
   ].filter((id) => id > 0));
   // Not listed in the manifest: pages find an icon by the name an entry gives, and the list would be thousands long.
   const icons: Record<string, z.infer<typeof File>> = {};
@@ -501,9 +512,20 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     const name = iconName(file);
     if (name) familyIcons[String(id)] = name;
   }
+  const currencyIcons: AssetManifest["currencyIcons"] = {};
+  for (const [id, file] of currencyIconOf) {
+    const name = iconName(file);
+    if (name) currencyIcons[String(id)] = name;
+  }
+  const petIcons: AssetManifest["petIcons"] = {};
+  for (const [id, file] of petIconOf) {
+    const name = iconName(file);
+    if (name) petIcons[String(id)] = name;
+  }
 
   // Item shards, into the private folder: they hold every named item, released or not, so they never go to
-  // the public bucket. An item records its icon only when the icon file was extracted.
+  // the public bucket. An item records its icon only when the icon file was extracted. Items the files give only an
+  // icon for (no named ItemSparse row) are `{ i }` entries beside them.
   let items: ItemIndex | null = null;
   let itemsWithIcon = 0;
   if (itemSet) {
@@ -514,7 +536,8 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     }
     mkdirSync(join(privateDir, "items"), { recursive: true });
     const shards: Record<string, z.infer<typeof DataFile>> = {};
-    for (const [shard, records] of shardRecords(itemSet.records)) {
+    const iconOnly = new Map([...itemSet.iconOnly].filter(([, file]) => icons[String(file)]));
+    for (const [shard, records] of shardRecords(itemSet.records, iconOnly)) {
       const body = Buffer.from(JSON.stringify(records));
       writeFileSync(join(privateDir, "items", `${shard}.json`), body);
       shards[String(shard)] = { file: `items/${shard}.json`, bytes: body.length, sha256: sha(body) };
@@ -711,7 +734,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   const manifest = AssetManifest.parse({
     schema: ASSET_SCHEMA, label: LABEL,
     build: { product: build.product, buildId: build.buildId, version: build.version, buildConfig: build.buildConfig, extractedAt: new Date().toISOString() },
-    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, maps, spellTips, loadingScreens, races, factions, poi, logo,
+    spells, frames, backgrounds, classes, professions, spellIcons, familyIcons, currencyIcons, petIcons, maps, spellTips, loadingScreens, races, factions, poi, logo,
     counts: {
       ...stats, tooltipsResolved: resolved, tooltipsUnresolved: unresolvedCount, tooltipsEmpty: empty,
       itemsRecorded: items?.count ?? 0, itemsWithIcon, mapsExtracted: Object.keys(maps).length, mapsSkipped: skippedMaps.length,

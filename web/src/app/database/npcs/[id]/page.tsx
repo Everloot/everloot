@@ -30,6 +30,8 @@ import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { npcIndexable } from "@/lib/indexable";
 import { entityTitle, npcDescription } from "@/lib/entity-meta";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -217,6 +219,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
           <LoreSection match={lore} />
           {!unreachable && (page.name !== null || dropped.length > 0 || zero !== undefined) && <AdSlot slot="inContent" />}
         </div>
+        <EntityScreenshots type="npc" id={npcId} name={title} />
+        <EntityComments type="npc" id={npcId} />
       </EntityLayout>
     </Container>
   );

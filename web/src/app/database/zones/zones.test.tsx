@@ -131,9 +131,10 @@ test("an empty zone page makes one addon call; its empty lists are single muted 
   store.loadCorpus.mockResolvedValue(corpus([]));
   const page = await html(ZonePage(props("1429-elwynn-forest")));
   expect(page.match(/href="\/addon"/g)).toHaveLength(1);
-  // The notice, then one line in place of six empty tabs.
-  expect(page.match(/data-empty-state/g)).toHaveLength(2);
-  expect(page).not.toContain('role="tab"');
+  // The game files' places fill one tab, so the tabs stay; every list players fill is empty, and says so in one muted line.
+  expect(page).toContain('role="tab"');
+  expect(page).toContain(">Places");
+  expect(page.match(/data-empty-state/g)).toHaveLength(1);
   expect(page).toContain("No entrance recorded yet: the game files place none here and players have not confirmed one.");
 });
 

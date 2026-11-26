@@ -28,6 +28,11 @@ import { writeClientDisenchant } from "./client-disenchant.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
+import { writeClientItemSets } from "./client-item-sets.js";
+import { writeClientCollections } from "./client-collections.js";
+import { writeClientHolidays } from "./client-holidays.js";
+import { writeClientPetFamilies } from "./client-pet-families.js";
+import { writeClientPlaces } from "./client-places.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -42,6 +47,7 @@ import { CASC_LIBRARY, extractTables, iconIds, NOT_IN_BUILD, openCdn, pinDefinit
 import { readTerrainAreas } from "./terrain-area.js";
 import { writeCatalogs } from "./client-catalog.js";
 import { buildClientAssets } from "./client-assets.js";
+import { buildClientRenders } from "./client-renders.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
 import { OPEN_DATA_KINDS } from "./open-data/build.js";
 import { readOpenDataGameFiles } from "./open-data/game-data.js";
@@ -164,6 +170,12 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     <out>/<product>-<build>-<config>/ with manifest.json and checksums.json (public bucket), and the item tooltip
     facts into <out>/<product>-<build>-<config>-private/ (private bucket only). Needs Python with Pillow. Never
     commit the output; see docs/ASSETS.md)
+  client-renders <snapshot.sqlite> --npcs <id list> --items <id list> [--out data/renders]
+    (still pictures of creature and item models, drawn from unencrypted model, skin and texture files of the
+    snapshot's build, for the NPCs the site lists and the items 3 installs reported only: the id lists come from
+    the site's gates (web/scripts/render-ids.mts). Pictures go to <out>/renders/<hash>.webp, shared by all builds;
+    <out>/<product>-<build>-<config>/ gets renders.json and checksums.json. Needs Python with Pillow. Never
+    commit the output; see docs/ASSETS.md, "Model pictures")
   client-diff <old.sqlite> <new.sqlite> [--out diff.json]   (field-level diff of two snapshots)
   recheck-scopes <diff.json> --since <ISO time> --source <build or post url> [--root ..]
     (adds recheck scopes to kb/curated/recheck.json from a client-diff: changed QuestV2 rows put their quests to
@@ -230,7 +242,14 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+  client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
+  client-holidays <snapshot.sqlite> [--out ../web/src/data/game-data/client-holidays.json]
+  client-pet-families <snapshot.sqlite> [--out ../web/src/data/game-data/client-pet-families.json]
+  client-places <snapshot.sqlite> [--out ../web/src/data/game-data/client-places.json]
     (every quest line with its quest ids in order. Pages and search, as above)
+  client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
+    (every item set with its pieces, its bonuses as pieces needed and spell id, and the skill a crafted set asks
+    for. Ids and numbers only: set names stay in private storage (game-names). Pages only)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -801,6 +820,41 @@ async function main(): Promise<number> {
       console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
       return 0;
     }
+    case "client-item-sets": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-item-sets.json";
+      const table = writeClientItemSets(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.sets.length} item sets -> ${path}`);
+      return 0;
+    }
+    case "client-collections": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-collections.json";
+      const table = writeClientCollections(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.currencies.length} currencies, ${table.pets.length} pets, ${table.toys.length} toys -> ${path}`);
+      return 0;
+    }
+    case "client-holidays": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-holidays.json";
+      const table = writeClientHolidays(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.holidays.length} holidays -> ${path}`);
+      return 0;
+    }
+    case "client-pet-families": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-pet-families.json";
+      const table = writeClientPetFamilies(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.families.length} hunter pet families -> ${path}`);
+      return 0;
+    }
+    case "client-places": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-places.json";
+      const table = writeClientPlaces(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.subzones.length} subzones, ${table.pois.length} points of interest -> ${path}`);
+      return 0;
+    }
     case "client-diff": {
       if (args.length < 2) break;
       const diff = diffSnapshots(args[0], args[1]);
@@ -855,6 +909,28 @@ async function main(): Promise<number> {
       // Printed before the public folder line: the upload script reads both.
       if (run.privateDir) console.log(`private -> ${run.privateDir}`);
       if (run.manifest.missingFrames.length) console.log(`frame pieces not available: ${run.manifest.missingFrames.join(", ")}`);
+      console.log(`-> ${run.dir}`);
+      return 0;
+    }
+    case "client-renders": {
+      if (!args[0]) break;
+      const npcsFile = flags.get("npcs"), itemsFile = flags.get("items");
+      if (!npcsFile && !itemsFile) {
+        console.error("client-renders draws only what the site's gates list: give --npcs and/or --items (web/scripts/render-ids.mts writes them)");
+        return 1;
+      }
+      const meta = readClientMeta(args[0]);
+      const { build, source } = await openCdn(meta.product);
+      if (build.buildConfig !== meta.buildConfig) {
+        console.error(`the snapshot is build ${meta.version} but the CDN now serves ${build.version}; run client-extract first, or the pictures would not match the snapshot`);
+        return 1;
+      }
+      const ids = (file: string | undefined) => new Set(file ? parseItemIds(readFileSync(file, "utf8")) : []);
+      const started = Date.now();
+      const run = await buildClientRenders({ snapshotPath: args[0], outDir: flags.get("out") || "data/renders", source, gates: { npcs: ids(npcsFile), items: ids(itemsFile) } });
+      for (const n of run.notes) console.log(n);
+      for (const s of run.manifest.skipped.slice(0, 10)) console.log(`skipped: ${s}`);
+      console.log(`time: ${((Date.now() - started) / 1000).toFixed(0)} s`);
       console.log(`-> ${run.dir}`);
       return 0;
     }

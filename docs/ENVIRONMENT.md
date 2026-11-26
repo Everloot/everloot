@@ -41,6 +41,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `EVERLOOT_SHOWCASE` | `web/src/lib/character-showcase.ts` | The character showcase pages and share cards | Switch |
 | `EVERLOOT_BOSS_KILL_SYNC` | `web/src/lib/boss-kill-sync.ts` | Linked-character boss-kill sync, enabled in production vars; kills are public on progression pages. Requires `20261114120000_private_boss_kills.sql` and `20261120100000_public_boss_kills.sql` (the new migration has NOT been applied by this change); also needs private sync | Switch |
 | `EVERLOOT_DUNGEON_PROGRESS` | `web/src/app/api/progression/dungeons/route.ts` | Desktop download of public dungeon clear summaries by realm. Enable after `20261123110000_dungeon_progress.sql` is applied. Requires Armory and boss-kill sync | Switch |
+| `EVERLOOT_INSTANCE_CLEARS` | `web/src/lib/progression.ts` | Clears by linked characters on instance pages and the `/armory/clears/<instance>` list (needs `EVERLOOT_ARMORY`). Enable after `20261125120000_instance_clears.sql` is applied | Switch |
 | `EVERLOOT_PRIVATE_SYNC` | `web/src/lib/private-sync.ts` | Private sync of a linked character's data | Switch |
 | `EVERLOOT_LEADERBOARDS` | `web/src/lib/leaderboard-switch.ts` | The item level and gear score rankings | Switch |
 | `NEWS_DIR` | `web/src/lib/news.ts` | Where the bundled news posts are inside the Worker | Yes |
@@ -109,6 +110,8 @@ one is not recorded here.
 | `EVERLOOT_ARMORY` | `web/src/lib/armory.ts` | The armory pages from Blizzard data | Switch |
 | `EVERLOOT_ARMORY_LOOKUP` | `web/src/lib/armory-lookup.ts` | `1` lets /search look up a full name nobody stored in Blizzard's character API (needs `EVERLOOT_ARMORY=1`, the BNET client and `20261117150000_armory_lookup.sql` applied) | Switch, off by default |
 | `EVERLOOT_GUIDE_SUBMISSIONS` | `web/src/lib/guide-submissions.ts` | Guide submissions from signed-in players; needs `EVERLOOT_PROFILES` | Switch |
+| `EVERLOOT_SCREENSHOTS` | `web/src/lib/screenshots.ts` | `1` turns on player screenshots on item, quest, NPC, spell, zone and instance pages and the moderation page `/ops/screenshots`; needs `EVERLOOT_PROFILES`, `20261125140000_entity_screenshots.sql` applied and the Worker's `SCREENSHOTS` (R2) and `IMAGES` (Cloudflare Images) bindings (docs/2026-11-25-screenshots-activation.md) | Switch, off by default |
+| `EVERLOOT_COMMENTS` | `web/src/lib/comments.ts` | `1` turns on comments on item, quest, NPC, spell, zone and instance pages and the moderation page `/ops/comments`; needs `EVERLOOT_PROFILES` and `20261125130000_entity_comments.sql` applied (docs/2026-11-25-comments-activation.md) | Switch, off by default |
 | `EVERLOOT_PLAYER_PAGES_INDEX` | `web/src/lib/player-pages.ts` | Character pages drop `noindex` | Switch |
 | `EVERLOOT_GUILDS_INDEX` | `web/src/lib/guild-switch.ts` | Guild pages drop `noindex` | Switch |
 | `EVERLOOT_SHOWCASE_BUILDS` | `web/src/lib/character-showcase.ts` | A showcase label links a saved build; needs the showcase and saved builds | Switch |
