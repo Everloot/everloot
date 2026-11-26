@@ -308,7 +308,7 @@ test("an item page that shows the item's name and icon shows its model picture i
   state.renders = { npcs: new Map([[id, { ...MODEL, url: "https://assets.example.test/renders/npc.webp" }]]), items: new Map([[id, MODEL]]) };
   const page = await html(ItemPage(props(String(id))));
   const sidebar = page.split("data-entity-sidebar")[1] ?? "";
-  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Wiki name ${id}" width="512" height="512" loading="lazy"`));
+  expect(sidebar).toMatch(new RegExp(`^[^>]*><div data-slot="media"><div data-model-picture[^>]*><img src="${MODEL.url}" alt="Model of Wiki name ${id}" width="512" height="512" loading="lazy"`));
   // The item's own picture, never the NPC with the same id.
   expect(page).not.toContain("renders/npc.webp");
   expect(page).not.toContain(CREDIT);

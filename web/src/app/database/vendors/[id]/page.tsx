@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -15,9 +13,9 @@ import { entitySummary, reportedLine } from "@/lib/evidence";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { Tabs, TooltipFrame } from "@/components/ui";
 import { hasCard } from "@/lib/tooltip";
-import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable, zoneName, type Pin } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, known, LINK, PinTable, Unreachable, zoneName, type Pin } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 import { loreFor } from "@/lib/lore-links";
@@ -77,64 +75,53 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   });
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/vendors/${page.vendorNpcId}`, identifier: `vendor:${page.vendorNpcId}` })} />
-        <EntityHeader
-          trail={trail}
-          title={title}
-          meta={["Vendor", <Link key="npc" href={`/database/npcs/${page.vendorNpcId}`} className={LINK}>{vendorName ? `NPC ${page.vendorNpcId}` : "NPC page"}</Link>]}
-        />
-        <EntityTop
-          box={
-            <TooltipFrame name={title} label={`${title}, as players saw it`}>
-              {places[0] && <p>{`${zoneName(places[0].mapId)} at ${places[0].x}, ${places[0].y}`}</p>}
-            </TooltipFrame>
-          }
-          facts={!facts.unreachable && (
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Goods", value: known(page.offers.length ? `${page.offers.length} prices` : null) },
-                { label: "Map positions", value: known(places.length || null), numeric: true },
-              ]}
-            />
-          )}
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData report={{ type: "Vendor", id: page.vendorNpcId, path: `/database/vendors/${page.vendorNpcId}` }}
-            text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
-            // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
-            jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}
-          />
-        </EntitySidebar>
-        <Tabs
-          className="mt-6"
-          label={`${title}: relations`}
-          tabs={[
-            {
-              id: "goods", label: "Goods", count: facts.unreachable ? undefined : page.offers.length,
-              panel: facts.unreachable ? <Unreachable />
-                : page.offers.length ? (
-                  <VendorGoods title={title} offers={page.offers} tips={tips} items={items} />
-                )
-                : <EmptyTab message={EMPTY.goods} />,
-            },
-            {
-              id: "map", label: "Map", count: facts.unreachable ? undefined : places.length,
-              panel: facts.unreachable ? <Unreachable />
-                : places.length ? <PinTable caption={`Where ${title} stands`} rows={places} rowKey={(p) => p.href} />
-                : <EmptyTab message={EMPTY.position} />,
-            },
-          ]}
-        />
-        <div className="mt-6 space-y-6 empty:hidden">
-          <LoreSection match={lore} />
-          {!facts.unreachable && page.offers.length > 0 && <AdSlot slot="inContent" />}
-        </div>
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: `/database/vendors/${page.vendorNpcId}`, identifier: `vendor:${page.vendorNpcId}` }}
+      header={{
+        trail,
+        title,
+        meta: ["Vendor", <Link key="npc" href={`/database/npcs/${page.vendorNpcId}`} className={LINK}>{vendorName ? `NPC ${page.vendorNpcId}` : "NPC page"}</Link>],
+      }}
+      box={
+        <TooltipFrame name={title} label={`${title}, as players saw it`}>
+          {places[0] && <p>{`${zoneName(places[0].mapId)} at ${places[0].x}, ${places[0].y}`}</p>}
+        </TooltipFrame>
+      }
+      facts={!facts.unreachable && [
+        { label: "Goods", value: known(page.offers.length ? `${page.offers.length} prices` : null) },
+        { label: "Map positions", value: known(places.length || null), numeric: true },
+      ]}
+      summary={summary}
+      main={<Tabs
+        label={`${title}: relations`}
+        tabs={[
+          {
+            id: "goods", label: "Goods", count: facts.unreachable ? undefined : page.offers.length,
+            panel: facts.unreachable ? <Unreachable />
+              : page.offers.length ? (
+                <VendorGoods title={title} offers={page.offers} tips={tips} items={items} />
+              )
+              : <EmptyTab message={EMPTY.goods} />,
+          },
+          {
+            id: "map", label: "Map", count: facts.unreachable ? undefined : places.length,
+            panel: facts.unreachable ? <Unreachable />
+              : places.length ? <PinTable caption={`Where ${title} stands`} rows={places} rowKey={(p) => p.href} />
+              : <EmptyTab message={EMPTY.position} />,
+          },
+        ]}
+      />}
+      related={<>
+        <LoreSection match={lore} />
+        {!facts.unreachable && page.offers.length > 0 && <AdSlot slot="inContent" />}
+      </>}
+      openData={{
+        report: { type: "Vendor", id: page.vendorNpcId, path: `/database/vendors/${page.vendorNpcId}` },
+        text: [`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n"),
+        // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
+        jsonHref: npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined,
+      }}
+    />
   );
 }

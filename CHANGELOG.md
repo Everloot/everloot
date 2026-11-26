@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.
 - Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).
 - Site: entity pages share one layout: spell, instance, zone and Alliance/Horde faction pages show their game art in the header, instance sections are tabs, achievement, faction, title and quest chain pages get the wide-screen side column, and empty tabs read from one wording table.
 - Site: every database page has its own link preview card (the name, its type and a few of the page's facts), and a Report wrong data link that opens the Wrong data issue form with the page, its type, id and game build filled in.

@@ -1,11 +1,9 @@
 import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
-import { EMPTY, EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { DataTable, Facts, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
+import { EMPTY, EmptyTab, EntityPage, LINK } from "../../entity";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -166,42 +164,37 @@ export default async function SpellPage(props: Props) {
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
-        <EntityHeader trail={trail} icon={<EntityIcon src={assets?.spellIcons.get(spellId)} />} title={fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
-        <EntityTop
-          box={
-            <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
-              {tip?.text ? <p>{tip.text}</p> : <p>No text for this spell in the client files.</p>}
-            </TooltipFrame>
-          }
-          facts={
-            <Facts
-              layout="list"
-              label={`${title}: quick facts`}
-              items={[
-                { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
-                { label: "Build", value: build },
-                // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
-                { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
-                { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
-              ]}
-            />
-          }
-        />
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData report={{ type: "Spell", id: spellId, path: `/database/spells/${spellId}`, build }}
-            text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
-          />
-        </EntitySidebar>
-        {tabs.length
-          ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
-          : <EmptyTab message={EMPTY.files(build)} players={false} action={null} />}
-        <EntityScreenshots type="spell" id={spellId} name={title} />
-        <EntityComments type="spell" id={spellId} />
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={{ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` }}
+      header={{
+        trail,
+        icon: <EntityIcon src={assets?.spellIcons.get(spellId)} />,
+        title: fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title,
+        meta: ["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>],
+      }}
+      box={
+        <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>
+          {tip?.text ? <p>{tip.text}</p> : <p>No text for this spell in the client files.</p>}
+        </TooltipFrame>
+      }
+      facts={[
+        { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
+        { label: "Build", value: build },
+        // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
+        { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
+        { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
+      ]}
+      summary={summary}
+      main={tabs.length
+        ? <Tabs label={`${title}: relations`} tabs={tabs} />
+        : <EmptyTab message={EMPTY.files(build)} players={false} action={null} />}
+      screenshots={<EntityScreenshots type="spell" id={spellId} name={title} />}
+      comments={<EntityComments type="spell" id={spellId} />}
+      openData={{
+        report: { type: "Spell", id: spellId, path: `/database/spells/${spellId}`, build },
+        text: [`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n"),
+      }}
+    />
   );
 }

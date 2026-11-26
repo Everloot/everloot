@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import JsonLd from "@/components/JsonLd";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import GameIcon from "@/components/game/GameIcon";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { DataTable, Tabs, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { parseSegment } from "@/lib/completion-lists";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { petFamiliesBuild, petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { EmptyTab, EntityPage, LINK } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -60,60 +58,51 @@ export default async function PetFamilyPage(props: Props) {
     "The name is shown from the game files; players have not reported it yet.",
   ];
   return (
-    <Container width="data">
-      <article>
-        <JsonLd data={entityPageJsonLd({ name: family.name, path, identifier: `pet-family:${family.id}` })} />
-        <EntityHeader
-          trail={trail} title={family.name}
-          icon={<EntityIcon src={assets?.familyIcons.get(family.id)} unconfirmed />}
-          meta={["Hunter pet family", <span key="id" className="tabular-nums">ID {family.id}</span>]}
-        />
-        <EntityTop
-          box={<TooltipFrame name={family.name} label={`${family.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>Hunter pet family</p></TooltipFrame>}
-          facts={(
-            <Facts
-              layout="list"
-              label={`${family.name}: quick facts`}
-              items={[
-                { label: "Tamed by", value: <Link href="/classes/hunter" className={LINK}>Hunters</Link> },
-                { label: "Skill line", value: family.skillLine, numeric: true },
-                { label: "Spells", value: family.spellIds.length, numeric: true },
-                { label: "Build", value: petFamiliesBuild() ?? "Unrecorded", numeric: true },
-              ]}
-            />
-          )}
-        />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData report={{ type: "Hunter pet family", id: family.id, path }} text={[`${family.name} (hunter pet family ${family.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n")} />
-        <Tabs
-          label={`${family.name}: relations`}
-          tabs={[{
-            id: "abilities", label: "Abilities", count: rows.length,
-            panel: rows.length ? (
-              <DataTable
-                dense
-                caption={`Spells on the ${family.name} skill line, ${CLIENT_LABEL.toLowerCase()}`}
-                columns={[
-                  {
-                    key: "name", header: "Spell", cell: (a) => {
-                      const icon = assets?.spellIcons.get(a.ids[0]!);
-                      return (
-                        <span className="inline-flex items-center gap-2">
-                          {icon && <GameIcon src={icon} size={20} />}
-                          <Link prefetch={false} href={`/database/spells/${a.ids[0]}`} className={LINK}>{a.name ?? `Spell ${a.ids[0]}`}</Link>
-                        </span>
-                      );
-                    },
+    <EntityPage
+      name={family.name}
+      jsonLd={{ name: family.name, path, identifier: `pet-family:${family.id}` }}
+      header={{
+        trail, title: family.name,
+        icon: <EntityIcon src={assets?.familyIcons.get(family.id)} unconfirmed />,
+        meta: ["Hunter pet family", <span key="id" className="tabular-nums">ID {family.id}</span>],
+      }}
+      box={<TooltipFrame name={family.name} label={`${family.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>Hunter pet family</p></TooltipFrame>}
+      facts={[
+        { label: "Tamed by", value: <Link href="/classes/hunter" className={LINK}>Hunters</Link> },
+        { label: "Skill line", value: family.skillLine, numeric: true },
+        { label: "Spells", value: family.spellIds.length, numeric: true },
+        { label: "Build", value: petFamiliesBuild() ?? "Unrecorded", numeric: true },
+      ]}
+      summary={summary}
+      main={<Tabs
+        label={`${family.name}: relations`}
+        tabs={[{
+          id: "abilities", label: "Abilities", count: rows.length,
+          panel: rows.length ? (
+            <DataTable
+              dense
+              caption={`Spells on the ${family.name} skill line, ${CLIENT_LABEL.toLowerCase()}`}
+              columns={[
+                {
+                  key: "name", header: "Spell", cell: (a) => {
+                    const icon = assets?.spellIcons.get(a.ids[0]!);
+                    return (
+                      <span className="inline-flex items-center gap-2">
+                        {icon && <GameIcon src={icon} size={20} />}
+                        <Link prefetch={false} href={`/database/spells/${a.ids[0]}`} className={LINK}>{a.name ?? `Spell ${a.ids[0]}`}</Link>
+                      </span>
+                    );
                   },
-                  { key: "ranks", header: "Spell ids", cell: (a) => <span className="font-mono text-cell-2 text-muted">{a.ids.join(", ")}</span> },
-                ]}
-                rows={rows}
-                rowKey={(a) => a.key}
-              />
-            ) : <EmptyTab players={false} action={null} message="The game files list no spells on this family's skill line." />,
-          }]}
-        />
-      </article>
-    </Container>
+                },
+                { key: "ranks", header: "Spell ids", cell: (a) => <span className="font-mono text-cell-2 text-muted">{a.ids.join(", ")}</span> },
+              ]}
+              rows={rows}
+              rowKey={(a) => a.key}
+            />
+          ) : <EmptyTab players={false} action={null} message="The game files list no spells on this family's skill line." />,
+        }]}
+      />}
+      openData={{ report: { type: "Hunter pet family", id: family.id, path }, text: [`${family.name} (hunter pet family ${family.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n") }}
+    />
   );
 }

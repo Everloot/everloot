@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Container, DataTable, Disclosure, Facts, filledColumns, InShort, OpenData, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
+import { AgreementMeter, Badge, DataTable, Disclosure, filledColumns, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
@@ -16,7 +14,6 @@ import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { npcLootTable } from "@kb/loot-tables";
@@ -28,7 +25,7 @@ import { gearFor, instanceTerrain, TERRAIN_BUILD, TERRAIN_PATH } from "@/lib/ter
 import TerrainGearTable from "@/components/TerrainGearTable";
 import { itemNames, npcNames } from "@/lib/names";
 import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
-import { EMPTY, EmptyTab, EntityArt, EntityHeader, EntityLayout, EntitySidebar, EntityTop, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityArt, EntityPage, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
 import { loreFor } from "@/lib/lore-links";
@@ -324,37 +321,29 @@ export default async function InstancePage(props: Props) {
   ];
 
   return (
-    <Container width="data">
-      <EdgeDegraded when={unreachable || !!world?.unreachable || !!loot?.unreachable} />
-      <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
-      <EntityLayout>
-        <EntityHeader
-          title={title}
-          icon={<EntityIcon src={loading?.small?.url ?? loading?.url} cover />}
-          meta={[kindLabel(row.raid), <span key="id" className="tabular-nums">Instance {row.instanceMapId}</span>]}
-          trail={[
-            ...trailFor("/database/instances")!,
-            { name: title, path: canonical },
-          ]}
-        />
-
+    <EntityPage
+      name={title}
+      degraded={unreachable || !!world?.unreachable || !!loot?.unreachable}
+      jsonLd={{ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` }}
+      header={{
+        title,
+        icon: <EntityIcon src={loading?.small?.url ?? loading?.url} cover />,
+        meta: [kindLabel(row.raid), <span key="id" className="tabular-nums">Instance {row.instanceMapId}</span>],
+        trail: [
+          ...trailFor("/database/instances")!,
+          { name: title, path: canonical },
+        ],
+      }}
+      box={loading && <EntityArt src={loading.url} alt={`Loading screen of ${title}`} width={loading.width} height={Math.round((loading.width * 9) / 16)} />}
+      facts={facts}
+      notices={(prep || unreachable) && <>
         {prep && (
           <p className="mb-3 text-sm"><Link href={wikiHref(prep.slug)} className={link}>Prepare for this {prep.type === "raid" ? "raid" : "dungeon"}</Link></p>
         )}
-
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
-
-        <EntityTop
-          box={loading && <EntityArt src={loading.url} alt={`Loading screen of ${title}`} width={loading.width} height={Math.round((loading.width * 9) / 16)} />}
-          facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />}
-        />
-
-        <EntitySidebar>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
-          {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
-          <OpenData report={{ type: "Instance", id: row.instanceMapId, path: canonical }} className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
-        </EntitySidebar>
-
+      </>}
+      summary={summary}
+      main={
         <div className="space-y-6">
           <Disclosure as="h2" summary="How this is counted">
             <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
@@ -365,12 +354,13 @@ export default async function InstancePage(props: Props) {
           </Disclosure>
 
           <Tabs label={`${title}: sections`} tabs={tabs} />
-
-          <LoreSection match={lore} />
-          <EntityScreenshots type="instance" id={row.instanceMapId} name={title} />
-          <EntityComments type="instance" id={row.instanceMapId} />
         </div>
-      </EntityLayout>
-    </Container>
+      }
+      related={<LoreSection match={lore} />}
+      screenshots={<EntityScreenshots type="instance" id={row.instanceMapId} name={title} />}
+      comments={<EntityComments type="instance" id={row.instanceMapId} />}
+      // No per-instance JSON is served, so no Raw JSON link: the copy text is the record.
+      openData={{ report: { type: "Instance", id: row.instanceMapId, path: canonical }, text: [`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n") }}
+    />
   );
 }

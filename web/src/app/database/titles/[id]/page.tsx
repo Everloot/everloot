@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { Tabs, TooltipFrame } from "@/components/ui";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadCatalog, parseSegment, titleDisplayName, titleHref } from "@/lib/completion-lists";
@@ -12,7 +10,7 @@ import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import LoreSection from "@/components/LoreSection";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EMPTY, EmptyTab, EntityHeader, EntityLayout, EntitySidebar, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, LINK, Unreachable, known } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -70,47 +68,33 @@ export default async function TitlePage(props: Props) {
   const lore = entry ? await loreFor("title", id, title) : null;
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` })} />}
-        <EntityHeader trail={trail} title={title} meta={["Title", <span key="id" className="tabular-nums">ID {id}</span>]} />
-        {entry ? (
-          <>
-            <EntityTop
-              box={<TooltipFrame name={title} label={entry.confirmed ? `${title}, as players reported it` : `${title}, ${CLIENT_LABEL.toLowerCase()}`} />}
-              facts={
-                <Facts
-                  layout="list"
-                  label={`${title}: quick facts`}
-                  items={[
-                    // Short of three installs: the meter with how many have reported, never the words "not reported".
-                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
-                    { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
-                    { label: "ID", value: entry.titleId, numeric: true },
-                  ]}
-                />
-              }
-            />
-            <EntitySidebar>
-              <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-              <OpenData report={{ type: "Title", id, path: titleHref(entry.titleId, entry.name) }} text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
-            </EntitySidebar>
-            <Tabs
-              label={`${title}: relations`}
-              tabs={[
-                {
-                  id: "earned-by", label: "Earned by", count: 0,
-                  // The achievement that rewards a title is in none of the game files read so far, and no report carries it: a plain line, no meter.
-                  panel: <EmptyTab players={false} action={null} message={EMPTY.titleRewards} />,
-                },
-              ]}
-            />
-            <div className="mt-6 space-y-6 empty:hidden">
-              <LoreSection match={lore} />
-            </div>
-          </>
-        ) : <Unreachable />}
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={entry && { name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` }}
+      header={{ trail, title, meta: ["Title", <span key="id" className="tabular-nums">ID {id}</span>] }}
+      box={entry && <TooltipFrame name={title} label={entry.confirmed ? `${title}, as players reported it` : `${title}, ${CLIENT_LABEL.toLowerCase()}`} />}
+      facts={entry && [
+        // Short of three installs: the meter with how many have reported, never the words "not reported".
+        { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
+        { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
+        { label: "ID", value: entry.titleId, numeric: true },
+      ]}
+      notices={!entry && <Unreachable />}
+      summary={entry ? summary : undefined}
+      main={entry && (
+        <Tabs
+          label={`${title}: relations`}
+          tabs={[
+            {
+              id: "earned-by", label: "Earned by", count: 0,
+              // The achievement that rewards a title is in none of the game files read so far, and no report carries it: a plain line, no meter.
+              panel: <EmptyTab players={false} action={null} message={EMPTY.titleRewards} />,
+            },
+          ]}
+        />
+      )}
+      related={entry && <LoreSection match={lore} />}
+      openData={entry && { report: { type: "Title", id, path: titleHref(entry.titleId, entry.name) }, text: [`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n") }}
+    />
   );
 }

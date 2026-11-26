@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import LoreSection from "@/components/LoreSection";
-import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { Tabs, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { factionHeaderOnly, factionHref, factionInFiles, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
@@ -12,7 +10,7 @@ import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
-import { EMPTY, EmptyTab, EntityHeader, EntityLayout, EntitySidebar, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, LINK, Unreachable, known } from "../../entity";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { loadSiteAssets } from "@/lib/game-assets";
 
@@ -76,54 +74,40 @@ export default async function FactionPage(props: Props) {
   const emblem = entry ? (await loadSiteAssets())?.factions.get(entry.name.toLowerCase()) : undefined;
 
   return (
-    <Container width="data">
-      <EntityLayout>
-        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: factionHref(entry.factionId, entry.name), identifier: `faction:${id}` })} />}
-        <EntityHeader trail={trail} icon={<EntityIcon src={emblem} />} title={title} meta={["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>]} />
-        {entry ? (
-          <>
-            <EntityTop
-              box={
-                <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}>
-                  {entry.header && <p>{entry.header}</p>}
-                  {entry.major && <p>Major faction</p>}
-                </TooltipFrame>
-              }
-              facts={
-                <Facts
-                  layout="list"
-                  label={`${entry.name}: quick facts`}
-                  items={[
-                    ...(files ? [{ label: "Header", value: files.header ? "Yes" : "No" }] : []),
-                    ...(parent ? [{ label: "Parent faction", value: parent }] : []),
-                    ...(entry.major ? [{ label: "Kind", value: "Major faction" }] : []),
-                    // Short of three installs: the meter with how many have reported, never the words "not reported".
-                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
-                    { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
-                  ]}
-                />
-              }
-            />
-            <EntitySidebar>
-              <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-              <OpenData report={{ type: "Faction", id, path: factionHref(entry.factionId, entry.name) }} text={[`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n")} />
-            </EntitySidebar>
-            <Tabs
-              label={`${entry.name}: relations`}
-              tabs={[
-                {
-                  id: "reputation-from", label: "Reputation from", count: 0,
-                  // A quest is public once 3 installs report it; which faction it pays is in no file read so far and in no report.
-                  panel: <EmptyTab action={null} message={EMPTY.factionQuests} />,
-                },
-              ]}
-            />
-            <div className="mt-6 space-y-6 empty:hidden">
-              <LoreSection match={lore} />
-            </div>
-          </>
-        ) : <Unreachable />}
-      </EntityLayout>
-    </Container>
+    <EntityPage
+      name={title}
+      jsonLd={entry && { name: title, path: factionHref(entry.factionId, entry.name), identifier: `faction:${id}` }}
+      header={{ trail, icon: <EntityIcon src={emblem} />, title, meta: ["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      box={entry && (
+        <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}>
+          {entry.header && <p>{entry.header}</p>}
+          {entry.major && <p>Major faction</p>}
+        </TooltipFrame>
+      )}
+      facts={entry && [
+        ...(files ? [{ label: "Header", value: files.header ? "Yes" : "No" }] : []),
+        ...(parent ? [{ label: "Parent faction", value: parent }] : []),
+        ...(entry.major ? [{ label: "Kind", value: "Major faction" }] : []),
+        // Short of three installs: the meter with how many have reported, never the words "not reported".
+        { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
+        { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
+      ]}
+      notices={!entry && <Unreachable />}
+      summary={entry ? summary : undefined}
+      main={entry && (
+        <Tabs
+          label={`${entry.name}: relations`}
+          tabs={[
+            {
+              id: "reputation-from", label: "Reputation from", count: 0,
+              // A quest is public once 3 installs report it; which faction it pays is in no file read so far and in no report.
+              panel: <EmptyTab action={null} message={EMPTY.factionQuests} />,
+            },
+          ]}
+        />
+      )}
+      related={entry && <LoreSection match={lore} />}
+      openData={entry && { report: { type: "Faction", id, path: factionHref(entry.factionId, entry.name) }, text: [`${entry.name} (faction ${id})`, ...summary, `Source: https://everloot.app${factionHref(entry.factionId, entry.name)}`].join("\n") }}
+    />
   );
 }
