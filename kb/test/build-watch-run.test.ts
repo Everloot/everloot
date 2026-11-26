@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChangeEntry } from "../src/build-watch/changes.js";
 import { branchFor, type PrRef } from "../src/build-watch/plan.js";
 import { GAME_DATA_DIR, RAID_LUA, RAID_TS, readSiteData, siteBuild } from "../src/build-watch/site-data.js";
+import { ITEM_DIGEST_SCHEMA, readItemDigests, type ItemDigests } from "../src/build-watch/item-digests.js";
+import { LABEL } from "../src/talents/catalog.js";
 import { runWatch, type Extracted, type WatchConfig, type WatchDeps, type WatchOptions } from "../src/build-watch/watch.js";
-import { CONFIG_A, CONFIG_B, commitBuild, extracted, node, raid, trimmed, versionsText, worldMap, type Build } from "./build-watch-fixtures.js";
+import { CONFIG_A, CONFIG_B, commitBuild, extracted, node, raid, stamp, trimmed, versionsText, worldMap, type Build } from "./build-watch-fixtures.js";
 
 const config: WatchConfig = { region: "us", products: [{ product: "wow_classic_beta", label: "beta", live: false }] };
 let root: string;
@@ -52,6 +54,18 @@ describe("runWatch", () => {
     expect(ChangeEntry.parse(JSON.parse(readFileSync(changeFile(70450), "utf8")))).toMatchObject({ initial: true, spoiler: true, readSet: null });
     expect(JSON.parse(readFileSync(join(out, "plan.json"), "utf8"))[0].branch).toBe(r.branch);
     expect(readFileSync(r.bodyFile!, "utf8")).toContain("First data for this product");
+  });
+
+  it("writes the item digests as the next build's baseline and lists the items new since the committed ones", async () => {
+    const items = (buildId: number, ids: number[]): ItemDigests => ({
+      schema: ITEM_DIGEST_SCHEMA, label: LABEL, build: stamp(buildId),
+      encryptedBlocks: { Item: 0, ItemSparse: 0 }, items: Object.fromEntries(ids.map((id) => [String(id), "abcd"])),
+    });
+    await runWatch(options(), fakes({ id: 70450 }, () => extracted(70450, v1, { itemDigests: items(70450, [1, 2]) })).deps);
+    expect(Object.keys(readItemDigests(root)!.items)).toEqual(["1", "2"]);
+    const [r] = await runWatch(options(), fakes({ id: 70460, config: CONFIG_B }, () => extracted(70460, v2, { itemDigests: items(70460, [1, 2, 5]) })).deps);
+    expect(r.paths).toContain(`${GAME_DATA_DIR}/item-digests.json`);
+    expect(ChangeEntry.parse(JSON.parse(readFileSync(changeFile(70460), "utf8"))).items).toEqual({ spoiler: true, comparedTo: 70450, added: [5], removed: [], changed: [] });
   });
 
   it("commits no folder of its own: nothing is written outside the files the site reads", async () => {

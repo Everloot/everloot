@@ -7,6 +7,7 @@ import type { WorldMapData } from "../world-map-data.js";
 import { LABEL } from "../talents/catalog.js";
 import { CHANGE_SCHEMA, ReadSet, type BuildRef, type ChangeEntry, type MapChanges, type RaidBuffChanges, type TalentChanges } from "./changes.js";
 import { diffClientDigests, type ClientDigests } from "./client-digests.js";
+import { diffItemDigests, type ItemDigests } from "./item-digests.js";
 import { siteBuild, type SiteData, type SpellValueTable, type TrimmedClass, type WebRaid } from "./site-data.js";
 
 type Node = TrimmedClass["trees"][number]["nodes"][number];
@@ -162,6 +163,9 @@ export interface DiffInput {
   afterDigests?: ClientDigests | null;
   /** Tables the extractor asked for and did not read, with the reason; an absence is a warning, not a removal. */
   missingTables?: { table: string; reason: string }[];
+  /** Item digests committed with the current data (null when absent) and the new build's; no `afterItems`, no item section. */
+  beforeItems?: ItemDigests | null;
+  afterItems?: ItemDigests;
   encryptedTables: { table: string; blocks: number }[];
   source: { definitions: string | null; library: string; extractedAt: string };
   warnings: string[];
@@ -189,6 +193,14 @@ export function buildChangeEntry(input: DiffInput): ChangeEntry {
   } else if (before && !input.beforeDigests) {
     warnings.push("no committed client digests to compare with, so client table changes are not listed");
   }
+  let items: ChangeEntry["items"] = null;
+  if (before && input.beforeItems && input.afterItems) {
+    const diff = diffItemDigests(input.beforeItems, input.afterItems, spoiler);
+    items = diff.items;
+    warnings.push(...diff.warnings);
+  } else if (before && input.afterItems) {
+    warnings.push("no committed item digests to compare with, so new and changed items are not listed");
+  }
   return {
     schema: CHANGE_SCHEMA,
     label: LABEL,
@@ -210,6 +222,7 @@ export function buildChangeEntry(input: DiffInput): ChangeEntry {
     } : null,
     mapChanges: before?.map && after.map ? diffMap(before.map, after.map, spoiler) : null,
     readSet,
+    ...(input.afterItems ? { items } : {}),
     warnings,
   };
 }

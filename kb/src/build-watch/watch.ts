@@ -12,6 +12,7 @@ import { z } from "zod";
 import { parseVersions, type VersionRow } from "../builds.js";
 import { readClientDigests, writeClientDigests, type ClientDigests } from "./client-digests.js";
 import { buildChangeEntry } from "./diff.js";
+import { readItemDigests, writeItemDigests, type ItemDigests } from "./item-digests.js";
 import {
   addPublishedChange, differingFiles, GAME_DATA_DIR, generatedFiles, RAID_TS, raidFiles, readSiteData, RECORDS_TS, retargetRaidImport, siteBuild,
   writeChangeEntry, writeSpellValues, type SpellValueTable,
@@ -41,6 +42,8 @@ export interface Extracted {
   spellValues: SpellValueTable;
   /** Counts and hashes of every table the extraction read; written to client-digests.json. */
   clientDigests: ClientDigests;
+  /** A hash per part of every item the site reads; written to item-digests.json. */
+  itemDigests?: ItemDigests;
   /** Tables asked for and not read, with the reason; used to explain an absent table in the entry. */
   missingTables: { table: string; reason: string }[];
   /** Writes the talent files, raid file, raid_data.lua and map.json for this build under `root`, with the site's own generators. */
@@ -128,6 +131,7 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
   const row = latestRow(await deps.fetchVersions(cfg.product));
   const before = readSiteData(opts.repoRoot);
   const beforeDigests = readClientDigests(opts.repoRoot);
+  const beforeItems = readItemDigests(opts.repoRoot);
   const ident = (b: { buildConfig: string; buildId: number }) => ({ buildConfig: b.buildConfig, buildId: b.buildId });
   const committed = before && ident(siteBuild(before));
   const decideOpts = { redo: opts.redo, force: opts.force };
@@ -160,6 +164,7 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
     await got.generate(root);
     writeSpellValues(root, got.spellValues);
     writeClientDigests(root, got.clientDigests);
+    if (got.itemDigests) writeItemDigests(root, got.itemDigests);
 
     const written = raidFiles(root);
     if (written.length > 1) throw new Error(`more than one raid file was written: ${written.join(", ")}`);
@@ -171,6 +176,7 @@ async function watchProduct(cfg: WatchConfig["products"][number], prs: PrRef[], 
     const entry = buildChangeEntry({
       product: cfg.product, live: cfg.live, detectedAt: deps.now().toISOString(), before, after,
       beforeDigests, afterDigests: got.clientDigests, missingTables: got.missingTables,
+      beforeItems, afterItems: got.itemDigests,
       encryptedTables: got.encryptedTables, source: got.source, warnings: got.warnings,
     });
     const branch = branchFor(cfg.product, got.build);

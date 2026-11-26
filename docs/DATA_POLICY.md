@@ -771,6 +771,17 @@ stays out, because we never decrypt. Description and tooltip text is not part of
 The spell and zone pages show their own lines from these entries (decided 2026-11-26): the same
 values, labelled the same way, and only from live builds and items not marked as spoilers.
 
+*Items in the build changes.* *Proposed 2026-11-27 in the pull request that adds them (the maintainer review).*
+The build watch also records, per build, the ids of the items added to or removed from the `Item` and `ItemSparse`
+tables and, for each changed item, the names of the parts of its site record that changed (name, quality, item level,
+required level, binding, class or slot, stat kinds, weapon, sell price, other tooltip lines, icon). Its comparison
+baseline, `web/src/data/game-data/item-digests.json`, holds a 4-hex-digit hash per part of each item, never a value or
+text. The entries carry ids and part names only, so the item values stay in private storage as the client layer rule
+says. An item page shows "Added in build" and its changes only when it may show the item's tooltip (3 installs or the
+item name rule), only from live builds and sections not marked as spoilers, and never "Added in" for an item already
+present in the first build compared, since the files do not say when it arrived. When the item tables skip a different
+number of encrypted blocks than the build before, nothing is listed for that build: an old item could read as new.
+
 **Blizzard's own posts.** The "what changed" page at `/changes` lists posts by Blizzard staff on
 the WoW forum and by the official World of Warcraft account on Bluesky, and the game builds
 Blizzard's version service reports.

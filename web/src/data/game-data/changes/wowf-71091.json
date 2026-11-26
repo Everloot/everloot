@@ -495,6 +495,34 @@
     ],
     "layoutChanged": true
   },
+  "items": {
+    "spoiler": false,
+    "comparedTo": 71037,
+    "added": [
+      291874
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "id": 6786,
+        "fields": [
+          "category"
+        ]
+      },
+      {
+        "id": 10053,
+        "fields": [
+          "category"
+        ]
+      },
+      {
+        "id": 274964,
+        "fields": [
+          "binding"
+        ]
+      }
+    ]
+  },
   "warnings": [
     "table definitions differ (WoWDBDefs 3a7954cfb8ee vs 3783c908726e): a change may come from the layouts, not the game"
   ]
