@@ -324,10 +324,12 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
  * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
  * `icons` is every asked-for item's icon the files give: a tooltip's, and the icon of an item the files give nothing
  * else for (no name, so no tooltip). Which items a page may draw it for is the caller's rule, as with the tips.
+ * `indexed` is whether this build's item index was read: only then does an item with no tooltip, and no failed or
+ * broken read, mean the files carry nothing for it.
  */
-export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; icons: Map<number, string>; unreachable: boolean; degraded: boolean }> {
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; icons: Map<number, string>; unreachable: boolean; degraded: boolean; indexed: boolean }> {
   const out = new Map<number, ItemTip>();
-  const result = { tips: out, icons: new Map<number, string>(), unreachable: false, degraded: false };
+  const result = { tips: out, icons: new Map<number, string>(), unreachable: false, degraded: false, indexed: false };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
   if (!assets || !store || !folder || !wanted.length) return result;
@@ -335,6 +337,7 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
   if (read === PRIVATE_UNREACHABLE) return { ...result, unreachable: true };
   const index = ItemIndexSchema.safeParse(read);
   if (!index.success || index.data.build.version !== assets.version) return result;
+  result.indexed = true;
   const byShard = new Map<number, number[]>();
   for (const id of wanted) {
     const s = itemShard(id, index.data.shardSize);
@@ -384,8 +387,8 @@ export interface MatchedName {
   name: string;
   /** Name colour by quality; common when only the wiki names the item. */
   color: string;
-  /** The quality id `color` is for. */
-  quality: number;
+  /** The quality id `color` is for; absent where the names file gives none (a name only the wiki gives), so none is claimed. */
+  quality?: number;
   /** The wiki article that gives this name; null for a name from the game files alone. */
   wikiPage: string | null;
   source: "wiki" | "files";
@@ -421,7 +424,7 @@ export async function loadItemNames(version: string, base: string | null = asset
       wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
       // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
       names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
-        name: x.n, color: qualityColor(x.q ?? 1), quality: x.q ?? 1, wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
+        name: x.n, color: qualityColor(x.q ?? 1), ...(x.q === undefined ? {} : { quality: x.q }), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
       } satisfies MatchedName])),
     } : null);
   }

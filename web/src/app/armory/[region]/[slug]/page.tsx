@@ -24,6 +24,7 @@ import { AddonSighting, CharacterFacts, CharacterOverview, DungeonRaidSlot, Rank
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
+import { compareHref } from "../../compare/sides";
 import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 /** Read on every request, so a hidden character is gone at once. */
@@ -141,22 +142,23 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
               </>}
               actions={<>
                 <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-sm">Update character</button></form>
+                <Link href={compareHref({ region: c.region, slug: c.slug })} className={`text-sm ${link}`}>Compare with…</Link>
                 <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={`text-sm ${link}`}>Blizzard armory</a>
               </>}
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm empty:hidden">
           {associated && <Link href={associated.path} className={link}>{associated.sharesData ? "Shares addon data" : "Linked character"}</Link>}
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
-          <ArmoryCredit at={lastRead} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
         <div className="space-y-3">
           <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
           <RankBadges ranks={rankBadges} />
+          <ArmoryCredit at={lastRead} />
         </div>
 
         <CharacterOverview character={c} />

@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   levels: new Map<number, { level: number; required: number; binding: number }>(),
   progress: [] as { fact: "armor"; reporters: number; build: string }[],
   renders: null as unknown, renderCalls: 0,
+  indexed: true, tipLines: [] as string[],
 }));
 vi.mock("@/lib/game-renders", () => ({ loadRenders: async () => { state.renderCalls++; return state.renders; } }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
@@ -17,8 +18,13 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   loadItemTips: async (_assets: unknown, ids: readonly number[]) => {
     state.tipCalls.push([...ids]);
     if (state.missingTip) return new Map();
-    return new Map(ids.map((id) => [id, { name: `Game name ${id}`, color: "#fff", quality: "Common", icon: `https://assets.example.test/b/icons/i${id}.webp`, lines: [], partial: false, why: [], label: "found in game files, unconfirmed · build 1.60.1.70450", level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
+    return new Map(ids.map((id) => [id, { name: `Game name ${id}`, color: "#fff", quality: "Common", icon: `https://assets.example.test/b/icons/i${id}.webp`, lines: state.tipLines, partial: false, why: [], label: "found in game files, unconfirmed · build 1.60.1.70450", level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
   },
+  // The item page's read for an item without a tooltip: its icon, and whether the build's item index was read.
+  readItemTips: async (_assets: unknown, ids: readonly number[]) => ({
+    tips: new Map(), unreachable: false, degraded: false, indexed: state.indexed,
+    icons: new Map(ids.flatMap((id) => (state.iconOnly.has(id) ? [[id, state.iconOnly.get(id)!] as const] : []))),
+  }),
 }));
 vi.mock("@/lib/item-icons", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/item-icons")>()),
@@ -57,7 +63,7 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; state.renders = null; state.renderCalls = 0; });
+beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; state.renders = null; state.renderCalls = 0; state.indexed = true; state.tipLines = []; });
 
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
@@ -125,6 +131,44 @@ test("the audited item keeps its quality when its icon and taxonomy quality are 
   expect(page).toMatch(/<h1 class="[^"]*text-q-epic"[^>]*>Wiki name 7230<\/h1>/);
   expect(page).not.toContain("<h1 style=");
   expect(page).not.toContain("border-dashed");
+});
+
+// Eye of Rend: no ItemSparse row, so the names file has its name from the wiki alone, with no quality (loadItemNames).
+const eyeOfRend = () => ({
+  version: "1.60.1.70450",
+  wiki: { name: "Warcraft Wiki (Internet Archive dump, 2023-11-13)", url: "https://warcraft.wiki.gg" },
+  names: new Map([[12587, { name: "Eye of Rend", color: "#ffffff", wikiPage: "https://warcraft.wiki.gg/wiki/Eye_of_Rend", source: "wiki" as const }]]),
+});
+const frameOf = (page: string) => page.slice(page.indexOf("data-tooltip-frame"), page.indexOf("</section>", page.indexOf("data-tooltip-frame")));
+
+test("an item the files carry nothing for says so inside the box, with the build read, and claims no quality", async () => {
+  state.assets = assets;
+  state.missingTip = true;
+  state.matched = eyeOfRend();
+  const page = await html(ItemPage(props("12587")));
+  expect(frameOf(page)).toMatch(/data-card-missing[^>]*>The game files read so far carry no stats for this item \(build 70450\)</);
+  // No quality is known: the title is plain, and neither the summary nor the facts call it Common.
+  expect(page).toMatch(/<h1 class="(?![^"]*text-q-)[^"]*"[^>]*>Eye of Rend<\/h1>/);
+  expect(page).not.toMatch(/Leather · common/i);
+});
+
+test("without the build's item index read, the box says nothing about what the files hold", async () => {
+  state.assets = assets;
+  state.missingTip = true;
+  state.indexed = false;
+  state.matched = eyeOfRend();
+  expect(await html(ItemPage(props("12587")))).not.toContain("data-card-missing");
+});
+
+test("a covered item: no line about missing stats, and its sell price as a fact when the files give one", async () => {
+  state.assets = assets;
+  state.matched = matchedNames([7230]);
+  state.tipLines = ["Binds when equipped", "Sell Price: 1g 2s 3c"];
+  const page = await html(ItemPage(props("7230")));
+  expect(page).not.toContain("data-card-missing");
+  expect(page).toMatch(/Sell price<\/dt><dd[^>]*>(?:<[^>]*>)*1g 2s 3c</);
+  state.tipLines = ["Binds when equipped"];
+  expect(await html(ItemPage(props("7230")))).not.toContain("Sell price");
 });
 
 test("a category row without an icon shows the question mark from the same asset folder", async () => {

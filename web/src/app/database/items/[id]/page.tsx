@@ -15,7 +15,7 @@ import { DisenchantPanel, showsDisenchant } from "./disenchant";
 import { loadDisenchant } from "@/lib/disenchant";
 import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
-import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
+import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, readItemTips, unknownItemIcon } from "@/lib/game-assets";
 import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
@@ -41,7 +41,6 @@ import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
 import { EntityIcon } from "@/components/game/EntityIcon";
-import { loadItemIcons } from "@/lib/item-icons";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -49,6 +48,8 @@ import EntityComments from "@/components/comments/EntityComments";
 import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
+/** How the files' tooltip prints the vendor price (lib/item-names.ts). */
+const SELL_PRICE = "Sell Price: ";
 
 /** The segment is an item id, or a class slug (/database/items/weapons): numbers are items, words are classes. */
 type Props = { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
@@ -104,7 +105,11 @@ export default async function ItemPage(props: Props) {
   const assets = tipped || spellLinked ? await loadSiteAssets() : null;
   const filesTip = tipped ? (await loadItemTips(assets, [itemId])).get(itemId) : undefined;
   // An item the files give only an icon for (no ItemSparse row: the server sends it) shows that icon, unconfirmed.
-  const filesIcon = tipped && !filesTip ? (await loadItemIcons(assets, [itemId])).get(itemId) : undefined;
+  const filesRead = tipped && !filesTip ? await readItemTips(assets, [itemId]) : null;
+  const filesIcon = filesRead?.icons.get(itemId);
+  // The box says the files carry no stats only after a whole read of this build's item files found no record.
+  const filesLack = assets && filesRead?.indexed && !filesRead.unreachable && !filesRead.degraded && !filesRead.tips.has(itemId)
+    ? assets.version.split(".").pop() : undefined;
   // The model picture under the same rule as the icon and tooltip, and only beside a shown name.
   const picture = tipped && name ? (await loadRenders())?.items.get(itemId) : undefined;
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
@@ -242,8 +247,9 @@ export default async function ItemPage(props: Props) {
     id: itemId, tip, name: shownItemName(itemId, agreed, matched?.names, tip), category, namesQuality: matched?.names.get(itemId)?.quality,
     set: set && { ...set, pieceName: itemName, spellName: (spell) => bonusNames?.names.get(spell) },
     spellHref: (spell) => (bonusNames?.names.has(spell) ? `/database/spells/${spell}` : undefined),
+    filesLack,
   });
-  const tooltipLines = tip ? [...box.card.lines, ...(box.card.evidence?.lines ?? []), ...(box.card.notes ?? [])] : box.card.lines;
+  const tooltipLines = tip ? [...box.card.lines, ...(box.card.evidence?.lines ?? []), ...(box.card.notes ?? [])] : [...box.card.lines, ...(box.card.missing ? [box.card.missing] : [])];
   // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain. The
   // taxonomy gives the quality, else the names file (for an item whose quality the taxonomy leaves unrecorded).
   const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;
@@ -264,6 +270,8 @@ export default async function ItemPage(props: Props) {
   ].slice(0, 3);
   // The page in four lines: what it is, what players saw, what nobody has reported, and where the name came from.
   const requiredLevel = tip?.lines.find((l) => l.startsWith("Requires Level"))?.replace("Requires Level ", "") ?? null;
+  // The vendor price the files give (the tooltip's last line), as a fact beside the box.
+  const sellPrice = tip?.lines.find((l) => l.startsWith(SELL_PRICE))?.slice(SELL_PRICE.length) || null;
   const identity = [
     category?.subclass?.name ?? category?.class?.label,
     shownQuality,
@@ -287,6 +295,7 @@ export default async function ItemPage(props: Props) {
       { label: "Slot", value: category.slot?.name ?? "—" },
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
+    ...(sellPrice ? [{ label: "Sell price", value: sellPrice, numeric: true }] : []),
     ...(getFrom.length ? [{ label: "Get it from", value: <span className="inline-flex flex-col gap-1">{getFrom}</span> }] : []),
     ...(facts.unreachable ? [] : [
       { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },

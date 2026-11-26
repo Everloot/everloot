@@ -150,6 +150,18 @@ test("a broken item folder is told apart from an item with no tooltip: a listed 
   expect((await readItemTips(a, [9], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).degraded).toBe(false);
 });
 
+test("whether the build's item index was read, so a page may say the files hold nothing for an item", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  // Read: the item the shard does not hold is one the files carry nothing for.
+  const read = await readItemTips(a, [30], memoryStore({ [`${FOLDER}/items.json`]: itemIndex, [`${FOLDER}/items/0.json`]: shard0 }));
+  expect(read).toMatchObject({ indexed: true, unreachable: false, degraded: false });
+  expect(read.tips.has(30)).toBe(false);
+  // No index, another build's index, or no bucket: nothing is known about the files.
+  expect((await readItemTips(a, [30], memoryStore({}))).indexed).toBe(false);
+  expect((await readItemTips(a, [30], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).indexed).toBe(false);
+  expect((await readItemTips(a, [30], null)).indexed).toBe(false);
+});
+
 test("an item the files give only an icon for reads as an icon, not a tooltip, and is no broken record", async () => {
   const a = parseSiteManifest(siteManifest, BASE)!;
   const store = memoryStore({ [`${FOLDER}/items.json`]: itemIndex, [`${FOLDER}/items/0.json`]: { ...shard0, "30": { i: 135661 }, "31": { i: 0 } } });
@@ -388,12 +400,13 @@ test("the shown item names come from one private file for the client layer's bui
   expect(names?.names.has(9)).toBe(false);
 });
 
-test("every id shows; a name without a wiki page is the game files' alone, and one without a quality is common", async () => {
+test("every id shows; a name without a wiki page is the game files' alone, and one without a quality is drawn common but claims none", async () => {
   const file = { ...namesFile, count: 4, names: { ...namesFile.names, 191666: { n: "Skeletal Steed", q: 4 }, 883: { n: "Deprecated Fire Eyed Skull", w: "Deprecated_Fire_Eyed_Skull" } } };
   const names = await loadItemNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/item-names.json`]: file })) as ItemNames | null;
   expect([...names!.names.keys()].sort((a, b) => a - b)).toEqual([883, 2589, 19019, 191666]);
   expect(names!.names.get(191666)).toEqual({ name: "Skeletal Steed", color: qualityColor(4), quality: 4, wikiPage: null, source: "files" });
-  expect(names!.names.get(883)).toEqual({ name: "Deprecated Fire Eyed Skull", color: qualityColor(1), quality: 1, wikiPage: "https://warcraft.wiki.gg/wiki/Deprecated_Fire_Eyed_Skull", source: "wiki" });
+  // Only the wiki names it (no ItemSparse row, as Eye of Rend 12587): no quality to give the pages, which then say none.
+  expect(names!.names.get(883)).toEqual({ name: "Deprecated Fire Eyed Skull", color: qualityColor(1), wikiPage: "https://warcraft.wiki.gg/wiki/Deprecated_Fire_Eyed_Skull", source: "wiki" });
 });
 
 test("without the file, the bucket or the asset URL, or with a file for another build or of another kind, no names show", async () => {

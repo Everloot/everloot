@@ -15,9 +15,9 @@ import { link } from "./parts";
 
 // The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the character's
 // summary in the model's place between them.
-const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
-const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
-const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
+export const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
+export const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
+export const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
 const qualityName = (q: string | null | undefined): Quality | undefined => QUALITIES.find((x) => x === q?.toLowerCase());
 const quality = (q: string | null) => QUALITY_TEXT[qualityName(q) as Quality] ?? "text-fg";
 const ICON = 40;
@@ -144,9 +144,10 @@ export function TalentTrees({ character: c, trees, open = false }: { character: 
   </>;
 }
 
-export function ProfessionList({ rows }: { rows: NonNullable<Details["professions"]>["rows"] }) {
+/** The profession bars; `grid` lays them out two columns wide from small screens up (the character overview). */
+export function ProfessionList({ rows, grid = false }: { rows: NonNullable<Details["professions"]>["rows"]; grid?: boolean }) {
   return <>
-    <ul className="space-y-4">{rows.map((profession) => <li key={profession.name}>
+    <ul {...(grid ? { "data-profession-grid": "" } : {})} className={grid ? "grid gap-x-8 gap-y-4 sm:grid-cols-2" : "space-y-4"}>{rows.map((profession) => <li key={profession.name}>
       <div className="mb-1 flex justify-between gap-3 text-sm"><span className="text-fg">{profession.name}</span><span className="font-mono tabular-nums text-fg-2">{profession.rank} / {profession.max}</span></div>
       <progress className="h-2 w-full accent-accent" value={profession.rank} max={profession.max} aria-label={`${profession.name} skill`} />
     </li>)}</ul>

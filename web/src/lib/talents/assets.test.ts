@@ -104,6 +104,8 @@ const root = join(__dirname, "../../../..");
 const SHOWS_ART = new Set([
   // Lightweight armory equipment icons and race/class portrait fallback.
   "web/src/app/armory/profile.tsx", "web/src/app/armory/[region]/[slug]/page.tsx",
+  // Two characters' equipment side by side, with the same icons and tooltips.
+  "web/src/app/armory/compare/page.tsx",
   // Approved entity share icons use the same page art switch and item visibility rule.
   "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
