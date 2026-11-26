@@ -620,7 +620,9 @@ after the instance when there is one, else the terrain chunk's area in the ADT f
 `AreaTable` to the area a zone's `UiMapAssignment` names; only the zone id is published), each stamped
 with the build it came from. It also holds flight masters and flight paths (`TaxiNodes`, `TaxiPath`,
 `TaxiPathNode`), and for each master the side whose flight map shows it (the `TaxiNodes` flags: Alliance, Horde
-or both; none when the flags say neither). Like the talent catalog, it may be shown on the site and committed as
+or both; none when the flags say neither). For each zone it holds whose territory the files make it (the
+`FactionGroupMask` of the `AreaTable` area the zone's `UiMapAssignment` names: Alliance, Horde, or contested when
+the mask names neither side or both; none without a mask). Like the talent catalog, it may be shown on the site and committed as
 a clearly marked game-data file in `web/src/data/game-data/`, with a README that says it is
 Blizzard's and outside our licence. It is labelled *found in game files, unconfirmed* until
 checked in game. General rule: new zones or other content found only in the game files stay hidden
