@@ -29,6 +29,7 @@ import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
 import { writeClientItemSets } from "./client-item-sets.js";
+import { writeClientSpells } from "./client-spells.js";
 import { writeClientCollections } from "./client-collections.js";
 import { writeClientHolidays } from "./client-holidays.js";
 import { writeClientPetFamilies } from "./client-pet-families.js";
@@ -250,6 +251,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-item-sets <snapshot.sqlite> [--out ../web/src/data/game-data/client-item-sets.json]
     (every item set with its pieces, its bonuses as pieces needed and spell id, and the skill a crafted set asks
     for. Ids and numbers only: set names stay in private storage (game-names). Pages only)
+  client-spells <snapshot.sqlite> [--out ../web/src/data/game-data/client-spells.json]
+    (the tooltip numbers of the spells the site links: school, level, cast time, range, cooldown, duration, costs,
+    passive and channeled, dispel type and mechanic, the rank each replaces, effect values and the items that cast
+    it. Ids and numbers only: spell names and text stay in private storage. Pages only)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
     grows, and writes the name the site shows for every item a source names (the game files' first, with the wiki
@@ -825,6 +830,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-item-sets.json";
       const table = writeClientItemSets(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.sets.length} item sets -> ${path}`);
+      return 0;
+    }
+    case "client-spells": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-spells.json";
+      const table = writeClientSpells(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.spells).length} spells -> ${path}`);
       return 0;
     }
     case "client-collections": {

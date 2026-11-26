@@ -22,6 +22,8 @@ export interface SpellTalent {
   gate: { points: number; scope: "tree" | "class" | "unconfirmed" } | null;
   build: string;
   label: string;
+  /** The trait definition the entry is: the key of its name, icon and tooltip text in the calculator's manifest. */
+  definitionId: number | null;
 }
 
 /** The talents of one catalog, by spell id. */
@@ -36,7 +38,7 @@ export function talentsBySpell(catalog: TalentCatalog, classSlug: TalentClassSlu
         classSlug, className: catalog.className, tree: trees.get(node.treeId) ?? "", row: node.row, col: node.col, kind: node.kind,
         maxRanks: entry.maxRanks ?? node.maxRanks, tier: node.kind === "tiered" ? i + 1 : null,
         gate: points ? { points, scope: node.unlock?.scope ?? "tree" } : null,
-        build: catalog.build, label: catalog.label,
+        build: catalog.build, label: catalog.label, definitionId: entry.definitionId,
       };
       out.set(entry.spellId, [...(out.get(entry.spellId) ?? []), talent]);
     });

@@ -20,6 +20,7 @@
  *   web/src/data/game-data/client-titles.json      npm run kb -- client-titles (character titles)
  *   web/src/data/game-data/client-quest-lines.json  npm run kb -- client-quest-lines (quest lines and their quest ids)
  *   web/src/data/game-data/client-item-sets.json   npm run kb -- client-item-sets (item sets, their pieces and bonuses)
+ *   web/src/data/game-data/client-spells.json      npm run kb -- client-spells (tooltip numbers of the spells the site links)
  *   web/src/data/game-data/client-collections.json  npm run kb -- client-collections (currencies, companion pets, toys)
  *   web/src/data/game-data/client-holidays.json    npm run kb -- client-holidays (holidays and world events)
  *   web/src/data/game-data/client-pet-families.json  npm run kb -- client-pet-families (hunter pet families)
@@ -217,6 +218,6 @@ export function differingFiles(generated: string, committed: string, files: stri
 export function generatedFiles(root: string): string[] {
   const dir = dataDir(root);
   const talents = existsSync(join(dir, "talents")) ? readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json")).sort().map((f) => `${GAME_DATA_DIR}/talents/${f}`) : [];
-  const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-terrain.json", "client-disenchant.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "client-item-sets.json", "client-collections.json", "client-places.json", "client-holidays.json", "client-pet-families.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
+  const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-terrain.json", "client-disenchant.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "client-item-sets.json", "client-spells.json", "client-collections.json", "client-places.json", "client-holidays.json", "client-pet-families.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
   return [...talents, ...top, ...[RAID_LUA, DISENCHANT_LUA, FLIGHT_LUA].filter((f) => existsSync(join(root, f)))];
 }
