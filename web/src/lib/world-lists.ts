@@ -69,6 +69,12 @@ export interface QuestRow extends QuestPage {
 
 /** The side a quest is offered to, as the lists and the search overview print it. */
 export const SIDE_LABEL: Record<QuestSide, string> = { alliance: "Alliance", horde: "Horde", both: "Both" };
+/** A side is a faction fact: Alliance and Horde wear their colour, a quest for both sides stays plain. */
+export const SIDE_TONE: Record<QuestSide, string> = { alliance: "text-faction-alliance", horde: "text-faction-horde", both: "text-fg" };
+const TAG_LABEL: Record<QuestTag, string> = { group: "Group", dungeon: "Dungeon", raid: "Raid", pvp: "PvP" };
+/** "Dungeon, 5 players": the tag and suggested group 3 installs agree on; empty for a quest with neither. */
+export const questTypeLabel = (x: Pick<QuestRow, "tag" | "suggestedGroup">): string =>
+  [x.tag && TAG_LABEL[x.tag], x.suggestedGroup !== null && `${x.suggestedGroup} players`].filter(Boolean).join(", ");
 
 export function publicQuests(facts: WorldFacts): QuestRow[] {
   const npcs = facts.agreedNpcs ? { agreedNpcs: facts.agreedNpcs } : {};
