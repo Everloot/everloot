@@ -7,7 +7,7 @@ import {
 import { getUser } from "@/lib/supabase/server";
 
 /**
- * GET /comments?type=<item|quest|npc|spell|zone|instance>&id=<n>: one page's comments and who is reading, for the
+ * GET /comments?type=<item|quest|npc|spell|zone|instance|boss>&id=<n>: one page's comments and who is reading, for the
  * comments section, which loads them in the browser so the page's cached HTML never carries a session or a comment.
  * POST {action}: "post" {type, id, body}, "edit" {commentId, body}, "delete" {commentId}, "report" {commentId, reason,
  * note}, for the signed-in account. Part of the site, not the API: it is left out of the API docs, the MCP server and

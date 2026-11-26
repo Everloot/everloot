@@ -114,6 +114,32 @@ describe("player directory", () => {
     expect(seen).not.toHaveBeenCalled();
   });
 
+  test("before 20261126100000 the guild lists its members here and there is no last login, as today", async () => {
+    const { lastLogin: _login, guildSlug: _guild, ...before } = armoryCharacter();
+    vi.spyOn(armory, "directory").mockResolvedValue({ rows: [before], total: 1 });
+    const html = await page();
+    const table = html.slice(html.indexOf('id="player-results"'));
+    expect(table).toContain('href="/players?guild=Ember+Wardens"');
+    expect(table).not.toContain("/armory/eu/guilds/");
+    expect(html).not.toContain("Last login");
+  });
+
+  test("once it is applied the guild links its own page and each row shows its last login", async () => {
+    vi.spyOn(armory, "directory").mockResolvedValue({ total: 2, rows: [
+      { ...armoryCharacter(), guildSlug: "ember-wardens" },
+      // A guild the armory has not read (or one hidden or disbanded) has no page: the name lists its members, as before.
+      armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", guildSlug: null, guildName: "Quill Watch", lastLogin: null }),
+    ] });
+    const html = await page();
+    const table = html.slice(html.indexOf('id="player-results"'));
+    expect(table).toContain('href="/armory/eu/guilds/ember-wardens"');
+    expect(table).not.toContain('href="/players?guild=Ember+Wardens"');
+    expect(table).toContain('href="/players?guild=Quill+Watch"');
+    expect(table).toContain("Last login");
+    expect(table).toContain("2026-11-08");
+    expect(table).toContain("Not given");
+  });
+
   test("parses filters for the store and keeps all of them in paging and menu links", async () => {
     const directory = vi.spyOn(armory, "directory").mockResolvedValue({ rows: [armoryCharacter()], total: 160 });
     const html = await page({ q: ["Vel", "other"], class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: "Ember", sort: "item-level", page: "2" });

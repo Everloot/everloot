@@ -14,7 +14,7 @@ export * from "./screenshots-shared";
 
 /**
  * Player screenshots on entity pages (supabase/migrations/20261125140000_entity_screenshots.sql): a signed-in player
- * with a profile handle uploads one for an item, quest, NPC, spell, zone or instance page; nothing shows until a comment
+ * with a profile handle uploads one for an item, quest, NPC, spell, zone, instance or boss page; nothing shows until a comment
  * moderator approves it at /ops/screenshots; the uploader deletes their own. Off until EVERLOOT_SCREENSHOTS=1, which
  * needs EVERLOOT_PROFILES=1 too, since the gallery names an uploader by handle; with either unset nothing here is
  * reachable.

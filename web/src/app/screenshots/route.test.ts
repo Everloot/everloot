@@ -69,6 +69,8 @@ test("GET is the approved gallery, the same for everyone: cached, unindexed, and
   expect(rpcCalls("entity_screenshots_for")).toEqual([{ p_entity_type: "item", p_entity_id: 19019 }]);
   expect(await response.json()).toEqual({ screenshots: [{ id: SHOT, author: "thrall", width: 1920, height: 1080, approvedAt: "2026-11-25T10:00:00.000Z" }] });
   for (const q of ["type=guild&id=1", "type=item&id=0", "type=item&id=abc", "type=item"]) expect((await get(q)).status, q).toBe(400);
+  expect((await get("type=boss&id=1084")).status).toBe(200);
+  expect(rpcCalls("entity_screenshots_for").at(-1)).toEqual({ p_entity_type: "boss", p_entity_id: 1084 });
 });
 
 test("an upload needs this site's Origin, a session, and the account the page named", async () => {

@@ -8,7 +8,7 @@ import {
 
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const QUIET = "btn min-h-11 px-4 text-sm";
-const TYPE_LABEL: Record<QueuedScreenshot["entityType"], string> = { item: "Item", quest: "Quest", npc: "NPC", spell: "Spell", zone: "Zone", instance: "Instance" };
+const TYPE_LABEL: Record<QueuedScreenshot["entityType"], string> = { item: "Item", quest: "Quest", npc: "NPC", spell: "Spell", zone: "Zone", instance: "Instance", boss: "Boss" };
 const DONE: Record<"approved" | "rejected", string> = { approved: "Approved. It shows on its page within a few minutes.", rejected: "Rejected. Its file is removed." };
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";

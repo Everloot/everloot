@@ -3,7 +3,8 @@
  * report reasons and the shapes a page reads. No server code, so the browser bundle can import it.
  */
 
-export const COMMENT_TYPES = ["item", "quest", "npc", "spell", "zone", "instance"] as const;
+/** "boss" needs 20261126100000_directory_login_boss_pages.sql; until it is applied the database refuses boss comments. */
+export const COMMENT_TYPES = ["item", "quest", "npc", "spell", "zone", "instance", "boss"] as const;
 export type CommentEntityType = (typeof COMMENT_TYPES)[number];
 export const isCommentType = (value: unknown): value is CommentEntityType => COMMENT_TYPES.includes(value as CommentEntityType);
 
@@ -50,9 +51,9 @@ export interface QueuedComment {
   notes: string[];
 }
 
-/** A page's address for an entity; the zone and instance pages redirect a bare id to their full address. */
+/** A page's address for an entity; the zone, instance and boss pages redirect a bare id to their full address. */
 export function commentEntityHref(type: CommentEntityType, id: number): string {
-  const dir = { item: "items", quest: "quests", npc: "npcs", spell: "spells", zone: "zones", instance: "instances" }[type];
+  const dir = { item: "items", quest: "quests", npc: "npcs", spell: "spells", zone: "zones", instance: "instances", boss: "bosses" }[type];
   return `/database/${dir}/${id}`;
 }
 

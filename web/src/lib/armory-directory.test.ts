@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { armoryCharacter } from "./armory.fixture";
+import { armoryCharacter, armoryGuild } from "./armory.fixture";
 import { createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 import { StorageError } from "./supabase/server";
 import { activeDirectoryFilters, levelBandOf, PLAYER_LEVEL_BANDS, playerDirectoryQuery, playerDirectoryHref } from "./armory-directory";
@@ -73,4 +73,30 @@ test("cloud directory distinguishes a missing migration from failed storage", as
   expect(await store.directory(playerDirectoryQuery({}))).toBeNull();
   query.mockRejectedValueOnce(new StorageError(503, null, "down"));
   await expect(store.directory(playerDirectoryQuery({}))).rejects.toThrow();
+});
+
+test("cloud directory reads last login and the guild's page once 20261126100000 is applied, and leaves them out before", async () => {
+  const query = vi.fn(async (): Promise<unknown> => [{ ...stored, last_login: "2026-11-08T20:00:00Z", guild_slug: "ember-wardens" }]);
+  const store = createCloudArmoryStore(query as never);
+  expect((await store.directory(playerDirectoryQuery({})))?.rows[0]).toMatchObject({ lastLogin: "2026-11-08T20:00:00Z", guildSlug: "ember-wardens" });
+  query.mockResolvedValueOnce([{ ...stored, last_login: null, guild_slug: null }]);
+  expect((await store.directory(playerDirectoryQuery({})))?.rows[0]).toMatchObject({ lastLogin: null, guildSlug: null });
+  // Before the migration the function has no such columns: the row has no such keys, so the page shows what it shows today.
+  query.mockResolvedValueOnce([stored]);
+  const before = (await store.directory(playerDirectoryQuery({})))!.rows[0]!;
+  expect("lastLogin" in before || "guildSlug" in before).toBe(false);
+});
+
+test("memory directory gives a guild's page only for a guild the armory has read and Blizzard has not disbanded", async () => {
+  const store = createMemoryArmoryStore();
+  store.putCharacter(armoryCharacter());
+  store.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", guildSlug: "quill-watch", guildName: "Quill Watch", lastLogin: null }));
+  store.putCharacter(armoryCharacter({ slug: "orna-gone", name: "Orna", guildSlug: "ash-hall", guildName: "Ash Hall" }));
+  store.putGuild(armoryGuild(), []);
+  store.putGuild(armoryGuild({ slug: "ash-hall", name: "DELETED" }), []);
+  const rows = (await store.directory(playerDirectoryQuery({ sort: "name" })))!.rows;
+  expect(rows.map((r) => [r.name, r.guildSlug, r.lastLogin])).toEqual([
+    ["Arla", null, null], ["Orna", null, "2026-11-08T20:00:00.000Z"], ["Velkara", "ember-wardens", "2026-11-08T20:00:00.000Z"],
+  ]);
+  expect(rows[0]).not.toHaveProperty("equipment");
 });

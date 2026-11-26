@@ -5,7 +5,7 @@ import {
 } from "@/lib/screenshots";
 
 /**
- * GET /screenshots?type=<item|quest|npc|spell|zone|instance>&id=<n>: the page's approved screenshots, the same for every
+ * GET /screenshots?type=<item|quest|npc|spell|zone|instance|boss>&id=<n>: the page's approved screenshots, the same for every
  * visitor. It reads no session, so it is cached for five minutes (browser and edge) and the section asks for it without
  * cookies. POST (multipart: type, id, file, confirm=yes): one upload for the signed-in account, re-encoded and kept
  * for review. Part of the site, not the API: left out of the API docs, the MCP server and search engines, and 404
