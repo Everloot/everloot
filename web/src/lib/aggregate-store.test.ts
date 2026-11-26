@@ -151,6 +151,41 @@ test("the stored file reads back as exactly the set the cron worked out, the NPC
   expect(read!.set.disenchant.bands.get(4)?.installs).toBeInstanceOf(Set);
 });
 
+test("the file is parsed without a reviver, and its Maps and Sets come back as a reviver gave them, nested ones included", () => {
+  const text = JSON.stringify({ version: 1, generatedAt: AS_OF, set: { ...JSON.parse(encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF, WITH_ROWS)).set, odd: {
+    nested: { $map: [[1, { $set: [2, 3] }], ["k", { $map: [["in", [{ $set: [] }]]] }]] },
+    inArrays: [[{ $set: ["a"] }], { $map: [] }],
+    notTagged: [{ $map: "no array" }, { $set: [1], other: 1 }, { $map: [], $set: [] }],
+    ["__proto__"]: { $set: [1] },
+  } } });
+  // The reviver this replaced, as the reference.
+  const reviver = (_: string, value: unknown) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    const keys = Object.keys(value);
+    const v = value as Record<string, unknown>;
+    if (keys.length === 1 && keys[0] === "$map" && Array.isArray(v.$map)) return new Map(v.$map as [unknown, unknown][]);
+    if (keys.length === 1 && keys[0] === "$set" && Array.isArray(v.$set)) return new Set(v.$set);
+    return value;
+  };
+  const expected = JSON.parse(text, reviver).set;
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const read = parseAggregates(text);
+    expect(parse.mock.calls.every((call) => call[1] === undefined)).toBe(true);
+    const { addonTrends: _a, ...got } = read!.set as AggregateSet & { odd: unknown };
+    const { addonTrends: _b, ...want } = expected as Record<string, unknown>;
+    expect(got).toEqual(want);
+    const odd = (read!.set as unknown as { odd: Record<string, unknown> }).odd;
+    expect(odd.nested).toEqual(new Map<unknown, unknown>([[1, new Set([2, 3])], ["k", new Map([["in", [new Set()]]])]]));
+    expect(odd.notTagged).toEqual([{ $map: "no array" }, { $set: [1], other: 1 }, { $map: [], $set: [] }]);
+    // A "__proto__" key stays a plain property, as JSON.parse makes it, and sets no prototype.
+    expect(Object.getPrototypeOf(odd)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(odd, "__proto__")?.value).toEqual(new Set([1]));
+  } finally {
+    parse.mockRestore();
+  }
+});
+
 test("a file written before the disenchant tables reads with none, not as no file", () => {
   const good = JSON.parse(encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF));
   const { disenchant: _gone, ...older } = good.set;
