@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { authV2Enabled, withAuth } from "@/lib/auth/auth";
+import { dbReadName, timeRead } from "@/lib/server-timing";
 
 // Battle.net uses our server-side sessions, not Supabase Auth JWTs. The browser
 // receives an opaque cookie; only its hash is stored in the private sessions table.
@@ -36,18 +37,23 @@ export async function authQuery<T>(path: string, init: RequestInit = {}): Promis
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key) throw new Error("Authentication storage is not configured");
-  const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/${path}`, {
-    ...init,
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-    headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...init.headers },
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
-    throw new StorageError(response.status, typeof body?.code === "string" ? body.code : null, typeof body?.message === "string" ? body.message : "");
+  const done = timeRead(dbReadName(path));
+  try {
+    const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/${path}`, {
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+      headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...init.headers },
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+      throw new StorageError(response.status, typeof body?.code === "string" ? body.code : null, typeof body?.message === "string" ? body.message : "");
+    }
+    if (response.status === 204 || new Headers(init.headers).get("prefer")?.includes("return=minimal")) return undefined as T;
+    return await response.json() as T;
+  } finally {
+    done();
   }
-  if (response.status === 204 || new Headers(init.headers).get("prefer")?.includes("return=minimal")) return undefined as T;
-  return await response.json() as T;
 }
 
 async function sessionHash(): Promise<string | null> {
