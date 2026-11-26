@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: faction pages show the eight standings, the parent and sub-factions; title pages say prefix or suffix and show the title on a sample name; quest chain pages draw the chain as numbered steps with agreed levels, start NPC and zone, and the three lists gain those columns (#1566).
+- Site: hover cards now lead with what each page leads with: an NPC's level, rank, type, reaction and zone; a quest's level, side, type, category and zone; a spell's rank, cost, range, cast time and cooldown; a zone's territory and creature levels; an achievement's category, side and icon; an object's kind, zones and players' skill (#1568).
+- Site: Armory guild rosters show the rank names a guild's officers published, class icons, a sort menu that works on phones, an "At 60 / Below 60" level filter and a level-spread bar above the roster (#1570).
 - Site: object pages show the type, the skill players had, the zone and what the object contains; vendor pages show the NPC, reaction, zone, items sold and a full Sells table (#1560).
 - Site: class pages are class hubs: talent trees, weapon and armour types by level, a spells-by-level page and links to the class's armory board (#1562).
 - Site: /search opens on the best match, groups results by type with "See all", colours names and helps when nothing matches (#1563).
@@ -318,6 +321,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: armory character pages load faster: they no longer load the whole game-file item layer to name an equipped item's type and slot (#1567).
+- Site: pages load faster on a fresh server: the item lists, search, home page and database hub no longer load the whole game-file layer, and pages without a signed-in session no longer load the sign-in library (#1569).
+- Site: auction house pages use less server time, mostly in the minutes after new prices arrive (#1571).
 - Site: achievements no longer list the game files' development rows, points read "1 point", and the category overview folds on phones (#1558).
 - Site: armory character and guild pages send a Server-Timing header with each read's duration, and start every address-keyed read with the first one (#1559, #1561).
 - Site: the character overview puts the Blizzard credit under the facts strip and stacks the specs and professions, so no empty band or blank area is left (#1547).
