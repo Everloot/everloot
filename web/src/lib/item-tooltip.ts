@@ -27,6 +27,8 @@ export interface ItemTooltip {
    * each number's installs, date and build behind it; absent when no number is reported.
    */
   evidence?: { summary: string; lines: string[] };
+  /** One muted line where the files were read and hold no record for a shown item, so a thin box is not taken for a broken one. */
+  missing?: string;
   foot: string | null;
 }
 
@@ -55,6 +57,11 @@ export interface ItemTooltipInput {
   set?: TooltipSet | null;
   /** A spell's page, for the Use, Equip and Chance on hit lines; undefined where the spell has none. */
   spellHref?: (spellId: number) => string | undefined;
+  /**
+   * The build whose item files were read and hold no record for this item, where the caller may show its tooltip;
+   * undefined where the files were not read or the tooltip is gated, so the box claims nothing about them.
+   */
+  filesLack?: string;
 }
 
 const SET_LINE = /^Set: (.+)$/;
@@ -103,7 +110,7 @@ export function reportSummary(reported: readonly ReportedLine[]): string {
  * The card, and the lines that open a page (the set's name, its pieces) by the line's text: the page box links them,
  * the hover card takes no pointer and leaves them out.
  */
-export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, spellHref }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
+export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, spellHref, filesLack }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
   const { reasons, evidence } = splitWhy(tip?.why ?? []);
   let links: Record<string, string> = {};
   const lines: string[] = [];
@@ -144,6 +151,7 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, 
       lines,
       ...(notes ? { notes } : {}),
       ...(reported.length ? { evidence: { summary: reportSummary(reported), lines: reported.map((r) => r.detail) } } : {}),
+      ...(!tip && filesLack ? { missing: `The game files read so far carry no stats for this item (build ${filesLack})` } : {}),
       foot,
     },
     links,
