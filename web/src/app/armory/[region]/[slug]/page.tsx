@@ -150,9 +150,9 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
-        <DungeonRaidSlot progress={progression.summary} href="#progress" />
-
         <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} ranks={gearRanks} />} />
+
+        <DungeonRaidSlot data={progression.dungeons} href="#progress" />
 
         {seen && <AddonSighting seen={seen} />}
 

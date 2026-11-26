@@ -134,11 +134,14 @@ describe("the character page", () => {
     expect(header).toContain('href="/armory/eu/guilds/ember-wardens"');
   });
 
-  test("the dungeon and raid section has its own named slot, holding today's progress line until its component lands", async () => {
+  test("the dungeons and raids section has its own named slot, below the gear sheet and above the tabs", async () => {
     const out = await html(pages.character("eu", "velkara-duskmantle"));
-    const slot = out.slice(out.indexOf('data-slot="dungeon-raid-progress"'));
+    const at = (s: string) => out.indexOf(s);
+    const slot = out.slice(at('data-slot="dungeon-raid-progress"'));
     expect(out).toContain('data-slot="dungeon-raid-progress"');
-    expect(slot).toContain("Dungeon progress");
+    expect(slot).toContain("data-dungeons-raids");
+    expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('data-slot="dungeon-raid-progress"'));
+    expect(at('data-slot="dungeon-raid-progress"')).toBeLessThan(at('role="tablist"'));
   });
 
   test("the addon's sighting fills in when the old address would redirect here: the day it was last seen and the guild it saw", async () => {
@@ -340,4 +343,14 @@ test("classification filters reach storage, preserve each other in links and lin
   expect(out).toContain('text-class-hunter');
   await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("a character page shows its dungeons and raids where the dungeon progress line was, linked to the full checklist", async () => {
+  const out = await html(pages.character("eu", "velkara-duskmantle"));
+  const section = out.split('aria-labelledby="dungeons-raids"')[1]?.split("</section>")[0] ?? "";
+  expect(section).toContain("Dungeons &amp; raids");
+  expect(section).toContain('href="#progress"');
+  // No storage in this test: no synced history is unknown, never 0 cleared.
+  expect(section).toContain("No boss kills are synced for this character");
+  expect(out.indexOf('aria-labelledby="dungeons-raids"')).toBeLessThan(out.indexOf('id="progress"'));
 });

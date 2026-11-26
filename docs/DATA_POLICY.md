@@ -1030,6 +1030,21 @@ The feed respects the existing linked-character and hide rules. Desktop replaces
 refresh. The addon suppresses a snapshot when it reaches its two-hour expiry. It leaves the tooltip alone when the
 game cannot confirm the player's name or realm. The snapshot download sends realm names and page offsets.
 
+## Dungeon and raid clears
+
+*Proposed 25 November 2026, in the pull request that adds it (the maintainer review).* The public boss-kill history above
+is also shown as clears. Nothing new is collected. A linked character's armory page lists each instance it has a kill in,
+with every boss the game files list there, killed or not, and for each boss killed its lifetime kill count (summed across
+difficulties) and its first and last kill day. The history already held the counts and first kills; the pages did not
+show them before. A clear is a kill of every listed boss, dated by the day the last of them first fell.
+
+An instance's database page shows counts only, from up to the 500 linked characters with the newest kills there: how
+many have a kill, how many have killed every boss, and each boss's characters and kills. It names no one. The names of
+the characters who cleared it are listed only on `/armory/clears/<instance>`, an armory page with the armory's rules:
+read on every request, ad-free and out of search engines. Hiding a character removes it from that list and the
+character page at once, and from the database page's counts once that page's shared copy expires (an hour). Weekly raid
+lockouts are not part of these views; they stay in the owner-published Raids section.
+
 ## Gear rankings
 
 In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration

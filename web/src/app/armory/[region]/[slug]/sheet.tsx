@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Card, type Fact } from "@/components/ui";
-import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
+import DungeonsAndRaids from "@/components/progress/DungeonsAndRaids";
+import type { DungeonsAndRaidsData } from "@/lib/dungeon-clears";
 import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import { guildPath, guildsOn } from "@/lib/guilds";
@@ -42,11 +43,11 @@ export function SheetSummary({ character: c, ranks }: { character: ArmoryCharact
 }
 
 /**
- * The character's dungeon and raid progress. Lane D's component takes this slot; until it lands, today's one-line
- * summary stands here.
+ * The character's dungeons and raids (components/progress/DungeonsAndRaids): synced boss kills per instance, below the
+ * gear sheet so the sheet stays the first thing on the page.
  */
-export function DungeonRaidSlot({ progress, href }: { progress: { cleared: number; total: number } | null; href: string }) {
-  return <div data-slot="dungeon-raid-progress"><DungeonProgressSummary progress={progress} href={href} /></div>;
+export function DungeonRaidSlot({ data, href }: { data: DungeonsAndRaidsData; href: string }) {
+  return <div data-slot="dungeon-raid-progress"><DungeonsAndRaids data={data} href={href} /></div>;
 }
 
 /**
