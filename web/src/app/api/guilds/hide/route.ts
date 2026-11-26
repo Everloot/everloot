@@ -37,5 +37,7 @@ export async function POST(req: Request) {
   revalidatePath(GUILDS_PATH);
   revalidatePath(guildPath(realm, guild));
   revalidatePath(realmPath(realm));
+  // The landing page's ladder panel lists guilds too; its read carries the search tag, and the page is redrawn.
+  revalidatePath("/");
   return back(req, "done=1");
 }
