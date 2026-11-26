@@ -36,3 +36,11 @@ test("a name the calculator does not know keeps Blizzard's list and says which",
   expect(html).not.toContain("role=\"group\"");
   expect(html).toContain('href="/tools/talents/warlock"');
 });
+
+test("the fallback list sets only the numbers in mono; 'points' and 'Rank' stay in the text font", () => {
+  const trees = [{ name: "Demonology", points: 6, talents: [{ name: "Made-up Talent", rank: 1 }] }];
+  const html = renderToStaticMarkup(<TalentTrees character={armoryCharacter({ class: "Warlock", classId: 9 })} trees={trees} open />);
+  expect(html).toMatch(/<span class="font-mono tabular-nums">6<\/span> points/);
+  expect(html).toMatch(/Rank <span class="font-mono tabular-nums">1<\/span>/);
+  expect(html).not.toMatch(/class="[^"]*font-mono[^"]*">(?:\d+ points|Rank \d)/);
+});
