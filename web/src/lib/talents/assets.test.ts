@@ -127,8 +127,11 @@ const SHOWS_ART = new Set([
   // An item set page: its pieces' names and icons under the item name rule, and the set and bonus spell names and
   // icons, as the item and spell pages show them. The set list reads the set names only, no art.
   "web/src/app/database/item-sets/[id]/page.tsx", "web/src/app/database/item-sets/page.tsx",
-  // The spell page: the spell's icon and its text come from the same manifest as the item's.
-  "web/src/app/database/spells/[id]/page.tsx",
+  // The spell page: the spell's icon and its text come from the same manifest as the item's (read in load-spell.ts,
+  // which the page's text-only social card shares for the name and the 404).
+  "web/src/app/database/spells/[id]/page.tsx", "web/src/app/database/spells/[id]/load-spell.ts",
+  // The item set page's social card reads the set names under the page's rule. Text only, no art.
+  "web/src/app/database/item-sets/[id]/opengraph-image.tsx",
   // The mount, companion pet and currency pages: their icon, by id, from the same manifest.
   "web/src/app/database/mounts/[id]/page.tsx", "web/src/app/database/pets/[id]/page.tsx", "web/src/app/database/currencies/[id]/page.tsx",
   // The hunter pet family list and pages: the family icons and the icons and names of the spells on its skill line.

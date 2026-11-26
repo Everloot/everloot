@@ -161,7 +161,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         <EntitySidebar>
           <ModelPicture picture={picture} name={title} />
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
+          <OpenData report={{ type: "NPC", id: npcId, path: `/database/npcs/${npcId}` }}
             text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
             jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
           />

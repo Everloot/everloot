@@ -6,7 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { hasCard } from "@/lib/tooltip";
-import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "@kb/object-page";
+import { objectPage, type ObjectDrop } from "@kb/object-page";
 import { pendingLine } from "@kb/pending-loot";
 import { objectIndexable } from "@/lib/indexable";
 import { entityTitle, objectDescription } from "@/lib/entity-meta";
@@ -19,12 +19,9 @@ import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, typ
 import type { Crumb } from "@/lib/jsonld";
 import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
+import { unknownObject } from "../../unknown";
 
 export const dynamic = "force-dynamic";
-
-/** An object no loot window or minimap sighting came from, public or not: a 404 (uploads are the only list of objects). */
-const unknownObject = (page: ObjectFactsPage, facts: ObjectFacts, unreachable: boolean) => !unreachable && !page.drops.length && !page.zero && !page.queued
-  && !page.pendingLoot && !(facts.sightings ?? []).some((r) => r.objectId === page.objectId);
 
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const params = await props.params;
@@ -35,7 +32,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const windows = facts.unreachable ? null : page.zero?.kills ?? page.drops[0]?.kills ?? null;
   const name = !facts.unreachable && page.name ? page.name : `Object ${params.id}`;
   return {
-    ...pageMetadata({ title: entityTitle(name, "object"), description: objectDescription({ name, id: page.objectId, items: facts.unreachable ? 0 : page.drops.length, windows }), path: `/database/objects/${params.id}` }),
+    ...pageMetadata({ title: entityTitle(name, "object"), description: objectDescription({ name, id: page.objectId, items: facts.unreachable ? 0 : page.drops.length, windows }), path: `/database/objects/${params.id}`, image: `${`/database/objects/${params.id}`}/opengraph-image` }),
     robots: { index: objectIndexable(page, facts.unreachable), follow: true },
   };
 }
@@ -98,7 +95,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         />
         <EntitySidebar>
           <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-          <OpenData
+          <OpenData report={{ type: "Object", id: page.objectId, path: `/database/objects/${page.objectId}` }}
             text={[`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n")}
             jsonHref={!facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined}
           />

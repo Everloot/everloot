@@ -48,7 +48,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const criteria = entry?.criteria ? "reported criteria" : files?.criteria.length ? "the criteria from the game files" : "criteria count";
   return {
-    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
+    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name), image: `${achievementHref(id!, name)}/opengraph-image` }),
     robots: { index: true, follow: true },
   };
 }
@@ -132,7 +132,7 @@ export default async function AchievementPage(props: Props) {
         {summary.length > 0 && (
           <>
             <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${title} (achievement ${id})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+            <OpenData report={{ type: "Achievement", id, path: canonical }} text={[`${title} (achievement ${id})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
           </>
         )}
         {fileCriteria.length > 0 && (

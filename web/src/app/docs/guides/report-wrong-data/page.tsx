@@ -30,6 +30,8 @@ export default function Page() {
       <H2 id="send">Where the report goes</H2>
       <P>
         Use the <a href="https://github.com/Everloot/everloot/issues/new?template=wrong-data.yml" className={docLink}>Wrong data issue form</a>.
+        Every database page has a Report wrong data link under its summary that opens the form with the page, its type, its
+        id and the game build already filled in.
         GitHub issues are public. Keep private information out of them; use <Link href="/contact" className={docLink}>contact</Link> for anything private.
       </P>
       <H2 id="next">What happens next</H2>
