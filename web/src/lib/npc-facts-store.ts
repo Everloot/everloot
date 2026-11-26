@@ -1,6 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { agreedNpcsOf, NPC_RANKS, NPC_REACTIONS, type AgreedNpc } from "@kb/world-pages";
 import type { AggregateSet } from "./aggregate-set";
+import { asciiJsonText } from "./ascii-json";
 import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import type { R2Config } from "./upload-store";
@@ -105,7 +106,8 @@ const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ clo
     const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) } }));
     if (res.status === 304 && kept?.value.file) return { value: kept.value };
     if (res.ok) {
-      const file = parseNpcFacts(await res.text());
+      // ASCII text (ascii-json.ts): the names reported in other alphabets would make `res.text()` two bytes a character.
+      const file = parseNpcFacts(await asciiJsonText(res));
       return file ? { value: { file, etag: res.headers.get("etag") ?? undefined } } : { value: { file: null }, ...retry };
     }
     return kept?.value.file && res.status !== 404 ? { value: kept.value, ...retry } : { value: { file: null }, ...retry };

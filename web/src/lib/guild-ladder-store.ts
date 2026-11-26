@@ -6,6 +6,7 @@ import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
 import { sharingStore, uploadStore, type R2Config } from "./upload-store";
 import { STAMP, stampOf } from "./stored-view-freshness";
 import { keep } from "./kept";
+import { reviveMapsAndSets } from "./revive-json";
 
 export const GUILD_LADDER_KEY = "snapshots/guild-ladder.json";
 const AUTHORITY = "x-amz-meta-authority";
@@ -34,13 +35,8 @@ function encode(set: StoredGuildLadder): string {
 }
 function parse(text: string): StoredGuildLadder | null {
   try {
-    const raw = JSON.parse(text, (_, value) => {
-      if (value && typeof value === "object" && Object.keys(value).length === 1) {
-        if (Array.isArray(value.$map)) return new Map(value.$map);
-        if (Array.isArray(value.$set)) return new Set(value.$set);
-      }
-      return value;
-    });
+    // No reviver: it makes V8 keep each value's source text while parsing (revive-json.ts).
+    const raw = reviveMapsAndSets(JSON.parse(text)) as ReturnType<typeof JSON.parse>;
     const s = raw?.set;
     const r = s?.rollup;
     if (raw?.version !== 1 || !(s.dataAsOf === null || typeof s.dataAsOf === "string") || typeof s.authority !== "string" ||

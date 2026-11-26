@@ -1,5 +1,7 @@
 import { AwsClient } from "aws4fetch";
+import { asciiJsonText } from "./ascii-json";
 import { keep } from "./kept";
+import { reviveMapsAndSets } from "./revive-json";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { derivedSteps, pathFactsFromRecords } from "@kb/recipe-thresholds";
 import { objectSpawnRowsFromRecords } from "@kb/object-spawns";
@@ -42,8 +44,8 @@ const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) 
 /** Unknown or unreadable files fall back to the corpus. A `derived` list in an older file is ignored and worked out again. */
 export function parseProfessions(text: string): { generatedAt: string; set: ProfessionsView } | null {
   try {
-    const raw: unknown = JSON.parse(text, (_, value: unknown) =>
-      isObject(value) && Object.keys(value).length === 1 && Array.isArray(value.$map) ? new Map(value.$map as [unknown, unknown][]) : value);
+    // No reviver (revive-json.ts); the file holds Maps only, so a `{"$set": [...]}` stays as written.
+    const raw = reviveMapsAndSets(JSON.parse(text), false);
     if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
     const s = raw.set;
     if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !(arrays(s.facts, "sightings", "prices", "observations", "trainers") && isObject(s.facts) && s.facts.vendorPrices instanceof Map && Array.isArray(s.sightings))) return null;
@@ -92,7 +94,8 @@ const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ clo
     }));
     if (res.status === 304 && kept?.value.set) return { value: kept.value };
     if (res.ok) {
-      const read = parseProfessions(await res.text());
+      // ASCII text (ascii-json.ts): the file's few non-Latin-1 characters would make `res.text()` two bytes a character.
+      const read = parseProfessions(await asciiJsonText(res));
       const same = read && kept?.value.set && kept.value.generatedAt === read.generatedAt;
       return read
         ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined } }

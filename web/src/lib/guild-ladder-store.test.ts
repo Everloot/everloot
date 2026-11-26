@@ -80,3 +80,37 @@ test("missing or malformed files return no stored ladder; failed publication nev
   stores.loadCorpus.mockResolvedValue({ records: [], uploads: 0, unreachable: true });
   await expect(write()).rejects.toThrow("corpus unreachable");
 });
+
+test("the file is parsed without a reviver, and its Maps and Sets come back as the reviver gave them, nested ones and a \"__proto__\" key included", async () => {
+  await write();
+  const file = JSON.parse(body);
+  file.set.rollup.odd = {
+    nested: { $map: [[1, { $set: [2, 3] }], ["k", { $map: [["in", [{ $set: [] }]]] }]] },
+    notTagged: [{ $map: "no array" }, { $set: [1], other: 1 }, { $map: [], $set: [] }],
+    ["__proto__"]: { $set: [1] },
+  };
+  body = JSON.stringify(file);
+  // The reviver this replaced, as the reference.
+  const reviver = (_: string, value: unknown) => {
+    const v = value as Record<string, unknown>;
+    if (v && typeof v === "object" && Object.keys(v).length === 1) {
+      if (Array.isArray(v.$map)) return new Map(v.$map as [unknown, unknown][]);
+      if (Array.isArray(v.$set)) return new Set(v.$set);
+    }
+    return value;
+  };
+  const expected = JSON.parse(body, reviver).set;
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const stored = await read();
+    expect(parse.mock.calls.every((call) => call[1] === undefined)).toBe(true);
+    expect(stored).toEqual(expected);
+    const odd = (stored!.rollup as unknown as { odd: Record<string, unknown> }).odd;
+    expect(odd.nested).toEqual(new Map<unknown, unknown>([[1, new Set([2, 3])], ["k", new Map([["in", [new Set()]]])]]));
+    expect(odd.notTagged).toEqual([{ $map: "no array" }, { $set: [1], other: 1 }, { $map: [], $set: [] }]);
+    expect(Object.getPrototypeOf(odd)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(odd, "__proto__")?.value).toEqual(new Set([1]));
+  } finally {
+    parse.mockRestore();
+  }
+});

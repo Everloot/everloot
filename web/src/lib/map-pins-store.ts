@@ -1,5 +1,6 @@
 import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "@kb/map-bounds";
 import { AwsClient } from "aws4fetch";
+import { asciiJsonText } from "./ascii-json";
 import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -99,7 +100,8 @@ const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ clo
     }));
     if (res.status === 304 && kept?.value.set) return { value: kept.value };
     if (res.ok) {
-      const read = parseMapPins(await res.text());
+      // ASCII text (ascii-json.ts): the file's few non-Latin-1 characters would make `res.text()` two bytes a character.
+      const read = parseMapPins(await asciiJsonText(res));
       const same = read && kept?.value.set && kept.value.generatedAt === read.generatedAt;
       return read
         ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined } }

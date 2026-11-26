@@ -97,3 +97,45 @@ test("the file holds the reported rows only; the derived steps come from the bui
   old.set.facts.derived = [{ profession: "Alchemy", recipe: "Stale Step", skillMin: 1, skillMax: 2, points: 1, reagents: [], reporters: 3, trainingCopper: null }];
   expect(parseProfessions(JSON.stringify(old))?.set.facts.derived).toEqual(set.facts.derived);
 });
+
+test("the file is parsed without a reviver, and its Maps come back as the reviver gave them, nested ones and a \"__proto__\" key included", () => {
+  const good = JSON.parse(encodeProfessions(buildProfessions(corpus), asOf));
+  const text = JSON.stringify({ ...good, set: { ...good.set, odd: {
+    nested: { $map: [[1, { $map: [["in", [{ $map: [] }]]] }]] },
+    notTagged: [{ $map: "no array" }, { $set: [1] }, { $map: [], other: 1 }],
+    ["__proto__"]: { $map: [[1, 2]] },
+  } } });
+  // The reviver this replaced, as the reference: Maps only, as the file is written with Maps only.
+  const reviver = (_: string, value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value) &&
+    Object.keys(value).length === 1 && Array.isArray((value as { $map?: unknown }).$map) ? new Map((value as { $map: [unknown, unknown][] }).$map) : value;
+  const expected = JSON.parse(text, reviver).set;
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const read = parseProfessions(text);
+    expect(parse.mock.calls.every((call) => call[1] === undefined)).toBe(true);
+    const { derived: _derived, ...facts } = read!.set.facts;
+    expect({ ...read!.set, facts }).toEqual(expected);
+    const odd = (read!.set as unknown as { odd: Record<string, unknown> }).odd;
+    expect(odd.nested).toEqual(new Map<unknown, unknown>([[1, new Map([["in", [new Map()]]])]]));
+    expect(odd.notTagged).toEqual([{ $map: "no array" }, { $set: [1] }, { $map: [], other: 1 }]);
+    expect(Object.getPrototypeOf(odd)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(odd, "__proto__")?.value).toEqual(new Map([[1, 2]]));
+  } finally {
+    parse.mockRestore();
+  }
+});
+
+test("a file with characters past U+00FF is parsed from one-byte ASCII text, to the same value", async () => {
+  const good = JSON.parse(encodeProfessions(buildProfessions(corpus), asOf));
+  const note = "страж смерти “Оливер”";
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const read = await loadStoredProfessions({ cloud, fetch: async () => new Response(JSON.stringify({ ...good, set: { ...good.set, note } })), now: () => 0 });
+    const texts = parse.mock.calls.map((call) => call[0]).filter((t) => typeof t === "string" && t.includes("generatedAt"));
+    expect(texts).toHaveLength(1);
+    expect([...texts[0]].every((c) => c.charCodeAt(0) < 0x80)).toBe(true);
+    expect((read as unknown as { note: string }).note).toBe(note);
+  } finally {
+    parse.mockRestore();
+  }
+});

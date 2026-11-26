@@ -79,3 +79,20 @@ test("a page reads the stored table once and keeps it; with no file it gets null
   forgetStoredNpcFacts();
   expect(await loadStoredNpcFacts({ cloud: null })).toBeNull();
 });
+
+test("a file with characters past U+00FF is parsed from one-byte ASCII text, to the same table", async () => {
+  const file = buildNpcFacts(set);
+  file.npcs[2] = { ...file.npcs[2], reportedName: "страж смерти “Оливер”" };
+  const { fetch } = bucket({ body: JSON.stringify(file), stamp: stampOf(AS_OF, NPC_FACTS_REVISION) });
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const read = await loadStoredNpcFacts({ cloud, fetch, now: () => 0 });
+    const texts = parse.mock.calls.map((call) => call[0]).filter((t) => typeof t === "string" && t.includes("npcs"));
+    expect(texts).toHaveLength(1);
+    expect([...texts[0]].every((c) => c.charCodeAt(0) < 0x80)).toBe(true);
+    expect(read).toEqual(parseNpcFacts(JSON.stringify(file)));
+    expect(read!.npcs.get(9)?.reportedName).toBe("страж смерти “Оливер”");
+  } finally {
+    parse.mockRestore();
+  }
+});
