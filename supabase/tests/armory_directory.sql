@@ -52,4 +52,35 @@ do $$
 begin
   if (select slug from public.armory_directory('Él',null,null,null,null,null,null,null,null,'name',25,0)) is distinct from 'elara-brun' then raise exception 'accented prefix'; end if;
 end $$;
+-- Last login, and the guild's own page when the armory has read that guild (20261126100000). A guild hidden through
+-- /guilds/hide in that region, or one Blizzard calls disbanded, gives no page; the name stays as before.
+update public.armory_characters set last_login='2026-11-09 20:00+00' where region='eu' and slug='velkara-mire';
+update public.armory_characters set guild_slug='ember-wardens' where region='eu' and slug in ('velkara-mire','hidden-quill');
+update public.armory_characters set guild_slug='quill-watch' where region='us' and slug='arla-quill';
+insert into public.armory_characters(region,slug,character_id,name,surname,level,ruleset_id,ruleset,race_id,race,class_id,class,faction,guild_slug,guild_name,fetched_at,checked_at)
+values ('eu','orna-gone',6,'Orna','Gone',60,2,'Normal',8,'Troll',3,'Hunter','Horde','ash-hall','Ash Hall','2026-11-10','2026-11-10'),
+       ('eu','tavi-unread',7,'Tavi','Unread',60,2,'Normal',8,'Troll',3,'Hunter','Horde','never-read','Never Read','2026-11-10','2026-11-10');
+insert into public.armory_guilds(region,slug,guild_id,name,faction,ruleset_id,ruleset,fetched_at,checked_at) values
+ ('eu','ember-wardens',70,'Ember Wardens','Horde',2,'Normal','2026-11-10','2026-11-10'),
+ ('us','quill-watch',71,'Quill Watch','Alliance',1,'PvP','2026-11-10','2026-11-10'),
+ ('eu','ash-hall',72,'DELETED','Horde',2,'Normal','2026-11-10','2026-11-10');
+insert into public.guild_suppressions(realm_key,guild_key) values('camwow us1 realm 4 pvp','quill watch');
+do $$
+declare r record;
+begin
+  select * into r from public.armory_directory('Velkara',null,null,null,null,null,null,null,null,'name',25,0);
+  if r.last_login is distinct from '2026-11-09 20:00+00'::timestamptz or r.guild_slug is distinct from 'ember-wardens' or r.guild_name<>'Ember Wardens'
+    then raise exception 'last login and guild page %',r; end if;
+  select * into r from public.armory_directory('Brin',null,null,null,null,null,null,null,null,'name',25,0);
+  if r.last_login is not null or r.guild_slug is not null then raise exception 'no guild, never logged in %',r; end if;
+  select * into r from public.armory_directory('Arla',null,null,null,null,null,null,null,null,'name',25,0);
+  if r.guild_slug is not null or r.guild_name<>'Quill Watch' then raise exception 'hidden guild gives no page %',r; end if;
+  select * into r from public.armory_directory('Orna',null,null,null,null,null,null,null,null,'name',25,0);
+  if r.guild_slug is not null or r.guild_name<>'Ash Hall' then raise exception 'disbanded guild gives no page %',r; end if;
+  select * into r from public.armory_directory('Tavi',null,null,null,null,null,null,null,null,'name',25,0);
+  if r.guild_slug is not null or r.guild_name<>'Never Read' then raise exception 'unread guild gives no page %',r; end if;
+  if exists(select 1 from public.armory_directory('Hidden',null,null,null,null,null,null,null,null,'name',25,0)) then raise exception 'hidden character'; end if;
+  if (select count(*) from public.armory_directory(null,null,null,null,null,null,null,null,null,'name',100,0))<>6
+    or (select max(total) from public.armory_directory(null,null,null,null,null,null,null,null,null,'name',100,0))<>6 then raise exception 'one row a character'; end if;
+end $$;
 rollback;

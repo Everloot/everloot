@@ -38,7 +38,7 @@ test("site only: nothing but the screenshot routes, the moderation page and this
   expect(readers.filter((f) => !allowed.has(f))).toEqual([]);
 });
 
-test("the item, quest, NPC, spell, zone and instance pages each render it with their type, id and shown name, before the comments", () => {
+test("the item, quest, NPC, spell, zone, instance and boss pages each render it with their type, id and shown name, before the comments", () => {
   const pages: Array<[string, string, string]> = [
     ["../../app/database/items/[id]/page.tsx", '<EntityScreenshots type="item" id={itemId} name={title} />', '<EntityComments type="item"'],
     ["../../app/database/quests/[id]/page.tsx", '<EntityScreenshots type="quest" id={page.questId} name={title} />', '<EntityComments type="quest"'],
@@ -46,6 +46,7 @@ test("the item, quest, NPC, spell, zone and instance pages each render it with t
     ["../../app/database/spells/[id]/page.tsx", '<EntityScreenshots type="spell" id={spellId} name={title} />', '<EntityComments type="spell"'],
     ["../../app/database/zones/[zone]/page.tsx", '<EntityScreenshots type="zone" id={zone.mapId} name={zone.name} />', '<EntityComments type="zone"'],
     ["../../app/database/instances/[instance]/page.tsx", '<EntityScreenshots type="instance" id={row.instanceMapId} name={title} />', '<EntityComments type="instance"'],
+    ["../../app/database/bosses/[boss]/page.tsx", '<EntityScreenshots type="boss" id={boss.id} name={title} />', '<EntityComments type="boss"'],
   ];
   for (const [path, line, comments] of pages) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");

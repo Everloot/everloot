@@ -1,7 +1,10 @@
 # Comments on entity pages: migration and activation
 
-Comments at the bottom of the item, quest, NPC, spell, zone and instance pages, and the moderation page `/ops/comments`,
-need one additive migration, `supabase/migrations/20261125130000_entity_comments.sql`, and then `EVERLOOT_COMMENTS=1`.
+Comments at the bottom of the item, quest, NPC, spell, zone, instance and boss pages, and the moderation page
+`/ops/comments`, need one additive migration, `supabase/migrations/20261125130000_entity_comments.sql`, then
+`supabase/migrations/20261126100000_directory_login_boss_pages.sql` again after it (it adds boss pages to the types the
+table and `post_entity_comment` accept, and skips that part while the comments table is missing), and then
+`EVERLOOT_COMMENTS=1`.
 The switch needs `EVERLOOT_PROFILES=1` as well, since a comment names its author by profile handle. Rules for players:
 `docs/DATA_POLICY.md` ("Comments") and `/terms#comments`. Owner decisions of 2026-11-25: any signed-in account posts,
 comments show at once, players report, the owner and the moderators hide; site only.
@@ -18,7 +21,7 @@ The owner applies the migration. Nothing in this repository applies it.
 
 ## What the switch turns on
 
-- Each of the six pages renders an empty Comments section. The browser fills it from `GET /comments?type=&id=`, which
+- Each of the seven pages renders an empty Comments section. The browser fills it from `GET /comments?type=&id=`, which
   answers `Cache-Control: private, no-store` and `X-Robots-Tag: noindex`, so the cached page carries no comment and no
   session. Signed out, the section reads and offers sign-in; signed in without a handle, it links `/settings`.
 - `POST /comments` posts, edits, deletes and reports, for the session's account. Writes need this site's `Origin`, and
@@ -89,6 +92,9 @@ set local statement_timeout = '60s';
 commit;
 ```
 
+Then run `supabase/migrations/20261126100000_directory_login_boss_pages.sql` once more, unchanged, on its own (it has
+its own `begin`/`commit`; safe twice). Without it a boss page's section loads but every post is refused.
+
 ## Postflight (read-only)
 
 Every row must be `t`; anything else means leave the switch off and find out why.
@@ -121,7 +127,11 @@ select check_name, ok from (values
          'comment_moderation_queue'))),
   ('a deleted comment stays deleted: the trigger is on',
     exists (select 1 from pg_trigger where tgrelid = 'public.entity_comments'::regclass
-      and tgname = 'entity_comments_stay_deleted' and tgenabled = 'O'))
+      and tgname = 'entity_comments_stay_deleted' and tgenabled = 'O')),
+  ('boss pages are accepted (20261126100000 run after this)',
+    pg_get_constraintdef((select oid from pg_constraint where conrelid = 'public.entity_comments'::regclass
+      and conname = 'entity_comments_entity_type_check')) like '%''boss''%'
+    and pg_get_functiondef('public.post_entity_comment(uuid,text,integer,text)'::regprocedure) like '%''instance'', ''boss'')%')
 ) as checks(check_name, ok);
 ```
 

@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
 import { CENSUS_CLASSES, CENSUS_RACES } from "@kb/census";
 import {
-  ARMORY_HIDE_PATH, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryNameQuery, armoryOn,
+  ARMORY_HIDE_PATH, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn,
   classTokenOfName, metricValue, regionLabel,
 } from "@/lib/armory";
-import { armoryStore, type ArmoryBoardRow, type ArmoryDirectoryRow } from "@/lib/armory-store";
+import { armoryStore, type ArmoryBoardRow, type ArmoryDirectoryRow, type ArmoryHit } from "@/lib/armory-store";
 import {
   activeDirectoryFilters, levelBandOf, PLAYER_LEVEL_BANDS, PLAYER_SORTS, playerDirectoryQuery, playerDirectoryHref, type PlayerDirectoryQuery, type PlayerSearchParams,
 } from "@/lib/armory-directory";
@@ -39,7 +39,8 @@ const LIMIT = 25;
 /** How many of the latest reads the page offers before a search. */
 const RECENT = 10;
 
-type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number | null; fetchedAt?: string };
+/** `guildPath` and `lastLogin` come with 20261126100000; before it the row has neither. */
+type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number | null; fetchedAt?: string; guildPath?: string; lastLogin?: string | null };
 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
 const day = (iso: string | undefined | null) => <span className="font-mono tabular-nums">{iso?.slice(0, 10) ?? ""}</span>;
@@ -63,28 +64,38 @@ const SORT_OF_COLUMN: Record<string, (typeof PLAYER_SORTS)[number]> = Object.fro
 );
 
 /**
- * The table's columns. `guildHref` makes a guild a link to that guild's members in this list; addon sightings carry
- * no gear and no Blizzard guild, so their table leaves those out.
+ * The table's columns. A guild links its own armory page when the row gives one, else `guildHref` makes it a link to
+ * that guild's members in this list; addon sightings carry no gear and no Blizzard guild, so their table leaves those
+ * out. `login` adds the last login, once the directory gives it.
  */
-function columns(guildHref: ((guild: string) => string) | null): Column<DirectoryRow>[] {
+function columns(guildHref: ((guild: string) => string) | null, login = false): Column<DirectoryRow>[] {
   const all: (Column<DirectoryRow> & { armory?: true })[] = [
     { key: "name", header: "Name", sortable: true, cell: (r) => <NameCell row={r} /> },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => r.level },
     { key: "who", header: "Race and class", nowrap: true, cell: (r) => `${raceName(r.race)} ${className(r.classToken)}` },
     {
       key: "guild", header: "Guild",
-      cell: (r) => r.guild === null ? muted("None seen") : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
+      cell: (r) => r.guild === null ? muted("None seen")
+        : r.guildPath ? <Link href={r.guildPath} className={link}>{r.guild}</Link>
+        : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
     },
     { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted("Not read") : metricValue("item-level", r.itemLevel) },
     { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted("Not read") : metricValue("gear-score", r.gearScore) },
     { key: "realm", header: "Realm", nowrap: true, cell: (r) => r.where },
+    ...(login ? [{ key: "login", header: "Last login", numeric: true, armory: true as const, cell: (r: DirectoryRow) => r.lastLogin ? day(r.lastLogin) : muted("Not given") }] : []),
     { key: "seen", header: guildHref ? "Last read" : "Last seen", numeric: true, sortable: true, cell: (r) => day(r.fetchedAt ?? r.lastSeen) },
   ];
   return guildHref ? all : all.filter((c) => !c.armory).map((c) => ({ ...c, sortable: false }));
 }
 
+/** The guild's page and last login a directory row carries once 20261126100000 is applied; nothing before it. */
+function directoryExtras(h: ArmoryHit): Pick<DirectoryRow, "guildPath" | "lastLogin"> {
+  const { guildSlug, lastLogin } = h as Partial<ArmoryDirectoryRow>;
+  return { ...(guildSlug && { guildPath: armoryGuildPath(h.region, guildSlug) }), ...(lastLogin !== undefined && { lastLogin }) };
+}
+
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${r.where} · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${r.where} · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastLogin ? ` · Login ${r.lastLogin.slice(0, 10)}` : ""}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -230,7 +241,8 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
   const rows: DirectoryRow[] = armory ? hits.map((h) => ({ ...byKey.get(`armory/${h.region}/${h.slug}`)!,
     gearScore: "gearScore" in h ? (h as ArmoryDirectoryRow).gearScore : null,
     itemLevel: "itemLevel" in h ? (h as ArmoryDirectoryRow).itemLevel : null,
-    fetchedAt: "fetchedAt" in h ? (h as ArmoryDirectoryRow).fetchedAt : undefined })) : merged;
+    fetchedAt: "fetchedAt" in h ? (h as ArmoryDirectoryRow).fetchedAt : undefined,
+    ...directoryExtras(h) })) : merged;
   const sightings = armory ? merged.filter((r) => !r.sources.includes("armory")) : [];
   const unreachable = players === null || loaded === null || fallback === null;
   const count = rows.length + sightings.length;
@@ -302,7 +314,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                 dense
                 nofollow
                 caption={q ? `Characters matching ${q}` : "Blizzard profiles"}
-                columns={armory ? columns(guildHref) : columns(null)}
+                columns={armory ? columns(guildHref, rows.some((r) => r.lastLogin !== undefined)) : columns(null)}
                 rows={rows}
                 rowKey={(r) => r.key}
                 meta={rowMeta}

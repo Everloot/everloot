@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Terms of Use", description, path: "/terms" }),
 };
 
-const UPDATED = "2026-11-25";
+const UPDATED = "2026-11-26";
 const HISTORY_URL = `${REPO_URL}/commits/main/web/src/app/terms/page.tsx`;
 
 const SECTIONS: TocItem[] = [
@@ -118,7 +118,7 @@ export default function TermsPage() {
           <Section id="comments">
             <p>
               Where the site offers comments, a signed-in player with a profile handle can comment on item, quest, NPC, spell,
-              zone and instance pages. You keep the rights to what you write. By posting, you give us a worldwide, free,
+              zone, instance and boss pages. You keep the rights to what you write. By posting, you give us a worldwide, free,
               non-exclusive licence to store your comment and show it on that page on everloot.app, under your handle, for as
               long as it stays up. Comments are not part of the open data and are not offered through the API, the MCP server,
               chat answers, exports or sitemaps.
@@ -135,7 +135,7 @@ export default function TermsPage() {
           <Section id="screenshots">
             <p>
               Where the site offers them, a signed-in player with a profile handle can upload screenshots for item, quest, NPC,
-              spell, zone and instance pages. Upload only screenshots you took yourself in the game. By uploading, you confirm
+              spell, zone, instance and boss pages. Upload only screenshots you took yourself in the game. By uploading, you confirm
               that, and you give us a worldwide, free, non-exclusive licence to store the screenshot, save a smaller copy of it,
               and show it on that page on everloot.app, credited to your handle, for as long as it stays up. You keep whatever
               rights you have in it. A game screenshot shows Blizzard&apos;s art, which stays Blizzard&apos;s; we show it under

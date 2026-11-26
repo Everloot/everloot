@@ -36,7 +36,7 @@ test("site only: nothing but the comments route, the moderation page and route, 
   expect(readers.filter((f) => !allowed.has(f))).toEqual([]);
 });
 
-test("the item, quest, NPC, spell, zone and instance pages each render it with their own type and id", () => {
+test("the item, quest, NPC, spell, zone, instance and boss pages each render it with their own type and id", () => {
   const pages: Array<[string, string]> = [
     ["../../app/database/items/[id]/page.tsx", '<EntityComments type="item" id={itemId} />'],
     ["../../app/database/quests/[id]/page.tsx", '<EntityComments type="quest" id={page.questId} />'],
@@ -44,6 +44,7 @@ test("the item, quest, NPC, spell, zone and instance pages each render it with t
     ["../../app/database/spells/[id]/page.tsx", '<EntityComments type="spell" id={spellId} />'],
     ["../../app/database/zones/[zone]/page.tsx", '<EntityComments type="zone" id={zone.mapId} />'],
     ["../../app/database/instances/[instance]/page.tsx", '<EntityComments type="instance" id={row.instanceMapId} />'],
+    ["../../app/database/bosses/[boss]/page.tsx", '<EntityComments type="boss" id={boss.id} />'],
   ];
   for (const [path, line] of pages) expect(readFileSync(new URL(path, import.meta.url), "utf8"), path).toContain(line);
 });

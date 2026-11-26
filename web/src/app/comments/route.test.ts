@@ -71,6 +71,11 @@ test("GET refuses a type or id no page has", async () => {
   expect(auth.authQuery).not.toHaveBeenCalled();
 });
 
+test("GET reads a boss page's comments by its encounter id", async () => {
+  expect((await get("type=boss&id=1084")).status).toBe(200);
+  expect(rpcCalls("entity_comments_for")).toEqual([{ p_entity_type: "boss", p_entity_id: 1084, p_viewer: null }]);
+});
+
 test("a write needs this site's Origin, a session and the account the page named", async () => {
   const body = { action: "post", type: "item", id: 19019, body: "hi" };
   expect((await post(body, { origin: "https://example.com" })).status).toBe(403);

@@ -13,7 +13,7 @@ export * from "./comments-shared";
 
 /**
  * Comments on entity pages (supabase/migrations/20261125130000_entity_comments.sql): a signed-in player with a profile
- * handle comments on an item, quest, NPC, spell, zone or instance page, edits for 15 minutes and deletes their own;
+ * handle comments on an item, quest, NPC, spell, zone, instance or boss page, edits for 15 minutes and deletes their own;
  * other players report; moderators hide from /ops/comments. Off until EVERLOOT_COMMENTS=1, which needs
  * EVERLOOT_PROFILES=1 too, since a comment names its author by handle; with either unset nothing here is reachable.
  *

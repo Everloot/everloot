@@ -1018,7 +1018,7 @@ data, not game data and not an observation.
 ## Comments
 
 *Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_COMMENTS=1`), a signed-in player
-can comment at the bottom of an item, quest, NPC, spell, zone or instance page. A comment is the player's own words,
+can comment at the bottom of an item, quest, NPC, spell, zone, instance or boss page. A comment is the player's own words,
 not game data and not an observation.
 
 - **Who can post.** Any signed-in Everloot account with a profile handle. A comment names its author by the handle
@@ -1046,7 +1046,7 @@ not game data and not an observation.
 ## Screenshots
 
 *Decided 2026-11-25 by Carlos.* Where the site offers them (off until `EVERLOOT_SCREENSHOTS=1`), a signed-in player can
-upload screenshots for an item, quest, NPC, spell, zone or instance page, in a gallery above the comments. A screenshot
+upload screenshots for an item, quest, NPC, spell, zone, instance or boss page, in a gallery above the comments. A screenshot
 is the player's own picture of the game, not game data and not an observation.
 
 - **Who can upload.** Any signed-in Everloot account with a profile handle. The gallery credits the handle the

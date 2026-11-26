@@ -1,7 +1,9 @@
 # Player screenshots on entity pages: migration, bucket and activation
 
-Screenshots on the item, quest, NPC, spell, zone and instance pages, and the moderation page `/ops/screenshots`, need
-one additive migration, `supabase/migrations/20261125140000_entity_screenshots.sql`, an R2 bucket and the Cloudflare
+Screenshots on the item, quest, NPC, spell, zone, instance and boss pages, and the moderation page `/ops/screenshots`,
+need one additive migration, `supabase/migrations/20261125140000_entity_screenshots.sql`, then
+`supabase/migrations/20261126100000_directory_login_boss_pages.sql` again after it (it adds boss pages to the types the
+table and `submit_entity_screenshot` accept, and skips that part while the table is missing), an R2 bucket and the Cloudflare
 Images binding on the site's Worker, and then `EVERLOOT_SCREENSHOTS=1`. The switch needs `EVERLOOT_PROFILES=1` as well,
 since the gallery credits an uploader by profile handle. Rules for players: `docs/DATA_POLICY.md` ("Screenshots") and
 `/terms#screenshots`. Owner decisions of 2026-11-25: signed-in accounts upload; nothing shows until a moderator
@@ -22,7 +24,8 @@ The owner applies the migration, creates the bucket and adds the bindings. Nothi
 ## Steps, in order
 
 1. **Preflight**, read-only, below. Every row `t`.
-2. **Apply** the migration, below. Then the **postflight**; every row `t`.
+2. **Apply** the migration, below, then `20261126100000_directory_login_boss_pages.sql` once more. Then the
+   **postflight**; every row `t`.
 3. **Create the bucket** (private, no public access, no custom domain, no `r2.dev` URL):
    ```
    cd web
@@ -50,7 +53,7 @@ unavailable (bindings missing), and `/screenshots...` and `/ops/screenshots` are
 
 ## What the switch turns on
 
-- Each of the six pages renders an empty Screenshots section above its comments. When it nears the screen, the browser
+- Each of the seven pages renders an empty Screenshots section above its comments. When it nears the screen, the browser
   asks `GET /screenshots?type=&id=` without cookies: approved screenshots only, the same answer for everyone, cached
   five minutes (`Cache-Control: public, max-age=300`, `CDN-Cache-Control: max-age=300`), `X-Robots-Tag: noindex`. It
   also asks `GET /screenshots/mine?type=&id=` (`private, no-store`) for the viewer and their own uploads.
@@ -133,6 +136,9 @@ set local statement_timeout = '60s';
 commit;
 ```
 
+Then run `supabase/migrations/20261126100000_directory_login_boss_pages.sql` once more, unchanged, on its own (it has
+its own `begin`/`commit`; safe twice). Without it a boss page's gallery loads but every upload is refused.
+
 ## Postflight (read-only)
 
 Every row must be `t`; anything else means leave the switch off and find out why.
@@ -162,7 +168,11 @@ select check_name, ok from (values
          'screenshot_moderation_queue'))),
   ('the trigger is on the table',
     exists (select 1 from pg_trigger where tgrelid = 'public.entity_screenshots'::regclass and tgname = 'entity_screenshots_stay_deleted')),
-  ('the table is empty', not exists (select 1 from public.entity_screenshots))
+  ('the table is empty', not exists (select 1 from public.entity_screenshots)),
+  ('boss pages are accepted (20261126100000 run after this)',
+    pg_get_constraintdef((select oid from pg_constraint where conrelid = 'public.entity_screenshots'::regclass
+      and conname = 'entity_screenshots_entity_type_check')) like '%''boss''%'
+    and pg_get_functiondef('public.submit_entity_screenshot(uuid,text,integer,integer,integer,integer)'::regprocedure) like '%''instance'', ''boss'')%')
 ) as checks(check_name, ok);
 ```
 

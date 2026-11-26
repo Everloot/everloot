@@ -5,6 +5,8 @@ import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { npcLootTable } from "@kb/loot-tables";
 import { CLIENT_LABEL } from "@kb/edges";
 import EntityLink from "@/components/EntityLink";
+import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 import { AgreementMeter, Badge, DataTable, Disclosure, Tabs, TooltipFrame, TooltipLines, type Column, type Fact, type TabItem } from "@/components/ui";
 import { bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -199,6 +201,8 @@ export default async function BossPage(props: Props) {
           <Tabs label={`${title}: sections`} tabs={tabs} />
         </div>
       }
+      screenshots={<EntityScreenshots type="boss" id={boss.id} name={title} />}
+      comments={<EntityComments type="boss" id={boss.id} />}
       openData={{ report: { type: "Boss", id: boss.id, path }, text: [`${title} (boss ${boss.id})`, ...summary, `Source: https://everloot.app${path}`].join("\n") }}
       credit={<p className="mt-3 text-meta text-muted">{GAME_DATA_CREDIT}</p>}
     />

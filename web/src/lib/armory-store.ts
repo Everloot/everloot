@@ -40,7 +40,13 @@ export interface ArmoryMember {
 }
 
 export interface ArmoryHit { region: string; slug: string; name: string; surname: string; level: number; class: string; race: string; ruleset: string; guildName: string | null }
-export interface ArmoryDirectoryRow extends ArmoryHit { faction: string; rulesetId: number; itemLevel: number | null; gearScore: number | null; fetchedAt: string }
+export interface ArmoryDirectoryRow extends ArmoryHit {
+  faction: string; rulesetId: number; itemLevel: number | null; gearScore: number | null; fetchedAt: string;
+  /** From 20261126100000_directory_login_boss_pages.sql; absent before it is applied. The character's last login. */
+  lastLogin?: string | null;
+  /** The same migration: the guild's armory page, null unless the armory has read the guild and it is neither hidden nor disbanded. */
+  guildSlug?: string | null;
+}
 export interface ArmoryDirectoryFilter {
   prefix: string | null; class: string | null; race: string | null; faction: string | null; region: string | null;
   rulesetId: number | null; minLevel: number | null; maxLevel: number | null; guildPrefix: string | null;
@@ -196,9 +202,11 @@ const SitePeopleRows = z.array(z.union([
 const PlayerDirectoryRow = z.object({
   region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), race: z.string(),
   faction: z.string(), ruleset_id: num, ruleset: z.string(), guild_name: textOrNull, item_level: numOrNull, gear_score: numOrNull, fetched_at: z.string(), total: num,
+  last_login: textOrNull.optional(), guild_slug: textOrNull.optional(),
 }).transform((r) => ({
   region: r.region, slug: r.slug, name: r.name, surname: r.surname, level: r.level, class: r.class, race: r.race,
   faction: r.faction, rulesetId: r.ruleset_id, ruleset: r.ruleset, guildName: r.guild_name, itemLevel: r.item_level, gearScore: r.gear_score, fetchedAt: r.fetched_at, total: r.total,
+  ...(r.last_login !== undefined && { lastLogin: r.last_login }), ...(r.guild_slug !== undefined && { guildSlug: r.guild_slug }),
 }));
 
 const DirectoryRow = z.object({
@@ -399,7 +407,14 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       rows.sort((a, b) => (f.sort === "name" ? 0 : (value(b) ?? -Infinity) - (value(a) ?? -Infinity)) ||
         a.name.localeCompare(b.name) || a.surname.localeCompare(b.surname) || a.region.localeCompare(b.region) || a.slug.localeCompare(b.slug));
       const offset = Math.max(f.offset, 0);
-      return { rows: rows.slice(offset, offset + Math.min(Math.max(f.limit, 0), 100)), total: rows.length };
+      // The function's columns; a guild page only for a guild read and not disbanded (no /guilds/hide list here).
+      const page = rows.slice(offset, offset + Math.min(Math.max(f.limit, 0), 100)).map((c): ArmoryDirectoryRow => {
+        const guild = c.guildSlug ? guilds.get(key(c.region, c.guildSlug)) : undefined;
+        return { region: c.region, slug: c.slug, name: c.name, surname: c.surname, level: c.level, class: c.class, race: c.race, ruleset: c.ruleset,
+          guildName: c.guildName, faction: c.faction, rulesetId: c.rulesetId, itemLevel: c.itemLevel, gearScore: c.gearScore, fetchedAt: c.fetchedAt,
+          lastLogin: c.lastLogin, guildSlug: guild && guild.name !== DISBANDED ? guild.slug : null };
+      });
+      return { rows: page, total: rows.length };
     },
     async guildDirectory(f) {
       const p = f.prefix === null ? null : prefixOf(f.prefix);
