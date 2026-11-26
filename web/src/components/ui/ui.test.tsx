@@ -268,7 +268,7 @@ describe("DataTable", () => {
     const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} meta={(r) => `Seen ${r.count}`} />);
     expect(html.match(/<th [^>]*hidden sm:table-cell/g)).toHaveLength(1);
     expect(html.match(/<td class="dt-td dt-num dt-fold"/g)).toHaveLength(rows.length);
-    expect(html).toContain('<div class="text-cell-2 text-muted sm:hidden">Seen 12</div>');
+    expect(html).toContain('<div class="dt-meta">Seen 12</div>');
     // The columns that show from 640 px can still be wider than a tablet: the table scrolls inside itself below 1024 px.
     expect(html).toMatch(/role="region" aria-label="Items" tabindex="0" class="[^"]*overflow-x-auto lg:overflow-visible/);
   });

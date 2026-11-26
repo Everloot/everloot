@@ -32,7 +32,7 @@ const REGION_CHIP: Record<string, string> = { us: "border-region-us text-region-
 /** A region as a small coloured chip, "US" in blue and "EU" in gold, so a lopsided list shows at a glance. */
 export function RegionChip({ region }: { region: string }) {
   return (
-    <span data-region={region} className={`inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 font-mono text-xs ${REGION_CHIP[region] ?? "border-line text-fg-2"}`}>
+    <span data-region={region} className={`region-chip ${REGION_CHIP[region] ?? "border-line text-fg-2"}`}>
       {regionLabel(region)}
     </span>
   );
