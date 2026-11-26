@@ -10,7 +10,7 @@ import { bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
 import { trailFor } from "@/lib/breadcrumbs";
 import { observedLine } from "@/lib/evidence";
 import { entityTitle } from "@/lib/entity-meta";
-import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadingArt, loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { loadRenders } from "@/lib/game-renders";
 import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
@@ -20,7 +20,7 @@ import { dayLabel } from "@/lib/report-labels";
 import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { EmptyTab, EntityPage, known, LINK, ModelPicture, Unreachable } from "../../entity";
+import { EmptyTab, EntityArt, EntityPage, known, LINK, ModelPicture, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 
 export const dynamic = "force-dynamic";
@@ -77,23 +77,26 @@ export default async function BossPage(props: Props) {
   const instanceLink = <Link href={instancePath} className={LINK}>{instanceName}</Link>;
 
   // The creature's loot table, the same rows its NPC page shows; item names and icons as there.
-  const [loot, world, clears, renders] = await Promise.all([
+  const [loot, world, clears, renders, assets] = await Promise.all([
     npcIds.length ? loadLootTables() : null,
     npcIds.length ? loadWorldFacts() : null,
     loadInstanceClears(instance.instanceMapId),
     npcIds.length ? loadRenders() : null,
+    loadSiteAssets(),
   ]);
   const tables = new Map(loot && !loot.unreachable ? npcIds.map((id) => [id, npcLootTable(loot.tables, id)]) : []);
   const droppedIds = [...tables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
   const itemFacts = droppedIds.length ? await loadItemFacts() : null;
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
+  const tips = await loadItemTips(assets, droppedIds);
   const npcName = world && !world.unreachable ? npcNames(world) : new Map<number, string>();
   const creature = (id: number) => <EntityLink kind="npc" id={id} name={npcName.get(id) ?? `NPC ${id}`} />;
   // The first creature with a model picture; renders.json lists only creatures the site lists.
   const pictured = npcIds.find((id) => renders?.npcs.has(id));
   const picture = pictured === undefined ? undefined : renders?.npcs.get(pictured);
   const killsHere = clears?.bosses.find((b) => b.id === boss.id) ?? null;
+  // The instance's loading screen is the top band's box, as on the instance page; no art in the upload, no box.
+  const art = loadingArt(assets, instance.instanceMapId);
 
   const filesNote = (note: string) => <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />{note}</span>;
   const order = boss.order === null ? null : `${boss.order} of ${boss.total}`;
@@ -131,10 +134,19 @@ export default async function BossPage(props: Props) {
       ? <span className="font-semibold text-fg">{b.name}</span>
       : <Link href={bossHref(b.id, b.row.name)} className={LINK}>{b.name}</Link>) },
   ];
+  // The bosses either side of this one in the files' encounter order, for the header.
+  const at = others.findIndex((b) => b.id === boss.id);
+  const prev = at > 0 ? others[at - 1] : undefined;
+  const next = at >= 0 ? others[at + 1] : undefined;
+  const nav = (prev || next) && (
+    <nav data-boss-nav aria-label={`Bosses of ${instanceName}`} className="flex flex-wrap gap-x-4 gap-y-1 text-meta">
+      {prev && <Link href={bossHref(prev.id, prev.row.name)} rel="prev" className={LINK}>← {prev.name}</Link>}
+      {next && <Link href={bossHref(next.id, next.row.name)} rel="next" className={LINK}>{next.name} →</Link>}
+    </nav>
+  );
   const noCreature = "Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.";
 
-  const tabs: TabItem[] = [
-    {
+  const lootTab: TabItem = {
       id: "loot", label: "Loot",
       panel: unreachable || loot?.unreachable ? <Unreachable />
         : npcIds.length === 0 ? <EmptyTab message={noCreature} reported={boss.row.reported} />
@@ -153,7 +165,11 @@ export default async function BossPage(props: Props) {
             ))}
           </div>
         ),
-    },
+    };
+  // The loot opens first when the creature's table has rows; otherwise it goes last, after the kills and the instance.
+  const lootRows = [...tables.values()].some((t) => t.rows.length > 0);
+  const tabs: TabItem[] = [
+    ...(lootRows ? [lootTab] : []),
     ...(clears ? [{
       id: "kills", label: "Kills",
       panel: <>
@@ -163,12 +179,14 @@ export default async function BossPage(props: Props) {
             ? `${killsHere.characters.toLocaleString("en-US")} linked ${killsHere.characters === 1 ? "character has" : "characters have"} killed this boss${killsHere.kills === null ? "." : `, ${killsHere.kills.toLocaleString("en-US")} ${killsHere.kills === 1 ? "kill" : "kills"} in all.`}`
             : "No linked character has a synced kill of this boss yet."}
         </p>
+        {killsHere?.firstKillDay && <p className="mt-1 text-sm tabular-nums text-fg-2">First synced kill {dayLabel(killsHere.firstKillDay)}</p>}
       </>,
     }] : []),
     {
       id: "instance", label: `In ${instanceName}`, count: others.length || undefined,
       panel: <DataTable dense caption={`Bosses of ${instanceName}, in the game files' order`} columns={otherColumns} rows={others} rowKey={(b) => String(b.id)} />,
     },
+    ...(lootRows ? [] : [lootTab]),
   ];
 
   return (
@@ -180,8 +198,10 @@ export default async function BossPage(props: Props) {
         trail: [...trailFor("/database/bosses")!, { name: title, path }],
         title,
         meta: [kindOf(boss), instanceLink, <span key="id" className="tabular-nums">Encounter {boss.id}</span>, boss.filesName ? <Badge key="files" tone="files" /> : null],
+        aside: nav || undefined,
       }}
-      // No box: the name, the instance and the order are the header and the facts already.
+      // The box is the instance's art when the upload has it; the name, the instance and the order are the header and facts.
+      box={art && <EntityArt src={art.url} alt={`Loading screen of ${instanceName}`} width={art.width} height={Math.round((art.width * 9) / 16)} />}
       facts={facts}
       media={picture && <ModelPicture picture={picture} name={title} />}
       summary={summary}

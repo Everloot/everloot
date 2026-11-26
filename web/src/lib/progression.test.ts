@@ -99,7 +99,7 @@ test("instance clears stay dark until their switch is on, then read one instance
   expect(state.query).not.toHaveBeenCalled();
   vi.stubEnv("EVERLOOT_INSTANCE_CLEARS", "1");
   vi.stubEnv("EVERLOOT_ARMORY", "1"); // the clears link armory pages
-  expect((await loadInstanceClears(33))?.bosses[0]).toEqual({ id: 2748, name: "Rethilgore", characters: 1, kills: 2 });
+  expect((await loadInstanceClears(33))?.bosses[0]).toEqual({ id: 2748, name: "Rethilgore", characters: 1, kills: 2, firstKillDay: "2026-11-17" });
   expect(state.query.mock.calls[0][0]).toBe("rpc/public_instance_clears");
   expect(JSON.parse(state.query.mock.calls[0][1].body)).toEqual({ p_map: 33 });
   state.query.mockRejectedValue(new Error("migration not applied"));

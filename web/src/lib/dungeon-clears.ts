@@ -76,8 +76,8 @@ export interface InstanceClears {
   characters: number;
   /** Characters who have killed every boss, newest kill first. */
   clears: { region: string; slug: string; name: string; firstClearDay: string | null; lastKillDay: string | null }[];
-  /** Per boss: how many of those characters killed it and their summed kills (null where a history has no count). */
-  bosses: { id: number; name: string; characters: number; kills: number | null }[];
+  /** Per boss: how many of those characters killed it, their summed kills (null where a history has no count) and their first kill day (null where one is unknown). */
+  bosses: { id: number; name: string; characters: number; kills: number | null; firstKillDay: string | null }[];
 }
 
 /** Clears of one instance from public histories; null when the files list no boss for it. */
@@ -91,7 +91,8 @@ export function instanceClears(mapId: number, rows: readonly InstanceClearsRow[]
   const bosses = instance.bosses.map((boss, i) => {
     const mine = read.map((r) => r.clear.bosses[i]!).filter((b) => b.killed);
     return { id: boss.id, name: boss.name, characters: mine.length,
-      kills: mine.every((b) => b.kills !== null) ? mine.reduce((n, b) => n + b.kills!, 0) : null };
+      kills: mine.every((b) => b.kills !== null) ? mine.reduce((n, b) => n + b.kills!, 0) : null,
+      firstKillDay: mine.length && mine.every((b) => b.firstKillDay !== null) ? mine.map((b) => b.firstKillDay!).sort()[0]! : null };
   });
   return { characters: read.length, clears, bosses };
 }

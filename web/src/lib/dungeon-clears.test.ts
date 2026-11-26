@@ -57,7 +57,7 @@ test("instance clears: cleared characters newest first, and per-boss characters 
   expect(result.characters).toBe(3);
   expect(result.clears.map((c) => c.slug)).toEqual(["ash-brook", "mira-dawn"]);
   expect(result.clears[1]).toEqual({ region: "us", slug: "mira-dawn", name: "Mira Dawn", firstClearDay: "2026-11-14", lastKillDay: "2026-11-21" });
-  expect(result.bosses[0]).toEqual({ id: 2732, name: "Oggleflint", characters: 3, kills: 13 });
-  expect(result.bosses[2]).toEqual({ id: 2734, name: "Jergosh the Invoker", characters: 2, kills: 4 });
+  expect(result.bosses[0]).toEqual({ id: 2732, name: "Oggleflint", characters: 3, kills: 13, firstKillDay: "2026-11-10" });
+  expect(result.bosses[2]).toEqual({ id: 2734, name: "Jergosh the Invoker", characters: 2, kills: 4, firstKillDay: "2026-11-14" });
   expect(instanceClears(999999, rows)).toBeNull();
 });
