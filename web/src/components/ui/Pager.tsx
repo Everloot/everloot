@@ -1,3 +1,4 @@
+import { cloneElement, type ComponentProps, type ReactElement } from "react";
 import Link from "./PendingLink";
 import { PAGE_SIZES } from "@/lib/page-size";
 
@@ -49,16 +50,24 @@ function NumberedPager({ label, page, pages, href, nofollow }: Numbered) {
   );
 }
 
+/** A list's result strip, again under the list: the same strip, its pager named apart from the one above. */
+export function stripBelow(strip: ReactElement<ComponentProps<typeof ResultStrip>> | null) {
+  return strip && cloneElement(strip, { below: true });
+}
+
 /**
  * The line above and below a database list: the count on the left, the rows shown and the pager on the right
  * ("3,845 items · 1–50 · ‹ 1 2 … 77 ›").
  */
-export function ResultStrip({ total, noun, page, perPage, href, sizeHref, label = "Pages", nofollow }: {
+export function ResultStrip({ total, noun, page, perPage, href, sizeHref, label: given = "Pages", nofollow, below }: {
   total: number; noun: string; page: number; perPage: number; href: (page: number) => string;
   /** The list at another page size (?per=): the strip offers PAGE_SIZES once the list is longer than the smallest. */
   sizeHref?: (per: number) => string;
   label?: string; nofollow?: boolean;
+  /** The copy under the list: its pager gets a name of its own, so the two page navs are told apart. */
+  below?: boolean;
 }) {
+  const label = below ? `${given}, below the list` : given;
   // An empty list says so in its own empty state, never as a bare "0 items".
   if (total === 0) return null;
   const pages = Math.max(1, Math.ceil(total / perPage));

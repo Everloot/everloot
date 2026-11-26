@@ -53,14 +53,15 @@ const phone = block(css, "@media (max-width: 639.98px)");
 
 test("filter menus and the phone filter sheet carry the menu entrance (.pop)", () => {
   expect(html).toMatch(/<ul class="pop /);
-  expect(html).toMatch(/<div class="pop mt-2 flex/);
+  expect(html).toMatch(/<div id="[^"]+" data-filter-sheet-panel="true" class="pop /);
 });
 
 test("each chevron points up while its own menu is open, with no animation", () => {
   const chevrons = html.match(/<svg[^>]*class="[^"]*"/g) ?? [];
   expect(chevrons.length).toBeGreaterThan(0);
   for (const svg of chevrons) {
-    expect(svg).toContain("[[open]&gt;summary&gt;&amp;]:rotate-180");
+    // A dropdown's follows its <details>; the phone sheet's follows the sheet's checkbox.
+    expect(svg).toMatch(/\[\[open\]&gt;summary&gt;&amp;\]:rotate-180|\[:checked\+label&gt;&amp;\]:rotate-180/);
     expect(svg).not.toContain("transition");
   }
 });

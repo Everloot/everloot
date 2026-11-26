@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { objectList } from "@kb/object-page";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
 import { MAX_QUERY } from "@/lib/lore";
@@ -106,7 +106,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

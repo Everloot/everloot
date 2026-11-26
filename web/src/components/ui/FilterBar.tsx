@@ -40,7 +40,7 @@ function Chevron() {
   return <Icon name="chevron" className="text-muted [[open]>summary>&]:rotate-180" />;
 }
 
-function Menu({ c: given, phone, rel }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean; rel?: string }) {
+function Menu({ c: given, rel }: { c: Extract<FilterControl, { type: "menu" }>; rel?: string }) {
   // A choice that matches nothing is noise ("Alliance 0" before launch): it stays only while selected, and a menu
   // left with nothing to pick is not drawn.
   const c = { ...given, options: given.options.filter((o) => o.reset || o.on || o.count !== 0) };
@@ -49,7 +49,7 @@ function Menu({ c: given, phone, rel }: { c: Extract<FilterControl, { type: "men
   const summary = on.length === 0 ? c.label : on.length === 1 ? <>{c.label}: <span className="text-fg">{on[0].label}</span></> : <>{c.label} ({on.length})</>;
   return (
     // `name` makes the menus one group: opening one closes the other.
-    <details name={phone ? "filters-phone" : "filters"} className="relative" data-filter={c.key}>
+    <details name="filters" className="relative" data-filter={c.key}>
       <summary className={`${control} cursor-pointer list-none [&::-webkit-details-marker]:hidden ${on.length ? lit : idle}`}>
         {summary}<Chevron />
       </summary>
@@ -69,16 +69,16 @@ function Menu({ c: given, phone, rel }: { c: Extract<FilterControl, { type: "men
   );
 }
 
-function Controls({ search, controls, active, clearHref, phone, nofollow }: FilterBarProps & { phone: boolean }) {
+function Controls({ search, controls, active, clearHref, nofollow }: FilterBarProps) {
   const rel = nofollow ? "nofollow" : undefined;
   return (
     <>
       {search && (
-        <form action={search.action} method="get" role="search" className={`flex ${phone ? "w-full" : ""}`}>
+        <form action={search.action} method="get" role="search" className="flex max-sm:w-full">
           {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-          <label htmlFor={phone ? "filter-q-phone" : "filter-q"} className="sr-only">{search.label}</label>
+          <label htmlFor="filter-q" className="sr-only">{search.label}</label>
           <input
-            id={phone ? "filter-q-phone" : "filter-q"}
+            id="filter-q"
             name="q"
             type="search"
             defaultValue={search.value ?? ""}
@@ -92,7 +92,7 @@ function Controls({ search, controls, active, clearHref, phone, nofollow }: Filt
       )}
       {controls.map((c) => c.type === "menu"
         // Keyed on its choices, so after a client-side navigation the menu comes back closed.
-        ? <Menu key={`${c.key}-${c.options.map((o) => Number(o.on)).join("")}`} c={c} phone={phone} rel={rel} />
+        ? <Menu key={`${c.key}-${c.options.map((o) => Number(o.on)).join("")}`} c={c} rel={rel} />
         : <Link key={c.key} href={c.href} rel={rel} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
             <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-control border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
           </Link>)}
@@ -105,7 +105,7 @@ function Controls({ search, controls, active, clearHref, phone, nofollow }: Filt
 export function FilterMenu({ label, control }: { label: string; control: Extract<FilterControl, { type: "menu" }> }) {
   return (
     <FilterMenus label={label} className="flex flex-wrap items-center gap-2">
-      <Menu key={control.options.map((o) => Number(o.on)).join("")} c={control} phone={false} />
+      <Menu key={control.options.map((o) => Number(o.on)).join("")} c={control} />
     </FilterMenus>
   );
 }
@@ -114,21 +114,22 @@ export function FilterMenu({ label, control }: { label: string; control: Extract
  * The filter row above a database list: one wrapping row of 32 px dropdown buttons and toggles, every choice a
  * link (the filters live in the URL, so a view can be shared and works without JavaScript). Below 640 px the
  * controls fold into one "Filters (n)" button that opens them as a sheet; the aside stays in view.
+ *
+ * The controls are drawn once for both widths. The phone sheet is a checkbox and its label (a closed <details>
+ * cannot be shown by CSS in every browser we support): checked, or from 640 px, the same row shows. Without
+ * JavaScript it all still works.
  */
 export default function FilterBar(props: FilterBarProps) {
   const { label, active, aside } = props;
+  const sheet = `filter-sheet-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
     <FilterMenus label={label} className="flex flex-wrap items-center gap-2">
-      <details className="w-full sm:hidden">
-        <summary className={`${control} cursor-pointer list-none [&::-webkit-details-marker]:hidden ${active ? lit : idle}`}>
-          Filters{active > 0 && <span className="tabular-nums"> ({active})</span>}<Chevron />
-        </summary>
-        <div className="pop mt-2 flex flex-wrap gap-2 rounded-control border border-line bg-panel p-2">
-          <Controls {...props} phone />
-        </div>
-      </details>
-      <div className="hidden flex-wrap items-center gap-2 sm:flex">
-        <Controls {...props} phone={false} />
+      <input type="checkbox" id={sheet} data-filter-sheet aria-controls={`${sheet}-panel`} className="peer sr-only sm:hidden" />
+      <label htmlFor={sheet} className={`${control} cursor-pointer select-none peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent sm:hidden ${active ? lit : idle}`}>
+        Filters{active > 0 && <span className="tabular-nums"> ({active})</span>}<Icon name="chevron" className="text-muted [:checked+label>&]:rotate-180" />
+      </label>
+      <div id={`${sheet}-panel`} data-filter-sheet-panel className="pop hidden w-full flex-wrap gap-2 rounded-control border border-line bg-panel p-2 peer-checked:flex sm:contents">
+        <Controls {...props} />
       </div>
       {aside && <div className="ml-auto min-w-0 max-sm:w-full">{aside}</div>}
     </FilterMenus>

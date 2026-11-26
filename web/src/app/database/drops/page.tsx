@@ -8,7 +8,7 @@ import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { loadDropSourceNames, loadNames } from "@/lib/names";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
-import { Container, DataTable, DataTitle, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { rateWithRange } from "../loot-tables";
 import { listHref, listMetadata, listQuery, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
@@ -97,7 +97,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
         </div>
         </>}
         {!stats.unreachable && shown.some((r) => r.rate !== null) && <p className="py-2 text-meta text-fg-2">Ranges describe the recorded sample (95% Wilson); windows may not be independent.</p>}
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

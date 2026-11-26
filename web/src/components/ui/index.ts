@@ -22,7 +22,7 @@ export { default as OpenData } from "./OpenData";
 export { default as Field, Input } from "./Field";
 export { default as LinkTabs, type LinkTab } from "./LinkTabs";
 export { default as PageHeader, type PageHeaderProps } from "./PageHeader";
-export { default as Pager, ResultStrip, pageWindow } from "./Pager";
+export { default as Pager, ResultStrip, pageWindow, stripBelow } from "./Pager";
 export { default as Prose } from "./Prose";
 export { default as SearchBar, type SearchBarProps } from "./SearchBar";
 export { default as SectionHeading } from "./SectionHeading";

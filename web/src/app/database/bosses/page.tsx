@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { bossEntries, bossHref, BOSSES_PATH, type BossEntry } from "@/lib/bosses";
 import { compareInstances, instanceHref, instanceRows, instanceTitle, loadSightings } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
@@ -97,7 +97,7 @@ export default async function BossListPage(props: { searchParams?: Promise<Searc
             empty={<NoMatches noun="bosses" chips={chips} clearHref={BOSSES_PATH} />}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

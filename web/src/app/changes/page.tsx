@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
-import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl } from "@/components/ui";
+import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl, stripBelow } from "@/components/ui";
 import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -236,7 +236,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
             ? <ol data-change-feed aria-label={`Changes, ${GAMES[q.game]}: ${rows.length}`} className="max-w-3xl space-y-3">{shown.map(card)}</ol>
             : empty}
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
         <AdSlot slot="inContent" />
       </article>
     </Container>

@@ -17,7 +17,7 @@ import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
 import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
-import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import { Respelled, LEVEL_BRACKETS, NameCell, paged } from "../list-parts";
@@ -385,7 +385,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

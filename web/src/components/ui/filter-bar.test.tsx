@@ -13,6 +13,8 @@ import FilterBar, { type FilterBarProps } from "./FilterBar";
 // The filter dropdowns are native <details>, so they open without JavaScript. These tests pin the dismissal that
 // needs it, as the header and account menus already behave: Escape closes the menu you are in and returns focus
 // to its button, a press outside closes it, and the phone's outer "Filters" sheet is never closed by either.
+// The controls are drawn once: the phone sheet is a checkbox-driven CSS toggle around the same row the desktop
+// shows, so the sheet's state is the checkbox, not a <details>.
 
 const props: FilterBarProps = {
   label: "Item filters",
@@ -49,11 +51,14 @@ afterEach(async () => {
 });
 
 const bar = () => container.querySelector<HTMLElement>("[data-filter-bar]")!;
-const menu = (name: "filters" | "filters-phone", key: string, scope: ParentNode = bar()) =>
-  scope.querySelector<HTMLDetailsElement>(`details[name="${name}"][data-filter="${key}"]`)!;
+const menu = (key: string, scope: ParentNode = bar()) =>
+  scope.querySelector<HTMLDetailsElement>(`details[name="filters"][data-filter="${key}"]`)!;
 const summaryOf = (d: HTMLDetailsElement) => d.querySelector("summary")!;
-const sheet = () => bar().querySelector<HTMLDetailsElement>(":scope > details")!;
-const open = (...details: HTMLDetailsElement[]) => { for (const d of details) d.open = true; };
+const sheet = () => bar().querySelector<HTMLInputElement>("input[data-filter-sheet]")!;
+const open = (...details: (HTMLDetailsElement | HTMLInputElement)[]) => {
+  for (const d of details) if (d instanceof HTMLInputElement) d.checked = true; else d.open = true;
+};
+const isOpen = (d: HTMLDetailsElement | HTMLInputElement) => (d instanceof HTMLInputElement ? d.checked : d.open);
 
 const press = (target: Element, key = "Escape") =>
   act(async () => { target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })); });
@@ -61,7 +66,7 @@ const pointerdown = (target: Element | Document) =>
   act(async () => { target.dispatchEvent(new Event("pointerdown", { bubbles: true })); });
 
 test("Escape inside an open dropdown closes it and returns focus to its button", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   const link = quality.querySelector("a")!;
   link.focus();
@@ -71,7 +76,7 @@ test("Escape inside an open dropdown closes it and returns focus to its button",
 });
 
 test("Escape on the button of an open dropdown closes it too", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   summaryOf(quality).focus();
   await press(summaryOf(quality));
@@ -80,8 +85,8 @@ test("Escape on the button of an open dropdown closes it too", async () => {
 });
 
 test("Escape closes only the dropdown it is in", async () => {
-  const quality = menu("filters", "quality");
-  const klass = menu("filters", "class");
+  const quality = menu("quality");
+  const klass = menu("class");
   open(quality, klass);
   const link = quality.querySelector("a")!;
   link.focus();
@@ -91,17 +96,17 @@ test("Escape closes only the dropdown it is in", async () => {
 
 test("in the phone sheet, Escape closes the dropdown but not the Filters sheet", async () => {
   open(sheet());
-  const quality = menu("filters-phone", "quality");
+  const quality = menu("quality");
   open(quality);
   const link = quality.querySelector("a")!;
   link.focus();
   await press(link);
-  expect([quality.open, sheet().open]).toEqual([false, true]);
+  expect([quality.open, isOpen(sheet())]).toEqual([false, true]);
   expect(document.activeElement).toBe(summaryOf(quality));
 });
 
 test("Escape that closes a dropdown goes no further, so it does not also close something behind it", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   const seen = vi.fn();
   document.addEventListener("keydown", seen);
@@ -113,25 +118,25 @@ test("Escape that closes a dropdown goes no further, so it does not also close s
 
 test("Escape outside a dropdown touches nothing: not the dropdowns, the sheet, or another disclosure", async () => {
   open(sheet());
-  const quality = menu("filters", "quality");
-  const phoneClass = menu("filters-phone", "class");
+  const quality = menu("quality");
+  const phoneClass = menu("class");
   open(quality, phoneClass);
   const seen = vi.fn();
   document.addEventListener("keydown", seen);
   for (const target of [
     bar().querySelector<HTMLElement>("input[type=search]")!,
-    summaryOf(sheet()),
+    bar().querySelector("label[for]")!,
     container.querySelector("#elsewhere-field")!,
     container.querySelector("#outside")!,
     document.body,
   ]) await press(target);
   document.removeEventListener("keydown", seen);
-  expect([quality.open, phoneClass.open, sheet().open, container.querySelector<HTMLDetailsElement>("#elsewhere")!.open]).toEqual([true, true, true, true]);
+  expect([quality.open, phoneClass.open, isOpen(sheet()), container.querySelector<HTMLDetailsElement>("#elsewhere")!.open]).toEqual([true, true, true, true]);
   expect(seen).toHaveBeenCalledTimes(5);
 });
 
 test("other keys inside a dropdown leave it open", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   await press(quality.querySelector("a")!, "ArrowDown");
   expect(quality.open).toBe(true);
@@ -139,16 +144,16 @@ test("other keys inside a dropdown leave it open", async () => {
 
 test("a press outside closes every open dropdown in the bar, and keeps the phone Filters sheet open", async () => {
   open(sheet());
-  const desktop = menu("filters", "quality");
-  const phone = menu("filters-phone", "class");
+  const desktop = menu("quality");
+  const phone = menu("class");
   open(desktop, phone);
   await pointerdown(container.querySelector("#outside")!);
   expect([desktop.open, phone.open]).toEqual([false, false]);
-  expect(sheet().open).toBe(true);
+  expect(isOpen(sheet())).toBe(true);
 });
 
 test("a press on the page itself, or on a disclosure elsewhere, also closes a dropdown and leaves that disclosure alone", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   await pointerdown(document.body);
   expect(quality.open).toBe(false);
@@ -159,7 +164,7 @@ test("a press on the page itself, or on a disclosure elsewhere, also closes a dr
 });
 
 test("a press inside a dropdown, on its panel, a choice or its own button, does not close it", async () => {
-  const quality = menu("filters", "quality");
+  const quality = menu("quality");
   open(quality);
   await pointerdown(quality.querySelector("ul")!);
   await pointerdown(quality.querySelector("a")!);
@@ -169,10 +174,10 @@ test("a press inside a dropdown, on its panel, a choice or its own button, does 
 
 test("a press inside the phone sheet but outside its dropdown closes the dropdown, not the sheet", async () => {
   open(sheet());
-  const phone = menu("filters-phone", "quality");
+  const phone = menu("quality");
   open(phone);
-  await pointerdown(sheet().querySelector("form")!);
-  expect([phone.open, sheet().open]).toEqual([false, true]);
+  await pointerdown(bar().querySelector("[data-filter-sheet-panel] form")!);
+  expect([phone.open, isOpen(sheet())]).toEqual([false, true]);
 });
 
 test("with several filter bars, each closes only its own dropdowns for a press that is outside them", async () => {
@@ -180,8 +185,8 @@ test("with several filter bars, each closes only its own dropdowns for a press t
   document.body.append(second);
   const secondRoot = createRoot(second);
   await act(async () => secondRoot.render(<FilterBar {...props} label="Other filters" />));
-  const first = menu("filters", "quality");
-  const other = menu("filters", "quality", second);
+  const first = menu("quality");
+  const other = menu("quality", second);
   open(first, other);
   // Escape in the second bar leaves the first alone.
   await press(other.querySelector("a")!);
@@ -210,12 +215,23 @@ test("each bar adds one document listener and removes it when it goes, however o
   expect(count(added) - count(removed)).toBe(0);
 });
 
-test("on the server it is still plain markup: the same bar, native <details> menus in two exclusive groups", () => {
+// Before, the bar drew every control twice (a phone sheet and a desktop row), about 61 kB of /database/items' RSC.
+test("on the server it is still plain markup: one copy of the controls, native <details> menus in one exclusive group", () => {
   const html = renderToStaticMarkup(<FilterBar {...props} />);
-  expect(html).toMatch(/^<div role="group" aria-label="Item filters" data-filter-bar="true" class="flex flex-wrap items-center gap-2"><details class="w-full sm:hidden">/);
+  expect(html).toMatch(/^<div role="group" aria-label="Item filters" data-filter-bar="true" class="flex flex-wrap items-center gap-2"><input type="checkbox"/);
   expect(html.match(/<details name="filters" /g)).toHaveLength(2);
-  expect(html.match(/<details name="filters-phone" /g)).toHaveLength(2);
+  expect(html).not.toContain("filters-phone");
+  expect(html.match(/type="search"/g)).toHaveLength(1);
+  expect(html.match(/>Crafted</g)).toHaveLength(1);
   expect(html).not.toContain("open=");
+  expect(html).not.toContain("checked=");
+});
+
+test("the phone Filters button is a label for the sheet's checkbox, and the row shows on its own from 640 px", () => {
+  const html = renderToStaticMarkup(<FilterBar {...props} />);
+  const id = html.match(/<input type="checkbox" id="([^"]+)"/)![1];
+  expect(html).toMatch(new RegExp(`<label for="${id}"[^>]*class="[^"]*sm:hidden[^"]*">Filters(?:<[^>]*>)* \\(1\\)`));
+  expect(html).toMatch(/data-filter-sheet-panel="true" class="[^"]*hidden[^"]*peer-checked:flex[^"]*sm:contents/);
 });
 
 test("a choice that matches nothing is left out unless selected, and a menu with nothing left to pick is not drawn", () => {

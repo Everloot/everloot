@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ArtThumb from "@/components/game/ArtThumb";
-import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type SparseColumn } from "@/components/ui";
+import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type SparseColumn, stripBelow } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { loadWorldFacts } from "@/lib/rollup-compute";
@@ -117,7 +117,7 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
             empty={<NoMatches noun="zones" chips={q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []} clearHref={META.path} />}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );

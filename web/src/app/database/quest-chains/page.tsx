@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ChainEntry } from "@kb/completion";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { chainHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
@@ -80,7 +80,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
             empty={empty}
           />
         </div>
-        {pages > 1 && <div className="mt-2">{strip}</div>}
+        {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
       </article>
     </Container>
   );
