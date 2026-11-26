@@ -57,6 +57,16 @@ test.each([
   expect(importChain(join(web, entry), "client-layer")).toBeNull();
 });
 
+// Better Auth's code is 0.7 MB and takes about 30 ms to load on a fresh isolate. The root layout (every page) and the
+// Supabase helpers (the armory and account pages) need only its on/off switch until a request has a session to read.
+test.each([
+  "src/app/layout.tsx",
+  "src/lib/supabase/server.ts",
+])("%s does not load Better Auth until a session is read", (entry) => {
+  expect(importChain(join(web, entry), join("lib", "auth", "auth.ts"))).toBeNull();
+});
+
 test("the import walk finds the layer where it is imported", () => {
   expect(importChain(join(web, "src", "lib", "edges.ts"), "client-layer")).not.toBeNull();
+  expect(importChain(join(web, "src", "app", "sign-in", "page.tsx"), join("lib", "auth", "auth.ts"))).not.toBeNull();
 });

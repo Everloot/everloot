@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
-import { authV2Enabled, withAuth } from "@/lib/auth/auth";
+import { authV2Enabled } from "@/lib/auth/flag";
 import { dbReadName, timeRead } from "@/lib/server-timing";
 
 // Battle.net uses our server-side sessions, not Supabase Auth JWTs. The browser
@@ -65,6 +65,8 @@ async function sessionHash(): Promise<string | null> {
 export async function getUser(): Promise<AccountUser | null> {
   if (authV2Enabled()) {
     const requestHeaders = await headers();
+    // Loaded here, not at the top: Better Auth is 0.7 MB of code that pages without a session never need.
+    const { withAuth } = await import("@/lib/auth/auth");
     const session = await withAuth((auth) => auth.api.getSession({ headers: requestHeaders }));
     return session ? { id: session.user.id, name: session.user.name } : null;
   }
