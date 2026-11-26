@@ -21,11 +21,13 @@ import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-comp
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { EmptyTab, EntityArt, EntityPage, known, LINK, ModelPicture, Unreachable } from "../../entity";
-import { NpcLootPanel } from "../../loot-tables";
+import { lootPage, NpcLootPanel } from "../../loot-tables";
+import { listHref } from "../../list-parts";
+import { agreedNpc } from "@kb/world-pages";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ boss: string }> };
+type Props = { params: Promise<{ boss: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 /** The boss, from its instance's boss table with what players reported when storage answers; null for an id no listed instance has. */
 async function find(segment: string): Promise<{ boss: BossEntry; unreachable: boolean; asOf?: Date } | null> {
@@ -63,6 +65,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
  */
 export default async function BossPage(props: Props) {
   const segment = (await props.params).boss;
+  const dropPage = lootPage((await props.searchParams)?.drops);
   const found = await find(segment);
   if (!found) notFound();
   const { boss, unreachable } = found;
@@ -90,6 +93,8 @@ export default async function BossPage(props: Props) {
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const tips = await loadItemTips(assets, droppedIds);
   const npcName = world && !world.unreachable ? npcNames(world) : new Map<number, string>();
+  // The level 3 installs agree on for the first creature tied to the boss that has one.
+  const level = world && !world.unreachable ? npcIds.map((id) => agreedNpc(id, world)?.level ?? null).find((l) => l !== null) ?? null : null;
   const creature = (id: number) => <EntityLink kind="npc" id={id} name={npcName.get(id) ?? `NPC ${id}`} />;
   // The first creature with a model picture; renders.json lists only creatures the site lists.
   const pictured = npcIds.find((id) => renders?.npcs.has(id));
@@ -108,6 +113,7 @@ export default async function BossPage(props: Props) {
     { label: "Type", value: kindOf(boss) },
     { label: "Order", value: order ?? PLACEHOLDER, numeric: order !== null },
     { label: "Difficulty", value: difficulty },
+    ...(level !== null ? [{ label: "Level", value: level, numeric: true }] : []),
     { label: "Kills reported", value: unreachable ? PLACEHOLDER : known(reported ? reported.kills.toLocaleString("en-US") : null, boss.row.reported), numeric: Boolean(reported) },
     ...(reported ? [
       { label: "Installs", value: <AgreementMeter count={reported.reporters} /> },
@@ -159,6 +165,7 @@ export default async function BossPage(props: Props) {
                   table={tables.get(id)!}
                   title={title}
                   dataAsOf={loot!.dataAsOf}
+                  pages={{ page: dropPage, href: (page) => `${listHref(path, [["drops", page === 1 ? undefined : String(page)]])}#loot` }}
                   item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
                 />
               </div>

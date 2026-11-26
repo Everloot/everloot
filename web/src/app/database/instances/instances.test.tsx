@@ -7,12 +7,12 @@ import { edgeDegraded } from "@/lib/cf-edge-cache";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 // Storage is down unless a test hands in sightings: the pages are then built from the game files alone, which is
 // where the level comes from.
-const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>(), quests: [] as unknown[], worldDown: false, lootDown: false }));
+const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>(), quests: [] as unknown[], npcs: [] as unknown[], worldDown: false, lootDown: false }));
 vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rollup-compute")>()),
   loadLootTables: async () => (state.lootDown ? { unreachable: true } : { tables: { sources: state.loot, leftOut: 0 }, unreachable: false, dataAsOf: "2026-11-05T00:00:00Z" }),
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
-  loadWorldFacts: async () => (state.worldDown ? { unreachable: true } : { npcs: [], quests: state.quests, vendors: [], unreachable: false }),
+  loadWorldFacts: async () => (state.worldDown ? { unreachable: true } : { npcs: state.npcs, quests: state.quests, vendors: [], unreachable: false }),
 }));
 // No lore archive here: the lookup answers "no page" (a missing release is an outage, which marks the page degraded).
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
@@ -30,6 +30,10 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSiteAssets: async () => art.assets,
 }));
+
+// Model pictures: none unless a test hands one in.
+const renders = vi.hoisted(() => ({ npcs: new Map<number, { url: string; size: number }>() }));
+vi.mock("@/lib/game-renders", () => ({ loadRenders: async () => ({ npcs: renders.npcs, items: new Map() }) }));
 
 import InstancesPage from "./page";
 import InstancePage, { generateMetadata as instanceMetadata } from "./[instance]/page";
@@ -417,5 +421,71 @@ test("each boss in the Bosses tab and the loot section links its boss page", asy
     expect(await lootOf("389-ragefire-chasm")).toContain('href="/database/bosses/2732-oggleflint"');
   } finally {
     state.seen = { unreachable: true };
+  }
+});
+
+test("an instance's facts give the group size the files give its difficulties and the entrance with its zone", async () => {
+  const facts = async (segment: string) => renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })).split("data-tab-panel")[0]!;
+  const deadmines = await facts("36-deadmines");
+  expect(text(deadmines)).toMatch(/\|Players\|5\|/);
+  // The entrance fact links its outdoor zone and the spot on the map.
+  const entrance = deadmines.split(">Entrance<")[1]?.split("</dd>")[0] ?? "";
+  expect(entrance).toMatch(/href="\/database\/zones\/[^"]+"/);
+  expect(entrance).toMatch(/href="\/map\?[^"]+"/);
+  // Molten Core's difficulties are for 20 and for 40 players in the files.
+  expect(text(await facts("409-molten-core"))).toMatch(/\|Players\|20 or 40\|/);
+});
+
+/** SYNTHETIC: three installs saw creature `npcId` at `level`. */
+const sighted = (npcId: number, level: number) => INSTALLS.map((installId) => ({ installId, npcId, name: "Oggleflint", mapId: 389, x: 50, y: 50, positionKind: "npc", level, capturedAt: "2026-11-04T20:00:00Z" }));
+/** Loot windows on one creature from 3 installs: `items` distinct items, item 20000+i in (i+1) of 40 windows. */
+const manyItems = (npcId: number, items: number) => new Map([[`npc:${npcId}`, {
+  windows: 40, installs: new Set(INSTALLS), first: "2026-11-03T20:00:00Z", last: "2026-11-04T20:00:00Z",
+  items: new Map(Array.from({ length: items }, (_, i) => [20000 + i, { windows: i + 1, installs: new Set(INSTALLS) }])),
+}]]);
+
+test("the Bosses tab gives each reported boss its creature's picture, agreed level and top three drops", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  state.loot = manyItems(11517, 5);
+  state.npcs = sighted(11517, 16);
+  renders.npcs = new Map([[11517, { url: "https://a.test/renders/11517.webp", size: 512 }]]);
+  try {
+    const bosses = panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) })), "bosses");
+    const headers = [...bosses.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+    expect(headers).toEqual(expect.arrayContaining(["Boss", "Level", "Top drops"]));
+    const row = bosses.split("<tr").find((r) => r.includes('href="/database/bosses/2732-oggleflint"')) ?? "";
+    expect(row).toContain('src="https://a.test/renders/11517.webp"');
+    expect(text(row)).toContain("|16|");
+    // The highest chance first: items 20004, 20003, 20002; the other two stay in the Loot tab.
+    const drops = [...row.matchAll(/href="\/database\/items\/(\d+)"/g)].map((m) => Number(m[1]));
+    expect(drops).toEqual([20004, 20003, 20002]);
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
+    state.npcs = [];
+    renders.npcs = new Map();
+  }
+});
+
+test("the Loot tab is one table of every boss's drops, highest chance first, paged by ?drops= like the NPC pages", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  state.loot = manyItems(11517, 30);
+  try {
+    const first = await lootOf("389-ragefire-chasm");
+    const rows = (html: string) => [...html.matchAll(/<tr[^]*?<\/tr>/g)].map((m) => m[0]).filter((r) => r.includes("/database/items/"));
+    expect(rows(first)).toHaveLength(25);
+    // Each row names its boss, linked to the boss page.
+    expect(rows(first)[0]).toContain('href="/database/items/20029"');
+    expect(rows(first)[0]).toContain('href="/database/bosses/2732-oggleflint"');
+    expect(first).toContain('href="/database/instances/389-ragefire-chasm?drops=2#loot"');
+    expect(text(first)).toContain("Show all 30");
+    const second = panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }), searchParams: Promise.resolve({ drops: "2" }) })), "loot");
+    expect(rows(second)).toHaveLength(5);
+    expect(rows(second).at(-1)).toContain('href="/database/items/20000"');
+    const all = panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }), searchParams: Promise.resolve({ drops: "all" }) })), "loot");
+    expect(rows(all)).toHaveLength(30);
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
   }
 });

@@ -102,6 +102,34 @@ export function NpcLootPanel({ table, title, item, dataAsOf, sort, sortHref, pag
 const byChance = (a: LootTableRow, b: LootTableRow) =>
   b.rate - a.rate || b.withItem - a.withItem || (a.sourceNpcId ?? a.sourceObjectId ?? 0) - (b.sourceNpcId ?? b.sourceObjectId ?? 0);
 
+/** One row of an instance's loot table: a creature's loot table row, with the boss that creature is tied to. */
+export type InstanceLootRow = LootTableRow & { encounterId: number };
+
+/**
+ * The Loot tab of an instance page: every boss creature's rated rows in one table, highest drop chance first, each
+ * with its boss, paged like the NPC Drops tab. Nothing when no row is rated; the caller says why per boss.
+ */
+export function InstanceLootPanel({ rows, title, item, boss, dataAsOf, pages }: {
+  rows: InstanceLootRow[]; title: string; item: (itemId: number) => ReactNode; boss: (encounterId: number) => ReactNode;
+  dataAsOf: string | null; pages?: LootPages;
+}) {
+  if (rows.length === 0) return null;
+  const columns: Column<InstanceLootRow>[] = [
+    { key: "item", header: "Item", cell: (r) => item(r.itemId) },
+    { key: "boss", header: "Boss", cell: (r) => boss(r.encounterId) },
+    { key: "with", header: "Windows with it", numeric: true, cell: (r) => r.withItem },
+    { key: "windows", header: "Out of", numeric: true, cell: (r) => r.windows },
+    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => rateWithRange(r.withItem, r.windows, r.installs) },
+    { key: "installs", header: "Reports", cell: (r) => dropTierLabel(r.installs) },
+  ];
+  const { shown, strip } = lootRows([...rows].sort(byChance), ["item", "items"], "Drop pages", pages);
+  return <>
+    <DataTable dense caption={`What the bosses of ${title} drop`} columns={columns} rows={shown} rowKey={(r) => `${r.encounterId}-${r.sourceNpcId}-${r.itemId}`} nofollow />
+    {strip}
+    <Method dataAsOf={dataAsOf} />
+  </>;
+}
+
 /**
  * The Dropped by tab of an item page, highest drop chance first. `zone` is where 3 installs agree a source stands, or
  * null: the Zone column shows only when some source has one.

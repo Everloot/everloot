@@ -96,6 +96,11 @@ export const difficultyLabel = (id: number): string => difficultyLabelIn(WORLD_M
 /** "Normal, Infinite" for ids [1, 201, 213]: the files carry several ids under one name, and each name prints once. */
 export const difficultyList = (ids: readonly number[], label: (id: number) => string = difficultyLabel): string =>
   [...new Set(ids.map(label))].join(", ");
+/** "5", or "20 or 40": the group sizes the files' Difficulty rows give these ids, smallest first; null when they give none. */
+export const groupSizeLabel = (ids: readonly number[], data: Pick<WorldMapData, "difficulties"> = WORLD_MAP): string | null => {
+  const sizes = [...new Set(ids.map((id) => data.difficulties?.[id]?.maxPlayers).filter((n): n is number => n !== undefined && n > 0))].sort((a, b) => a - b);
+  return sizes.length ? sizes.join(sizes.length === 2 ? " or " : ", ") : null;
+};
 export const instanceTitle = (row: Pick<InstanceRow, "instanceMapId" | "name">): string => row.name ?? `Instance ${row.instanceMapId}`;
 
 /** "17–24" for a range, "60" for one level, null when the game files give none. */
