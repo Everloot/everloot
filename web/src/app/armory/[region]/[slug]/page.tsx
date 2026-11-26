@@ -2,25 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { cache } from "react";
-import { Badge, Card, Container, PageHeader, SectionHeading, Tabs, type Fact } from "@/components/ui";
+import { Badge, Card, Container, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import ShowcaseSections from "@/components/showcase/ShowcaseSections";
 import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
-import {
-  armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
-  metricOfKey, PLAY_HISTORY_METRICS, rankText, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
-} from "@/lib/armory";
-import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
+import { armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, regionLabel } from "@/lib/armory";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { loadEquippedTips } from "@/lib/equipped-item-tips";
-import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
 import { Equipment, readTimes } from "../../profile";
-import { characterTabs } from "../../character-tabs";
-import { loadCharacterProgression } from "@/lib/progression";
+import { characterPanel, characterTabs, DEFAULT_TAB } from "../../character-tabs";
 import { addonSighting } from "@/lib/character-match";
-import { AddonSighting, CharacterFacts, CharacterOverview, DungeonRaidSlot, RankBadges, SheetSummary, type RankBadge } from "./sheet";
+import { AddonSighting, CharacterFacts, CharacterOverview, DungeonRaidSlot, RankBadges, SheetSummary } from "./sheet";
+import { loadCharacter as load, loadProgression, loadRanks, rankBadges as badgesOf, tabParts } from "./character-data";
+import LaterTab from "./later-tab";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
@@ -32,13 +27,6 @@ export const dynamic = "force-dynamic";
 
 type Params = { region: string; slug: string };
 
-/** The character, null when there is none (or the address is not one), "unreachable" when storage did not answer. */
-const load = cache(async (region: string, segment: string): Promise<ArmoryCharacter | null | "unreachable"> => {
-  const slug = slugFromSegment(segment);
-  if (!isArmoryRegion(region) || slug === null || !validArmorySlug(slug)) return null;
-  try { return await armoryStore().character(region, slug); } catch { return "unreachable"; }
-});
-
 export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
   if (!armoryOn()) return NOT_FOUND_METADATA;
   const { region, slug } = await props.params;
@@ -49,15 +37,6 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
     title: `${c.name} ${c.surname}, level ${c.level} ${c.race} ${c.class}`,
     description: `${c.name} ${c.surname}, a level ${c.level} ${c.race} ${c.class} on WoW: Forever ${regionLabel(c.region)} ${c.ruleset}: gear, item level and honorable kills from Blizzard's API.`,
     path: armoryCharacterPath(c.region, c.slug),
-  });
-}
-
-function rankFacts(c: ArmoryCharacter, ranks: ArmoryRank[]): Fact[] {
-  return ranks.flatMap((r) => {
-    const metric = metricOfKey(r.metric);
-    if (!metric) return [];
-    const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
-    return [{ label: `${ARMORY_BOARDS[metric].title} rank`, value: <Link href={href} className={link}>{rankText(r)}</Link>, numeric: true }];
   });
 }
 
@@ -77,21 +56,26 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
       </Container>
     );
   }
-  // A rank the store cannot give leaves the ranks out; the rest of the page stands.
-  const ranks = await armoryStore().rank(c.region, c.slug).catch(() => [] as ArmoryRank[]);
   const path = armoryCharacterPath(c.region, c.slug);
   const fullName = `${c.name} ${c.surname}`;
-  const associated = await publicArmoryLink(c.region, c.slug).catch(() => null);
-  const addon = associated?.sharesData ? await addonProfile(associated.identity).catch(() => null) : null;
-  const assets = await loadSiteAssets().catch(() => null);
-  const tips = await loadEquippedTips(assets, c.equipment);
-  // Achievement category names come from player reports only (the game files carry the id); none read leaves "Other".
-  const categories = c.details?.achievements?.rows.length
-    ? await loadCatalog().then((cat) => new Map((cat?.achievements ?? []).flatMap((a) => (a.category ? [[a.achievementId, a.category] as const] : [])))).catch(() => new Map<number, string>())
-    : new Map<number, string>();
+  // Every read the first screen needs starts at once; none waits on another it does not use. A tab other than the
+  // default one loads its own reads when it opens (./later-tab.tsx).
+  const linkRead = publicArmoryLink(c.region, c.slug).catch(() => null);
+  const assetsRead = loadSiteAssets().catch(() => null);
+  const [ranks, associated, addon, assets, tips, progression, seen, defaultParts, search] = await Promise.all([
+    loadRanks(c.region, c.slug),
+    linkRead,
+    linkRead.then((a) => (a?.sharesData ? addonProfile(a.identity).catch(() => null) : null)),
+    assetsRead,
+    assetsRead.then((a) => loadEquippedTips(a, c.equipment)),
+    loadProgression(c.region, c.slug),
+    addonSighting(c),
+    tabParts(c, DEFAULT_TAB),
+    props.searchParams,
+  ]);
   const race = assets?.races.get(c.race.toLowerCase());
   const portrait = c.details?.avatar?.url ?? (c.gender === "FEMALE" ? race?.female : race?.male) ?? assets?.classes.get(c.class.toLowerCase())?.icon ?? null;
-  const refresh = (await props.searchParams)?.refresh;
+  const refresh = search?.refresh;
   const refreshMessages: Record<string, string> = {
     queued: "Refresh queued. The profile updates after the next armory run.",
     "queued-already": "A refresh is already queued.",
@@ -102,26 +86,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   };
   const lastLogin = day(c.lastLogin);
   const lastRead = newest(readTimes(c));
-  // The honorable-kills rank sits with the kills in the PvP tab; the gear ranks stay with the numbers above the tabs.
-  const pvpRanks = rankFacts(c, ranks.filter((r) => r.metric === "honorable_kills"));
-  // The play-history ranks sit beside their counts in the Play history tab.
-  const historyKeys = new Set<string>(PLAY_HISTORY_METRICS.map((m) => ARMORY_BOARDS[m].key));
-  const historyRanks = ranks.flatMap((r) => {
-    const metric = metricOfKey(r.metric);
-    return metric && historyKeys.has(r.metric)
-      ? [{ metric, rank: r.rank, of: r.of, ...(r.tied === undefined ? {} : { tied: r.tied }), href: armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId }) }]
-      : [];
-  });
-  const progression = await loadCharacterProgression(c.region, c.slug);
-  // Every rank but the play-history ones shows as a badge under the facts strip, scoped by region and ruleset, in the
-  // same words as every other rank (rankText: the tie count and top share once the database returns them).
-  const rankBadges: RankBadge[] = ranks.flatMap((r) => {
-    const metric = metricOfKey(r.metric);
-    if (!metric || historyKeys.has(r.metric)) return [];
-    const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
-    return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} ${rankText(r)}`, href }];
-  });
-  const seen = await addonSighting(c);
+  const rankBadges = badgesOf(c, ranks);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
 
   return (
@@ -170,7 +135,10 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
         {seen && <AddonSighting seen={seen} />}
 
         <div id="progress">
-          <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { categories, pvpFacts: pvpRanks, historyRanks, progression })} />
+          <Tabs
+            label={`${fullName}: character sheet`}
+            tabs={characterTabs(c, {}, (id) => (id === DEFAULT_TAB ? characterPanel(c, id, defaultParts) : <LaterTab region={c.region} slug={c.slug} tab={id} />))}
+          />
         </div>
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">

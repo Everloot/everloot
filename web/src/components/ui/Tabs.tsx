@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { TAB_SCROLL, TabCount, filledTabs, tabClass } from "./tab-style";
 
 export interface TabItem {
@@ -11,6 +11,9 @@ export interface TabItem {
   count?: number;
   panel: ReactNode;
 }
+
+/** The id of the tab open in the nearest Tabs, so a panel can wait to load its content until it is opened. */
+export const OpenTab = createContext<string | null>(null);
 
 /** The tab a hash names, or null when it names none of them. */
 export function tabFromHash(hash: string, ids: string[]): string | null {
@@ -84,6 +87,7 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
   const panelId = (id: string) => `${uid}-panel-${id}`;
 
   return (
+    <OpenTab.Provider value={selected}>
     <div data-tabs className={`${inFrame ? "" : "min-w-0"} ${className}`.trim() || undefined}>
       {/* The hairline sits outside the scrolling list, so a narrow screen scrolls the tabs and not the page. */}
       <div className="border-b border-line">
@@ -117,5 +121,6 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
         </div>
       ))}
     </div>
+    </OpenTab.Provider>
   );
 }

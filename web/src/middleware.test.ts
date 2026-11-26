@@ -61,6 +61,15 @@ test("the armory shows Blizzard API data, so it is ad-free too: a client fetch g
   }
 });
 
+test("a Server Action posted to an ad-free page from that page passes: the character sheet loads its tabs this way", () => {
+  const action = { "Next-Action": "7015559c74", "Sec-Fetch-Dest": "empty", "Next-Router-State-Tree": "%5B%5D" };
+  const posted = middleware(new NextRequest("https://everloot.app/armory/eu/some-character", { method: "POST", headers: action }));
+  expect(posted.headers.get("x-middleware-next")).toBe("1");
+  // Only a POST is an action call: a client-side move carrying the header still gets no page.
+  const moved = middleware(new NextRequest("https://everloot.app/armory/eu/some-character", { headers: action }));
+  expect(moved.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+});
+
 test("a signed-in page load of an ad-free page gets that page, not the signed-in home", () => {
   for (const [v2, cookie] of [["0", "everloot_session=fixture"], ["1", "everloot.session_token=fixture"]]) {
     vi.stubEnv("EVERLOOT_PROFILES", "1");
