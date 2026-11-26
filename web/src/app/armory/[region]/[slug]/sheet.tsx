@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Card, type Fact } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import DungeonsAndRaids from "@/components/progress/DungeonsAndRaids";
 import type { DungeonsAndRaidsData } from "@/lib/dungeon-clears";
-import { metricValue } from "@/lib/armory";
+import { metricValue, readLine } from "@/lib/armory";
+import { timeAgo } from "@/lib/time";
+import { ProfessionList } from "../../profile";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import { guildPath, guildsOn } from "@/lib/guilds";
 import { optOutPath, type Player } from "@/lib/player-pages";
@@ -18,22 +20,81 @@ const Pair = ({ label, children }: { label: string; children: ReactNode }) => (
 );
 
 /**
- * The summary in the model's place of the sheet: the item level large, then the other gear numbers and the board ranks
- * (`ranks`, each a link to its board), then the key stats from the last stats read.
+ * The first line under the header: the numbers that say how geared the character is and how fresh the read is. A
+ * number the read did not bring is left out, never shown as 0. The read age names its exact time on hover.
  */
-export function SheetSummary({ character: c, ranks }: { character: ArmoryCharacter; ranks: Fact[] }) {
+export function CharacterFacts({ character: c, lastRead, now }: { character: ArmoryCharacter; lastRead: string | null; now: number }) {
+  const d = c.details;
+  const items: [string, ReactNode][] = [
+    ...(c.itemLevel !== null ? [["Item level", metricValue("item-level", c.itemLevel)] as [string, ReactNode]] : []),
+    ...(c.gearScore !== null ? [["Gear Score", metricValue("gear-score", c.gearScore)] as [string, ReactNode]] : []),
+    ...(c.honorableKills !== null ? [["Honorable kills", metricValue("honorable-kills", c.honorableKills)] as [string, ReactNode]] : []),
+    ...(d?.achievements ? [["Achievements", d.achievements.rows.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
+    ...(d?.quests ? [["Quests completed", d.quests.completed.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
+    ...(lastRead ? [["Last read", <time key="read" dateTime={lastRead} title={readLine(lastRead)}>{timeAgo(Date.parse(lastRead), now)}</time>] as [string, ReactNode]] : []),
+  ];
+  if (items.length === 0) return null;
+  return (
+    <dl data-character-facts aria-label="At a glance" className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-line bg-panel px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
+      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted">{label}</dt><dd className="font-mono text-lg tabular-nums text-fg">{value}</dd></div>)}
+    </dl>
+  );
+}
+
+/** A board rank as a badge with its scope ("EU Normal · Item level #6 of 20,943"), linking to that board. */
+export interface RankBadge { label: string; href: string }
+
+export function RankBadges({ ranks }: { ranks: readonly RankBadge[] }) {
+  if (ranks.length === 0) return null;
+  return (
+    <ul data-rank-badges aria-label="Board ranks" className="flex flex-wrap gap-2">
+      {ranks.map((r) => <li key={r.href}><Link href={r.href} className="inline-flex rounded-full hover:text-fg">
+        <Badge tone="neutral">{r.label}</Badge>
+      </Link></li>)}
+    </ul>
+  );
+}
+
+/**
+ * The overview row above the gear: a card per talent tree (the largest first and brightest) and the profession bars.
+ * Nothing when the last read brought neither.
+ */
+export function CharacterOverview({ character: c }: { character: ArmoryCharacter }) {
+  const trees = [...(c.details?.talents?.trees ?? [])].sort((a, b) => b.points - a.points);
+  const professions = c.details?.professions?.rows ?? [];
+  if (trees.length === 0 && professions.length === 0) return null;
+  return (
+    <div data-character-overview className="grid gap-6 lg:grid-cols-2">
+      {trees.length > 0 && <section aria-labelledby="armory-spec" className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+          <h2 id="armory-spec" className="text-h2 text-fg">Specialization</h2>
+          <a href="#talents" className={`text-sm ${link}`}>Talent details</a>
+        </div>
+        <ul className="grid grid-cols-3 gap-2">
+          {trees.map((tree, i) => <li key={tree.name} data-spec-card={tree.name} className="min-w-0 rounded-card border border-line bg-panel p-3"><p className={`text-sm [overflow-wrap:anywhere] ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.name}</p>
+            <p className={`font-mono text-lg tabular-nums ${i === 0 ? "text-fg" : "text-fg-2"}`}>{tree.points} points</p>
+          </li>)}
+        </ul>
+      </section>}
+      {professions.length > 0 && <section aria-labelledby="armory-overview-professions" className="space-y-3">
+        <h2 id="armory-overview-professions" className="text-h2 text-fg">Professions</h2>
+        <ProfessionList rows={professions} />
+      </section>}
+    </div>
+  );
+}
+
+/**
+ * The summary in the model's place of the sheet: the average item level, then the key stats from the last stats read.
+ * The item level, Gear Score and ranks sit above the sheet (CharacterFacts, RankBadges).
+ */
+export function SheetSummary({ character: c }: { character: ArmoryCharacter }) {
   const stats = c.details?.statistics?.rows ?? [];
   const key = KEY_STATS.flatMap((label) => stats.filter((s) => s.label === label));
   return (
     <section aria-label="Summary" data-sheet-summary className="flex h-full flex-col gap-4 rounded-card border border-edge bg-panel p-4">
-      <div>
-        <p className="text-cell-2 text-muted">Item level</p>
-        <p className="font-mono text-title tabular-nums text-fg">{c.itemLevel !== null ? metricValue("item-level", c.itemLevel) : "Not read"}</p>
-      </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
         {c.averageItemLevel !== null && <Pair label="Average item level">{c.averageItemLevel}</Pair>}
-        {c.gearScore !== null && <Pair label="Gear Score">{metricValue("gear-score", c.gearScore)}</Pair>}
-        {ranks.map((r, i) => <div key={i} className="min-w-0"><dt className="text-cell-2 text-muted">{r.label}</dt><dd className="font-mono text-cell tabular-nums text-fg">{r.value}</dd></div>)}
       </dl>
       {key.length > 0 && <dl aria-label="Key stats" className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4">
         {key.map((s) => <Pair key={s.label} label={s.label}>{s.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{s.percent ? "%" : ""}</Pair>)}
@@ -44,9 +105,15 @@ export function SheetSummary({ character: c, ranks }: { character: ArmoryCharact
 
 /**
  * The character's dungeons and raids (components/progress/DungeonsAndRaids): synced boss kills per instance, below the
- * gear sheet so the sheet stays the first thing on the page.
+ * gear sheet so the sheet stays the first thing on the page. With no kill to list it is one muted line and the link.
  */
 export function DungeonRaidSlot({ data, href }: { data: DungeonsAndRaidsData; href: string }) {
+  if (!data.synced || data.instances.length === 0) {
+    return <p data-slot="dungeon-raid-progress" className="text-meta text-muted">
+      Dungeons &amp; raids: {data.synced ? "no boss kill is recorded in this character's synced history yet" : "no boss kills are synced for this character"}.{" "}
+      <a href={href} className={link}>Every instance</a>
+    </p>;
+  }
   return <div data-slot="dungeon-raid-progress"><DungeonsAndRaids data={data} href={href} /></div>;
 }
 
