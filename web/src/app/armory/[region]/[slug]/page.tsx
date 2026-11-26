@@ -112,13 +112,13 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
       : [];
   });
   const progression = await loadCharacterProgression(c.region, c.slug);
-  // Every rank but the play-history ones shows as a badge under the facts strip, scoped by region and ruleset. The
-  // number is the store's own rank (one more than the characters strictly above); ties are not told apart yet.
+  // Every rank but the play-history ones shows as a badge under the facts strip, scoped by region and ruleset, in the
+  // same words as every other rank (rankText: the tie count and top share once the database returns them).
   const rankBadges: RankBadge[] = ranks.flatMap((r) => {
     const metric = metricOfKey(r.metric);
     if (!metric || historyKeys.has(r.metric)) return [];
     const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
-    return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} #${r.rank} of ${r.of.toLocaleString("en-US")}`, href }];
+    return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} ${rankText(r)}`, href }];
   });
   const seen = await addonSighting(c);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;

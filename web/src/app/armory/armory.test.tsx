@@ -114,7 +114,11 @@ describe("the character page", () => {
   test("a rank shared with others says how many, and a rank read without a tie count reads as before", async () => {
     // Torvin (the store's other EU Normal character) on Velkara's item level: both are #1, each tied with the other.
     mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", itemLevel: armoryCharacter().itemLevel }));
-    expect(await html(pages.character("eu", "velkara-duskmantle"))).toContain("#1 (tied with 1) of 2");
+    const tied = await html(pages.character("eu", "velkara-duskmantle"));
+    expect(tied).toContain("#1 (tied with 1) of 2");
+    // The rank badges above the gear use the same words.
+    const badges = tied.slice(tied.indexOf("data-rank-badges"), tied.indexOf("data-paper-doll"));
+    expect(badges).toMatch(/>EU Normal · Item level #1 \(tied with 1\) of 2</);
     // Before the database counts ties, the store gives no tied field and the rank reads "#n of N".
     vi.spyOn(mem, "rank").mockResolvedValueOnce([{ metric: "item_level", rank: 1, of: 2 }]);
     const out = await html(pages.character("eu", "velkara-duskmantle"));
