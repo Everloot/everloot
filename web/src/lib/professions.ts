@@ -108,3 +108,7 @@ export function recipeItemIds(recipes: readonly RecipeView[]): number[] {
   }
   return [...ids];
 }
+
+const RECIPE_BY_SPELL = new Map(CLIENT_PROFESSIONS.flatMap((p) => p.recipes.map((r) => [r.spellId, r] as const)));
+/** The recipe a spell is in the files (its ranks and reagents); undefined for a spell no profession lists. */
+export const recipeBySpell = (spellId: number): RecipeView | undefined => RECIPE_BY_SPELL.get(spellId);

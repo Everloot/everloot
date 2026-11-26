@@ -24,6 +24,7 @@ import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { FACT_WORD, withReported } from "@/lib/item-names";
 import { itemTooltip } from "@/lib/item-tooltip";
+import { recipeBySpell } from "@/lib/professions";
 import { itemSetOf } from "@/lib/item-sets";
 import { GameCard } from "@/components/game/GameCard";
 import type { Crumb } from "@/lib/jsonld";
@@ -147,10 +148,41 @@ export default async function ItemPage(props: Props) {
     { name: title, path: `/database/items/${itemId}` },
   ];
 
+  // Beside each row, what the site already holds for it: the zone 3 installs measured a vendor in, and a recipe's
+  // reagents and skill ranks from the game files (client-recipes.json). A column shows only where some row has a value.
+  const vendorZones = (e: Edge) => (e.rel === "sold_by" ? edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === e.toId) : []);
+  const recipeOf = (e: Edge) => (e.toKind === "spell" && (e.rel === "created_by" || e.rel === "reagent_for") ? recipeBySpell(e.toId) : undefined);
+  // Icons only for reagents whose tooltip shows under the item name rule; none reads nothing.
+  const reagentIds = [...new Set(rel("created_by").flatMap((e) => recipeOf(e)?.reagents.map((x) => x.itemId) ?? []))].filter(showsTip);
+  const reagentTips = reagentIds.length ? await loadItemTips(assets ?? await loadSiteAssets(), reagentIds) : new Map<number, { icon: string | null }>();
+  const rank = (n: number | null | undefined) => (n == null ? <span className="text-muted">—</span> : n);
+  const detailColumns = (rows: Edge[]): Column<Edge>[] => {
+    const recipes = rows.map(recipeOf);
+    return [
+      ...(rows.some((e) => vendorZones(e).length) ? [{
+        key: "zone", header: "Zone", cell: (e: Edge) => {
+          const zones = vendorZones(e);
+          return zones.length ? <span className="inline-flex flex-wrap gap-x-2">{zones.map((z) => <span key={z.toId}><RelationTarget edge={z} rel={z.rel} client={edges.client} /></span>)}</span> : <span className="text-muted">—</span>;
+        },
+      }] : []),
+      ...(rows.some((e) => e.rel === "created_by") && recipes.some((r) => r?.reagents.length) ? [{
+        key: "reagents", header: "Reagents", cell: (e: Edge) => {
+          const reagents = recipeOf(e)?.reagents ?? [];
+          return reagents.length
+            ? <ul className="flex flex-col gap-1">{reagents.map((x) => <li key={x.itemId} className="inline-flex items-center gap-1"><EntityLink kind="item" id={x.itemId} name={itemName(x.itemId)} icon={reagentTips.get(x.itemId)?.icon} />{x.count > 1 && <span className="font-mono tabular-nums text-fg-2">×{x.count}</span>}</li>)}</ul>
+            : <span className="text-muted">—</span>;
+        },
+      }] : []),
+      ...(recipes.some((r) => r?.learn) ? [{ key: "learn", header: "Needs", numeric: true, cell: (e: Edge) => rank(recipeOf(e)?.learn) }] : []),
+      ...(recipes.some((r) => r?.yellow) ? [{ key: "yellow", header: "Yellow", numeric: true, cell: (e: Edge) => rank(recipeOf(e)?.yellow) }] : []),
+      ...(recipes.some((r) => r?.grey) ? [{ key: "grey", header: "Grey", numeric: true, cell: (e: Edge) => rank(recipeOf(e)?.grey) }] : []),
+    ];
+  };
   // The "Seen" column only where some row was seen in play; a tab read wholly from the game files carries
   // the item's own unconfirmed marker instead of one per row.
   const relationColumns = (head: string, rows: Edge[]): Column<Edge>[] => [
     { key: "target", header: head, cell: (e) => <span className="inline-flex flex-wrap items-center gap-1"><RelationTarget edge={e} rel={e.rel} client={edges.client} spellIcon={spellIcon} nameOf={nameFor} gameName={gameName} /></span> },
+    ...detailColumns(rows),
     ...(rows.some((e) => e.evidence === "observed") ? [{ key: "source", header: "Seen", cell: evidence, nowrap: true }] : []),
   ];
   // A relation tab from player reports (sold by) empties with the agreement meter; one from the game files
@@ -260,14 +292,17 @@ export default async function ItemPage(props: Props) {
 
   // The same per-item index and 3-install gate as the item lists' Source column; no row when nothing is reported.
   const source = itemSourceValue(itemSeen.from.get(itemId), filledTabs(tabs).map((t) => t.id));
-  // Where to get it, above the fold: the first three sources the tabs below list, drops, then vendors, then recipes.
+  // Where to get it, above the fold: the first three sources the tabs below list, vendors (a sure source) first, then
+  // drops, then recipes.
+  const relationSource = (e: Edge) => (
+    <span key={`${e.rel}-${e.toKind}-${e.toId}`}><RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} /></span>
+  );
   const getFrom = [
+    ...rel("sold_by").map(relationSource),
     ...(facts.unreachable ? [] : sources.rows.map((d) => (d.sourceNpcId !== undefined
       ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
       : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} />))),
-    ...[...rel("sold_by"), ...rel("created_by")].map((e) => (
-      <span key={`${e.rel}-${e.toKind}-${e.toId}`}><RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} /></span>
-    )),
+    ...rel("created_by").map(relationSource),
   ].slice(0, 3);
   // The page in four lines: what it is, what players saw, what nobody has reported, and where the name came from.
   const requiredLevel = tip?.lines.find((l) => l.startsWith("Requires Level"))?.replace("Requires Level ", "") ?? null;
