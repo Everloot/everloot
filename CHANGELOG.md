@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item pages show the zone each vendor stands in, a recipe's reagents and the skill where it turns yellow and grey, and list vendors first under "Get it from"; the armory talents list sets only numbers in the number font (#1575).
+- Site: item drop sources show the zone each creature stands in and sort by drop chance; long drop lists on item and NPC pages show 25 rows a page with a pager and "Show all"; the "Not yet reported" fact lists its missing facts as small tags (#1576).
 - Site: faction pages show the eight standings, the parent and sub-factions; title pages say prefix or suffix and show the title on a sample name; quest chain pages draw the chain as numbered steps with agreed levels, start NPC and zone, and the three lists gain those columns (#1566).
 - Site: hover cards now lead with what each page leads with: an NPC's level, rank, type, reaction and zone; a quest's level, side, type, category and zone; a spell's rank, cost, range, cast time and cooldown; a zone's territory and creature levels; an achievement's category, side and icon; an object's kind, zones and players' skill (#1568).
 - Site: Armory guild rosters show the rank names a guild's officers published, class icons, a sort menu that works on phones, an "At 60 / Below 60" level filter and a level-spread bar above the roster (#1570).
@@ -321,6 +323,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: auction browse and realm pages are about 40% lighter (760 kB → 450 kB of HTML for 50 rows): coins come from one shared drawing and price cells carry only their amounts. They look the same (#1573).
+- Site: the armory character page's facts strip sits right under the header, the spec cards sit beside the professions on wide screens, and words like "points" and "3 days ago" are no longer set in the number font (#1574).
+- Site: a burst of item pages no longer runs the server out of memory; pages that need the same game-data file at once share one read of it (#1577).
 - Site: armory character pages load faster: they no longer load the whole game-file item layer to name an equipped item's type and slot (#1567).
 - Site: pages load faster on a fresh server: the item lists, search, home page and database hub no longer load the whole game-file layer, and pages without a signed-in session no longer load the sign-in library (#1569).
 - Site: auction house pages use less server time, mostly in the minutes after new prices arrive (#1571).
