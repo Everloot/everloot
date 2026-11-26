@@ -18,8 +18,17 @@ export const BOARD_PREVIEW = 10;
 export interface RegionRows { region: ArmoryRegion; rows: ArmoryBoardRow[] | null }
 /** One character board: US and EU side by side, or the one region chosen. */
 export interface CharacterBoard { metric: ArmoryMetric; regions: RegionRows[] }
-/** Guilds by the average item level of the members read, newest read first among equals (the directory's order). */
-export type GuildGear = { state: "ready"; rows: ArmoryGuildRow[] } | { state: "not-ready" } | { state: "unreachable" };
+/**
+ * The guild gear board keeps guilds with at least this many members read (owner decision D6, the benchmark's
+ * recommended default, awaiting the owner): one member's gear is not a guild's. The full directory still lists them all.
+ */
+export const GUILD_GEAR_MIN_READ = 5;
+
+/**
+ * Guilds by the average item level of the members read, newest read first among equals (the directory's order).
+ * `minRead` is the minimum the database applied; absent until 20261126110000_armory_honest_ranks.sql is applied.
+ */
+export type GuildGear = { state: "ready"; rows: ArmoryGuildRow[]; minRead?: number } | { state: "not-ready" } | { state: "unreachable" };
 /** The newest raid's ladder: its top rows, the raid's name, whether raids have opened, and whether uploads could be read. */
 export interface RaidProgress { rows: RankedRow[]; instance: string | null; open: boolean; unreachable: boolean }
 
@@ -72,11 +81,12 @@ const bestOfClass = unstable_cache(async (region: ArmoryRegion | null) =>
 
 /** The directory's top of the average-item-level sort; an unreachable read throws, so it is never kept. */
 const guildGear = unstable_cache(async (region: ArmoryRegion | null): Promise<GuildGear> => {
-  const dir = await loadGuildDirectory({ prefix: null, region, ruleset: null, sort: "item-level", page: 1 }, await hiddenGuilds());
+  const dir = await loadGuildDirectory({ prefix: null, region, ruleset: null, sort: "item-level", page: 1 }, await hiddenGuilds(), GUILD_GEAR_MIN_READ);
   if (dir.state === "unreachable") throw new Error("guild directory unreachable");
   if (dir.state !== "ready") return { state: "not-ready" };
   // A guild with no member read has no gear to rank by.
-  return { state: "ready", rows: dir.rows.filter((g) => g.averageItemLevel !== null).slice(0, BOARD_PREVIEW) };
+  const rows = dir.rows.filter((g) => g.averageItemLevel !== null).slice(0, BOARD_PREVIEW);
+  return dir.minRead === undefined ? { state: "ready", rows } : { state: "ready", rows, minRead: dir.minRead };
 }, ["rankings-guild-gear"], { revalidate: BOARDS_KEPT_SECONDS, tags: [GUILD_SEARCH_TAG, PLAYER_SEARCH_TAG] });
 
 /** The newest raid's ladder; a dungeon ladder (the only kind before raids open) is not raid progress, so it stays empty. */

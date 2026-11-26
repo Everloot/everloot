@@ -65,6 +65,39 @@ describe("the Supabase store", () => {
     ]);
   });
 
+  test("reads how many share a rank once the database gives it, and leaves it out while it does not", async () => {
+    const { store } = fake([{ metric: "item_level", rank: 6, of: 20943, tied: 9 }, { metric: "gear_score", rank: "2", of: "40", tied: "0" }]);
+    expect(await store.rank("eu", "velkara-duskmantle")).toEqual([
+      { metric: "item_level", rank: 6, of: 20943, tied: 9 }, { metric: "gear_score", rank: 2, of: 40, tied: 0 },
+    ]);
+    // Before 20261126110000_armory_honest_ranks.sql the rows carry no tied column: the rank still reads, with no tie count.
+    const before = await fake([{ metric: "item_level", rank: 6, of: 20943 }]).store.rank("eu", "velkara-duskmantle");
+    expect(before).toEqual([{ metric: "item_level", rank: 6, of: 20943 }]);
+    expect(before[0]).not.toHaveProperty("tied");
+  });
+
+  test("the guild directory passes a minimum of members read, and reads without it while the database lacks it", async () => {
+    const row = { region: "eu", slug: "reed-few", name: "Reed Few", faction: "Alliance", ruleset_id: 1, ruleset: "PvP", member_count: 9,
+      members_read: 5, average_item_level: "61.0", level_60: 5, fetched_at: "2026-11-20T00:00:00Z", total: 1 };
+    const filter = { prefix: null, region: "eu", rulesetId: null, sort: "item_level" as const, limit: 50, offset: 0 };
+    const { query, store } = fake([row]);
+    expect(await store.guildDirectory({ ...filter, minRead: 5 })).toMatchObject({ total: 1, minRead: 5, rows: [{ slug: "reed-few", membersRead: 5 }] });
+    expect(call(query).body).toEqual({ p_prefix: null, p_region: "eu", p_ruleset_id: null, p_sort: "item_level", p_limit: 50, p_offset: 0, p_min_read: 5 });
+    // Without a minimum the six-argument directory is called as before.
+    const plain = fake([row]);
+    expect(await plain.store.guildDirectory(filter)).not.toHaveProperty("minRead");
+    expect(call(plain.query).body).not.toHaveProperty("p_min_read");
+    // The seven-argument form not applied yet: PostgREST answers 404 PGRST202, and the six-argument one answers instead.
+    const older = vi.fn(async (_path: string, init?: RequestInit) => {
+      if ("p_min_read" in JSON.parse(String(init?.body))) throw new StorageError(404, "PGRST202", "Could not find the function");
+      return [{ ...row, members_read: 1 }];
+    });
+    const page = await createCloudArmoryStore(older as never).guildDirectory({ ...filter, minRead: 5 });
+    expect(page).toMatchObject({ rows: [{ slug: "reed-few", membersRead: 1 }] });
+    expect(page).not.toHaveProperty("minRead");
+    expect(older).toHaveBeenCalledTimes(2);
+  });
+
   test("a rank for a board the site does not know is left out, not fatal", async () => {
     const { store } = fake([{ metric: "gear_score", rank: 3, of: 9 }, { metric: "future_board", rank: 1, of: 9 }]);
     expect(await store.rank("eu", "velkara-duskmantle")).toEqual([{ metric: "gear_score", rank: 3, of: 9 }]);
@@ -203,7 +236,7 @@ describe("the memory store", () => {
     expect((await s.board("item_level", "eu", 2, 10)).map((r) => r.slug)).toEqual(["torvin-ashbrook", "velkara-duskmantle"]);
     expect((await s.board("gear_score", "eu", null, 10)).map((r) => r.slug)).toEqual(["velkara-duskmantle"]);
     expect(await s.rank("eu", "velkara-duskmantle")).toEqual([
-      { metric: "item_level", rank: 2, of: 2 }, { metric: "gear_score", rank: 1, of: 1 }, { metric: "honorable_kills", rank: 1, of: 2 },
+      { metric: "item_level", rank: 2, of: 2, tied: 0 }, { metric: "gear_score", rank: 1, of: 1, tied: 0 }, { metric: "honorable_kills", rank: 1, of: 2, tied: 0 },
     ]);
   });
 
@@ -214,7 +247,17 @@ describe("the memory store", () => {
     s.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", details: history(50) }));
     expect((await s.board("fish_caught", "eu", 2, 10)).map((r) => [r.slug, r.value])).toEqual([["torvin-ashbrook", 50], ["velkara-duskmantle", 5]]);
     expect(await s.board("total_deaths", null, null, 10)).toEqual([]);
-    expect(await s.rank("eu", "velkara-duskmantle")).toContainEqual({ metric: "fish_caught", rank: 2, of: 2 });
+    expect(await s.rank("eu", "velkara-duskmantle")).toContainEqual({ metric: "fish_caught", rank: 2, of: 2, tied: 0 });
+  });
+
+  test("characters on one value share its rank and count the others on it; a guild directory minimum leaves out guilds read less", async () => {
+    const s = filled();
+    s.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", itemLevel: 57.41, gearScore: null, honorableKills: 50 }));
+    expect(await s.rank("eu", "torvin-ashbrook")).toContainEqual({ metric: "item_level", rank: 1, of: 2, tied: 1 });
+    expect(await s.rank("eu", "velkara-duskmantle")).toContainEqual({ metric: "item_level", rank: 1, of: 2, tied: 1 });
+    const filter = { prefix: null, region: null, rulesetId: null, sort: "item_level" as const, limit: 50, offset: 0 };
+    expect((await s.guildDirectory(filter))!.rows.map((g) => g.slug)).toEqual(["ember-wardens"]);
+    expect(await s.guildDirectory({ ...filter, minRead: 5 })).toEqual({ rows: [], total: 0, minRead: 5 });
   });
 
   test("the roster joins stored characters' numbers", async () => {
