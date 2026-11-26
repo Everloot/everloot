@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item tooltips read like the game's: reported armour, stats, resistances and DPS in white, and a set piece lists its set's pieces and bonuses under the set's name (linked on the item page). The hover card and the item page's box now come from one builder.
 - Site: spell and zone pages list what each game build changed about them (numbers, talent ranks and positions, map bounds), newest first, with a link to the build on /changes.
 - Site: every database entity page fills one shared template, so headers, quick facts, side column, tabs and the Open data and Report wrong data row sit in the same order on all of them.
 - Site: hover cards on links to achievement, faction, title, quest chain, zone, dungeon and raid, item set, mount, companion pet, currency, holiday and hunter pet family pages, and search finds spells, vendors and item sets (the type-ahead too, for spells and vendors).

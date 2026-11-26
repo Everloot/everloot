@@ -10,14 +10,14 @@ import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { currencyEntries, mountEntries, petEntries } from "./collectibles";
 import { factionInFiles, loadCatalog, titleDisplayName } from "./completion-lists";
 import { instanceRows, levelLabel } from "./instances";
-import { itemSet } from "./item-sets";
+import { itemSet, itemSetOf } from "./item-sets";
 import { zonePlaces } from "./places";
 import { holidayEntries, lastsLabel, petFamilyEntries, startLabel } from "./world-events";
 import { placedEntrances, zoneByMapId } from "./zones";
 import { WORLD_MAP } from "./world-map";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
-import { splitWhy } from "./placeholder";
+import { itemTooltip } from "./item-tooltip";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
 import { CLIENT_EDGES } from "@kb/client-layer-file";
 import { loadSpellTalents } from "./talents/spell-talents";
@@ -160,21 +160,21 @@ async function itemCard(id: number): Promise<SiteCardResult> {
   const filesTip = files.tips.get(id);
   const tip = filesTip && withReported(filesTip, reported);
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
-  const category = categoryOf(CLIENT_TAXONOMY, id);
-  // As the item page's box: the game's lines, else the type and slot from the client layer.
-  const { reasons, evidence } = splitWhy(tip?.why ?? []);
-  const lines = tip
-    ? [...tip.lines, ...evidence]
-    : [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l));
-  // The quality colour only where a name is shown, as on the item page; "Item N" stays plain.
-  const quality = name && category?.quality && category.quality.id <= 5 ? category.quality.id : null;
-  return {
-    status: 200,
-    body: {
-      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? files.icons.get(id) ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
-      foot: join([name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label]),
+  // The set's pieces and bonuses, as the item page's box shows them: the bonus names are the private spell names file's,
+  // so a failed read of it is a 503, never a cached card with "Spell N" in their place.
+  const set = tip ? itemSetOf(id) : undefined;
+  const spells = set?.bonuses.length ? await readSpellNames(CLIENT_LAYER.build.version) : null;
+  if (spells !== null && (spells === PRIVATE_UNREACHABLE || spells === PRIVATE_MALFORMED)) return UNAVAILABLE;
+  // As the item page's box (lib/item-tooltip.ts): one builder for both, so they never drift.
+  const { card } = itemTooltip({
+    id, tip, name, category: categoryOf(CLIENT_TAXONOMY, id), namesQuality: shown.matched?.names.get(id)?.quality, icon: files.icons.get(id) ?? null,
+    set: set && {
+      ...set,
+      pieceName: (item) => shownItemName(item, shown.agreed, shown.matched?.names)?.name,
+      spellName: (spell) => spells?.names.get(spell),
     },
-  };
+  });
+  return { status: 200, body: { type: "item", id, ...card } };
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;

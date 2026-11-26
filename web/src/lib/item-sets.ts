@@ -14,6 +14,9 @@ export const ITEM_SETS_PATH = "/database/item-sets";
 const byId = new Map(ITEM_SETS.map((s) => [s.id, s]));
 export const itemSet = (id: number): ClientItemSet | undefined => byId.get(id);
 export const itemSetHref = (id: number) => `${ITEM_SETS_PATH}/${id}`;
+const byItem = new Map(ITEM_SETS.flatMap((s) => s.items.map((item) => [item, s] as const)));
+/** The set an item is a piece of, as the game files list it. */
+export const itemSetOf = (itemId: number): ClientItemSet | undefined => byItem.get(itemId);
 
 const CLASS_BY_BIT = Object.entries(CLIENT_CLASS_GEAR.classes).map(([slug, c]) => ({ slug, bit: 1 << (c.id - 1), id: c.id })).sort((a, b) => a.id - b.id);
 

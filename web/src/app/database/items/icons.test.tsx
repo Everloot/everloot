@@ -201,8 +201,10 @@ test("an item page with a matched name shows it with its icon and tooltip facts,
   const page = await html(ItemPage(props(String(id))));
   expect(page).toContain(`Wiki name ${id}</h1>`);
   expect(page).toMatch(new RegExp(`data-unconfirmed[^>]*>(?:<[^>]+>)*?<img[^>]*i${id}\\.webp`));
-  // The tooltip card, as for an item players reported (DATA_POLICY, item names: facts follow the name).
-  expect(page).toMatch(new RegExp(`data-tooltip-frame[^>]*>[\\s\\S]*Game name ${id}`));
+  // The tooltip card, as for an item players reported (DATA_POLICY, item names: facts follow the name), under the name
+  // the page and its hover card show (lib/item-tooltip.ts), not a second one.
+  expect(page).toMatch(new RegExp(`data-tooltip-frame[^>]*>[\\s\\S]*Wiki name ${id}`));
+  expect(page).not.toContain(`Game name ${id}`);
   // No source line on the page: the Warcraft Wiki and Blizzard credits are in the site footer and /methodology#credits.
   expect(page).not.toContain(NAME_SOURCE.wiki);
   expect(page).not.toContain(CREDIT);

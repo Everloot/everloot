@@ -27,8 +27,12 @@ const ICON = 48;
 const GAP = 6;
 const MARGIN = 8;
 
-/** The game's tooltip box: the icon beside the name inside it, the reasons for any `[?]` as a footnote under it. */
-export function GameCard({ card }: { card: CardContent }) {
+/**
+ * The game's tooltip box: the icon beside the name inside it, the reasons for any `[?]` as a footnote under it. The
+ * hover card and the item page's box both draw it (lib/item-tooltip.ts gives an item's content to both); the page
+ * passes `links` and its region `label`.
+ */
+export function GameCard({ card, links, label }: { card: CardContent; links?: Readonly<Record<string, string>>; label?: string }) {
   const quality = typeof card.quality === "number" && card.quality >= 0 && card.quality <= 5 ? qualityOf(card.quality) : QUALITIES.find((q) => tokens.dark[`q-${q}`] === card.color);
   const notes = card.notes?.length && card.lines.some((line) => line.includes(PLACEHOLDER)) ? card.notes : null;
   return (
@@ -38,8 +42,9 @@ export function GameCard({ card }: { card: CardContent }) {
         quality={quality}
         icon={card.icon ? <GameIcon src={card.icon} size={ICON} quality={quality} /> : undefined}
         foot={card.foot ?? undefined}
+        label={label}
       >
-        {card.lines.length > 0 ? <TooltipLines lines={card.lines} /> : null}
+        {card.lines.length > 0 ? <TooltipLines lines={card.lines} links={links} /> : null}
       </TooltipFrame>
       {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
     </div>
