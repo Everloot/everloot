@@ -9,12 +9,13 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/ui/OpenData", () => ({ default: ({ text, report }: { text: string; report?: { type: string; id: number } }) => <pre data-open-data data-report={report ? `${report.type} ${report.id}` : ""}>{text}</pre> }));
 // Storage is down unless a test hands in sightings: the page is then the game files' encounter alone.
+const world = vi.hoisted(() => ({ npcs: [] as unknown[] }));
 const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>() }));
 vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rollup-compute")>()),
   loadLootTables: async () => ({ tables: { sources: state.loot, leftOut: 0 }, unreachable: false, dataAsOf: "2026-11-05T00:00:00Z" }),
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
-  loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
+  loadWorldFacts: async () => ({ npcs: world.npcs, quests: [], vendors: [], unreachable: false }),
 }));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
@@ -148,4 +149,24 @@ test("the loot tab opens first when it has rows; with none, the other tabs come 
     items: new Map([[14149, { windows: 6, installs: new Set(INSTALLS) }]]),
   }]]);
   expect(tabOrder(await page("2732-oggleflint"))[0]).toBe("loot");
+});
+
+test("a reported boss's facts give its creature's agreed level, and its loot pages by ?drops=", async () => {
+  reported();
+  world.npcs = INSTALLS.map((installId) => ({ installId, npcId: 11517, name: "Oggleflint", mapId: 389, x: 50, y: 50, positionKind: "npc", level: 16, capturedAt: "2026-11-04T20:00:00Z" }));
+  state.loot = new Map([["npc:11517", {
+    windows: 40, installs: new Set(INSTALLS), first: "2026-11-03T20:00:00Z", last: "2026-11-04T20:00:00Z",
+    items: new Map(Array.from({ length: 30 }, (_, i) => [20000 + i, { windows: i + 1, installs: new Set(INSTALLS) }])),
+  }]]);
+  try {
+    const html = await page("2732-oggleflint");
+    expect(text(html)).toMatch(/\|Level\|16\|/);
+    const items = (h: string) => [...panel(h, "loot").matchAll(/href="\/database\/items\/(\d+)"/g)].length;
+    expect(items(html)).toBe(25);
+    expect(panel(html, "loot")).toContain('href="/database/bosses/2732-oggleflint?drops=2#loot"');
+    const second = renderToStaticMarkup(await BossPage({ params: Promise.resolve({ boss: "2732-oggleflint" }), searchParams: Promise.resolve({ drops: "2" }) }));
+    expect(items(second)).toBe(5);
+  } finally {
+    world.npcs = [];
+  }
 });
