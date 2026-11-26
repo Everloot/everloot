@@ -42,6 +42,7 @@ import { UNAVAILABLE } from "@/lib/lore";
 import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 import EntityComments from "@/components/comments/EntityComments";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -347,6 +348,7 @@ export default async function ZonePage(props: Props) {
           )}
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
+        <EntityScreenshots type="zone" id={zone.mapId} name={zone.name} />
         <EntityComments type="zone" id={zone.mapId} />
       </EntityLayout>
     </Container>

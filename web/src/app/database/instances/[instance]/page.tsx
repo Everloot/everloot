@@ -35,6 +35,7 @@ import LoreSection from "@/components/LoreSection";
 import EntityComments from "@/components/comments/EntityComments";
 import { loadInstanceClears } from "@/lib/progression";
 import type { InstanceClears } from "@/lib/dungeon-clears";
+import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -359,6 +360,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <LoreSection match={lore} />
+          <EntityScreenshots type="instance" id={row.instanceMapId} name={title} />
           <EntityComments type="instance" id={row.instanceMapId} />
         </div>
       </article>
