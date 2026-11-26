@@ -216,6 +216,7 @@ test("every database entity page gives its open-data row a Report wrong data lin
     const source = readFileSync(file, "utf8");
     // The mount, pet and currency pages draw through the shared collectible page, which passes it on.
     const page = source.includes("<CollectiblePage") ? readFileSync(join(ROOT, "collectible-page.tsx"), "utf8") : source;
-    expect(page, file).toMatch(/<OpenData[^>]*\breport=\{/s);
+    // EntityPage draws the row from its openData prop (entity-slots.test.tsx renders the link on every type).
+    expect(page, file).toMatch(/\bopenData=\{[^\n]*?\{\s*report: \{/);
   }
 });

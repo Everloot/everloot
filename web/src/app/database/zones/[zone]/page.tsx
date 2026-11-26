@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import JsonLd from "@/components/JsonLd";
-import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "./ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, Disclosure, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, DataTable, Disclosure, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
@@ -28,7 +26,6 @@ import { bossLine, entranceLinks, instanceHref, loadSightings } from "@/lib/inst
 import { confirmedLine, dayLabel } from "@/lib/report-labels";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import EdgeDegraded from "@/components/EdgeDegraded";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import {
   hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneHref, zoneMapHref,
@@ -41,7 +38,7 @@ import { instanceRows } from "@/lib/instances";
 import { zonePlaces, type ZonePoi } from "@/lib/places";
 import { CLIENT_LABEL } from "@kb/edges";
 import { UNAVAILABLE } from "@/lib/lore";
-import { EMPTY, EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
+import { EMPTY, EmptyTab, EntityPage, FREQUENCY } from "../../entity";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 import EntityComments from "@/components/comments/EntityComments";
@@ -270,115 +267,112 @@ export default async function ZonePage(props: Props) {
   const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons" || t.id === "places") : all;
 
   return (
-    <Container width="data">
-      <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE} />
-      <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
-      <EntityLayout>
-        {/* The entity title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
-        <EntityHeader
-          title={zone.name}
-          icon={<EntityIcon src={art?.smallUrl ?? art?.url} cover />}
-          meta={[
-            <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
-            <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
-            wiki ? <Link key="wiki" href={wikiHref(wiki.slug)} className={link}>Wiki</Link> : null,
-          ]}
-          trail={[
-            ...trailFor("/database/zones")!,
-            { name: zone.name, path: canonical },
-          ]}
-          aside={<Link href={zoneMapHref(zone.mapId)} className="ctl inline-flex items-center border border-edge px-3 text-control text-fg-2 hover:text-fg">Open on the map</Link>}
-        />
-
-        {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
-
-        <EntitySidebar>
-          {/* The zone's box: its map with the pins on it, first in the side column (under the title on a phone). */}
-          <div className="entity-box mb-6">
-            <ZonePreview
-              name={zone.name}
-              width={shape.bounds.left - shape.bounds.right}
-              height={shape.bounds.top - shape.bounds.bottom}
-              art={art?.url ?? null}
-              npcs={here?.npcs ?? []}
-              entrances={entrances}
-            />
-          </div>
-          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
-          {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
-          <OpenData report={{ type: "Zone", id: zone.mapId, path: canonical }} className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
-        </EntitySidebar>
-
-        <div className="space-y-6">
-          <section aria-labelledby="known">
-            <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
-              What we know here
-            </SectionHeading>
-            {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
-            {!facts.unreachable && !hasConfirmed(here) && items.length === 0 && gathered.length === 0 && (
-              <div className="mb-4">
-                <EmptyTab
-                  message={`Players have not confirmed anything in ${zone.name} yet.${entrances.length ? " The dungeon and raid entrances here are read from the game files." : ""} A fact appears when 3 installs agree on it, and until then the lists below stay empty on purpose.`}
-                />
-              </div>
-            )}
-            <Tabs label={`Known in ${zone.name}`} tabs={tabs} empty={empty(noEntrance)} />
-            {farmLinks.length > 0 && (
-              <p data-farm-links className="mt-3 text-meta text-fg-2">
-                Farming and gathering:{" "}
-                {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
-              </p>
-            )}
-          </section>
-
-          {lore && lore !== UNAVAILABLE && (
-            <section aria-labelledby="lore">
-              <SectionHeading id="lore">Lore</SectionHeading>
-              <Card as="div">
-                <p className="max-w-prose text-fg">{lore.text}</p>
-                <p className="mt-3 text-sm text-muted">
-                  From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
-                  <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
-                </p>
-              </Card>
-            </section>
-          )}
-
-          {(terrain.length > 0 || gear.length > 0) && (
-            <section aria-label="Terrain" data-zone-terrain>
-              {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. */}
-              <Disclosure as="h2" id="terrain" wide summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
-                <p className="text-meta text-fg-2">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
-                {terrain.length > 0 && (
-                  <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
-                    {terrain.map(({ type, parts }) => (
-                      <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
-                        {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
-                      </Link>
-                    ))}
-                  </p>
-                )}
-                {gear.length > 0 && (
-                  <TerrainGearTable
-                    gear={gear}
-                    zone={zone.mapId}
-                    caption={`Gear whose effect works in ${zone.name}`}
-                    names={{
-                      item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
-                      spell: (id) => spellNames?.names.get(id),
-                      set: (id) => setNames?.names.get(id),
-                      instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
-                    }}
-                  />
-                )}
-              </Disclosure>
-            </section>
-          )}
+    <EntityPage
+      name={zone.name}
+      degraded={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE}
+      jsonLd={{ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` }}
+      // The entity title row: name, continent, and the map link as a quiet control (the header keeps the one filled button).
+      header={{
+        title: zone.name,
+        icon: <EntityIcon src={art?.smallUrl ?? art?.url} cover />,
+        meta: [
+          <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
+          <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
+          wiki ? <Link key="wiki" href={wikiHref(wiki.slug)} className={link}>Wiki</Link> : null,
+        ],
+        trail: [
+          ...trailFor("/database/zones")!,
+          { name: zone.name, path: canonical },
+        ],
+        aside: <Link href={zoneMapHref(zone.mapId)} className="ctl inline-flex items-center border border-edge px-3 text-control text-fg-2 hover:text-fg">Open on the map</Link>,
+      }}
+      notices={facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
+      // The zone's box: its map with the pins on it, first in the side column (under the title on a phone).
+      media={
+        <div className="entity-box mb-6">
+          <ZonePreview
+            name={zone.name}
+            width={shape.bounds.left - shape.bounds.right}
+            height={shape.bounds.top - shape.bounds.bottom}
+            art={art?.url ?? null}
+            npcs={here?.npcs ?? []}
+            entrances={entrances}
+          />
         </div>
+      }
+      summary={summary}
+      main={
+        <section aria-labelledby="known">
+          <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
+            What we know here
+          </SectionHeading>
+          {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
+          {!facts.unreachable && !hasConfirmed(here) && items.length === 0 && gathered.length === 0 && (
+            <div className="mb-4">
+              <EmptyTab
+                message={`Players have not confirmed anything in ${zone.name} yet.${entrances.length ? " The dungeon and raid entrances here are read from the game files." : ""} A fact appears when 3 installs agree on it, and until then the lists below stay empty on purpose.`}
+              />
+            </div>
+          )}
+          <Tabs label={`Known in ${zone.name}`} tabs={tabs} empty={empty(noEntrance)} />
+          {farmLinks.length > 0 && (
+            <p data-farm-links className="mt-3 text-meta text-fg-2">
+              Farming and gathering:{" "}
+              {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
+            </p>
+          )}
+        </section>
+      }
+      related={<>
+        {lore && lore !== UNAVAILABLE && (
+          <section aria-labelledby="lore">
+            <SectionHeading id="lore">Lore</SectionHeading>
+            <Card as="div">
+              <p className="max-w-prose text-fg">{lore.text}</p>
+              <p className="mt-3 text-sm text-muted">
+                From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
+                <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
+              </p>
+            </Card>
+          </section>
+        )}
+
+        {(terrain.length > 0 || gear.length > 0) && (
+          <section aria-label="Terrain" data-zone-terrain>
+            {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. */}
+            <Disclosure as="h2" id="terrain" wide summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
+              <p className="text-meta text-fg-2">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
+              {terrain.length > 0 && (
+                <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
+                  {terrain.map(({ type, parts }) => (
+                    <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
+                      {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
+                    </Link>
+                  ))}
+                </p>
+              )}
+              {gear.length > 0 && (
+                <TerrainGearTable
+                  gear={gear}
+                  zone={zone.mapId}
+                  caption={`Gear whose effect works in ${zone.name}`}
+                  names={{
+                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                    spell: (id) => spellNames?.names.get(id),
+                    set: (id) => setNames?.names.get(id),
+                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+                  }}
+                />
+              )}
+            </Disclosure>
+          </section>
+        )}
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
-        <EntityScreenshots type="zone" id={zone.mapId} name={zone.name} />
-        <EntityComments type="zone" id={zone.mapId} />
-      </EntityLayout>
-    </Container>
+      </>}
+      screenshots={<EntityScreenshots type="zone" id={zone.mapId} name={zone.name} />}
+      comments={<EntityComments type="zone" id={zone.mapId} />}
+      // No per-zone JSON is served, so no Raw JSON link: the copy text is the record.
+      openData={{ report: { type: "Zone", id: zone.mapId, path: canonical }, text: [`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n") }}
+    />
   );
 }
