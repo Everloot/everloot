@@ -10,6 +10,7 @@ import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
 import { loadCatalog } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { currencyEntries, mountEntries, petEntries, toyEntries } from "@/lib/collectibles";
+import { holidayEntries, petFamilyEntries } from "@/lib/world-events";
 import { instanceRows } from "@/lib/instances";
 import { publicZones } from "@/lib/zones";
 import { terrainTypes } from "@/lib/terrain";
@@ -91,6 +92,8 @@ export default async function DatabasePage() {
     "/database/pets": listed(petEntries()?.length),
     "/database/toys": listed(toyEntries()?.length),
     "/database/currencies": listed(currencyEntries()?.length),
+    "/database/holidays": listed(holidayEntries()?.length),
+    "/database/pet-families": listed(petFamilyEntries()?.length),
     "/database/drops": seen(live),
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
