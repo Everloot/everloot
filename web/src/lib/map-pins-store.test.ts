@@ -119,3 +119,20 @@ test("legacy and malformed bound snapshots fall back to the corpus", async () =>
     expect(await loadMapPins()).toEqual({ ...buildMapPins(corpus), unreachable: false });
   }
 });
+
+test("a file with characters past U+00FF is parsed from one-byte ASCII text, to the same value", async () => {
+  const good = JSON.parse(encodeMapPins(buildMapPins(corpus), asOf));
+  good.set.facts.npcs[0].name = "страж смерти “Оливер”";
+  const text = JSON.stringify(good);
+  const parse = vi.spyOn(JSON, "parse");
+  try {
+    const read = await loadStoredMapPins({ cloud, fetch: async () => new Response(text), now: () => 0 });
+    const texts = parse.mock.calls.map((call) => call[0]).filter((t) => typeof t === "string" && t.includes("generatedAt"));
+    expect(texts).toHaveLength(1);
+    expect([...texts[0]].every((c) => c.charCodeAt(0) < 0x80)).toBe(true);
+    expect(read).toEqual(parseMapPins(text)!.set);
+    expect(read!.facts.npcs[0].name).toBe("страж смерти “Оливер”");
+  } finally {
+    parse.mockRestore();
+  }
+});

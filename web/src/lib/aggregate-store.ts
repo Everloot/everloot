@@ -1,6 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { asciiJsonText } from "./ascii-json";
 import { keep } from "./kept";
+import { reviveMapsAndSets } from "./revive-json";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { namedRecord } from "@kb/corpus";
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
@@ -71,28 +72,6 @@ export function encodeAggregates(set: AggregateSet, generatedAt: string, opts: {
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) => Array.isArray(v[k]));
-
-/**
- * Every `{"$map": [...]}` and `{"$set": [...]}` in parsed JSON turned back into a Map or Set, in place and innermost
- * first, as a JSON.parse reviver would. Done after the parse because a reviver makes V8 keep the source text of every
- * value while it parses: on the stored file that was about 40 MB more heap at once and four times the CPU.
- */
-function reviveMapsAndSets(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) value[i] = reviveMapsAndSets(value[i]);
-    return value;
-  }
-  if (!isObject(value)) return value;
-  const keys = Object.keys(value);
-  for (const key of keys) {
-    const next = reviveMapsAndSets(value[key]);
-    // Defined, not assigned, as JSON.parse defines it: a "__proto__" key stays a plain property.
-    if (next !== value[key]) Object.defineProperty(value, key, { value: next, writable: true, enumerable: true, configurable: true });
-  }
-  if (keys.length === 1 && keys[0] === "$map" && Array.isArray(value.$map)) return new Map(value.$map as [unknown, unknown][]);
-  if (keys.length === 1 && keys[0] === "$set" && Array.isArray(value.$set)) return new Set(value.$set);
-  return value;
-}
 
 /**
  * The file as read, or null for text that is not JSON or a shape this code does not know (the pages then fall back). Never throws.
