@@ -1,6 +1,6 @@
 import { screenshotsOn } from "@/lib/screenshots";
 import type { ScreenshotEntityType } from "@/lib/screenshots-shared";
-import ScreenshotsSection from "./ScreenshotsSection";
+import ScreenshotsSection from "./LazyScreenshotsSection";
 
 /**
  * Player screenshots on an entity page, above its comments, by (type, id); `name` is the name the page shows, for the

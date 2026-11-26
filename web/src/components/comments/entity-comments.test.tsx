@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerenderToNodeStream } from "react-dom/static";
 import { afterEach, expect, test, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/database/items/19019" }));
+vi.mock("next/dynamic", async () => ({ default: (await import("react")).lazy }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: vi.fn(), authQuery: vi.fn(), siteUrl: () => "https://everloot.app" }));
 
 import EntityComments from "./EntityComments";
@@ -17,13 +19,31 @@ test("renders nothing unless EVERLOOT_COMMENTS=1 with profiles on", () => {
   }
 });
 
-test("on, the page's HTML holds the empty section and no comment, viewer or session", () => {
+// The section is loaded lazily, so read the HTML the way the server sends it: after it has loaded. Outside Next's
+// compiler next/dynamic is the pages-router loader, which draws nothing on the server; the app router's is React.lazy.
+async function fullHtml(node: React.ReactNode): Promise<string> {
+  const { prelude } = await prerenderToNodeStream(node);
+  let html = "";
+  for await (const chunk of prelude) html += chunk;
+  return html;
+}
+
+test("on, the page's HTML holds the empty section and no comment, viewer or session", async () => {
   vi.stubEnv("EVERLOOT_COMMENTS", "1");
   vi.stubEnv("EVERLOOT_PROFILES", "1");
-  const html = renderToStaticMarkup(<EntityComments type="item" id={19019} />);
+  const html = await fullHtml(<EntityComments type="item" id={19019} />);
   expect(html).toContain('id="comments"');
   expect(html).toContain("Loading comments");
   expect(html).not.toMatch(/Sign in|@\w|textarea/);
+});
+
+// Its code is a chunk of its own, so a page with the switch off (all of them today) never downloads it.
+test("the section's code reaches a page only through the lazy loader", () => {
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  expect(read("./EntityComments.tsx")).not.toMatch(/from "\.\/CommentsSection"/);
+  expect(read("./LazyCommentsSection.tsx")).toMatch(/dynamic\(\(\) => import\("\.\/CommentsSection"\)\)/);
+  // The barrel would pull every UI part into the chunk.
+  expect(read("./CommentsSection.tsx")).not.toMatch(/from "@\/components\/ui"/);
 });
 
 test("site only: nothing but the comments route, the moderation page and route, and this section reads comments", () => {

@@ -43,7 +43,7 @@ test("a zone page has a Places tab, labelled from the game files, that stays whe
   expect(out).toContain("The places the game files name in Elwynn Forest");
   expect(out).toContain("Found in game files, unconfirmed");
   expect(out).toMatch(/Subzones \(\d+\)/);
-  expect(out).toMatch(/href="\/map[^"]*"[^>]*>Show on the map/);
+  expect(out).toMatch(/href="\/map[^"]*"[^>]*>Show on the map<span class="sr-only">: Maclure Vineyards<\/span><\/a>/);
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   expect(await html(ZonePage({ params: Promise.resolve({ zone: "1429-elwynn-forest" }) }))).toContain("The places the game files name in Elwynn Forest");
 });

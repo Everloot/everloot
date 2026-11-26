@@ -13,12 +13,15 @@ import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-com
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
-import { DataTable, Tabs, TooltipFrame } from "@/components/ui";
+import { Badge, DataTable, Tabs, TooltipFrame, type SortDirection } from "@/components/ui";
+import { qualityNamed } from "@/components/ui/quality";
+import ItemTip from "@/components/game/ItemTip";
 import { EMPTY, EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
 import EntityMap from "../../EntityMap";
 import { entityMapZones } from "../../entity-map";
-import { NpcLootPanel } from "../../loot-tables";
+import { NPC_LOOT_SORTS, NpcLootPanel } from "../../loot-tables";
+import { nextSort, sortParam, sortRows } from "../../list-parts";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
 import { unknownNpc } from "../../unknown";
@@ -55,6 +58,17 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
 
 /** `UnitClassification` in words, as the game shows it. */
 const RANK_LABELS: Record<NpcRank, string> = { normal: "Normal", elite: "Elite", rare: "Rare", rare_elite: "Rare elite", boss: "Boss" };
+const REACTION_LABELS = { friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" } as const;
+
+type DropSort = { key: (typeof NPC_LOOT_SORTS)[number]; desc: boolean };
+/** The loot table's own order: the most frequent item first. */
+const DROP_DEFAULT: DropSort = { key: "rate", desc: true };
+/** `?sort=item`, `?sort=-rate`: the drops table's order; anything else is the default. */
+function dropSort(raw: unknown): DropSort {
+  if (typeof raw !== "string") return DROP_DEFAULT;
+  const key = raw.replace(/^-/, "");
+  return (NPC_LOOT_SORTS as readonly string[]).includes(key) ? { key: key as DropSort["key"], desc: raw.startsWith("-") } : DROP_DEFAULT;
+}
 
 /**
  * In place of a tooltip, a small picture of the zone with the NPC's point on it, linked to the world map.
@@ -78,8 +92,9 @@ function MapThumb({ pin, zone, art }: { pin: NpcPin; zone: string; art: string |
   );
 }
 
-export default async function NpcPage(props: { params: Promise<{ id: string }> }) {
+export default async function NpcPage(props: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await props.params;
+  const drops = dropSort((await props.searchParams)?.sort);
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const npcId = Number(params.id);
   const facts = await loadWorldFacts();
@@ -91,6 +106,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const goods = vendorPage(npcId, facts).offers;
   const now = Date.now();
   const { quests, goodsEvidence, goodsReported, questsReported } = npcRelations(npcId, facts, now);
+  const starts = quests.filter((q) => q.role === "starts"), ends = quests.filter((q) => q.role === "ends");
   // The same traits as the NPC list, each shown when 3 installs agree.
   const traits = agreedNpc(npcId, facts) ?? npcTraits([]);
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
@@ -112,7 +128,13 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const lore = !unreachable && page.name ? await loreFor("npc", npcId, page.name) : null;
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
   const loot = await loadLootTables();
-  const lootTable = npcLootTable(loot.tables, npcId);
+  const table = npcLootTable(loot.tables, npcId);
+  const itemName = (itemId: number) => names.get(itemId) ?? tips.get(itemId)?.name ?? null;
+  const lootTable = { ...table, rows: sortRows([...table.rows], (r) => drops.key === "item" ? itemName(r.itemId)?.toLowerCase() ?? null : drops.key === "with" ? r.withItem : r.rate, drops.desc, (r) => r.itemId) };
+  const dropHref = (key: string, dir: SortDirection) => {
+    const sort = sortParam(nextSort(key, dir, DROP_DEFAULT));
+    return `/database/npcs/${npcId}${sort ? `?sort=${sort}` : ""}#drops`;
+  };
   const trail = [...trailFor("/database/npcs")!, { name: title, path: `/database/npcs/${npcId}` }];
   const named = title !== `NPC ${npcId}`;
   // The model picture only where the page names the NPC; renders.json lists only NPCs the site lists.
@@ -143,7 +165,16 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
       header={{
         trail,
         title: shown.fromWiki ? <a href={shown.wikiPage} title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></a> : title,
-        meta: ["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null],
+        // What it is, from the traits 3 installs agree on: level, rank (a badge unless normal), type, reaction, zone.
+        meta: [
+          "NPC",
+          !unreachable && traits.level !== null ? <span key="level" className="tabular-nums">Level {traits.level}</span> : null,
+          !unreachable && traits.rank && traits.rank !== "normal" ? <Badge key="rank" tone="neutral">{RANK_LABELS[traits.rank]}</Badge> : null,
+          !unreachable ? traits.creatureType : null,
+          !unreachable && traits.reaction ? REACTION_LABELS[traits.reaction] : null,
+          zone ? <Link key="zone" href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : null,
+          named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null,
+        ],
       }}
       railMap
       // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
@@ -157,7 +188,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         { label: "Reported name", value: known(page.name, npcNameReporters(npcId, facts)) },
         { label: "Level", value: known(traits.level), numeric: true },
         { label: "Type", value: known(traits.creatureType) },
-        { label: "Reaction", value: known(traits.reaction && ({ friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" })[traits.reaction]) },
+        { label: "Reaction", value: known(traits.reaction && REACTION_LABELS[traits.reaction]) },
         { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
         ...(bosses.length ? [{ label: "Boss", value: <span>{bosses.map((b, i) => (
           <span key={b.id}>{i > 0 && "; "}<Link href={bossHref(b.id, b.row.name)} className={LINK}>{b.name}</Link> in <Link href={instanceHref(b.instance.instanceMapId, b.instance.name)} className={LINK}>{instanceTitle(b.instance)}</Link></span>
@@ -183,14 +214,16 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                   table={lootTable}
                   title={title}
                   dataAsOf={loot.dataAsOf}
-                  item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
+                  item={(itemId) => <ItemTip tip={tips.get(itemId)}><EntityLink kind="item" id={itemId} name={itemName(itemId)} quality={qualityNamed(tips.get(itemId)?.quality)} /></ItemTip>}
+                  sort={{ key: drops.key, direction: drops.desc ? "desc" : "asc" }}
+                  sortHref={dropHref}
                 />
                 {pending}
               </>,
           },
           {
             // Reports short of 3 installs fill the meter: no count, so the tab and its meter stay.
-            id: "goods", label: "Goods", count: unreachable || (!goods.length && goodsReported) ? undefined : goods.length,
+            id: "sells", label: "Sells", count: unreachable || (!goods.length && goodsReported) ? undefined : goods.length,
             panel: unreachable ? <Unreachable />
               : goods.length ? <>
                 <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>
@@ -198,21 +231,35 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
               </>
               : <EmptyTab reported={goodsReported} message={EMPTY.goods} />,
           },
-          {
-            id: "quests", label: "Quests", count: unreachable || (!quests.length && questsReported) ? undefined : quests.length,
+          ...([["starts", "Starts", starts, questsReported.giverNpcId, "gives"], ["ends", "Ends", ends, questsReported.turnInNpcId, "takes"]] as const).map(([id, label, rows, reported, verb]) => ({
+            // Reports short of 3 installs fill the meter: no count, so the tab and its meter stay.
+            id, label, count: unreachable || (!rows.length && reported) ? undefined : rows.length,
             panel: unreachable ? <Unreachable />
-              : quests.length ? <DataTable
+              : rows.length ? <DataTable
                 dense
-                caption={`Quests ${title} gives and takes`}
+                caption={`Quests ${title} ${verb}`}
                 columns={[
-                  { key: "role", header: "Role", cell: (q) => q.role },
                   { key: "quest", header: "Quest", cell: (q) => <EntityLink kind="quest" id={q.questId} name={q.title} /> },
                   { key: "reported", header: "Reported", cell: (q) => q.reported },
                 ]}
-                rows={quests}
-                rowKey={(q) => `${q.questId}-${q.role}`}
+                rows={rows}
+                rowKey={(q) => String(q.questId)}
               />
-              : <EmptyTab reported={questsReported} message={EMPTY.quests} />,
+              : <EmptyTab reported={reported} message={EMPTY.quests} />,
+          })),
+          {
+            // The encounters 3 installs tie this creature to; no tab for any other NPC.
+            id: "boss", label: "Boss", count: bosses.length || 0,
+            panel: <DataTable
+              dense
+              caption={`Boss encounters ${title} is part of`}
+              columns={[
+                { key: "boss", header: "Boss", cell: (b) => <Link href={bossHref(b.id, b.row.name)} className={LINK}>{b.name}</Link> },
+                { key: "instance", header: "Instance", cell: (b) => <Link href={instanceHref(b.instance.instanceMapId, b.instance.name)} className={LINK}>{instanceTitle(b.instance)}</Link> },
+              ]}
+              rows={bosses}
+              rowKey={(b) => String(b.id)}
+            />,
           },
           {
             id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,

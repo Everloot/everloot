@@ -1,6 +1,6 @@
 import { commentsOn } from "@/lib/comments";
 import type { CommentEntityType } from "@/lib/comments-shared";
-import CommentsSection from "./CommentsSection";
+import CommentsSection from "./LazyCommentsSection";
 
 /**
  * The comments at the bottom of an entity page, by (type, id). Nothing at all unless EVERLOOT_COMMENTS=1 (with

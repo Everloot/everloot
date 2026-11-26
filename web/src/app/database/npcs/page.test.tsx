@@ -79,3 +79,15 @@ test("a filter value the list does not know is a 404", async () => {
   await expect(html({ react: "x" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html({ page: "9" })).rejects.toThrow("NEXT_NOT_FOUND");
 });
+
+test("a rank above normal is a badge and the zone links its page", async () => {
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", rank: "elite", zone: { mapId: 1426, name: "Synthetic Hills", continentId: 0, continentName: "Synthetic Continent" } }),
+    npc({ npcId: 102, name: "Npc Beta", rank: "normal" }),
+  ];
+  const page = await html();
+  expect(page).toMatch(/data-badge="neutral"[^>]*>Elite</);
+  expect(page).not.toMatch(/data-badge="neutral"[^>]*>Normal</);
+  expect(page).toContain(">Normal<");
+  expect(page).toContain('<a href="/database/zones/1426-synthetic-hills">Synthetic Hills</a>');
+});

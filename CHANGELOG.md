@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: NPC pages read like a database entry: level, rank badge, type, reaction and zone link under the name; tabs in order Drops, Sells, Starts, Ends, Boss, Map with empty ones left out; drop and goods items in their quality colour, and the drops table sorts by item, count or rate. The NPC list shows ranks as badges and links zones.
+- Site: quest pages show the side in its faction colour, the type (group, dungeon, raid) and category in the header, Start and End NPCs, rewards with icons in their quality colour, and the quest chain as a row of steps with this quest marked.
 - Site: item tooltips show "This Item Begins a Quest", link Use and Equip lines to the spell page on the item page, and sum up players' reported numbers in one line with each number's installs, build and date behind it.
 - Site: Players is a directory to browse characters: class, race, faction, level, region, ruleset and guild filters in the address, sortable headers, 25/50/100 rows, names in class colour, guild links to that guild's members, and before a search the latest reads and the best item level of each class.
 - Site: the database lists work as one system: each row starts with the entity's icon and its name in its colour (item quality, a faction's side, a quest's side, a set's classes), columns run name, numbers, where, status, id, a Rows choice of 25, 50 or 100 sits beside the pager (?per=), more columns sort in the URL, the spell list filters by class, game-file lists lead with the unconfirmed mark, and the dungeon list folds into one line per row on a phone.
@@ -301,6 +303,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Site: the "Report a bug" button is a small icon in the corner that shows its words on hover or focus, and the page end keeps room for it, so it no longer covers headings, rows or footer links.
+- Site: item, NPC, zone and instance pages load 12 to 15 kB less compressed script (the switched-off comments and screenshots code no longer rides along), and screen readers get distinct names for search boxes and tables plus map links whose name starts with the words on screen.
 - Site: hover cards and the chat's item card load from /card instead of the challenged /database/ path, so they work for every visitor; gear and items the game files give only an icon for show that icon, marked unconfirmed, instead of a question mark; recipe reagents link their item pages.
 - Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.

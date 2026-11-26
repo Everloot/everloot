@@ -33,7 +33,7 @@ const records = [
 const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }) });
 const HEADER = '<span class="sr-only">Map link</span>';
-const LABEL = 'aria-label="Show Elwynn Forest at 40, 60 on the map"';
+const LABEL = '>Show on the map<span class="sr-only">: Elwynn Forest at 40, 60</span></a>';
 
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-10T00:00:00.000Z" }));
 
@@ -49,7 +49,7 @@ test("an NPC with no agreed position and a quest with no agreed level draw no na
   const npc = await html(NpcPage(props("1")));
   expect(npc).not.toContain('data-tab-panel="map"');
   expect(npc).not.toContain("No agreed position yet.");
-  expect(npc).toContain('data-tab-panel="goods"');
+  expect(npc).toContain('data-tab-panel="sells"');
 });
 
 test("an NPC's pin table names the zone, keeps the map id in a tooltip, and names its link and its link column", async () => {
