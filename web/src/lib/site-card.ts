@@ -4,7 +4,17 @@ import { npcPage, vendorPage } from "@kb/world-pages";
 import { loadWorldFacts } from "./rollup-compute";
 import { loadStoredAggregates } from "./aggregate-store";
 import { categoryOf } from "@kb/item-taxonomy";
-import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
+import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemSetNames, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
+import { CLIENT_LABEL } from "@kb/edges";
+import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
+import { currencyEntries, mountEntries, petEntries } from "./collectibles";
+import { factionInFiles, loadCatalog, titleDisplayName } from "./completion-lists";
+import { instanceRows, levelLabel } from "./instances";
+import { itemSet } from "./item-sets";
+import { zonePlaces } from "./places";
+import { holidayEntries, lastsLabel, petFamilyEntries, startLabel } from "./world-events";
+import { placedEntrances, zoneByMapId } from "./zones";
+import { WORLD_MAP } from "./world-map";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
 import { splitWhy } from "./placeholder";
@@ -26,7 +36,16 @@ import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
  * aggregates, the names, the asset manifest, the private item files, the quest titles) makes the card a 503, never
  * a card missing what that read holds. A 404 is only for an id no page shows.
  */
-export type SiteCardType = TooltipType | "spell" | "vendor";
+export type SiteCardType = TooltipType | "spell" | "vendor" | EntryCardType;
+
+/**
+ * The pages built on the game files' lists, each with a card: its name as the page shows it, the art its header
+ * shows, and a few of its facts. Achievements, factions, titles and quest chains also read the completion rollup, as
+ * their pages do, and dungeons and raids the cron's stored view; the rest are the committed game data alone.
+ */
+export const ENTRY_CARD_TYPES = ["achievement", "faction", "title", "chain", "zone", "instance", "item-set", "mount", "pet", "currency", "holiday", "family"] as const;
+export type EntryCardType = (typeof ENTRY_CARD_TYPES)[number];
+export const isEntryCardType = (v: unknown): v is EntryCardType => (ENTRY_CARD_TYPES as readonly unknown[]).includes(v);
 
 export interface SiteCard {
   type: SiteCardType;
@@ -56,6 +75,10 @@ const plain = (type: SiteCardType, id: number, title: string, lines: string[], f
   ({ status: 200, body: { type, id, title, quality: null, color: null, icon: null, lines, foot } });
 
 export async function loadSiteCard(type: SiteCardType, id: number): Promise<SiteCardResult> {
+  if (isEntryCardType(type)) {
+    try { return await entryCard(type, id); }
+    catch { return UNAVAILABLE; }
+  }
   if (type === "spell" || type === "vendor") {
     try { return await (type === "spell" ? spellCard(id) : vendorCard(id)); }
     catch { return UNAVAILABLE; }
@@ -152,4 +175,136 @@ async function itemCard(id: number): Promise<SiteCardResult> {
       foot: join([name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label]),
     },
   };
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+/** The foot of a card whose page says the entry is the game files' own; a confirmed entry's page says players reported it. */
+const filesFoot = (confirmed: boolean) => (confirmed ? "As three installs reported it" : CLIENT_LABEL);
+const kept = (parts: (string | null | undefined | false | 0)[]) => parts.filter((p): p is string => Boolean(p));
+const NO_CARD = { status: 404, error: NOT_FOUND } as const;
+type Assets = NonNullable<Awaited<ReturnType<typeof loadSiteAssets>>>;
+
+/** The art a page's header shows, by id, from the manifest; a manifest that did not load with its URL set is a failed read. */
+async function art(from: (assets: Assets) => string | undefined): Promise<string | null | typeof UNAVAILABLE> {
+  const assets = await loadSiteAssets();
+  if (!assets) return assetsBaseUrl() ? UNAVAILABLE : null;
+  return from(assets) ?? null;
+}
+
+const failed = (icon: string | null | typeof UNAVAILABLE): icon is typeof UNAVAILABLE => typeof icon === "object" && icon !== null;
+
+/** A card of one of the game-file entry pages, under that page's rules: a 404 where the page is a 404. */
+async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResult> {
+  const card = (title: string, lines: string[], foot: string | null, icon: string | null = null): SiteCardResult =>
+    ({ status: 200, body: { type, id, title, quality: null, color: null, icon, lines, foot } });
+
+  switch (type) {
+    case "achievement": case "faction": case "title": case "chain": {
+      // The pages read the completion rollup to say whether three installs confirmed the entry, and under what name.
+      const catalog = await loadCatalog();
+      if (!catalog?.confirmations) return UNAVAILABLE;
+      if (type === "achievement") {
+        const listed = catalog.achievements.find((a) => a.achievementId === id);
+        const files = CLIENT_ACHIEVEMENTS.achievements[String(id)];
+        if (!listed && !files) return NO_CARD;
+        const entry = listed?.confirmed ? listed : null;
+        const points = entry?.points ?? files?.points ?? null;
+        const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;
+        return card(listed?.name ?? files!.title, kept([
+          entry ? entry.category : files?.description,
+          points !== null && plural(points, "point"),
+          criteria !== null && criteria > 0 && plural(criteria, "criterion", "criteria"),
+        ]), filesFoot(Boolean(entry)));
+      }
+      if (type === "faction") {
+        const entry = catalog.factions.find((f) => f.factionId === id);
+        if (!entry) return NO_CARD;
+        const files = factionInFiles(id);
+        return card(entry.name, kept([
+          files?.parent?.name ?? entry.header, entry.major && "Major faction", files?.header && "A header of the reputation pane",
+        ]), filesFoot(entry.confirmed));
+      }
+      if (type === "title") {
+        const entry = catalog.titles.find((t) => t.titleId === id);
+        return entry ? card(titleDisplayName(entry.name), ["Character title"], filesFoot(entry.confirmed)) : NO_CARD;
+      }
+      const entry = catalog.chains.find((c) => c.questLineId === id);
+      if (!entry) return NO_CARD;
+      const count = entry.questIds.length;
+      return card(entry.name, [entry.truncated ? `More than ${plural(count, "quest")}` : plural(count, "quest")], filesFoot(entry.confirmed));
+    }
+    case "zone": {
+      // Released zones only: a held-back zone has no page.
+      const zone = zoneByMapId(id);
+      if (!zone) return NO_CARD;
+      const places = zonePlaces(id);
+      const named = places ? places.pois.length + places.subzones.length : 0;
+      const entrances = placedEntrances(WORLD_MAP).filter((e) => e.zone?.mapId === id).length;
+      return card(zone.name, kept([
+        `Zone in ${zone.continentName}`,
+        named > 0 && `${plural(named, "named place")} in the game files`,
+        entrances > 0 && plural(entrances, "dungeon or raid entrance", "dungeon and raid entrances"),
+      ]), null);
+    }
+    case "instance": {
+      // The cron's stored view, as the vendor card reads it: the names and kinds 3 installs agree on beside the files'.
+      const set = await loadStoredAggregates({ strict: true });
+      if (!set) return UNAVAILABLE;
+      const asOf = set.dataAsOf && Number.isFinite(Date.parse(set.dataAsOf)) ? new Date(set.dataAsOf) : undefined;
+      const row = instanceRows({ instances: set.instances, ...(asOf ? { asOf } : {}) }).get(id);
+      if (!row) return NO_CARD;
+      const level = levelLabel(row.level);
+      const entrance = row.confirmed[0]?.zoneName ?? row.files[0]?.zoneName;
+      return card(row.name ?? `Instance ${id}`, kept([
+        `${row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon"}${level ? `, level ${level}` : ""}`,
+        row.encounters.length > 0 && `${plural(row.encounters.length, "boss", "bosses")} in the game files`,
+        entrance && `Entrance in ${entrance}`,
+      ]), null);
+    }
+    case "item-set": {
+      const set = itemSet(id);
+      if (!set) return NO_CARD;
+      // The set and bonus names are the private files', as on the set page; a failed read is never a card without them.
+      const version = CLIENT_LAYER.build.version;
+      const [names, spells] = await Promise.all([readItemSetNames(version), set.bonuses.length ? readSpellNames(version) : null]);
+      if (names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED || spells === PRIVATE_UNREACHABLE || spells === PRIVATE_MALFORMED) return UNAVAILABLE;
+      return card(names?.names.get(id) ?? `Item set ${id}`, [
+        plural(set.items.length, "piece"),
+        ...set.bonuses.map(([count, spell]) => `(${count}) Set: ${spells?.names.get(spell) ?? `Spell ${spell}`}`),
+      ], CLIENT_LABEL);
+    }
+    case "mount": {
+      const mount = mountEntries()?.find((m) => m.id === id);
+      if (!mount) return NO_CARD;
+      const icon = await art((a) => a.spellIcons.get(mount.spellId));
+      if (failed(icon)) return icon;
+      // Whether 3 installs confirm a mount is read from the whole corpus, which a card never reads: the card says neither.
+      return card(mount.name, kept(["Mount", mount.ridingSkill && `Requires Riding (${mount.ridingSkill})`]), null, icon);
+    }
+    case "pet": {
+      const pet = petEntries()?.find((p) => p.id === id);
+      if (!pet) return NO_CARD;
+      const icon = await art((a) => a.petIcons.get(id));
+      return failed(icon) ? icon : card(pet.name, ["Companion pet"], CLIENT_LABEL, icon);
+    }
+    case "currency": {
+      const currency = currencyEntries()?.find((c) => c.id === id);
+      if (!currency) return NO_CARD;
+      const icon = await art((a) => a.currencyIcons.get(id));
+      if (failed(icon)) return icon;
+      return card(currency.name, kept([currency.description, currency.max && `Maximum: ${currency.max.toLocaleString("en-US")}`, currency.category]), CLIENT_LABEL, icon);
+    }
+    case "holiday": {
+      const holiday = holidayEntries()?.find((h) => h.id === id);
+      if (!holiday) return NO_CARD;
+      const lasts = lastsLabel(holiday.hours);
+      return card(holiday.name, kept([holiday.starts[0] && startLabel(holiday.starts[0]), lasts && `Lasts ${lasts}`]), CLIENT_LABEL);
+    }
+    case "family": {
+      const family = petFamilyEntries()?.find((f) => f.id === id);
+      if (!family) return NO_CARD;
+      const icon = await art((a) => a.familyIcons.get(id));
+      return failed(icon) ? icon : card(family.name, ["Hunter pet family", `${plural(family.spellIds.length, "spell")} on its skill line`], CLIENT_LABEL, icon);
+    }
+  }
 }

@@ -327,3 +327,33 @@ test.each([["spells", "spell"], ["vendors", "vendor"]])("%s links use the frame,
   expect(card()!.textContent).toContain("Loaded name");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+// Every page built on the game files' lists: the link's path, with or without its name slug, and the card it asks for.
+test.each([
+  ["/database/achievements/627-explore-dun-morogh", "achievement/627"],
+  ["/database/factions/21-booty-bay", "faction/21"],
+  ["/database/titles/144-bloodsail-admiral", "title/144"],
+  ["/database/quest-chains/5963-to-have-loved-and-lost", "chain/5963"],
+  ["/database/zones/1426-dun-morogh", "zone/1426"],
+  ["/database/instances/36-the-deadmines", "instance/36"],
+  ["/database/item-sets/1", "item-set/1"],
+  ["/database/mounts/6-brown-horse", "mount/6"],
+  ["/database/pets/39", "pet/39"],
+  ["/database/currencies/1792-honor-points", "currency/1792"],
+  ["/database/holidays/62-fireworks-spectacular", "holiday/62"],
+  ["/database/pet-families/1-wolf", "family/1"],
+])("a link to %s asks for its card", async (href, key) => {
+  container.innerHTML = `<a href="${href}">Shown name</a>`;
+  pointer("pointerover", link(href));
+  await wait(SHOW_DELAY);
+  expect(fetcher).toHaveBeenCalledWith(`/card/${key}`);
+});
+
+test.each(["/database/items/19019-thunderfury", "/database/achievements", "/database/zones/1426-dun-morogh/coverage", "/database/item-sets/1-x", "/database/achievements/0-zero"])(
+  "a link to %s is not an entity page with a card", async (href) => {
+    container.innerHTML = `<a href="${href}">Not a card</a>`;
+    pointer("pointerover", link(href));
+    await wait(SHOW_DELAY);
+    expect(fetcher).not.toHaveBeenCalled();
+  },
+);

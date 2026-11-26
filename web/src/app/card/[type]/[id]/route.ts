@@ -1,8 +1,10 @@
-import { loadSiteCard } from "@/lib/site-card";
+import { isEntryCardType, loadSiteCard } from "@/lib/site-card";
 import { tooltipId, tooltipType } from "@/lib/tooltip";
 
 /**
- * GET /card/<item|npc|quest|object|spell|vendor>/<id>: the hover card on the site's own links (components/game/HoverCards)
+ * GET /card/<type>/<id>: item, npc, quest, object, spell, vendor and the game-file entry pages (ENTRY_CARD_TYPES in
+ * lib/site-card.ts: achievement, faction, title, chain, zone, instance, item-set, mount, pet, currency, holiday,
+ * family). The hover card on the site's own links (components/game/HoverCards)
  * and the chat's item card. Part of the site, not the API, like /search/suggest: it follows the pages' rules
  * (lib/site-card.ts), so other sites get no CORS and search engines a noindex, and it stays out of /api/, which carries
  * no game-file names. It sits outside /database/ because Cloudflare challenges every path there, and a background fetch
@@ -24,7 +26,7 @@ const NO_STORE = { "Cache-Control": "no-store", "CDN-Cache-Control": "no-store",
 
 export async function GET(_req: Request, ctx: { params: Promise<{ type: string; id: string }> }) {
   const params = await ctx.params;
-  const type = params.type === "spell" || params.type === "vendor" ? params.type : tooltipType(params.type);
+  const type = params.type === "spell" || params.type === "vendor" || isEntryCardType(params.type) ? params.type : tooltipType(params.type);
   const id = tooltipId(params.id);
   if (!type || id === null) return Response.json({ ok: false, error: "No such card." }, { status: 404, headers: CACHE_404 });
   const result = await loadSiteCard(type, id);

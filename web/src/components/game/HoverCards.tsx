@@ -5,7 +5,9 @@ import { QUALITIES } from "@/design/tokens";
 import type { SiteCard } from "@/lib/site-card";
 import { CardPopup, GameCard, type CardContent } from "./GameCard";
 
-// The in-game card on every link to an item, NPC, quest, object, spell or vendor page, mounted once in the root layout. It
+// The in-game card on every link to an item, NPC, quest, object, spell or vendor page, or to one of the game-file entry
+// pages (achievement, faction, title, quest chain, zone, dungeon or raid, item set, mount, companion pet, currency,
+// holiday, hunter pet family), mounted once in the root layout. It
 // listens on the document, so a list, a search result, the type-ahead or a link inside a page needs nothing of
 // its own: any <a href="/database/items/123"> gets the card. A pointer resting on the link for SHOW_DELAY or
 // keyboard focus opens it: the card's frame at once with the name and quality colour the link already shows, filled
@@ -14,8 +16,14 @@ import { CardPopup, GameCard, type CardContent } from "./GameCard";
 // open. It appears without motion, so there is nothing for reduced motion to turn off, and it sits in a fixed layer
 // over the page, so it moves nothing on it. Links that already carry their own card (ItemTip, SpellTip) are left alone.
 
-const PATH = /^\/database\/(items|npcs|quests|objects|spells|vendors)\/([1-9]\d{0,9})\/?$/;
-const TYPE = { items: "item", npcs: "npc", quests: "quest", objects: "object", spells: "spell", vendors: "vendor" } as const;
+const PATH = /^\/database\/(items|npcs|quests|objects|spells|vendors|item-sets)\/([1-9]\d{0,9})\/?$/;
+// The game-file entry pages, whose address adds the name's words after the id ("627-explore-dun-morogh").
+const SLUG_PATH = /^\/database\/(achievements|factions|titles|quest-chains|zones|instances|mounts|pets|currencies|holidays|pet-families)\/([1-9]\d{0,9})(?:-[a-z0-9-]*)?\/?$/;
+const TYPE = {
+  items: "item", npcs: "npc", quests: "quest", objects: "object", spells: "spell", vendors: "vendor", "item-sets": "item-set",
+  achievements: "achievement", factions: "faction", titles: "title", "quest-chains": "chain", zones: "zone", instances: "instance",
+  mounts: "mount", pets: "pet", currencies: "currency", holidays: "holiday", "pet-families": "family",
+} as const;
 /**
  * How long the pointer rests on a link before its card is asked for and shown, so a pointer crossing a list asks
  * nothing. Short: the frame shows at once, and a card asked for before needs no request.
@@ -30,7 +38,7 @@ export function cardKey(link: HTMLAnchorElement): string | null {
   let url: URL;
   try { url = new URL(link.href, window.location.href); } catch { return null; }
   if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return null;
-  const m = PATH.exec(url.pathname);
+  const m = PATH.exec(url.pathname) ?? SLUG_PATH.exec(url.pathname);
   return m ? `${TYPE[m[1] as keyof typeof TYPE]}/${m[2]}` : null;
 }
 

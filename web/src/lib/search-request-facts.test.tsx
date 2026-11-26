@@ -5,6 +5,8 @@ const reads = vi.hoisted(() => ({ items: vi.fn(), world: vi.fn(), tips: vi.fn() 
 vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world, computeRollups: async () => ({ rates: [], measuredZeros: [], rejected: [], stats: { uploads: 0, lootWindows: 0, records: 0, unreachable: false, dataAsOf: null } }) }));
 vi.mock("./objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 vi.mock("./game-assets", () => ({
+  // No spell or item set names file here: the search has no spell or item set group.
+  loadSpellNames: async () => null, loadItemSetNames: async () => null,
   loadItemNames: async () => null,
   PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadQuestNames: async () => null,

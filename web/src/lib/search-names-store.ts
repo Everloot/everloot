@@ -3,6 +3,7 @@ import { objectList } from "@kb/object-page";
 import { npcReportedName } from "@kb/world-pages";
 import type { AggregateSet } from "./aggregate-set";
 import { keep } from "./kept";
+import { publicVendors } from "./world-lists";
 import { itemNames, npcNames, objectNames, questTitles, type Names } from "./names";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import type { R2Config } from "./upload-store";
@@ -14,14 +15,15 @@ import type { R2Config } from "./upload-store";
  * needs: the names 3 installs agree on per kind (names.ts, the same functions), the one- or two-install unanimous NPC
  * names a Warcraft Wiki name may stand in for (shown-item-names.ts wikiNpcNames), the item ids with a public drop
  * rate (which, with the agreed and game-file names, decide whether an item row shows its icon), and the object ids
- * /database/objects lists (the ones an object hit may name; site-search.ts objectHits). Nothing here is a
+ * /database/objects lists (the ones an object hit may name; site-search.ts objectHits), and the vendor ids
+ * /database/vendors lists (the vendor group's rows, named by the NPC names here). Nothing here is a
  * name a page would not print, and no game-file name is in it: those stay in the private bucket and are merged in
  * by the reader. With no file, the search reads the aggregates as before.
  */
 
 export const SEARCH_NAMES_KEY = "snapshots/search-names.json";
 /** The file's shape in its stamp. Change it when the file gains a list, so the next cron rewrites it. */
-export const SEARCH_NAMES_REVISION = "names-1";
+export const SEARCH_NAMES_REVISION = "names-2";
 /** How long one server instance keeps the file before asking for it again; the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute. */
@@ -37,10 +39,13 @@ export interface SearchNamesFile {
   dropped: number[];
   /** The objects /database/objects lists: the ones with a public loot window (kb object-page objectList). */
   objectIds: number[];
+  /** The vendors /database/vendors lists: an item and price 3 installs agree on (world-lists publicVendors). */
+  vendorIds: number[];
 }
 
 /** The file as read: the maps the search matches against, kept per instance so each keystroke reuses them. */
-export interface SearchNames { generatedAt: string; dataAsOf: string | null; names: Names; candidates: Map<number, string>; dropped: Set<number>; objectIds: Set<number> }
+/** `vendorIds` is undefined for a file written before the list: the vendor group then waits for the next cron. */
+export interface SearchNames { generatedAt: string; dataAsOf: string | null; names: Names; candidates: Map<number, string>; dropped: Set<number>; objectIds: Set<number>; vendorIds?: Set<number> }
 
 const pairs = (names: Map<number, string>): [number, string][] => [...names].sort((a, b) => a[0] - b[0]);
 
@@ -62,6 +67,7 @@ export function buildSearchNames(set: AggregateSet, generatedAt: string): Search
     version: 1, revision: SEARCH_NAMES_REVISION, generatedAt, dataAsOf: set.dataAsOf,
     items: pairs(itemNames(set.items)), npcs: pairs(agreedNpcs), quests: pairs(questTitles(set.world)), objects: pairs(objectNames(set.items)),
     npcCandidates: pairs(candidates), dropped, objectIds,
+    vendorIds: publicVendors(set.world).map((v) => v.vendorNpcId).sort((a, b) => a - b),
   };
 }
 
@@ -77,11 +83,13 @@ export function parseSearchNames(text: string): SearchNames | null {
   if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || (raw.dataAsOf !== null && typeof raw.dataAsOf !== "string")) return null;
   const isIds = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => Number.isInteger(n));
   if (![raw.items, raw.npcs, raw.quests, raw.objects, raw.npcCandidates].every(isPairs) || !isIds(raw.dropped) || !isIds(raw.objectIds)) return null;
+  if (raw.vendorIds !== undefined && !isIds(raw.vendorIds)) return null;
   const map = (v: unknown) => new Map(v as [number, string][]);
   return {
     generatedAt: raw.generatedAt, dataAsOf: raw.dataAsOf as string | null,
     names: { items: map(raw.items), npcs: map(raw.npcs), quests: map(raw.quests), objects: map(raw.objects) },
     candidates: map(raw.npcCandidates), dropped: new Set(raw.dropped), objectIds: new Set(raw.objectIds),
+    ...(raw.vendorIds === undefined ? {} : { vendorIds: new Set(raw.vendorIds as number[]) }),
   };
 }
 

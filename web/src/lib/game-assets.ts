@@ -512,6 +512,10 @@ export const loadItemSetNames = (version: string, base: string | null = assetsBa
 export const loadSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
   loadNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
 
+/** Item set names, distinguishing failed reads and malformed files from an absent or wrong-build catalog. */
+export const readItemSetNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
+  readNamesFile("item-set-names.json", version, base, store, fileNames(SetNamesSchema, mayShowSetName));
+
 /** Spell names, distinguishing failed reads and malformed files from an absent or wrong-build catalog. */
 export const readSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
   readNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));

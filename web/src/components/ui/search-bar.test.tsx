@@ -343,3 +343,15 @@ test("the type-ahead asks in lower case, so every casing is one cached request",
   expect(suggestUrl(" Thrall ", "")).toBe("/search/suggest?q=thrall");
   expect(suggestUrl("THRALL", "npc")).toBe("/search/suggest?q=thrall&in=npc");
 });
+
+test("vendors sit with the NPCs and spells in a section of their own, each row saying its type and id", async () => {
+  await type("frost");
+  await answer("frost", [
+    { type: "vendor", id: 10, label: "Frostmane Vendor", href: "/database/vendors/10" },
+    { type: "spell", id: 116, label: "Frostbolt", href: "/database/spells/116" },
+  ]);
+  expect(headings()).toEqual(["Zones & NPCs", "Spells"]);
+  const notes = [...container.querySelectorAll("[role=option]")].map((o) => o.textContent);
+  expect(notes[0]).toContain("Vendor 10");
+  expect(notes[1]).toContain("Spell 116");
+});
