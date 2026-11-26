@@ -93,43 +93,92 @@ describe("player directory", () => {
     return renderToStaticMarkup(await Players({ searchParams: Promise.resolve(params) }));
   };
 
-  test("without a name lists profiles by gear, with gear columns and hide forms", async () => {
+  test("without a name lists profiles by gear: names in class colour, guild and sort links, menus in the URL", async () => {
     armory.putCharacter(armoryCharacter());
-    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", gearScore: 1 }));
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", gearScore: 1, class: "Mage", race: "Gnome", guildName: null }));
     const seen = vi.spyOn(holder.store!, "search");
     const html = await page();
-    expect(html.indexOf('href="/armory/eu/velkara-duskmantle"')).toBeLessThan(html.indexOf('href="/armory/eu/arla-quill"'));
-    for (const text of ["2 Blizzard profiles", "Gear score", "Item level", "Last read", "61.2", "57.41", "/armory/hide?region=eu", "/players/opt-out", "Blizzard profile hide form"]) expect(html).toContain(text);
-    for (const name of ["q", "class", "race", "faction", "region", "ruleset", "min", "max", "guild", "sort"]) expect(html).toContain(`name="${name}"`);
+    const table = html.slice(html.indexOf('id="player-results"'));
+    expect(table.indexOf('href="/armory/eu/velkara-duskmantle"')).toBeLessThan(table.indexOf('href="/armory/eu/arla-quill"'));
+    expect(table).toMatch(/href="\/armory\/eu\/velkara-duskmantle" class="[^"]*text-class-hunter/);
+    expect(table).toMatch(/href="\/armory\/eu\/arla-quill" class="[^"]*text-class-mage/);
+    for (const text of ["Blizzard profiles", "Gear score", "Item level", "Last read", "61.2", "57.41", "Troll Hunter", "/armory/hide?region=eu", "/players/opt-out", "Blizzard profile hide form"]) expect(html).toContain(text);
+    // The guild cell lists that guild's members here; the sorted column says so and every other header is a sort link.
+    expect(table).toContain('href="/players?guild=Ember+Wardens"');
+    expect(table).toContain('aria-sort="descending"');
+    for (const sort of ["name", "level", "item-level", "last-read"]) expect(table).toContain(`href="/players?sort=${sort}"`);
+    for (const key of ["class", "race", "faction", "region", "ruleset", "level", "sort"]) expect(html).toContain(`data-filter="${key}"`);
+    expect(html).toContain('href="/players?class=HUNTER"');
+    expect(html).toContain('href="/players?min=60&amp;max=60"');
+    for (const name of ["q", "guild"]) expect(html).toContain(`name="${name}"`);
     expect(seen).not.toHaveBeenCalled();
   });
 
-  test("parses filters for the store and keeps all of them in paging links", async () => {
-    const directory = vi.spyOn(armory, "directory").mockResolvedValue({ rows: [armoryCharacter()], total: 60 });
+  test("parses filters for the store and keeps all of them in paging and menu links", async () => {
+    const directory = vi.spyOn(armory, "directory").mockResolvedValue({ rows: [armoryCharacter()], total: 160 });
     const html = await page({ q: ["Vel", "other"], class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: "Ember", sort: "item-level", page: "2" });
-    expect(directory).toHaveBeenCalledWith(expect.objectContaining({ prefix: "vel", class: "Hunter", race: "Troll", faction: "Horde", region: "eu", rulesetId: 2, minLevel: 40, maxLevel: 60, guildPrefix: "Ember", sort: "item_level", limit: 25, offset: 25 }));
-    expect(html).toContain("Previous");
-    expect(html).toContain("Next");
-    expect(html).toContain("60 Blizzard profiles");
+    expect(directory).toHaveBeenCalledWith(expect.objectContaining({ prefix: "vel", class: "Hunter", race: "Troll", faction: "Horde", region: "eu", rulesetId: 2, minLevel: 40, maxLevel: 60, guildPrefix: "Ember", sort: "item_level", limit: 50, offset: 50 }));
+    // The numbered pager: back to page 1 (no page in the address) and on to page 3, every filter kept.
+    expect(html).toMatch(/<a href="\/players\?q=Vel&amp;[^"]*sort=item-level"[^>]*>‹<\/a>/);
+    expect(html).toMatch(/<a href="\/players\?q=Vel&amp;[^"]*sort=item-level&amp;page=3"[^>]*>›<\/a>/);
+    expect(html).toContain(">160<");
     expect(html).toContain("guild=Ember&amp;sort=item-level&amp;page=3");
     expect(html).toContain("class=HUNTER&amp;race=Troll&amp;faction=Horde&amp;region=eu&amp;ruleset=2&amp;min=40&amp;max=60");
-    // Submitting filters resets the page because the form has no page control.
+    // A custom range is its own choice in the level menu; the name and guild boxes keep the menu filters.
+    expect(html).toContain("40–60");
+    expect(html).toContain('type="hidden" name="class" value="HUNTER"');
+    expect(html).toContain("Clear filters");
+    // Searching resets the page because the form has no page field.
     expect(html).not.toContain('name="page"');
   });
 
-  test("pages 25 profiles at a time and a page beyond the end keeps Previous and total", async () => {
-    for (let i = 0; i < 26; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, gearScore: i }));
+  test("pages 50 profiles at a time by default, 25 or 100 from ?per=, and a page beyond the end keeps the total", async () => {
+    for (let i = 0; i < 51; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, gearScore: i }));
+    const rows = (html: string) => html.slice(html.indexOf('id="player-results"'), html.indexOf('id="players-recent"') >>> 0).match(/href="\/armory\/eu\/quill-[^"]*" class/g) ?? [];
     const first = await page();
-    expect(first.match(/href="\/armory\/eu\/quill-/g)).toHaveLength(25);
-    expect(first).toContain("Next");
-    const last = await page({ page: "2" });
-    expect(last.match(/href="\/armory\/eu\/quill-/g)).toHaveLength(1);
-    expect(last).toContain("Previous");
-    expect(last).not.toContain(">Next<");
+    expect(rows(first)).toHaveLength(50);
+    expect(first).toMatch(/<a href="\/players\?page=2"[^>]*>›<\/a>/);
+    expect(first).toContain('href="/players?per=100"');
+    expect(rows(await page({ page: "2" }))).toHaveLength(1);
+    expect(rows(await page({ per: "25" }))).toHaveLength(25);
     const past = await page({ page: "3" });
-    expect(past).toContain("26 Blizzard profiles");
+    expect(past).toContain(">51<");
     expect(past).toContain("No profiles on this page");
-    expect(past).toContain("Previous");
+  });
+
+  test("with no name or filter the page offers the latest reads and the best item level of each class, linking the boards", async () => {
+    armory.putCharacter(armoryCharacter());
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", class: "Mage", itemLevel: 50, fetchedAt: "2026-11-09T12:00:00.000Z" }));
+    armory.putCharacter(armoryCharacter({ slug: "brin-mire", name: "Brin", surname: "Mire", class: "Mage", itemLevel: 40, fetchedAt: "2026-11-09T11:00:00.000Z" }));
+    armory.putCharacter(armoryCharacter({ slug: "hidden-one", name: "Hidda", surname: "One", class: "Warrior", itemLevel: 99, fetchedAt: "2026-11-09T13:00:00.000Z" }));
+    await armory.hide("eu", "hidden-one");
+    const html = await page();
+    const recent = html.slice(html.indexOf('id="players-recent"'), html.indexOf('id="players-best"'));
+    expect(recent.indexOf("/armory/eu/arla-quill")).toBeLessThan(recent.indexOf("/armory/eu/brin-mire"));
+    expect(recent.indexOf("/armory/eu/brin-mire")).toBeLessThan(recent.indexOf("/armory/eu/velkara-duskmantle"));
+    const best = html.slice(html.indexOf('id="players-best"'));
+    expect(best).toContain('href="/armory/eu/arla-quill"');
+    expect(best).not.toContain("/armory/eu/brin-mire");
+    expect(best).toContain('href="/armory/rankings/item-level?class=mage"');
+    expect(best).toContain('href="/armory/rankings/item-level"');
+    expect(html).not.toContain("hidden-one");
+    expect(html).not.toContain("Hidda");
+    // A name or a filter narrows the page to the list.
+    for (const params of [{ q: "vel" }, { class: "MAGE" }, { page: "2" }] as Record<string, string>[]) {
+      const narrowed = await page(params);
+      expect(narrowed).not.toContain('id="players-recent"');
+      expect(narrowed).not.toContain('id="players-best"');
+    }
+  });
+
+  test("an empty answer says why and offers the one thing to do", async () => {
+    const none = await page({ class: "MAGE" });
+    expect(none).toContain("No character matches these filters yet.");
+    expect(none).toContain("data-empty-state");
+    expect(none).toContain('href="/players"');
+    const empty = await page();
+    expect(empty).toContain("No Blizzard profile has been read yet.");
+    expect(empty).toContain('href="/armory/submit"');
   });
 
   test("one letter filters Blizzard profiles; no addon request until two letters", async () => {
@@ -161,7 +210,7 @@ test("search finds a name prefix, links each result and offers to hide it", asyn
   expect(html).toContain("/players/opt-out?realm=Forever%20Pioneer");
   expect(html).toContain('action="/players"');
   expect(html).toContain('role="search"');
-  expect(html).toMatch(/text-class-shaman">Shaman</);
+  expect(html).toMatch(/text-class-shaman[^"]*">Thrallina</);
   expect(html).toContain("Night Watch");
   expect(html.match(/<table /g)).toHaveLength(1);
 });
