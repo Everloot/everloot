@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: an armory guild page opens on its summary (roster, members read, level 60s, average item level) and a one-row class bar, lists the top five by item level, folds instances with no kills behind one line, and names rank 0 Guild Master.
 - Site: a character page opens on the verdict: a facts strip (item level, Gear Score, honorable kills, achievements, quests, read age), rank badges with their region and ruleset, spec cards and profession bars above the gear; an empty dungeons-and-raids section is one line.
 - Site: NPC pages read like a database entry: level, rank badge, type, reaction and zone link under the name; tabs in order Drops, Sells, Starts, Ends, Boss, Map with empty ones left out; drop and goods items in their quality colour, and the drops table sorts by item, count or rate. The NPC list shows ranks as badges and links zones.
 - Site: quest pages show the side in its faction colour, the type (group, dungeon, raid) and category in the header, Start and End NPCs, rewards with icons in their quality colour, and the quest chain as a row of steps with this quest marked.
