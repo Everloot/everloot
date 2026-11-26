@@ -24,6 +24,7 @@ import { AddonSighting, CharacterFacts, CharacterOverview, DungeonRaidSlot, Rank
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
+import { compareHref } from "../../compare/sides";
 import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 /** Read on every request, so a hidden character is gone at once. */
@@ -141,6 +142,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
               </>}
               actions={<>
                 <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-sm">Update character</button></form>
+                <Link href={compareHref({ region: c.region, slug: c.slug })} className={`text-sm ${link}`}>Compare with…</Link>
                 <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={`text-sm ${link}`}>Blizzard armory</a>
               </>}
             />
