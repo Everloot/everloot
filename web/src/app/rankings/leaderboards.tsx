@@ -2,7 +2,7 @@ import GuildProgressionBoard from "@/components/progression/GuildProgressionBoar
 import type { GuildProgressionRank } from "@/lib/progression";
 import Link from "@/components/Link";
 import { Card, DataTable, LinkTabs, SectionHeading, Tooltip, type Column } from "@/components/ui";
-import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryBoardHref, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
+import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryBoardHref, GEAR_SCORE_HINT, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
 import { guildDirectoryHref } from "@/lib/armory-guilds";
 import type { ArmoryBoardRow, ArmoryGuildRow } from "@/lib/armory-store";
 import { guildPath, LADDER_LINE, START_LINE, type RankedRow } from "@/lib/guilds";
@@ -52,6 +52,7 @@ export function CharacterBoards({ board, region }: { board: CharacterBoard; regi
         Characters
       </SectionHeading>
       <LinkTabs label="Character rankings" tabs={ARMORY_METRICS.map((m) => ({ label: ARMORY_BOARDS[m].title, href: hubHref(m, region), current: m === board.metric }))} />
+      {(board.metric === "item-level" || board.metric === "gear-score") && <p className="text-meta text-muted">{GEAR_SCORE_HINT}</p>}
       <div className={`grid gap-4 ${board.regions.length > 1 ? "lg:grid-cols-2" : ""}`}>
         {board.regions.map(({ region: r, rows }) => (
           <RegionBoard key={r} metric={board.metric} region={r} rows={rows}

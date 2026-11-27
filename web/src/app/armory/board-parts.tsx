@@ -4,7 +4,7 @@ import { Card, DataTable, type Column } from "@/components/ui";
 import Tooltip from "@/components/ui/Tooltip";
 import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import { classText } from "@/app/players/player-view";
-import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
+import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, metricValue, rankable, regionLabel, rulesetName, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
 import type { ArmoryBoardRow } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { RegionChip } from "./parts";
@@ -28,14 +28,25 @@ export function BoardValue({ row, metric, top }: { row: ArmoryBoardRow; metric: 
   const read = new Date(row.fetchedAt).toLocaleString("en-US", { timeZone: "UTC", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   return (
     <span className="inline-flex min-w-16 flex-col items-stretch text-right font-medium text-fg">
-      <Tooltip label={`${ARMORY_BOARDS[metric].column}: ${value}. ${ARMORY_BOARDS[metric].lede} Read ${read} UTC.`}>{value}</Tooltip>
+      <span><Tooltip label={`${ARMORY_BOARDS[metric].column}: ${value}. ${ARMORY_BOARDS[metric].lede} Read ${read} UTC.`}>{value}</Tooltip>{!rankable(row.value) && <span className="font-sans font-normal text-muted"> · not ranked</span>}</span>
       <span aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-edge"><span className={`block h-1 rounded-full ${classColour(CLASS_BG, row.class) ?? "bg-muted"}`} style={{ width: `${top > 0 ? Math.min(100, Math.max(0, row.value / top * 100)) : 0}%` }} /></span>
     </span>
   );
 }
 
-/** The rank sits in the name cell: on a phone a dense table keeps its first column only. */
-const rankMark = (rank: number) => <span className="w-6 shrink-0 font-mono tabular-nums text-muted">{rank}</span>;
+/**
+ * The rank sits in the name cell: on a phone a dense table keeps its first column only. A 0 would only share the last
+ * place with everyone else at 0, so it shows a dash and its value cell says "not ranked", as the character page does.
+ */
+export const rankMark = (row: ArmoryBoardRow, rank: number) =>
+  <span className="w-6 shrink-0 font-mono tabular-nums text-muted">{rankable(row.value) ? rank : <span aria-hidden="true">–</span>}</span>;
+
+/** What an empty board says, naming its filters: "No Roleplay PvP Druids with honorable kills read on EU realms yet." */
+export function emptyBoardText(metric: ArmoryMetric, region: ArmoryRegion, q: Partial<ArmoryBoardQuery> = {}): string {
+  const who = [q.ruleset ? rulesetName(q.ruleset) : null, q.faction ?? null, q.class ? `${q.class}s` : "characters"].filter(Boolean).join(" ");
+  const what = metric === "gear-score" ? ARMORY_BOARDS[metric].title : ARMORY_BOARDS[metric].title.toLowerCase();
+  return `No ${who} with ${what} read on ${regionLabel(region)} realms yet.`;
+}
 
 /**
  * The rank each row shows: a row on the same value as the one above it shares that row's rank, as the character page's
@@ -57,7 +68,7 @@ function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoard
       key: "name", header: "Character",
       cell: (r) => (
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          {rankMark(ranks.get(r) ?? r.rank)}
+          {rankMark(r, ranks.get(r) ?? r.rank)}
           <Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(r.class.toUpperCase())} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{r.name} {r.surname}</Link>
           <BoardClass row={r} />
         </span>
@@ -72,7 +83,7 @@ function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoard
  * One region's column of a board, ranked within that region alone: US and EU stand side by side, so a region with
  * more characters read never pushes the other off the list. Null rows when the store could not answer.
  */
-export function RegionBoard({ metric, region, rows, footer }: { metric: ArmoryMetric; region: ArmoryRegion; rows: ArmoryBoardRow[] | null; footer: ReactNode }) {
+export function RegionBoard({ metric, region, rows, footer, query }: { metric: ArmoryMetric; region: ArmoryRegion; rows: ArmoryBoardRow[] | null; footer: ReactNode; query?: Partial<ArmoryBoardQuery> }) {
   const title = ARMORY_BOARDS[metric].title;
   const heading = <h3 id={`board-${region}`} className="flex items-center gap-2 px-4 pt-3 text-h2-sm text-fg"><RegionChip region={region} />{title}</h3>;
   return (
@@ -85,7 +96,7 @@ export function RegionBoard({ metric, region, rows, footer }: { metric: ArmoryMe
           rows={rows}
           rowKey={(r) => `${r.region}/${r.slug}`}
           meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>}
-          empty={<p className="px-4 py-3 text-cell text-fg-2">No character with this number here yet.</p>}
+          empty={<p className="px-4 py-3 text-cell text-fg-2">{emptyBoardText(metric, region, query)}</p>}
           toolbar={heading}
           footer={footer}
         />

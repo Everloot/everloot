@@ -577,7 +577,7 @@ describe("the boards", () => {
     expect(out).toContain('href="/armory/rankings/honorable-kills"');
     expect(out).toContain("Read 2026-11-09 11:30 UTC");
     expect(await html(pages.board("gear-score"))).not.toContain("Torvin");
-    expect(await html(pages.board("item-level", { region: "us" }))).toContain("No character with this number here yet.");
+    expect(await html(pages.board("item-level", { region: "us" }))).toContain("No characters with item level read on US realms yet.");
     await expect(pages.board("dps")).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(pages.board("item-level", { ruleset: "4" })).rejects.toThrow("NEXT_NOT_FOUND");
     // A play history board says who it can rank yet; a gear board does not.
@@ -598,12 +598,33 @@ describe("the boards", () => {
     expect(us).toMatch(/<span[^>]*>1<\/span><a href="\/armory\/us\/maren-holt" class="[^"]*text-class-mage/);
     // Each column opens its region's full table, the other filters kept.
     expect(us).toContain('href="/armory/rankings/item-level?region=us&amp;class=mage"');
-    expect(out).toContain("No character with this number here yet.");
+    expect(out).toContain("No Mages with item level read on EU realms yet.");
     expect(out).toContain("US and EU");
     // One region chosen: the one table with level, race and realm, as before.
     const eu = await html(pages.board("item-level", { region: "eu" }));
     expect(eu).not.toContain('aria-labelledby="board-us"');
     expect(eu).not.toContain("maren-holt");
+  });
+
+  test("a zero is listed without a rank, and an empty board names its filters", async () => {
+    const druid = (slug: string, name: string, honorableKills: number) =>
+      armoryCharacter({ slug, name, surname: "Oak", class: "Druid", classId: 11, rulesetId: 15, ruleset: "Roleplay PvP", honorableKills });
+    mem.putCharacter(druid("ash-oak", "Ash", 5));
+    mem.putCharacter(druid("bram-oak", "Bram", 0));
+    mem.putCharacter(druid("cori-oak", "Cori", 0));
+    for (const search of [{ ruleset: "15", class: "druid", region: "eu" }, { ruleset: "15", class: "druid" }] as Record<string, string>[]) {
+      const out = await html(pages.board("honorable-kills", search));
+      expect(out).toMatch(/<span[^>]*>1<\/span><a href="\/armory\/eu\/ash-oak"/);
+      // QA round 7: eleven druids on 0 kills all read "#14". A 0 only shares last place, so it gets no rank.
+      expect(out).not.toMatch(/<span[^>]*>[23]<\/span><a href="\/armory\/eu\/(bram|cori)-oak"/);
+      // Each zero says so in its value cell and again in its phone line.
+      expect(out.match(/ · not ranked/g)?.length).toBe(4);
+    }
+    expect(await html(pages.board("honorable-kills", { ruleset: "15", class: "druid", region: "us" })))
+      .toContain("No Roleplay PvP Druids with honorable kills read on US realms yet.");
+    const split = await html(pages.board("honorable-kills", { ruleset: "15", class: "druid" }));
+    expect(split).toContain("No Roleplay PvP Druids with honorable kills read on US realms yet.");
+    expect(await html(pages.board("gear-score", { faction: "alliance", region: "us" }))).toContain("No Alliance characters with Gear Score read on US realms yet.");
   });
 });
 

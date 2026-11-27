@@ -64,28 +64,47 @@ export function HeatCell({ label, classToken, count, max }: { label: string; cla
   return <span tabIndex={0} title={`${label}: ${number(count)}`} className="flex min-h-10 min-w-12 items-center justify-end rounded-control px-2 text-fg" style={{ backgroundColor }}>{number(count)}</span>;
 }
 
-export function DailyChart({ days }: { days: { day: string; count: CensusCount }[] }) {
+/** The axis step: 1, 2 or 5 times a power of ten, whole, so the half-way label is a round count (2,000, not 1,947.5). */
+const axisStep = (half: number) => {
+  const power = 10 ** Math.floor(Math.log10(half));
+  return Math.max(1, [1, 2, 5, 10].map((m) => m * power).find((step) => step >= half)!);
+};
+
+/**
+ * Characters each UTC day. `partial`: the day still being counted (today), drawn dashed with a hollow point and labelled
+ * "so far", so its lower count does not read as a drop.
+ */
+export function DailyChart({ days, partial }: { days: { day: string; count: CensusCount }[]; partial?: string }) {
   const [active, setActive] = useState<number | null>(null);
-  const max = Math.max(1, ...days.flatMap((d) => d.count === null ? [] : [d.count]));
+  const step = axisStep(Math.max(1, ...days.flatMap((d) => d.count === null ? [] : [d.count])) / 2);
+  const top = step * 2;
   const x = (i: number) => 64 + i / Math.max(1, days.length - 1) * 600;
   const targetWidth = 600 / Math.max(1, days.length - 1);
-  const y = (n: number) => 180 - n / max * 156;
-  const path = days.map((d, i) => d.count === null ? "" : `${i && days[i - 1].count !== null ? "L" : "M"}${x(i)},${y(d.count)}`).join(" ");
+  const y = (n: number) => 180 - n / top * 156;
+  const last = days.length - 1;
+  const open = partial !== undefined && days[last]?.day === partial ? last : -1;
+  const dayLabel = (i: number) => `${days[i].day}${i === open ? " so far" : ""}`;
+  const path = days.map((d, i) => d.count === null || i === open ? "" : `${i && days[i - 1].count !== null ? "L" : "M"}${x(i)},${y(d.count)}`).join(" ");
+  const before = open > 0 ? days[open - 1].count : null;
+  const tail = open > 0 && before !== null && days[open].count !== null ? `M${x(open - 1)},${y(before)} L${x(open)},${y(days[open].count!)}` : null;
   if (!days.some((d) => d.count !== null)) return <p aria-label="Daily characters line chart" className="mb-6 text-muted">{HIDDEN_LABEL}</p>;
   return <div className="relative mb-6" onMouseLeave={() => setActive(null)}>
     <svg viewBox="0 0 720 224" role="img" aria-label="Daily characters line chart" className="w-full min-h-48">
-      {[0, max / 2, max].map((n) => <g key={n}><line x1="64" x2="664" y1={y(n)} y2={y(n)} className="stroke-line" /><text x="56" y={y(n) + 4} textAnchor="end" className="fill-muted text-xs">{number(n)}</text></g>)}
+      {[0, step, top].map((n) => <g key={n}><line x1="64" x2="664" y1={y(n)} y2={y(n)} className="stroke-line" /><text x="56" y={y(n) + 4} textAnchor="end" className="fill-muted text-xs">{number(n)}</text></g>)}
       <path d={path} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" className="stroke-fg-2" />
+      {tail && <path d={tail} strokeDasharray="4 4" fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" className="stroke-fg-2" />}
       {days.map((d, i) => <g key={d.day}>
-        {(i === 0 || i === days.length - 1) && <text x={x(i)} y="212" textAnchor="middle" className="fill-muted text-xs">{d.day.slice(5)}</text>}
-        {d.count !== null && <circle data-point={d.day} cx={x(i)} cy={y(d.count)} r="0.5" strokeWidth="8" vectorEffect="non-scaling-stroke" className="fill-fg-2 stroke-fg-2" />}
+        {(i === 0 || i === last) && <text x={x(i)} y="212" textAnchor={i === open && i > 0 ? "end" : "middle"} className="fill-muted text-xs">{d.day.slice(5)}{i === open ? " (so far)" : ""}</text>}
+        {d.count !== null && (i === open
+          ? <circle data-point={d.day} data-partial cx={x(i)} cy={y(d.count)} r="4" strokeWidth="2" vectorEffect="non-scaling-stroke" className="fill-panel stroke-fg-2" />
+          : <circle data-point={d.day} cx={x(i)} cy={y(d.count)} r="0.5" strokeWidth="8" vectorEffect="non-scaling-stroke" className="fill-fg-2 stroke-fg-2" />)}
       </g>)}
       {active !== null && <line data-crosshair x1={x(active)} x2={x(active)} y1="24" y2="180" className="stroke-muted" strokeDasharray="4 4" />}
       {days.map((d, i) => {
-        const label = `${d.day}: ${value(d.count)}`;
+        const label = `${dayLabel(i)}: ${value(d.count)}`;
         return <rect key={d.day} x={Math.max(64, x(i) - targetWidth / 2)} y="16" width={days.length === 1 ? 600 : i === 0 || i === days.length - 1 ? targetWidth / 2 : targetWidth} height="176" fill="transparent" tabIndex={0} role="button" aria-label={label} onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}><title>{label}</title></rect>;
       })}
     </svg>
-    {active !== null && <div role="tooltip" className="absolute right-2 top-0 rounded-control border border-edge bg-panel px-3 py-2 text-sm text-fg">{days[active].day}: {value(days[active].count)}</div>}
+    {active !== null && <div role="tooltip" className="absolute right-2 top-0 rounded-control border border-edge bg-panel px-3 py-2 text-sm text-fg">{dayLabel(active)}: {value(days[active].count)}</div>}
   </div>;
 }

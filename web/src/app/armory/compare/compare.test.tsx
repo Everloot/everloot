@@ -127,8 +127,11 @@ test("a side with too few known item levels shows no item level or Gear Score, n
   vi.doMock("@/lib/equipped-item-tips", () => ({ loadEquippedItems: async () => ({ tips: new Map(), unknown: new Set(), levels: new Map([[16846, 66], [17069, 69]]) }) }));
   try {
     const out = await page({ a: VELKARA, b: TORVIN });
-    expect(out).toMatch(/Item level(?:<[^>]*>)*\s*Not enough item levels known yet \(2 of 17 slots\)(?:<[^>]*>)*\s*60</);
-    expect(out).toMatch(/Gear Score(?:<[^>]*>)*\s*Not enough item levels known yet \(2 of 17 slots\)/);
+    // QA round 7 at 390: the sentence repeated in four narrow cells. The cells say "— (2/17)"; one note under the table explains.
+    expect(out).toMatch(/Item level(?:<[^>]*>)*\s*— \(2\/17\)(?:<[^>]*>)*\s*60</);
+    expect(out).toMatch(/Gear Score(?:<[^>]*>)*\s*— \(2\/17\)/);
+    expect(out.match(/Not enough item levels known yet/g)?.length).toBe(1);
+    expect(out).toContain("— Not enough item levels known yet to give an item level or Gear Score (Velkara: 2 of 17 slots).");
     expect(out).not.toContain("* Computed on this page");
   } finally {
     vi.doUnmock("@/lib/equipped-item-tips");

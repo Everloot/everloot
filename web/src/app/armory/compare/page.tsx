@@ -112,9 +112,11 @@ function FactsTable({ a, b, computed = [undefined, undefined] }: { a: ArmoryChar
     ["Achievements", (c) => c.details?.achievements ? c.details.achievements.rows.length.toLocaleString("en-US") : null, null],
     ["Quests completed", (c) => c.details?.quests ? c.details.quests.completed.length.toLocaleString("en-US") : null, null],
   ];
-  // A side with too few known item levels says so in place of its item level and Gear Score, never a number.
+  // A side with too few known item levels shows "— (6/17)" in place of its item level and Gear Score, never a number;
+  // one note under the table says why, so a phone's narrow cells do not each repeat the sentence.
   const missing = (side: Computed, key: string | null) =>
-    key !== null && side?.withheld ? `Not enough item levels known yet (${side.slots} of 17 slots)` : "Not read";
+    key !== null && side?.withheld ? `— (${side.slots}/17)` : "Not read";
+  const few = ([[a, computed[0]], [b, computed[1]]] as const).filter(([c, x]) => c && x?.withheld);
   const cell = (c: ArmoryCharacter | null, value: (c: ArmoryCharacter) => ReactNode, side: Computed, key: "itemLevel" | "gearScore" | null) => {
     const v = c ? value(c) : null;
     const marked = key !== null && Boolean(side?.[key]);
@@ -137,6 +139,7 @@ function FactsTable({ a, b, computed = [undefined, undefined] }: { a: ArmoryChar
         </tr>)}</tbody>
       </table>
     </div>
+    {few.length > 0 && <p className="text-meta text-muted">— Not enough item levels known yet to give an item level or Gear Score ({few.map(([c, x]) => `${c!.name}: ${x!.slots} of 17 slots`).join("; ")}).</p>}
     {made.length > 0 && <p className="text-meta text-muted">* Computed on this page from the game files&apos; item levels, as Blizzard&apos;s armory no longer sends them, leaving out items with no known level ({made.map(([c, x]) => `${c!.name}: computed from ${x!.slots} of 17 slots`).join("; ")}); not ranked until a read stores them.</p>}
   </section>;
 }
