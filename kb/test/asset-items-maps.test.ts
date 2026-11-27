@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { buildItemSet, parseItemIds, shardOf, shardRecords, weaponDamageTable, ITEM_SHARD_SIZE } from "../src/assets/items.js";
-import { fitSize, planMapArt, stitchPlan } from "../src/assets/map-art.js";
+import { fitSize, overlayProblem, planMapArt, stitchPlan } from "../src/assets/map-art.js";
 import type { Row, Rows } from "../src/talents/build-catalog.js";
 
 const t = (rows: Row[]): Rows => new Map(rows.map((r, i) => [typeof r.ID === "number" ? r.ID : i + 1, r]));
@@ -228,4 +228,43 @@ test("map art is planned per continent and zone from the art tables, phased art 
   expect(elwynn.tiles.map((x) => x.fileId)).toEqual([510, 511]);
   expect(elwynn.rect).toEqual({ left: 1000, top: 500, right: 0, bottom: -500 });
   expect(skipped).toEqual(["No Art Vale (1430): no art in this build"]);
+});
+
+// Redridge's art is a blank basin until its explored-area overlays (Lake Everstill, Lakeshire) are drawn over it.
+const withOverlays: Record<string, Rows> = {
+  ...mapTables,
+  WorldMapOverlay: t([
+    { ID: 300, UiMapArtID: 51, OffsetX: 382, OffsetY: 0, TextureWidth: 300, TextureHeight: 210 },
+    { ID: 200, UiMapArtID: 51, OffsetX: 10, OffsetY: 20, TextureWidth: 160, TextureHeight: 100 },
+    { ID: 400, UiMapArtID: 51, OffsetX: 0, OffsetY: 0, TextureWidth: 64, TextureHeight: 64 },
+    { ID: 500, UiMapArtID: 99, OffsetX: 0, OffsetY: 0, TextureWidth: 64, TextureHeight: 64 },
+  ]),
+  WorldMapOverlayTile: t([
+    { ID: 1, WorldMapOverlayID: 300, LayerIndex: 0, RowIndex: 0, ColIndex: 1, FileDataID: 3001 },
+    { ID: 2, WorldMapOverlayID: 300, LayerIndex: 0, RowIndex: 0, ColIndex: 0, FileDataID: 3000 },
+    { ID: 3, WorldMapOverlayID: 200, LayerIndex: 0, RowIndex: 0, ColIndex: 0, FileDataID: 2000 },
+    { ID: 4, WorldMapOverlayID: 200, LayerIndex: 1, RowIndex: 0, ColIndex: 0, FileDataID: 2999 },
+    { ID: 5, WorldMapOverlayID: 500, LayerIndex: 0, RowIndex: 0, ColIndex: 0, FileDataID: 5000 },
+  ]),
+};
+
+test("a zone's explored-area overlays come with its art, in id order, base layer only; one without tiles is left out", () => {
+  const { targets } = planMapArt((n) => withOverlays[n]);
+  const elwynn = targets.find((m) => m.uiMapId === 1429)!;
+  expect(elwynn.overlays).toEqual([
+    { overlayId: 200, x: 10, y: 20, width: 160, height: 100, tiles: [{ row: 0, col: 0, fileId: 2000 }] },
+    { overlayId: 300, x: 382, y: 0, width: 300, height: 210, tiles: [{ row: 0, col: 0, fileId: 3000 }, { row: 0, col: 1, fileId: 3001 }] },
+  ]);
+  // The phased art's overlay is not this zone's; a map without overlay rows has none.
+  expect(targets.find((m) => m.uiMapId === 2000)!.overlays).toEqual([]);
+  expect(planMapArt((n) => mapTables[n]).targets.find((m) => m.uiMapId === 1429)!.overlays).toEqual([]);
+});
+
+test("an overlay is drawn only whole: a missing or stray tile is named", () => {
+  const layer = { width: 1002, height: 668, tileWidth: 256, tileHeight: 256 };
+  const two = { overlayId: 1, x: 0, y: 0, width: 300, height: 210, tiles: [{ row: 0, col: 0, fileId: 1 }, { row: 0, col: 1, fileId: 2 }] };
+  expect(overlayProblem(layer, two)).toBeNull();
+  expect(overlayProblem(layer, { ...two, tiles: two.tiles.slice(1) })).toMatch(/1 tile\(s\) missing/);
+  expect(overlayProblem(layer, { ...two, tiles: [...two.tiles, { row: 1, col: 0, fileId: 3 }] })).toMatch(/outside/);
+  expect(overlayProblem(layer, { ...two, width: 0 })).toMatch(/no size/);
 });

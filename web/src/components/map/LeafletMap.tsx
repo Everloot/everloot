@@ -174,7 +174,9 @@ export default function LeafletMap(props: LeafletMapProps) {
       if (zoom >= 6) for (const pin of now.items.pins) out.push({ id: `p${pin.id}`, text: pin.name ?? `NPC ${pin.npcId}`, x: pin.x + yards * 14, y: pin.y, align: "start", priority: 70 });
       if (zoom >= 6) for (const t of now.items.treasures) out.push({ id: `p${t.id}`, text: t.name ?? `Object ${t.objectId}`, x: t.x + yards * 14, y: t.y, align: "start", priority: 65 });
       if (now.marker) out.push({ id: "marker", text: now.marker.label, x: now.marker.x + yards * 26, y: now.marker.y, align: "start", priority: 100 });
-      for (const l of placeLabels(out, v, px, fontPx)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
+      // Names keep off the pins drawn on the map (a city's name sits where its flight master and entrance are).
+      const drawn = [...now.items.entrances, ...now.items.flightMasters, ...now.items.pins, ...now.items.treasures];
+      for (const l of placeLabels(out, v, px, fontPx, drawn)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
     };
 
     let zoneImage: ArtImage | null = null;

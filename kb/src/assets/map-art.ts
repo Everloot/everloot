@@ -12,6 +12,12 @@
  *   picture sharper, and are not used.
  * - UiMapArtTile: one tile file (FileDataID) per row and column of an art's layer.
  *
+ * - WorldMapOverlay: the explored-area pictures of an art (lakes, towns, roads), each placed at OffsetX,
+ *   OffsetY on the base picture and TextureWidth x TextureHeight big. The game draws them over the base
+ *   art once a player has explored the area; a zone's base art alone is a blank basin, so all of them
+ *   are drawn, as on a fully explored map.
+ * - WorldMapOverlayTile: an overlay's tile files by row and column, each tile the layer's tile size.
+ *
  * The tiles are laid on a grid of whole tiles, which is usually a little bigger than the picture
  * (1002 x 668 pixels on a 4 x 3 grid of 256 pixel tiles is 1024 x 768), and the picture is the top-left
  * LayerWidth x LayerHeight part of that grid. The picture covers exactly the rectangle that the map's
@@ -22,6 +28,8 @@ import type { Rows, TableReader } from "../talents/build-catalog.js";
 
 export interface ArtTile { row: number; col: number; fileId: number }
 export interface ArtLayer { width: number; height: number; tileWidth: number; tileHeight: number }
+/** One explored-area picture: its place and size on the base picture, in pixels, and its tiles. */
+export interface ArtOverlay { overlayId: number; x: number; y: number; width: number; height: number; tiles: ArtTile[] }
 
 export interface MapTarget {
   uiMapId: number;
@@ -35,6 +43,8 @@ export interface MapTarget {
   artId: number;
   layer: ArtLayer;
   tiles: ArtTile[];
+  /** The explored-area pictures drawn over the base art, by overlay id. */
+  overlays: ArtOverlay[];
 }
 
 export interface StitchPlan {
@@ -69,6 +79,18 @@ export function stitchPlan(layer: ArtLayer, tiles: ArtTile[]): StitchPlan {
     crop: [0, 0, layer.width, layer.height],
     missing,
   };
+}
+
+/**
+ * Why an overlay cannot be drawn whole (a tile of its grid missing or outside it), or null. Its grid is
+ * ceil(width / tile) x ceil(height / tile) tiles of the layer's tile size.
+ */
+export function overlayProblem(layer: ArtLayer, overlay: ArtOverlay): string | null {
+  if (overlay.width <= 0 || overlay.height <= 0) return "it has no size";
+  const cols = Math.ceil(overlay.width / layer.tileWidth), rows = Math.ceil(overlay.height / layer.tileHeight);
+  const have = new Set(overlay.tiles.map((t) => `${t.row},${t.col}`));
+  if (overlay.tiles.some((t) => t.row < 0 || t.col < 0 || t.row >= rows || t.col >= cols)) return `a tile is outside its ${cols} x ${rows} grid`;
+  return have.size === cols * rows ? null : `${cols * rows - have.size} tile(s) missing from its grid`;
 }
 
 /** The size a picture is saved at: scaled down to fit `max` on its longer side, never up. */
@@ -109,6 +131,24 @@ export function planMapArt(get: TableReader): { targets: MapTarget[]; skipped: s
     if (num(r.LayerIndex) === 0) layerOf.set(num(r.UiMapArtStyleID), { width: num(r.LayerWidth), height: num(r.LayerHeight), tileWidth: num(r.TileWidth), tileHeight: num(r.TileHeight) });
   }
 
+  // Explored-area overlays: an overlay with no tile rows draws nothing and is left out.
+  const overlayTiles = new Map<number, ArtTile[]>();
+  for (const r of list(get("WorldMapOverlayTile"))) {
+    if (num(r.LayerIndex) !== 0) continue;
+    const id = num(r.WorldMapOverlayID);
+    overlayTiles.set(id, [...(overlayTiles.get(id) ?? []), { row: num(r.RowIndex), col: num(r.ColIndex), fileId: num(r.FileDataID) }]);
+  }
+  const overlaysOf = new Map<number, ArtOverlay[]>();
+  for (const r of [...list(get("WorldMapOverlay"))].sort((a, b) => num(a.ID) - num(b.ID))) {
+    const tiles = overlayTiles.get(num(r.ID));
+    if (!tiles?.length) continue;
+    const art = num(r.UiMapArtID);
+    overlaysOf.set(art, [...(overlaysOf.get(art) ?? []), {
+      overlayId: num(r.ID), x: num(r.OffsetX), y: num(r.OffsetY), width: num(r.TextureWidth), height: num(r.TextureHeight),
+      tiles: tiles.sort((a, b) => a.row - b.row || a.col - b.col),
+    }]);
+  }
+
   const continents = new Set<number>();
   const targets: MapTarget[] = [];
   const skipped: string[] = [];
@@ -118,7 +158,7 @@ export function planMapArt(get: TableReader): { targets: MapTarget[]; skipped: s
     const layer = art ? layerOf.get(num(art.UiMapArtStyleID)) : undefined;
     const tiles = artId === undefined ? undefined : tilesOf.get(artId);
     if (!at || !layer || !tiles?.length) { skipped.push(`${name} (${uiMapId}): no art in this build`); return; }
-    targets.push({ uiMapId, kind, name, continentId, rect: at.rect, heldBack, artId: artId!, layer, tiles });
+    targets.push({ uiMapId, kind, name, continentId, rect: at.rect, heldBack, artId: artId!, layer, tiles, overlays: overlaysOf.get(artId!) ?? [] });
   };
 
   // Continents first: a UiMap of the continent type under the world map.

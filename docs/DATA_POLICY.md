@@ -418,7 +418,9 @@ interface files, is a different thing and is covered by the second extension. Th
   (from the committed recipe files), only where that item's own page shows its tooltip, so a held-back item
   adds nothing. Sockets are not read: build 1.60.1.71139 has no socket values (`SocketType` is 0 on every row).
 - **Map pictures**: the game's own continent and zone map art from the map art tables, laid under
-  our zone outlines. A held-back zone's picture shows only with spoilers on. A continent's own
+  our zone outlines. A zone's picture is drawn fully explored: its explored-area overlays
+  (`WorldMapOverlay`) are drawn over the base art, as the game shows them once a player has been there
+  (2026-11-27; the same art from the same files, no new kind of data). A held-back zone's picture shows only with spoilers on. A continent's own
   picture always shows (decided 2026-10-19): it is the original world's parchment map, with no names
   and no new land painted in.
 - **The `/database` pages** (decided 2026-10-18 by the maintainer): the icons of the spells an item is

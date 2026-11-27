@@ -7,6 +7,8 @@ jobs.json: [{"src": "in.blp", "dst": "out.webp", "crop": [l, t, r, b] | null, "s
   bands, which fade out): the picture keeps the box of its near-opaque pixels.
   A job with "tiles" stitches map tiles instead of reading "src":
   {"dst", "tiles": [{"src": "t.blp", "row": 0, "col": 0}], "tile": [256, 256], "crop": [0, 0, w, h], "max": 1024, "quality": 80}
+  and "overlays": [{"x", "y", "width", "height", "tiles": [{"src", "row", "col"}]}] drawn over the stitched
+  tiles at x, y (the explored-area pictures of a zone map), each tile "tile"-sized and cut to the overlay.
   "quality" absent or null: lossless WebP. A number: lossy WebP at that quality (icons and map art).
 Prints one JSON object per job on stdout: {"dst", "ok", "width", "height", "error"}.
 Reads only the files it is given. Pillow decodes palette and DXT BLPs; the newer interface atlases are
@@ -59,7 +61,24 @@ def stitch(job):
     canvas = Image.new("RGBA", (cols * tw, rows * th))
     for t in tiles:
         canvas.paste(open_blp(t["src"]).convert("RGBA"), (t["col"] * tw, t["row"] * th))
+    for overlay in job.get("overlays") or []:
+        draw_overlay(canvas, overlay, tw, th)
     return canvas
+
+
+def draw_overlay(canvas, overlay, tw, th):
+    """An explored-area picture over the base art, blended by its alpha. Each tile covers a tile-sized cell from
+    the overlay's corner; an edge tile's file can be bigger than the part of the overlay it holds (a power of
+    two), so only its top-left part up to the overlay's size is drawn."""
+    ox, oy, ow, oh = overlay["x"], overlay["y"], overlay["width"], overlay["height"]
+    for t in overlay["tiles"]:
+        im = open_blp(t["src"]).convert("RGBA")
+        w = min(tw, ow - t["col"] * tw, im.width)
+        h = min(th, oh - t["row"] * th, im.height)
+        if w <= 0 or h <= 0:
+            continue
+        piece = im.crop((0, 0, w, h))
+        canvas.alpha_composite(piece, (ox + t["col"] * tw, oy + t["row"] * th))
 
 
 def main() -> int:
