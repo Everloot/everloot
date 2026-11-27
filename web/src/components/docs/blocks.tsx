@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import type { DocsIcon as IconName } from "@/lib/docs/nav";
 import Card from "@/components/ui/Card";

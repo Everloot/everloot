@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { CLASSES } from "@/design/tokens";
 import { classLabel, forgetClassContext, parseClassContext, readClassContext, rememberClassContext, type ClassContext } from "@/lib/class-context";

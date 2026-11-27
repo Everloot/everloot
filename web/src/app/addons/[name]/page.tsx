@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { approvedAddon, type ApprovedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";

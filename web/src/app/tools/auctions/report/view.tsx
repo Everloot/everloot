@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Container } from "@/components/ui";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";

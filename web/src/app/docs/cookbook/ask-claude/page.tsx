@@ -4,7 +4,7 @@ import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
 import { CONNECT_EXAMPLES as ex, MCP_URL } from "@/lib/docs/connect-data";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 
 export const metadata: Metadata = pageMetadata({
   title: "Ask Claude about WoW: Forever",

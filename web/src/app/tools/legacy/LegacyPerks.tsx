@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { DataTable, SectionHeading, type Column } from "@/components/ui";
 import type { LegacyPerkCatalog, Node, Tree } from "@kb/legacy-perks/catalog";
 

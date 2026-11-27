@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { AchievementEntry } from "@kb/completion";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl, stripBelow } from "@/components/ui";
 import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { loadSiteAssets } from "@/lib/game-assets";

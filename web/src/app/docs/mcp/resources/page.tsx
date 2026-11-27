@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Fragment } from "react";
 import { buildsResource, MCP_PROMPTS as PROMPT_DEFS, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_LIST, MCP_RESOURCE_URIS, MCP_RESOURCES as RESOURCE_DEFS, type McpPromptName } from "@everloot/protocol";
 import { z } from "zod";

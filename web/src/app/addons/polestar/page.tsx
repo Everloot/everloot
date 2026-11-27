@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { POLESTAR } from "@/data/polestar";
 import TrackedDownload from "@/components/TrackedDownload";
 import { polestarLive } from "@/lib/polestar-github";

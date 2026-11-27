@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
 import { Card, PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";

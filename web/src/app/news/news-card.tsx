@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { longDate } from "@/data/wow-forever";
 import { newsHref, sourceNames, type NewsPost } from "@/lib/news";
 

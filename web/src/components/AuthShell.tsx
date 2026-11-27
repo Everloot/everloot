@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { BannerArt } from "@/components/game/PageBanner";
 import Glint from "@/components/glint/Glint";
 import { BANNER_CAPTION } from "@/components/ui/Banner";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ALL_RECORD_KINDS, API_ROUTES, API_SCHEMAS, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS, SITE, UPLOAD_LIMITS, type ApiSchemaName } from "@everloot/protocol";
 import { C, H2, H3, List, P, Params, Table, docLink } from "@/components/docs/blocks";
 import DocPage from "@/components/docs/DocPage";

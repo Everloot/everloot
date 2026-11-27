@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { CLIENT_SKILLS } from "@kb/client-layer-file";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { preload } from "react-dom";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";

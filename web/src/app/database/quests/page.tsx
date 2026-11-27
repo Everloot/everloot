@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import type { QuestSide } from "@kb/world-pages";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";

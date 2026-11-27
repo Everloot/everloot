@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, DataTable, LinkTabs, type Column } from "@/components/ui";
 import { achievementHref, chainHref, factionHref, titleDisplayName, titleHref } from "@/lib/completion-lists";
 import type { CompletionFacts, CompletionKind, Overview, OverviewCategory, OwnedCharacter } from "@kb/completion";

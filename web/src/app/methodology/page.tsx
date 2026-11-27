@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { trailFor } from "@/lib/breadcrumbs";
 import { WIKI_URL } from "@/components/LoreSource";
 import { CURRENT_VERSION } from "@/lib/game-version";

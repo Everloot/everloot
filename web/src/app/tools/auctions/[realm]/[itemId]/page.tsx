@@ -1,6 +1,6 @@
 import { CoinText } from "@/components/ui/Coins";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";

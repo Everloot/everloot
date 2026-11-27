@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { HTMLAttributes, ReactNode } from "react";
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, "className" | "children"> {

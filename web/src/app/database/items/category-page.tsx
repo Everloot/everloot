@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,

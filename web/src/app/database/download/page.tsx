@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { CREDIT_LINE, LICENCE, LICENCE_URL } from "@everloot/protocol";
 import type { ManifestFile } from "@kb/open-data/manifest";
 import { GAME_FILES_LABEL, OPEN_DATA_EXCLUDED, OPEN_DATA_METHOD, OPEN_DATA_NOT_YET, OPEN_DATA_READING, OPEN_DATA_VERIFY } from "@kb/open-data/text";

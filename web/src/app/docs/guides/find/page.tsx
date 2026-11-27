@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Callout, C, Cards, H2, LinkCard, List, P, docLink } from "@/components/docs/blocks";
 import DocPage from "@/components/docs/DocPage";
 import { pageMetadata } from "@/lib/seo";

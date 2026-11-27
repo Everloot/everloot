@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useState, type ReactNode } from "react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import type { PeopleSearch, PersonGroup, PersonResult } from "@/lib/people-search-types";

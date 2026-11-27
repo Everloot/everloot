@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { unstable_noStore as noStore } from "next/cache";
 import LoreSearchForm from "@/components/LoreSearchForm";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreByExtId, loreSlug, openingSentence, startHere, UNAVAILABLE, UNAVAILABLE_COPY, zonePages, type BrowseSlug } from "@/lib/lore";

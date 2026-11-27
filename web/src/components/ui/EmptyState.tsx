@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import AgreementMeter, { AGREEMENT_NEEDED, clampAgreement, reportedLabel } from "./AgreementMeter";
 
 export interface EmptyStateProps {

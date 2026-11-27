@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import AdSlot from "@/components/AdSlot";
 import type { Metadata } from "next";
 import TrackedDownload from "@/components/TrackedDownload";
