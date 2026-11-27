@@ -17,7 +17,9 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, "className"
   [data: `data-${string}`]: string | number | boolean | undefined;
 }
 
-const PADDING: Record<NonNullable<CardProps["padding"]>, string> = { default: "p-6", sm: "p-4", none: "overflow-hidden", custom: "" };
+// `none` clips to the corners with overflow-clip, not overflow-hidden: a hidden box is a scroll container, so a dense
+// table's sticky header (top: the site header) stuck inside the card instead of the page and landed on the first row.
+const PADDING: Record<NonNullable<CardProps["padding"]>, string> = { default: "p-6", sm: "p-4", none: "overflow-clip", custom: "" };
 
 /** The one card: panel fill, hairline edge, 12 px corners, no shadow. */
 export default function Card({ href, unconfirmed = false, padding = "default", as: Tag = "div", className = "", children, ...rest }: CardProps) {

@@ -164,7 +164,23 @@ describe("player directory", () => {
     expect(arla).not.toContain("GS 0");
     expect(arla).not.toContain("ilvl 0");
     // QA round 4: the number is Everloot's own, not the GearScore addon's.
-    expect(html).toContain("Gear Score here is Everloot&#x27;s weighted item level, not the GearScore addon&#x27;s number: it weighs each item level by its slot");
+    expect(html).toContain("Gear Score here is Everloot&#x27;s, not the GearScore addon&#x27;s number.");
+  });
+
+  test("QA round 7: an item level and Gear Score that read the same are said once, and a hint above the list says why they match", async () => {
+    armory.putCharacter(armoryCharacter());
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", itemLevel: 62, gearScore: 62 }));
+    const html = await page();
+    const table = html.slice(html.indexOf('id="player-results"'));
+    const arla = table.slice(table.indexOf("arla-quill"), table.indexOf("</tr>", table.indexOf("arla-quill")));
+    expect(arla).toContain("ilvl and GS 62");
+    expect(arla).not.toContain("GS 62 · ilvl 62");
+    const velkara = table.slice(table.indexOf("velkara-duskmantle"), table.indexOf("</tr>", table.indexOf("velkara-duskmantle")));
+    expect(velkara).toContain("ilvl 57.41 · GS 61.2");
+    // Above the table, where the two columns first show, not under 50 rows.
+    const hint = table.indexOf("weighs the same item levels by slot");
+    expect(hint).toBeGreaterThan(0);
+    expect(hint).toBeLessThan(table.indexOf("<table"));
   });
 
   test("the sort menu names the chosen order once", async () => {

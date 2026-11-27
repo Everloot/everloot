@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { createRequire } from "node:module";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
@@ -134,7 +135,7 @@ test("a region tab narrows the boards and rides on their full-list links", async
   expect(tabs).toMatch(/href="\/rankings\?region=us"[^>]*aria-current="page"/);
   const characters = section(html, "characters");
   expect(characters).not.toContain(`href="/armory/eu/${armoryCharacter().slug}"`);
-  expect(characters).toContain("No character with this number here yet.");
+  expect(characters).toContain("No characters with item level read on US realms yet.");
   expect(characters).toContain('href="/armory/rankings/item-level?region=us"');
   expect(section(html, "guilds")).toContain('href="/guilds?region=us&amp;sort=item-level"');
   // An unknown region reads as every region; any casing is read.
@@ -242,4 +243,23 @@ test("hub shows public progression while the armory is on even when legacy guild
   expect(result).toContain("Public guild progression");
   publicProgression.mockResolvedValue([]);
   expect(await hub()).not.toContain('aria-labelledby="board-guild-progression"');
+});
+
+test("no board's sticky header sits inside a box that clips by scrolling, so the header never lands on the first row", async () => {
+  // overflow-hidden makes the box the header's scroll parent: `top` (the site header's 44 px) then pushed the header
+  // 44 px down inside its card, onto row 1, with an empty band above it (QA round 7, "Best of each class" at 1440).
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const { JSDOM } = createRequire(import.meta.url)("jsdom") as { JSDOM: new (html: string) => { window: { document: Document } } };
+  const doc = new JSDOM(await hub({ metric: "gear-score" })).window.document;
+  const sticky = [...doc.querySelectorAll("th")].filter((th) => th.classList.contains("lg:sticky"));
+  expect(sticky.length).toBeGreaterThan(0);
+  for (const th of sticky) {
+    for (let el = th.parentElement; el; el = el.parentElement) expect(el.classList.contains("overflow-hidden")).toBe(false);
+  }
+});
+
+test("the item level and Gear Score boards carry one line on why the two numbers sit close; other boards do not", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  for (const metric of ["item-level", "gear-score"]) expect(section(await hub({ metric }), "characters")).toContain("weighs the same item levels by slot");
+  expect(section(await hub({ metric: "honorable-kills" }), "characters")).not.toContain("weighs the same item levels by slot");
 });

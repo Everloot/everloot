@@ -9,7 +9,7 @@ import {
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
-import { BoardClass, BoardGuild, BoardMetric, BoardValue, RegionBoard } from "../../board-parts";
+import { BoardClass, BoardGuild, BoardMetric, BoardValue, emptyBoardText, rankMark, RegionBoard } from "../../board-parts";
 import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 export const revalidate = 1800;
@@ -59,7 +59,7 @@ function controls(metric: ArmoryMetric, q: ArmoryBoardQuery): FilterControl[] {
 
 function columns(metric: ArmoryMetric, top: number): Column<ArmoryBoardRow>[] {
   return [
-    { key: "name", header: "Rank / character", cell: (r) => <span className="flex items-baseline gap-2"><span className="w-6 shrink-0 font-mono tabular-nums text-muted">{r.rank}</span><Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link></span> },
+    { key: "name", header: "Rank / character", cell: (r) => <span className="flex items-baseline gap-2">{rankMark(r, r.rank)}<Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link></span> },
     { key: "level", header: "Level", numeric: true, cell: (r) => r.level },
     { key: "class", header: "Class", nowrap: true, cell: (r) => <BoardClass row={r} /> },
     { key: "race", header: "Race", nowrap: true, cell: (r) => r.race },
@@ -104,7 +104,7 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             <div className="grid gap-4 lg:grid-cols-2">
               {split.map(({ region, rows: regionRows }) => (
-                <RegionBoard key={region} metric={metric} region={region} rows={regionRows}
+                <RegionBoard key={region} metric={metric} region={region} rows={regionRows} query={q}
                   footer={<Link href={armoryBoardHref(metric, { ...q, region })} className={link}>{regionLabel(region)} only, with level, race and realm</Link>} />
               ))}
             </div>
@@ -113,7 +113,7 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
           <>
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             {rows.length === 0
-              ? <p className="text-sm text-fg-2">No character with this number here yet.</p>
+              ? <p className="text-sm text-fg-2">{emptyBoardText(metric, q.region!, q)}</p>
               : <DataTable dense caption={`${def.title}, top ${rows.length}`} columns={columns(metric, rows[0]?.value ?? 0)} rows={rows} rowKey={(r) => `${r.region}/${r.slug}`}
                 meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardClass row={r} /><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>} />}
           </>

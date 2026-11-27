@@ -331,3 +331,38 @@ test("the daily line breaks at hidden days and never draws an empty chart as zer
   expect(text(hidden)).toContain("not enough reports");
   expect(hidden).not.toContain("<svg");
 });
+
+test("QA round 7: the daily chart's axis reads whole round numbers, never 1,947.5", () => {
+  const page = renderToStaticMarkup(<DailyChart days={[{ day: "2026-11-14", count: 3895 }, { day: "2026-11-15", count: 3100 }]} />);
+  const ticks = [...page.matchAll(/<text x="56"[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+  expect(ticks).toEqual(["0", "2,000", "4,000"]);
+  const small = renderToStaticMarkup(<DailyChart days={[{ day: "2026-11-15", count: 3 }]} />);
+  expect([...small.matchAll(/<text x="56"[^>]*>([^<]*)<\/text>/g)].map((m) => m[1])).toEqual(["0", "2", "4"]);
+  // A tighter round step when one fits: 2,595 tops out at 3,000, not 4,000.
+  const mid = renderToStaticMarkup(<DailyChart days={[{ day: "2026-11-15", count: 2595 }]} />);
+  expect([...mid.matchAll(/<text x="56"[^>]*>([^<]*)<\/text>/g)].map((m) => m[1])).toEqual(["0", "1,500", "3,000"]);
+});
+
+test("QA round 7: today's day is drawn and labelled as partial, so it never reads as a drop", () => {
+  const days = [{ day: "2026-11-14", count: 300 }, { day: "2026-11-15", count: 120 }];
+  const page = renderToStaticMarkup(<DailyChart days={days} partial="2026-11-15" />);
+  expect(page).toMatch(/<text[^>]*>11-15 \(so far\)<\/text>/);
+  expect(page).toMatch(/<path d="M[^"]*" [^>]*stroke-dasharray="4 4"/);
+  expect(page).toContain('aria-label="2026-11-15 so far: 120"');
+  expect(renderToStaticMarkup(<DailyChart days={days} />)).not.toContain("so far");
+});
+
+test("QA round 7: the page marks today's day as so far in the chart and the table", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await html("launch");
+  expect(page).toMatch(/2026-11-16<\/span><span[^>]*> \(so far\)/);
+  expect(page).not.toMatch(/2026-11-15<\/span><span[^>]*> \(so far\)/);
+});
+
+test("QA round 7: under a filter the headline tiles say they count all characters", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await filtered({ class: "mage", window: "launch" });
+  expect(page).toMatch(/<dt[^>]*>Top class, all characters<\/dt>/);
+  expect(page).not.toMatch(/<dt[^>]*>Top class shown<\/dt>/);
+  expect(await html("launch")).toMatch(/<dt[^>]*>Top class shown<\/dt>/);
+});

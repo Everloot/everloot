@@ -250,17 +250,18 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
   );
 }
 
-function HeadlineTiles({ window: w }: { window: CensusWindow }) {
+/** `filtered`: the tiles stay on all characters in the window, and say so, while the filters narrow what is below. */
+function HeadlineTiles({ window: w, filtered = false }: { window: CensusWindow; filtered?: boolean }) {
   // Compare published counts only; a hidden contender is never treated as zero.
   const top = (rows: { label: string; count: CensusCount }[]) => {
     const first = rows.filter((r) => r.count !== null).sort((a, b) => b.count! - a.count!)[0];
     return first ? `${number(first.count!)} · ${first.label}` : HIDDEN_LABEL;
   };
   const stats = [
-    ["Characters in the window", w.characters === null ? HIDDEN_LABEL : number(w.characters)],
-    ["Faction split", w.factions.map((f) => `${f.faction}: ${f.count === null || !w.characters ? HIDDEN_LABEL : percent(f.count, w.characters)}`).join(" · ")],
-    ["Top class shown", top(w.classes.map((c) => ({ label: CLASS_NAME.get(c.class)!, count: c.count })))],
-    ["Top race shown", top(w.races.map((r) => ({ label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count })))],
+    [filtered ? "All characters in the window" : "Characters in the window", w.characters === null ? HIDDEN_LABEL : number(w.characters)],
+    [filtered ? "Faction split, all characters" : "Faction split", w.factions.map((f) => `${f.faction}: ${f.count === null || !w.characters ? HIDDEN_LABEL : percent(f.count, w.characters)}`).join(" · ")],
+    [filtered ? "Top class, all characters" : "Top class shown", top(w.classes.map((c) => ({ label: CLASS_NAME.get(c.class)!, count: c.count })))],
+    [filtered ? "Top race, all characters" : "Top race shown", top(w.races.map((r) => ({ label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count })))],
   ];
   return <dl aria-label="Census headlines" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
     {stats.map(([label, value]) => <Card key={label} padding="sm"><dt className="text-sm text-fg-2">{label}</dt><dd className="mt-2 text-xl font-semibold tabular-nums text-fg">{value}</dd></Card>)}
@@ -276,6 +277,8 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
   const w = view?.windows[chosen];
   const ready = !unreachable && view && w;
   const icons = ready && !w.collecting ? await censusIcons() : {};
+  // The week window ends at the data time, so its last day is still being counted.
+  const today = view ? day(view.windows.week.to) : undefined;
   return (
     <Container width="data">
       <EdgeDegraded when={Boolean(unreachable)} />
@@ -312,7 +315,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                 <Headline view={view} window={w} />
                 {!w.collecting && <p className="text-sm text-fg-2">Coverage reflects where participating players play.</p>}
               </div>
-              {!w.collecting && <HeadlineTiles window={w} />}
+              {!w.collecting && <HeadlineTiles window={w} filtered={filtering} />}
               {!w.collecting && (
                 <FilterBar
                   label="Census filters"
@@ -351,11 +354,11 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
             {!view.windows.week.collecting && !filtering && (
               <Card as="section" aria-labelledby="trend">
                 <SectionHeading id="trend" note="Characters active each UTC day, under the same rule.">The last 7 days, day by day</SectionHeading>
-                <DailyChart days={view.trend} />
+                <DailyChart days={view.trend} partial={today} />
                 <DataTable
                   caption="Characters active each day of the last 7 days"
                   columns={[
-                    { key: "day", header: "Day (UTC)", cell: (d) => <span className="font-mono tabular-nums">{d.day}</span> },
+                    { key: "day", header: "Day (UTC)", cell: (d) => <><span className="font-mono tabular-nums">{d.day}</span>{d.day === today && <span className="text-muted"> (so far)</span>}</> },
                     { key: "count", header: "Characters", numeric: true, cell: (d) => <Count count={d.count} /> },
                   ]}
                   rows={view.trend}

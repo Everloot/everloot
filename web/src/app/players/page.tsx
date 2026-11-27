@@ -5,7 +5,7 @@ import JsonLd from "@/components/JsonLd";
 import { CENSUS_CLASSES } from "@kb/census";
 import {
   ARMORY_HIDE_PATH, ARMORY_RACES, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryNameQuery, armoryOn,
-  classTokenOfName, metricValue, regionLabel,
+  classTokenOfName, GEAR_SCORE_HINT, metricValue, regionLabel,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow, type ArmoryDirectoryRow } from "@/lib/armory-store";
 import { isDisbandedGuild } from "@/lib/armory-guilds";
@@ -100,9 +100,17 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
   return guildHref ? all : all.filter((c) => !c.armory).map((c) => ({ ...c, sortable: false }));
 }
 
+/** Item level and Gear Score for the phone line, said once when they read the same ("ilvl and GS 62"). */
+function gearWords(r: DirectoryRow): string {
+  const il = r.itemLevel ? metricValue("item-level", r.itemLevel) : null;
+  const gs = r.gearScore ? metricValue("gear-score", r.gearScore) : null;
+  if (il && il === gs) return ` · ilvl and GS ${il}`;
+  return `${il ? ` · ilvl ${il}` : ""}${gs ? ` · GS ${gs}` : ""}`;
+}
+
 /** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${!r.gearScore ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${!r.itemLevel ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${gearWords(r)}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -322,6 +330,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                   href={(page) => playerDirectoryHref(d, page)} sizeHref={(per) => playerDirectoryHref({ ...d, per }, 1)} />}
               />
             )}
+            {rows.length > 0 && armory && <p className="text-meta text-muted">Gear Score here is Everloot&apos;s, not the GearScore addon&apos;s number. {GEAR_SCORE_HINT}</p>}
             {rows.length > 0 && (
               <DataTable
                 dense
@@ -341,7 +350,6 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                 action={active ? { href: "/players", label: "Clear filters" } : q ? { href: "/players", label: "Clear the search" } : { href: ARMORY_SUBMIT_PATH, label: "Add a character" }}
               />
             )}
-            {rows.length > 0 && armory && <p className="text-meta text-muted">Gear Score here is Everloot&apos;s weighted item level, not the GearScore addon&apos;s number: it weighs each item level by its slot&apos;s stat budget, so it can rank characters differently from item level.</p>}
             {directory && directory.rows.length > 0 && <ArmoryCredit at={newest(directory.rows.map((r) => r.fetchedAt))} />}
             {sightings.length > 0 && <>
               <h3 className="text-h2-sm text-fg">Seen by the addon</h3>

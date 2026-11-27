@@ -146,6 +146,12 @@ export const ARMORY_BOARDS: Record<ArmoryMetric, { key: ArmoryMetricKey; title: 
   "dungeons-entered": history("dungeons_entered", "Dungeons entered", "5-player dungeons entered"),
   "deaths": history("total_deaths", "Deaths", "total deaths"),
 };
+/**
+ * Why Gear Score and item level nearly always read the same: Gear Score is the same 17 item levels averaged with each
+ * slot weighted by its stat budget (kb/src/gear-score.ts), so a full kit at item level N scores N, and the two part only
+ * when the heavy slots are ahead of or behind the rest.
+ */
+export const GEAR_SCORE_HINT = "Gear Score weighs the same item levels by slot (head, chest and legs count most), so it matches item level unless those slots are ahead of or behind the rest.";
 export const metricOfKey = (key: string): ArmoryMetric | null => ARMORY_METRICS.find((m) => ARMORY_BOARDS[m].key === key) ?? null;
 export const armoryBoardPath = (metric: ArmoryMetric) => `/armory/rankings/${metric}`;
 /** The number a board or a fact shows: whole counts, item level and Gear Score to two decimals at most. */
