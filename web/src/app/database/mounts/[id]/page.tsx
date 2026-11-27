@@ -3,7 +3,13 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { loadAgreedMounts, mountEntries, mountHref, mountsBuild } from "@/lib/collectibles";
 import { parseSegment } from "@/lib/completion-lists";
-import { loadSiteAssets } from "@/lib/game-assets";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import EntityLink from "@/components/EntityLink";
+import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { shownItemName } from "@/lib/items";
+import { loadShownNames } from "@/lib/shown-item-names";
+import { spellUses } from "@/lib/spell-card";
 import { CollectiblePage, collectibleMetadata, FILES_NAME } from "../../collectible-page";
 import { LINK } from "../../entity";
 
@@ -32,8 +38,17 @@ export default async function MountPage(props: Props) {
   if (!mount) notFound();
   const path = mountHref(mount.id, mount.name);
   if (`/database/mounts/${segment}` !== path) permanentRedirect(path);
-  const [agreed, assets] = await Promise.all([loadAgreedMounts(), loadSiteAssets()]);
+  // The items whose Use line casts the mount's spell (client-spells.json), listed under the item name rule as on the spell page.
+  const casting = spellUses(mount.spellId).items.filter((u) => u.trigger === 0).map((u) => u.item);
+  const [agreed, assets, spellNames, shown] = await Promise.all([
+    loadAgreedMounts(), loadSiteAssets(), loadSpellNames(CLIENT_LAYER.build.version), casting.length ? loadShownNames() : null,
+  ]);
   const confirmed = agreed?.has(mount.spellId) ?? false;
+  const items = shown ? casting.flatMap((item) => {
+    const name = shown.showsTip(item) ? shownItemName(item, shown.agreed, shown.matched?.names)?.name : undefined;
+    return name && !isDevelopmentItemName(name) ? [{ item, name }] : [];
+  }) : [];
+  const icon = assets?.spellIcons.get(mount.spellId);
   const summary = [
     "A mount in WoW: Forever.",
     agreed === null ? "Player reports could not be read just now." : confirmed ? "Players reported it in their mount collection, three installs agreeing." : "No player has reported it in a mount collection yet.",
@@ -43,11 +58,12 @@ export default async function MountPage(props: Props) {
   return (
     <CollectiblePage
       list="/database/mounts" path={path} name={mount.name} kind="Mount" id={mount.id}
-      icon={assets?.spellIcons.get(mount.spellId)} confirmed={confirmed}
+      icon={icon} confirmed={confirmed}
       box={mount.ridingSkill ? <p>Requires Riding ({mount.ridingSkill})</p> : null}
       facts={[
         { label: "Player reports", value: agreed === null ? "Unrecorded" : confirmed ? "3 of 3 installs agree" : "None yet" },
-        { label: "Taught by", value: <Link href={`/database/spells/${mount.spellId}`} className={LINK}>Spell {mount.spellId}</Link> },
+        { label: "Taught by", value: <EntityLink kind="spell" id={mount.spellId} name={spellNames?.names.get(mount.spellId)} icon={icon} /> },
+        ...(items.length ? [{ label: items.length === 1 ? "Item" : "Items", value: <span>{items.map((x, i) => <span key={x.item}>{i > 0 && ", "}<EntityLink kind="item" id={x.item} name={x.name} /></span>)}</span> }] : []),
         { label: "Riding skill", value: mount.ridingSkill ?? "None in the files", numeric: Boolean(mount.ridingSkill) },
         { label: "Track this", value: <Link href="/tools/collections?view=mounts" className={LINK}>Collections tool</Link> },
         { label: "Build", value: mountsBuild() ?? "Unrecorded", numeric: true },

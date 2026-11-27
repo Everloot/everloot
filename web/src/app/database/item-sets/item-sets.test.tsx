@@ -8,14 +8,24 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadItemSetNames: async () => (files.sets ? { version: "x", names: new Map([[1, "The Gladiator"], [342, "Champion's Raiment"]]) } : null),
   loadSpellNames: async () => ({ version: "x", names: new Map([[9331, "Increased Defense"]]) }),
-  loadSiteAssets: async () => null,
-  loadItemTips: async (_: unknown, ids: readonly number[]) => new Map(ids.filter((id) => id === 11729).map((id) => [id, { icon: "https://assets.test/icon.webp" }])),
+  loadSiteAssets: async () => ({ spellIcons: new Map() }),
+  // Piece 11729 has a whole record; 11728 only an icon (no ItemSparse row), as tier pieces often do.
+  readItemTips: async (_: unknown, ids: readonly number[]) => ({
+    tips: new Map(ids.filter((id) => id === 11729).map((id) => [id, { icon: "https://assets.test/icon.webp" }])),
+    icons: new Map(ids.filter((id) => id === 11729 || id === 11728).map((id) => [id, id === 11729 ? "https://assets.test/icon.webp" : "https://assets.test/legs.webp"])),
+    unreachable: false, degraded: false, indexed: true,
+  }),
 }));
 vi.mock("@/lib/shown-item-names", () => ({
   loadShownNames: async () => ({
-    facts: { unreachable: false }, agreed: new Map([[11729, "Savage Gladiator Chain"]]), matched: null,
-    named: { has: (id: number) => id === 11729 }, showsTip: (id: number) => id === 11729, degraded: false,
+    facts: { unreachable: false }, agreed: new Map([[11729, "Savage Gladiator Chain"], [11728, "Savage Gladiator Leggings"]]), matched: null,
+    named: { has: (id: number) => id === 11729 || id === 11728 }, showsTip: (id: number) => id === 11729 || id === 11728, degraded: false,
   }),
+}));
+// Where players got each piece, under the 3-install rule the item lists' Source column uses.
+const seen = vi.hoisted(() => ({ unreachable: false }));
+vi.mock("@/lib/item-seen", () => ({
+  loadItemSeen: async () => ({ seen: new Set([11729]), from: seen.unreachable ? new Map() : new Map([[11729, ["drop", "vendor"]]]), unreachable: seen.unreachable }),
 }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
@@ -27,7 +37,24 @@ import ItemSetListPage from "./page";
 const html = async (id: string) => renderToStaticMarkup(await ItemSetPage({ params: Promise.resolve({ id }) }));
 const list = async (search: Record<string, string> = {}) => renderToStaticMarkup(await ItemSetListPage({ searchParams: Promise.resolve(search) }));
 
-beforeEach(() => { files.sets = true; });
+beforeEach(() => { files.sets = true; seen.unreachable = false; });
+
+test("a piece the files give only an icon for still shows that icon", async () => {
+  const out = await html("1");
+  expect(out).toMatch(/src="https:\/\/assets\.test\/legs\.webp"[^>]*>(?:<[^>]*>)*Savage Gladiator Leggings/);
+});
+
+test("each piece says where players got it, linking the item page's tab; a piece with no report shows a dash", async () => {
+  const out = await html("1");
+  expect(out).toMatch(/<th[^>]*>(?:<[^>]*>)*Source</);
+  expect(out).toMatch(/<a href="\/database\/items\/11729#dropped-by"[^>]*>Drop<\/a>/);
+  expect(out).toMatch(/<a href="\/database\/items\/11729#sold-by"[^>]*>Vendor<\/a>/);
+  // On a phone the column folds into the row's meta line.
+  expect(out).toContain("Head · Drop, Vendor · ID 11729");
+  // Storage out of reach: unrecorded, not "no source".
+  seen.unreachable = true;
+  expect(await html("1")).toContain("Unrecorded");
+});
 
 test("a set page: the name with the unconfirmed marker, its pieces with icons and links, its bonuses with pieces needed and spell links", async () => {
   const out = await html("1");
