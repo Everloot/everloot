@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { CLASS_BG, classColour, type ClassName } from "@/components/ui/class-colour";
 import { HIDDEN_LABEL, type CensusCount } from "@kb/census";
 import type { CensusIcons } from "@/lib/census-media";
 import { axisStep } from "@/lib/chart-axis";
+import { useMeasuredWidth } from "@/lib/use-measured-width";
 
 const number = (n: number) => n.toLocaleString("en-US");
 const value = (n: CensusCount) => n === null ? HIDDEN_LABEL : number(n);
@@ -72,15 +73,7 @@ export function HeatCell({ label, classToken, count, max }: { label: string; cla
  */
 export function DailyChart({ days, partial }: { days: { day: string; count: CensusCount }[]; partial?: string }) {
   const [active, setActive] = useState<number | null>(null);
-  const [width, setWidth] = useState(720);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = box.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => { const w = Math.round(entry.contentRect.width); if (w > 0) setWidth(w); });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const [box, width] = useMeasuredWidth();
   const step = axisStep(Math.max(...days.flatMap((d) => d.count === null ? [] : [d.count])));
   const top = step * 2;
   const plot = width - 120;

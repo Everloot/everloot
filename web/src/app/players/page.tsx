@@ -104,9 +104,9 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
 function gearWords(r: DirectoryRow): string {
   const il = r.itemLevel ? metricValue("item-level", r.itemLevel) : null;
   const gs = r.gearScore ? metricValue("gear-score", r.gearScore) : null;
-  // Non-breaking spaces: on a phone the phrase stays on one line.
+  // Non-breaking spaces: on a phone the phrase, or each "ilvl N" and "GS N" pair, stays on one line.
   if (il && il === gs) return ` · ilvl and GS ${il}`;
-  return `${il ? ` · ilvl ${il}` : ""}${gs ? ` · GS ${gs}` : ""}`;
+  return `${il ? ` · ilvl ${il}` : ""}${gs ? ` · GS ${gs}` : ""}`;
 }
 
 /** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */

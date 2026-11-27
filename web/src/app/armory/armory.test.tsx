@@ -119,6 +119,8 @@ describe("the character page", () => {
     expect(out).toContain("Last login");
     expect(out).toMatch(/Last read<\/dt><dd[^>]*><time dateTime="2026-11-09T10:00:00.000Z" title="Read 2026-11-09 10:00 UTC"/);
     expect(out).toContain('role="tablist"');
+    // QA round 9: on a phone the eight tabs wrap onto a second line instead of hiding five past the edge.
+    expect(out).toMatch(/<div[^>]*class="[^"]*\bflex-wrap\b[^"]*"[^>]*role="tablist"/);
     expect(out).toContain('data-tab-panel="pvp"');
     expect(out).toContain("57.41");
     expect(out).toContain("61.2");

@@ -177,7 +177,8 @@ describe("player directory", () => {
     expect(arla).toContain("ilvl and GS 62");
     expect(arla).not.toContain("GS 62 · ilvl 62");
     const velkara = table.slice(table.indexOf("velkara-duskmantle"), table.indexOf("</tr>", table.indexOf("velkara-duskmantle")));
-    expect(velkara).toContain("ilvl 57.41 · GS 61.2");
+    // QA round 9: each pair holds together even when the two values differ.
+    expect(velkara).toContain("ilvl 57.41 · GS 61.2");
     // Above the table, where the two columns first show, not under 50 rows.
     const hint = table.indexOf("weighs the same item levels by slot");
     expect(hint).toBeGreaterThan(0);

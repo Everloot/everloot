@@ -96,7 +96,7 @@ export function RegionBoard({ metric, region, rows, footer, query }: { metric: A
           columns={regionColumns(metric, rows[0]?.value ?? 0, sharedRanks(rows))}
           rows={rows}
           rowKey={(r) => `${r.region}/${r.slug}`}
-          meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>}
+          meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><span className="ml-auto"><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span></span>}
           empty={<p className="px-4 py-3 text-cell text-fg-2">{emptyBoardText(metric, region, query)}</p>}
           toolbar={heading}
           footer={rows.length ? footer : undefined}

@@ -170,6 +170,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
         <div id="progress">
           <Tabs
             label={`${fullName}: character sheet`}
+            wrap
             tabs={characterTabs(c, {}, (id) => (id === DEFAULT_TAB ? characterPanel(c, id, defaultParts) : <LaterTab region={c.region} slug={c.slug} tab={id} />))}
           />
         </div>
