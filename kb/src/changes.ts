@@ -228,6 +228,52 @@ export function sameBody(a: string, b: string): boolean {
   return x === y || (x.length >= MIN_SHARED && y.startsWith(x));
 }
 
+const MONTH_NUMBER = new Map(MONTHS.split("|").map((m, i) => [m.toLowerCase(), i + 1]));
+const DAY_MS = 86_400_000;
+/** The UTC day `iso` falls on, as midnight in milliseconds. */
+const utcDay = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+
+/**
+ * The day a title names ("November 10", "11 November", "November 11, 2026"), as YYYY-MM-DD, when it is within a day
+ * of the UTC day `at` falls on; else null. A title with no year takes the year that puts the day nearest `at`.
+ */
+function titledDay(title: string, at: string): string | null {
+  const m = TITLE_DATE.exec(title);
+  if (!m) return null;
+  const month = MONTH_NUMBER.get((m[1] ?? m[5]).toLowerCase())!;
+  const day = Number(m[2] ?? m[4]);
+  const posted = utcDay(at);
+  const written = m[3] ?? m[6];
+  const year = new Date(posted).getUTCFullYear();
+  const years = written ? [Number(written.replace(/\D/g, ""))] : [year - 1, year, year + 1];
+  const named = years.map((y) => Date.UTC(y, month - 1, day)).sort((a, b) => Math.abs(a - posted) - Math.abs(b - posted))[0];
+  if (new Date(named).getUTCDate() !== day || Math.abs(named - posted) > DAY_MS) return null;
+  return new Date(named).toISOString().slice(0, 10);
+}
+
+/**
+ * The day a list shows for an entry: the day its title names when that is within a day of when it was posted
+ * ("Hotfixes - November 11" posted at 00:48 UTC on the 12th is November 11, as Blizzard dated it), else the UTC
+ * day it was posted. Builds and titles without a day use the UTC day.
+ */
+export function postDay(e: Pick<ChangeEntry, "type" | "title" | "at">): string {
+  return (e.type !== "build" && titledDay(e.title, e.at)) || e.at.slice(0, 10);
+}
+
+/** A title with the day it names taken out: "PvP Updates - November 10" and "PvP Updates - 11 November" read the same. */
+const titleShape = (s: string) => s.replace(TITLE_DATE, "<date>").replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * The same announcement on both forums under titles that name its day differently, a day apart for Europe's
+ * maintenance ("November 10" in the US, "11 November" in the EU): the same title around the date, days a day apart
+ * at most, posted within a day, and the same text (sameBody).
+ */
+function regionalTwin(a: ChangeEntry, b: ChangeEntry): boolean {
+  if (titleShape(a.title) !== titleShape(b.title) || !TITLE_DATE.test(a.title) || Math.abs(Date.parse(a.at) - Date.parse(b.at)) > DAY_MS) return false;
+  const [da, db] = [titledDay(a.title, a.at), titledDay(b.title, b.at)];
+  return da !== null && db !== null && Math.abs(Date.parse(da) - Date.parse(db)) <= DAY_MS && sameBody(a.excerpt ?? "", b.excerpt ?? "");
+}
+
 /** A copy of an announcement whose stored text runs past the announcement's own (cut short when it was stored), or null. */
 export function fullerCopy(e: ChangeEntry): ChangeEntry | null {
   const own = bodyText(e.excerpt ?? "");
@@ -244,7 +290,7 @@ const threadOf = (e: ChangeEntry) => (e.topicId === undefined ? e.id : `${e.regi
  * one forum, with the day worded per region. Forum posts of the same game and type, posted the same day
  * (UTC) under the same title, in different threads, are one announcement; a reply also needs the same
  * text (sameBody: dates and clock times aside, one copy may be cut short), since every reply in a thread carries
- * the thread's title. The US copy, else the earliest, is
+ * the thread's title. Titles that name the day differently, a day apart, group when the text is the same (regionalTwin). The US copy, else the earliest, is
  * the entry; the rest are its `copies`. A Blizzard News article of the same game, type and title within a day of a
  * forum announcement joins it as a copy too: the news card holds no text, and the forum post links it. Bluesky
  * posts, builds and news with no forum twin pass through.
@@ -266,12 +312,14 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
     const candidates = groups.get(key) ?? [];
     const group = candidates.find((g) => g.every((c) => threadOf(c) !== threadOf(e))
       && ((g[0].startedThread !== false && e.startedThread !== false) || sameAnnouncement(g[0].excerpt ?? "", e.excerpt ?? "")
-        || sameBody(g[0].excerpt ?? "", e.excerpt ?? "")));
+        || sameBody(g[0].excerpt ?? "", e.excerpt ?? "")))
+      ?? [...groups.values()].flat().find((g) => g[0].game === e.game && g[0].type === e.type
+        && g.every((c) => threadOf(c) !== threadOf(e)) && regionalTwin(g[0], e));
     if (group) group.push(e);
     else groups.set(key, [...candidates, [e]]);
   }
   const all = [...groups.values()].flat();
-  const DAY = 86_400_000;
+  const DAY = DAY_MS;
   for (const e of news) {
     const gap = (g: ChangeEntry[]) => Math.abs(Date.parse(g[0].at) - Date.parse(e.at));
     const twin = all.filter((g) => g[0].game === e.game && g[0].type === e.type && gap(g) <= DAY && sameAnnouncement(g[0].title, e.title))
@@ -293,7 +341,7 @@ export function forumRegions(e: ChangeEntry): BlueRegion[] {
 export interface TitleDayRow { entry: ChangeEntry; posts: ChangeEntry[] }
 
 /**
- * One row per game, title and day (UTC), in the order the entries come. Blizzard posts several replies a day in a
+ * One row per game, title and day (postDay), in the order the entries come. Blizzard posts several replies a day in a
  * thread that all carry its title (the hotfixes, and the AV adjustments with a follow-up); after groupAnnouncements
  * has folded each one's regional copies, they are still different posts that would read as repeats. The row is
  * the first of them; `posts` holds them all. Builds are rows of their own.
@@ -301,7 +349,7 @@ export interface TitleDayRow { entry: ChangeEntry; posts: ChangeEntry[] }
 export function foldTitleDay(entries: readonly ChangeEntry[]): TitleDayRow[] {
   const rows = new Map<string, TitleDayRow>();
   for (const entry of entries) {
-    const key = entry.type === "build" ? entry.id : `${entry.game}|${entry.at.slice(0, 10)}|${entry.title}`;
+    const key = entry.type === "build" ? entry.id : `${entry.game}|${postDay(entry)}|${entry.title}`;
     const row = rows.get(key);
     if (row) row.posts.push(entry);
     else rows.set(key, { entry, posts: [entry] });

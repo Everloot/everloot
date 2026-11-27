@@ -53,7 +53,7 @@ test("the canonical address renders the post: blue title and author, date, sourc
   expect(html).toContain('<time dateTime="2026-10-20T21:00:12.897Z" title="2026-10-20 21:00 UTC">October 20, 2026</time>');
   expect(html).toContain("US forum");
   expect(html).toContain("WoW: Forever General Discussion");
-  expect(html).toMatch(/<figure data-excerpt="true" class="[^"]*border-blue-post[^"]*"><blockquote cite="https:\/\/us\.forums[^"]*" class="text-blue-post"><p>Get ready to make your mark in Azeroth! Name reservations open soon\.<\/p><\/blockquote><figcaption[^>]*>Blizzard(&#x27;|')s words, an excerpt\.<\/figcaption>/);
+  expect(html).toMatch(/<figure data-excerpt="true" class="[^"]*border-blue-post[^"]*"><blockquote cite="https:\/\/us\.forums[^"]*" class="text-fg"><p>Get ready to make your mark in Azeroth! Name reservations open soon\.<\/p><\/blockquote><figcaption[^>]*>Blizzard(&#x27;|')s words, an excerpt\.<\/figcaption>/);
   expect(html).toMatch(/<a data-original="true" href="https:\/\/us\.forums\.blizzard\.com\/en\/wow\/t\/claim-your-world-of-warcraft-forever-character-names\/2387945" rel="noopener"[^>]*>Read the full post on Blizzard(&#x27;|')s forums<\/a>/);
   // Nothing above the title: what kind of post it is leads the line under it.
   expect(html).toContain('<header class="mb-6"><h1 ');
@@ -124,7 +124,18 @@ test("with a reviewed write-up: our notes with lists and links, the page is inde
   expect(JSON.stringify(article)).not.toContain('"Person"');
 });
 
-test("More from the author and Same day link to the other posts' pages, never to builds, the post itself or its copies", async () => {
+// A post between this one and the Bluesky post: it is Newer, so the Bluesky post is left for Same day.
+const between: ChangeEntry = { ...sky, id: "bluesky:3mydklbetween", at: "2026-10-20T21:05:00.000Z", title: "Names go live soon", url: "https://bsky.app/profile/worldofwarcraft.blizzard.com/post/3mydklbetween" };
+const withBetween = async (run: () => Promise<void>) => {
+  data.entries = [sky, between, eu, post, build, older, euOnly];
+  try {
+    await run();
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+};
+
+test("More from the author and Same day link to the other posts' pages, never to builds, the post itself or its copies", () => withBetween(async () => {
   const html = await page(CANONICAL);
   const more = html.slice(html.indexOf('id="more-from"'), html.indexOf('id="same-day"'));
   expect(more).toContain("More from Blizzard Entertainment");
@@ -136,10 +147,11 @@ test("More from the author and Same day link to the other posts' pages, never to
   expect(day).toContain('href="/changes/bsky-3mydklukhq22f-good-news-everyone"');
   expect(day).not.toContain("an-older-notice");
   expect(html).not.toContain("1.60.1.70460");
-});
+}));
 
 test("the related lists sit in a column beside the post, after it on a phone, with long dates that never break", async () => {
-  const html = await page(CANONICAL);
+  let html = "";
+  await withBetween(async () => { html = await page(CANONICAL); });
   expect(html).toMatch(/<div data-container="wide" class="[^"]*lg:grid-cols-\[minmax\(0,48rem\)_minmax\(0,1fr\)\]"><article data-blue-post="true"/);
   const aside = html.slice(html.indexOf('<aside aria-label="More Blizzard posts"'));
   expect(aside).toContain('id="more-from"');
@@ -254,7 +266,11 @@ test("a copy whose stored text stops early shows its twin's fuller text, labelle
   try {
     const html = await page(NOV12_PAGE);
     expect(html).toContain("Shaman Weapon imbues and Weapon totems can now be used at the same time.");
-    expect(html).toMatch(/<figcaption[^>]*>Blizzard(&#x27;|')s words, an excerpt, from the EU forum copy: the US forum copy(&#x27;|')s stored text stops earlier\.<\/figcaption>/);
+    expect(html).toMatch(/<figcaption[^>]*>Excerpt from the EU forum post \(it has more text than the US copy\)\.<\/figcaption>/);
+    // The line under the title names the forum the shown words come from, with that copy's time.
+    expect(html).toContain('<span data-forum="true">EU forum</span>');
+    expect(html).toContain('<time dateTime="2026-11-12T19:10:54.868Z"');
+    expect(html).toMatch(/<blockquote cite="https:\/\/eu\.forums[^"]*" class="text-fg">/);
     const nearby = html.slice(html.indexOf("data-nearby"), html.indexOf("<aside"));
     expect(nearby).not.toContain(NOV12);
     expect(nearby).not.toContain("eu-6497741");
@@ -263,16 +279,55 @@ test("a copy whose stored text stops early shows its twin's fuller text, labelle
   }
 });
 
-test("Same day and More from list one row per title and day, saying how many posts it holds", async () => {
+test("a post shown in one list around the page is not repeated in another: Older, then Same day, then More from", async () => {
+  const podcast: ChangeEntry = { ...kaivax("forum:30874280", "us", 1, "2026-11-12T17:46:04.799Z", "The WoW Forever Podcast: Episode 7", "", "post"), topicId: 2412856, author: "Blizzard Entertainment" };
+  const noon: ChangeEntry = { ...kaivax("forum:30870000", "us", 1, "2026-11-12T12:00:00.000Z", "Realm restarts", "Realms restart at noon.", "post"), topicId: 2412000 };
+  data.entries = [...thread, podcast, noon];
+  try {
+    const html = await page(NOV12_PAGE);
+    const nearby = html.slice(html.indexOf("data-nearby"), html.indexOf("<aside"));
+    expect(nearby).toContain("The WoW Forever Podcast: Episode 7");
+    const more = html.slice(html.indexOf('id="more-from"'), html.indexOf('id="same-day"'));
+    const day = html.slice(html.indexOf('id="same-day"'));
+    expect(day).not.toContain("Podcast");
+    expect(day).toContain("Realm restarts");
+    expect(more).not.toContain("Realm restarts");
+    expect(more).not.toContain("Podcast");
+    for (const title of ["Podcast", "Realm restarts", NOV11, AV]) expect(html.slice(html.indexOf("data-nearby")).split(title).length - 1, title).toBeLessThanOrEqual(1);
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});
+
+test("a reply posted after midnight UTC is dated by the day its title names, in the header and the lists", async () => {
   data.entries = thread;
+  try {
+    expect(await page("us-30863849-wow-forever-hotfixes-november-11-2026"))
+      .toMatch(/<time dateTime="2026-11-12T00:48:47.076Z" title="2026-11-12 00:48 UTC">November 11, 2026<\/time>/);
+    // From November 12's page, the older card and the lists date November 11's replies the 11th.
+    const html = await page(NOV12_PAGE);
+    const nearby = html.slice(html.indexOf("data-nearby"), html.indexOf("<aside"));
+    expect(nearby).toMatch(new RegExp(`${NOV11}</span><time dateTime="2026-11-12T00:48:47.076Z"[^>]*>November 11, 2026</time>`));
+    expect(html.slice(html.indexOf("<aside"))).not.toContain(NOV11);
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});
+
+test("Same day and More from list one row per title and day, saying how many posts it holds", async () => {
+  // Newer and Older are other people's posts, so the rows below are not taken by them.
+  const other = (id: string, at: string, title: string, topicId: number) => ({ ...kaivax(id, "us", 1, at, title, `${title}.`, "post"), topicId, author: "Blizzard Entertainment" });
+  const restart = (id: string, n: number, at: string) => ({ ...other(id, at, "Realm restarts", 2412000), postNumber: n, startedThread: n === 1 });
+  data.entries = [...thread, other("forum:31100000", "2026-11-13T12:00:00.000Z", "A later notice", 2430000), other("forum:30874280", "2026-11-12T17:46:04.799Z", "Podcast", 2412856),
+    restart("forum:30870001", 1, "2026-11-12T12:00:00.000Z"), restart("forum:30870002", 2, "2026-11-12T13:00:00.000Z")];
   try {
     const html = await page(NOV12_PAGE);
     const more = html.slice(html.indexOf('id="more-from"'), html.indexOf('id="same-day"'));
     expect(more.match(new RegExp(AV, "g"))).toHaveLength(1);
     expect(more).toMatch(new RegExp(`${AV}</a>(?:<[^>]*>)*\\s*·\\s*2 posts`));
     const day = html.slice(html.indexOf('id="same-day"'));
-    expect(day.match(new RegExp(NOV11, "g"))).toHaveLength(1);
-    expect(day).toMatch(new RegExp(`${NOV11}</a>(?:<[^>]*>)*\\s*·\\s*2 posts`));
+    expect(day.match(/Realm restarts/g)).toHaveLength(1);
+    expect(day).toMatch(/Realm restarts<\/a>(?:<[^>]*>)*\s*·\s*2 posts/);
   } finally {
     data.entries = [sky, eu, post, build, older, euOnly];
   }

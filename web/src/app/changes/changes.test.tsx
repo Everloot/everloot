@@ -406,7 +406,32 @@ test("November 11 and 12: twins on both forums are one card, and two posts under
   expect(nov11).toContain("Auction House changes");
   expect(nov11).toContain('href="/changes/us-30863849-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toContain('href="/changes/us-30863846-wow-forever-hotfixes-november-11-2026"');
+  expect(nov11).toMatch(/<p data-thread-posts="true"[^>]*>Read <span><a [^>]*>post 7<\/a><\/span><span> · <a [^>]*>post 8<\/a><\/span><\/p>/);
+  // Posted at 00:48 UTC on the 12th, the card is dated the day its title names.
+  expect(nov11).toMatch(/<time dateTime="2026-11-12T00:48:47.076Z"[^>]*>2026-11-11<\/time>/);
+  expect(nov12).toMatch(/<time [^>]*>2026-11-12<\/time>/);
   expect(html.match(/data-change-row/g)).toHaveLength(2);
+});
+
+test("November 10: the PvP update titled 'November 10' in the US and '11 November' in the EU is one card", async () => {
+  const { buildTimeline } = await import("@/lib/changes");
+  const text = "It’s vitally important that the PvP rulesets in WoW: Forever have balanced factions where both factions vie for supremacy.";
+  const pvp = (id: string, region: "us" | "eu", topicId: number, n: number, postedAt: string, title: string, excerpt = text) => ({
+    id, source: "forum", region, url: `https://${region}.forums.blizzard.com/en/wow/t/pvp-faction-balance-updates/${topicId}/${n}`, title,
+    author: "Kaivax", role: "Community Manager", postedAt, category: "WoW: Forever", game: "forever", kind: "post", excerpt, topicId, postNumber: n,
+  });
+  timeline.entries = buildTimeline([
+    pvp("forum:30830227", "us", 2408781, 1, "2026-11-10T02:05:13.558Z", "PvP Faction Balance Updates - November 10"),
+    pvp("forum:eu:6488007", "eu", 641169, 1, "2026-11-10T02:06:08.484Z", "PvP Faction Balance Updates - 11 November"),
+    pvp("forum:30830868", "us", 2408781, 158, "2026-11-10T03:04:13.020Z", "PvP Faction Balance Updates - November 10", "We did significant investigation into that."),
+  ], []);
+  const html = await page();
+  expect(rows(html)).toBe(1);
+  expect(html).not.toContain("11 November");
+  const [card] = cards(html);
+  expect(card).toContain("US · EU forum");
+  expect(card).toMatch(/<span data-posts="true"[^>]*>2 posts<\/span>/);
+  expect(card).toMatch(/<time [^>]*>2026-11-10<\/time>/);
 });
 
 test("builds are plain cards without the blue edge", async () => {

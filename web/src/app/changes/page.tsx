@@ -5,7 +5,7 @@ import AdSlot from "@/components/AdSlot";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl, stripBelow } from "@/components/ui";
-import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, foldTitleDay, forumRegions, loadTimeline, parseFilter, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter, type TitleDayRow } from "@/lib/changes";
+import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, foldTitleDay, forumRegions, loadTimeline, parseFilter, postDay, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter, type TitleDayRow } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { changesJsonLd } from "@/lib/jsonld";
@@ -151,7 +151,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
               title={e.source === "manual" ? e.at.slice(0, 10) : e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
               className="font-mono tabular-nums"
             >
-              {e.at.slice(0, 10)}
+              {postDay(e)}
             </time>
             <span data-type><Badge tone="neutral">{typeLabel(e)}</Badge></span>
             {posts.length > 1 && <span data-posts className="text-muted">{posts.length} posts</span>}
@@ -162,7 +162,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
           {bodies.map(([p, body]) => <p key={p.id} data-excerpt className="text-cell text-fg">{body}</p>)}
           {posts.length > 1 && (
             <p data-thread-posts className="text-cell-2 text-fg-2">
-              Each post:{" "}
+              Read{" "}
               {thread.map((p, i) => (
                 <span key={p.id}>
                   {i > 0 && " · "}

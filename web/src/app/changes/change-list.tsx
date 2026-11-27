@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import { longDate } from "@/data/wow-forever";
-import { TYPE_LABEL, postPath, type ChangeEntry } from "@/lib/changes";
+import { TYPE_LABEL, postDay, postPath, type ChangeEntry } from "@/lib/changes";
 
 /**
  * A short list of timeline entries: the title in a blue post's blue, linked to its page on Everloot (a build
@@ -23,7 +23,7 @@ export default function ChangeList({ entries, types = false, columns = false, po
             {(posts?.get(e.id) ?? 1) > 1 && <span className="text-muted"> · {posts!.get(e.id)} posts</span>}
             <span className="block text-meta text-muted">
               {types && <span className="font-mono text-xs">{e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type]} · </span>}
-              <time dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at} className="whitespace-nowrap">{longDate(e.at.slice(0, 10))}</time>
+              <time dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at} className="whitespace-nowrap">{longDate(postDay(e))}</time>
             </span>
             {e.source === "manual" && <span className="block text-meta text-muted">Summary by Everloot. {e.summary} {e.url && <a href={e.url} className="text-fg underline underline-offset-4">Original source</a>}</span>}
           </li>
