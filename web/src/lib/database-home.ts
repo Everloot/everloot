@@ -1,4 +1,5 @@
 import type { SiteAssets } from "./game-assets";
+import type { IconsById } from "./icon-table";
 
 /**
  * The /database front door's grid: the entity types in three groups, each card with a one-line "what you'll find" and
@@ -10,7 +11,7 @@ export interface DatabaseCard { href: string; label: string; note: string; icon:
 export interface DatabaseGroup { key: string; heading: string; cards: DatabaseCard[] }
 
 /** The value under the smallest numeric key: a stable pick that does not move when the map gains entries. */
-const lowest = (m: ReadonlyMap<number, string>) => [...m.keys()].sort((a, b) => a - b).map((k) => m.get(k))[0];
+const lowest = (m: IconsById) => [...m.keys()].sort((a, b) => a - b).map((k) => m.get(k))[0];
 const firstClass = (a: SiteAssets) => a.classes.values().next().value;
 
 export const DATABASE_GROUPS: readonly DatabaseGroup[] = [
