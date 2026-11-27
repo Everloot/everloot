@@ -65,6 +65,7 @@ function NameCell({ row, icons }: { row: DirectoryRow; icons: ClassIcons }) {
       <ClassMark token={row.classToken} icons={icons} />
       <Link href={row.href} className={`${classText(row.classToken)} dir-name`}>{row.name}</Link>
       {joined && <> <span className="whitespace-nowrap rounded-control border border-edge px-1.5 text-meta text-fg-2">{SOURCE_LABEL.addon}</span></>}
+      {/* Set apart from the name by dir-hide's dot (globals.css): after a bare space it read as part of the name. */}
       {" "}<Link href={row.hideHref} className="dir-hide">Hide</Link>
     </>
   );

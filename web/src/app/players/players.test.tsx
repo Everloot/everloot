@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -128,6 +129,10 @@ describe("player directory", () => {
     expect(table).toContain('<i class="ci ci-hunter" role="img" aria-label="Hunter" title="Hunter"></i><a href="/armory/eu/velkara-duskmantle" class="text-class-hunter dir-name">');
     expect(table).toMatch(/<a href="\/armory\/eu\/arla-quill" class="text-class-mage dir-name">/);
     expect(table).not.toContain("ci-mage");
+    // The hide link sits after the name with a dot between them (it read "Velkara Duskmantle Hide", as if part of the
+    // name). The dot is the link class's, in globals.css, so a row's markup stays as light as before.
+    expect(table).toMatch(/dir-name">Velkara Duskmantle<\/a> <a href="\/armory\/hide\?[^"]*" class="dir-hide">Hide<\/a>/);
+    expect(readFileSync(new URL("../globals.css", import.meta.url), "utf8")).toMatch(/\.dir-hide::before \{\s*content: "·";/);
     // Race is its own column; the class is the colour and the icon, and the phone line still says it in words.
     expect(table).toMatch(/<th[^>]*><span[^>]*>Race<\/span><\/th>/);
     expect(table).toMatch(/<td class="dt-td dt-nowrap dt-fold">Troll<\/td>/);

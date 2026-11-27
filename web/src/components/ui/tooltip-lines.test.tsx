@@ -44,8 +44,13 @@ describe("item tooltip lines", () => {
       "Requires Level 4", "Chance on hit: Synthetic effect.", "Sell Price: 1 silver 10 copper",
     ]);
     expect(rows(root)[0].className).toBe("text-tip-yellow");
-    const pairs = [...root.querySelectorAll("[data-tip-pair]")].map((p) => [...p.children].filter((c) => !c.classList.contains("sr-only")).map((c) => c.textContent));
+    const shown = (c: Element) => [...c.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("");
+    const pairs = [...root.querySelectorAll("[data-tip-pair]")].map((p) => [...p.children].map(shown));
     expect(pairs).toEqual([["Main Hand", "Mace"], ["[?] - [?] Damage", "Speed 2.10"]]);
+    // The screen readers' comma sits inline inside the left half, right after its words, at zero size: as an sr-only
+    // flex item of its own (absolute, so a block) it read "Shoulder , Cloth" (QA r6).
+    expect(root.querySelector("[data-tip-pair]")!.children).toHaveLength(2);
+    expect(root.querySelector("[data-tip-pair]")!.firstElementChild!.innerHTML).toBe('Main Hand<span class="text-[0px]">, </span>');
     expect(root.querySelector("[data-tip-pair]")!.className).toContain("justify-between");
     expect(row(root, "Chance on hit:").className).toBe("text-q-uncommon");
     expect(row(root, "Requires Level 4").className).toBe("");

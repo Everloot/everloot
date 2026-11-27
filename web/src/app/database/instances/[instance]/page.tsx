@@ -243,11 +243,15 @@ export default async function InstancePage(props: Props) {
       ? <>{difficultyLabel(row.difficulty)}{row.difficulties.length > 0 && filesNote(`in the files, ${difficultyList(row.difficulties)}`)}</>
       : row.difficulties.length > 0 ? <>{difficultyList(row.difficulties)}{filesNote("from the game files")}</>
       : PLACEHOLDER },
-    // The bosses 3 installs confirmed, out of the files' list when it holds them all.
-    { label: "Bosses confirmed", value: <>
-      {unreachable ? PLACEHOLDER : row.encounters.length >= row.bosses.length && row.encounters.length > 0 ? `${row.bosses.length} of ${row.encounters.length}` : row.bosses.length}
-      {row.encounters.length > 0 && filesNote(`the game files list ${row.encounters.length}`)}
-    </> },
+    // The bosses 3 installs confirmed, out of the files' list when it holds them all, and the ones still waiting for
+    // 3 installs (named while there are few). A count players confirmed carries no unconfirmed marker; the files'
+    // count alone (storage out of reach, or a list shorter than the reports) keeps it.
+    { label: "Bosses confirmed", value: !unreachable && row.encounters.length > 0 && row.encounters.length >= row.bosses.length
+      ? bossesConfirmed(row.bosses.length, bosses.filter((b) => !b.boss).map((b) => b.name ?? `Encounter ${b.encounterId}`))
+      : <>
+        {unreachable ? PLACEHOLDER : row.bosses.length}
+        {row.encounters.length > 0 && filesNote(`the game files list ${row.encounters.length}`)}
+      </> },
   ];
 
   // The page's sections as tabs, like every other entity page. Each keeps its tab even when empty (no 0 count), so
@@ -426,4 +430,11 @@ export default async function InstancePage(props: Props) {
       openData={{ report: { type: "Instance", id: row.instanceMapId, path: canonical }, text: [`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n") }}
     />
   );
+}
+
+/** "7 of 8 confirmed · 1 waiting (Miner Johnson)": the waiting encounters are named when there are 3 or fewer. */
+function bossesConfirmed(confirmed: number, waiting: readonly string[]): string {
+  const all = `${confirmed} of ${confirmed + waiting.length} confirmed`;
+  if (waiting.length === 0) return all;
+  return `${all} · ${waiting.length} waiting${waiting.length <= 3 ? ` (${waiting.join(", ")})` : ""}`;
 }

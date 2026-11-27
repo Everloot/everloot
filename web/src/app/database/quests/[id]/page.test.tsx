@@ -230,19 +230,23 @@ test("Started by sits beside an agreed giver, and an item held back by the item 
   expect(await html()).not.toContain(">Started by</dt>");
 });
 
-test("the Warcraft Wiki blurb is an About fact near the top, named for its source, and the Lore block does not repeat it", async () => {
+test("the Warcraft Wiki blurb is its own full-width paragraph under a small heading, not a squeezed fact row, and the Lore block does not repeat it", async () => {
   data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
   const ABOUT = "About this quest (Warcraft Wiki, 2023)";
-  expect(await html()).not.toContain(`>${ABOUT}</dt>`);
+  expect(await html()).not.toContain(ABOUT);
   const intro = "Slaughter 6 Mottled Boars, then return to Grull Hawkwind.";
   lore.match = { extId: "x", name: "A quest", intro, sourceId: "wiki" };
   const out = await html();
   // Not the in-game objective: the wiki's blurb, so not labelled "Objective".
   expect(out).not.toContain(">Objective</dt>");
-  expect(out).toContain(`>${ABOUT}</dt>`);
-  expect(out.split(`>${ABOUT}</dt>`)[1]).toMatch(new RegExp(`^<dd[^>]*>(?:<[^>]*>)*${intro}`));
-  // First among the facts, before the reported title.
-  expect(out.indexOf(`>${ABOUT}</dt>`)).toBeLessThan(out.indexOf(">Reported title</dt>"));
+  // Not a row of the quick facts (two narrow columns there squeezed it to a word a line, QA r6).
+  expect(out).not.toContain(`>${ABOUT}</dt>`);
+  const facts = out.slice(out.indexOf('aria-label="Quick facts"'));
+  expect(facts.slice(0, facts.indexOf("</section>"))).not.toContain(intro);
+  // Its own block: a small heading, then the paragraph, after the quick facts and before the tabs.
+  expect(out).toMatch(new RegExp(`<section[^>]*data-quest-about[^>]*><h2[^>]*>${ABOUT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</h2><p[^>]*>${intro}</p></section>`));
+  expect(out.indexOf("data-quest-about")).toBeGreaterThan(out.indexOf(">Reported title</dt>"));
+  expect(out.indexOf("data-quest-about")).toBeLessThan(out.indexOf('role="tablist"'));
   // Shown once: the Lore block keeps its source line and archive link, not the paragraph again.
   expect(out.split(intro)).toHaveLength(2);
   expect(out).toContain("Read A quest in the lore archive");
