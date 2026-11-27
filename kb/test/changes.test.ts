@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } from "../src/blue-posts.js";
-import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, renderFeed, sameAnnouncement, sameBody, type BuildLike } from "../src/changes.js";
+import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, postDay, renderFeed, sameAnnouncement, sameBody, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
 import { postPath } from "../src/changes.js";
 
@@ -362,6 +362,43 @@ test("foldTitleDay: different posts under one title on one day are one row, newe
     ["WoW: Forever Hotfixes - November 11, 2026", 2],
   ]);
   expect(rows.at(-1)!.posts.map((p) => p.id)).toEqual(["forum:30863849", "forum:30863846"]);
+});
+
+// November 10, as stored on 2026-11-27: one announcement, its title naming the day per region (Europe's is a day later).
+const PVP_TEXT = "It’s vitally important that the PvP rulesets in WoW: Forever have balanced factions where both factions vie for supremacy, creating memories of epic victories a";
+const pvp = [
+  stored("forum:30830227", "us", 2408781, "2026-11-10T02:05:13.558Z", "PvP Faction Balance Updates - November 10", { excerpt: PVP_TEXT, author: "Kaivax" }),
+  stored("forum:eu:6488007", "eu", 641169, "2026-11-10T02:06:08.484Z", "PvP Faction Balance Updates - 11 November", { excerpt: PVP_TEXT, author: "Kaivax" }),
+  stored("forum:30830868", "us", 2408781, "2026-11-10T03:04:13.020Z", "PvP Faction Balance Updates - November 10",
+    { postNumber: 158, author: "Kaivax", excerpt: "We did significant investigation into that, and there is no evidence that trial characters had any impact at all." }),
+];
+
+test("groupAnnouncements: US and EU titles that name the day differently, a day apart, are one announcement when the text is the same", () => {
+  const grouped = groupAnnouncements(buildTimeline(pvp, []));
+  expect(grouped.map((e) => [e.id, (e.copies ?? []).map((c) => c.id)])).toEqual([
+    ["forum:30830868", []],
+    ["forum:30830227", ["forum:eu:6488007"]],
+  ]);
+  const rows = foldTitleDay(grouped);
+  expect(rows.map((r) => [r.entry.title, r.posts.length])).toEqual([["PvP Faction Balance Updates - November 10", 2]]);
+  // Different text, or days further apart, stay apart.
+  const other = stored("forum:eu:2", "eu", 9, "2026-11-10T02:06:08.484Z", "PvP Faction Balance Updates - 11 November", { excerpt: "Something else entirely, said only in Europe this time around." });
+  expect(groupAnnouncements(buildTimeline([pvp[0], other], []))).toHaveLength(2);
+  const far = stored("forum:eu:3", "eu", 9, "2026-11-10T02:06:08.484Z", "PvP Faction Balance Updates - 13 November", { excerpt: PVP_TEXT });
+  expect(groupAnnouncements(buildTimeline([pvp[0], far], []))).toHaveLength(2);
+});
+
+test("postDay: the day a title names when it is within a day of the post, else the UTC day", () => {
+  const [, , feral] = groupAnnouncements(buildTimeline(twins, []));
+  expect(feral.at.slice(0, 10)).toBe("2026-11-12");
+  expect(postDay(feral)).toBe("2026-11-11");
+  expect(postDay({ type: "post", title: "PvP Faction Balance Updates - 11 November", at: "2026-11-10T02:06:08.484Z" })).toBe("2026-11-11");
+  expect(postDay({ type: "post", title: "Raids open December 9", at: "2026-11-10T02:06:08.484Z" })).toBe("2026-11-10");
+  expect(postDay({ type: "post", title: "Happy New Year - December 31", at: "2027-01-01T03:00:00.000Z" })).toBe("2026-12-31");
+  expect(postDay({ type: "build", title: "WoW: Forever build 1.60.1.1", at: "2026-11-12T00:00:00.000Z" })).toBe("2026-11-12");
+  // The card for a day's replies posted after midnight UTC folds under the day its title names.
+  const rows = foldTitleDay(groupAnnouncements(buildTimeline(twins, [])));
+  expect(rows.map((r) => postDay(r.entry))).toEqual(["2026-11-12", "2026-11-11"]);
 });
 
 test("groupAnnouncements: a news article with no forum twin stays its own entry", () => {

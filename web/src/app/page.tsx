@@ -11,7 +11,7 @@ import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { loadTimeline, oneRowPerTitleDay, timelineDegraded } from "@/lib/changes";
-import { TYPE_LABEL, postPath } from "@kb/changes";
+import { TYPE_LABEL, postDay, postPath } from "@kb/changes";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { longDate } from "@/data/wow-forever";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
@@ -109,7 +109,7 @@ export default async function Home() {
                   <span className="text-fg">{e.title}</span>
                 )}
                 {posts > 1 && <span className="text-muted">· {posts} posts</span>}
-                <span className="text-muted">· {longDate(e.at.slice(0, 10))}</span>
+                <span className="text-muted">· {longDate(postDay(e))}</span>
               </li>
             ))}
           </ul>

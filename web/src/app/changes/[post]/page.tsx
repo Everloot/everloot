@@ -5,7 +5,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
-import { GAME_LABEL, TYPE_LABEL, foldTitleDay, fullerCopy, loadTimeline, loadWriteups, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
+import { GAME_LABEL, TYPE_LABEL, foldTitleDay, fullerCopy, loadTimeline, loadWriteups, postDay, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry, type TitleDayRow } from "@/lib/changes";
 import { keepBrieflyIf } from "@/lib/degraded-render";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
@@ -87,9 +87,8 @@ function Parts({ parts, index }: { parts: Inline[]; index: MentionIndex }) {
   );
 }
 
-/** Up to RELATED rows, one per title and day: several replies under one title that day are one row saying how many. */
-function PostList({ id, title, entries, more }: { id: string; title: string; entries: ChangeEntry[]; more?: { href: string; label: string } }) {
-  const rows = foldTitleDay(entries).slice(0, RELATED);
+/** Rows of one per title and day (foldTitleDay): several replies under one title that day are one row saying how many. */
+function PostList({ id, title, rows, more }: { id: string; title: string; rows: TitleDayRow[]; more?: { href: string; label: string } }) {
   if (rows.length === 0) return null;
   return (
     <section aria-labelledby={id} className="min-w-0">
@@ -107,7 +106,7 @@ function Nearby({ newer, older }: { newer: ChangeEntry | null; older: ChangeEntr
     <Card href={postPath(e)!} className={`flex min-w-0 flex-col gap-1 ${both ? align : "sm:col-span-2"}`}>
       <span className="text-meta text-muted">{label}</span>
       <span className="text-cell font-medium text-blue-post [overflow-wrap:anywhere]">{e.title}</span>
-      <time dateTime={e.at} className="whitespace-nowrap text-meta text-muted">{longDate(e.at.slice(0, 10))}</time>
+      <time dateTime={e.at} className="whitespace-nowrap text-meta text-muted">{longDate(postDay(e))}</time>
     </Card>
   );
   return (
@@ -134,15 +133,20 @@ export default async function BluePostPage(props: Props) {
   // A copy stored cut short (the US hotfix of November 12 stops after its first sentence) shows its twin's fuller text.
   const fuller = fullerCopy(entry);
   const excerpt = clampExcerpt((fuller ?? entry).excerpt);
-  const day = entry.at.slice(0, 10);
+  // The copy whose words are shown: the header names its forum and time.
+  const shown = fuller ?? entry;
+  const day = postDay(entry);
   // Newest first, as the timeline lists them.
   const posts = all.filter((e) => e.game === entry.game && isPost(e)).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   const at = posts.findIndex((e) => e.id === entry.id);
   const newer = at > 0 ? posts[at - 1] : null;
   const older = at >= 0 && at < posts.length - 1 ? posts[at + 1] : null;
-  const others = posts.filter((e) => e.id !== entry.id);
-  const byAuthor = entry.author ? others.filter((e) => e.author === entry.author) : [];
-  const sameDay = others.filter((e) => e.at.slice(0, 10) === day);
+  // Each title and day is listed once around the page: this post, Newer and Older first, then Same day, then More from the author.
+  const rowKey = (e: ChangeEntry) => `${postDay(e)}|${e.title}`;
+  const listed = new Set([entry, newer, older].filter((e) => e !== null).map(rowKey));
+  const sameDayRows = foldTitleDay(posts.filter((e) => !listed.has(rowKey(e)) && postDay(e) === day)).slice(0, RELATED);
+  for (const row of sameDayRows) listed.add(rowKey(row.entry));
+  const byAuthorRows = entry.author ? foldTitleDay(posts.filter((e) => !listed.has(rowKey(e)) && e.author === entry.author)).slice(0, RELATED) : [];
   const authorHref = `/changes?${new URLSearchParams([...(entry.game === "classic" ? [["game", "classic"]] : []), ["author", entry.author ?? ""]]).toString()}`;
   const where = entry.source === "bluesky" ? "on Bluesky" : "on Blizzard's forums";
   const copies = entry.copies ?? [];
@@ -161,10 +165,10 @@ export default async function BluePostPage(props: Props) {
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <Badge tone="neutral">{TYPE_LABEL[entry.type]} · {GAME_LABEL[entry.game]}</Badge>
             <p className="text-meta text-fg-2">
-              {entry.author && <span data-author className="font-semibold text-blue-post">{entry.author}</span>}
-              {entry.role && <span>, {entry.role}</span>}
-              {" · "}<time dateTime={entry.at} title={stamp(entry.at)}>{longDate(day)}</time>
-              {" · "}{sourceLabel(entry)}
+              {shown.author && <span data-author className="font-semibold text-blue-post">{shown.author}</span>}
+              {shown.role && <span>, {shown.role}</span>}
+              {" · "}<time dateTime={shown.at} title={stamp(shown.at)}>{longDate(day)}</time>
+              {" · "}<span data-forum>{sourceLabel(shown)}</span>
               {entry.category && entry.category !== "Bluesky" && <>{" · "}{entry.category}</>}
             </p>
           </div>
@@ -173,11 +177,13 @@ export default async function BluePostPage(props: Props) {
         {excerpt && (
           <Card as="section" aria-label="Blizzard's words">
             <figure data-excerpt className="border-l-2 border-blue-post pl-4">
-              <blockquote cite={(fuller ?? entry).url ?? undefined} className="text-blue-post">
+              <blockquote cite={shown.url ?? undefined} className="text-fg">
                 <p><WithSpells text={excerpt} index={index} /></p>
               </blockquote>
               <figcaption className="mt-1 text-meta text-muted">
-                {`Blizzard's words, an excerpt${fuller ? `, from the ${sourceLabel(fuller)} copy: the ${sourceLabel(entry)} copy's stored text stops earlier` : ""}.`}
+                {fuller
+                  ? `Excerpt from the ${sourceLabel(fuller)} post (it has more text than the ${(entry.region ?? "us").toUpperCase()} copy).`
+                  : "Blizzard's words, an excerpt."}
               </figcaption>
             </figure>
           </Card>
@@ -215,10 +221,10 @@ export default async function BluePostPage(props: Props) {
 
         <Nearby newer={newer} older={older} />
       </article>
-      {(byAuthor.length > 0 || sameDay.length > 0) && (
+      {(byAuthorRows.length > 0 || sameDayRows.length > 0) && (
         <aside aria-label="More Blizzard posts" className="min-w-0 space-y-8">
-          <PostList id="more-from" title={`More from ${entry.author}`} entries={byAuthor} more={{ href: authorHref, label: `Every post by ${entry.author}` }} />
-          <PostList id="same-day" title="Same day" entries={sameDay} />
+          <PostList id="more-from" title={`More from ${entry.author}`} rows={byAuthorRows} more={{ href: authorHref, label: `Every post by ${entry.author}` }} />
+          <PostList id="same-day" title="Same day" rows={sameDayRows} />
         </aside>
       )}
     </Container>
