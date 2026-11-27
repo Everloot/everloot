@@ -5,7 +5,7 @@ import {
   parseTopicView, staffIndex, type BlueOverrides, type StaffIndex, type StaffMember,
 } from "./blue-forum.js";
 import { NEWS_HOST, NEWS_INDEX, newsLinks, parseNewsArticle } from "./blue-news.js";
-import { sanitizePost } from "./changes.js";
+import { ownTitle, sanitizePost } from "./changes.js";
 import { clampExcerpt, clampText, isoTime, plainText } from "./text-safety.js";
 
 export { clampExcerpt as excerptOf, plainText } from "./text-safety.js";
@@ -184,12 +184,17 @@ export function parseBlueskyFeed(json: unknown, now: Date): BluePost[] {
   return posts;
 }
 
-/** Add new posts, refresh the ones already known. A maintainer's summary and the first-seen time are kept. */
+/**
+ * Add new posts, refresh the ones already known. A maintainer's summary and the first-seen time are kept, and so is
+ * a forum post's title: a post carries its thread's title, which Blizzard renames (the rolling hotfix thread takes
+ * each new day's date), so the title stays the one the post had when it was captured. See ownTitle.
+ */
 export function mergePosts(store: BlueStore, incoming: BluePost[]): { store: BlueStore; added: BluePost[] } {
   const byId = new Map(store.posts.map((p) => [p.id, p]));
   const added: BluePost[] = [];
-  for (const post of incoming) {
-    const known = byId.get(post.id);
+  for (const fetched of incoming) {
+    const known = byId.get(fetched.id);
+    const post = { ...fetched, title: ownTitle(known && fetched.source === "forum" ? { ...fetched, title: known.title } : fetched) };
     if (!known) {
       byId.set(post.id, post);
       added.push(post);

@@ -94,6 +94,34 @@ export function sanitizePost(raw: unknown): BluePost | null {
   };
 }
 
+const MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
+/** "November 25, 2026", "November 25" or "25 November" in a title. */
+const TITLE_DATE = new RegExp(`\\b(?:(${MONTHS}) (\\d{1,2})(, \\d{4})?|(\\d{1,2}) (${MONTHS})( \\d{4})?)\\b`);
+/** A post that opens with its day, as each day's entry in the rolling hotfix thread does. */
+const LEADING_DATE = new RegExp(`^(${MONTHS}) (\\d{1,2}),? (\\d{4})\\b`);
+const pacificDay = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" });
+
+/**
+ * A forum post's own title. Every post carries its thread's title, and Blizzard renames a rolling thread (the
+ * daily hotfixes) to the latest day, so a reply posted on November 16 would read "Hotfixes - November 25". When
+ * the title names a day, the post's own day replaces it: the date its text opens with, or for a hotfix post the
+ * day it was posted, in Pacific time as Blizzard dates them. Other titles, and other sources, are returned as they are.
+ */
+export function ownTitle(post: Pick<BluePost, "source" | "title" | "excerpt" | "postedAt" | "kind">): string {
+  if (post.source !== "forum") return post.title;
+  const m = TITLE_DATE.exec(post.title);
+  if (!m) return post.title;
+  const lead = LEADING_DATE.exec(post.excerpt);
+  let month: string, day: number, year: string;
+  if (lead) [month, day, year] = [lead[1], Number(lead[2]), lead[3]];
+  else if (post.kind === "hotfix") {
+    const parts = Object.fromEntries(pacificDay.formatToParts(new Date(post.postedAt)).map((p) => [p.type, p.value]));
+    [month, day, year] = [parts.month, Number(parts.day), parts.year];
+  } else return post.title;
+  const replacement = m[1] ? `${month} ${day}${m[3] ? `, ${year}` : ""}` : `${day} ${month}${m[6] ? ` ${year}` : ""}`;
+  return `${post.title.slice(0, m.index)}${replacement}${post.title.slice(m.index + m[0].length)}`;
+}
+
 /** Which game each version-service product is. Anything not listed is not shown. */
 const PRODUCT_GAME: Record<string, BlueGame> = {
   wowf: "forever",
@@ -144,7 +172,7 @@ export function buildTimeline(posts: unknown[], builds: unknown[]): ChangeEntry[
     const p = sanitizePost(raw);
     if (!p) continue;
     fromPosts.push({
-      id: p.id, type: p.kind, game: p.game, at: p.postedAt, title: p.title, url: p.url,
+      id: p.id, type: p.kind, game: p.game, at: p.postedAt, title: ownTitle(p), url: p.url,
       author: p.author, role: p.role, category: p.category, source: p.source, excerpt: p.excerpt,
       ...(p.summary ? { summary: p.summary } : {}),
       ...(p.region ? { region: p.region } : {}),
@@ -190,12 +218,19 @@ const threadOf = (e: ChangeEntry) => (e.topicId === undefined ? e.id : `${e.regi
  * one forum, with the day worded per region. Forum posts of the same game and type, posted the same day
  * (UTC) under the same title, in different threads, are one announcement; a reply also needs the same
  * excerpt, since every reply in a thread carries the thread's title. The US copy, else the earliest, is
- * the entry; the rest are its `copies`. Bluesky posts and builds pass through.
+ * the entry; the rest are its `copies`. A Blizzard News article of the same game, type and title within a day of a
+ * forum announcement joins it as a copy too: the news card holds no text, and the forum post links it. Bluesky
+ * posts, builds and news with no forum twin pass through.
  */
 export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
   const groups = new Map<string, ChangeEntry[][]>();
   const out: ChangeEntry[] = [];
+  const news: ChangeEntry[] = [];
   for (const e of [...entries].sort(primaryFirst)) {
+    if (e.source === "news" && e.type !== "build") {
+      news.push(e);
+      continue;
+    }
     if (e.source !== "forum" || e.type === "build") {
       out.push(e);
       continue;
@@ -207,7 +242,16 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
     if (group) group.push(e);
     else groups.set(key, [...candidates, [e]]);
   }
-  for (const [primary, ...copies] of [...groups.values()].flat()) out.push(copies.length ? { ...primary, copies } : primary);
+  const all = [...groups.values()].flat();
+  const DAY = 86_400_000;
+  for (const e of news) {
+    const gap = (g: ChangeEntry[]) => Math.abs(Date.parse(g[0].at) - Date.parse(e.at));
+    const twin = all.filter((g) => g[0].game === e.game && g[0].type === e.type && gap(g) <= DAY && sameAnnouncement(g[0].title, e.title))
+      .sort((a, b) => gap(a) - gap(b))[0];
+    if (twin) twin.push(e);
+    else out.push(e);
+  }
+  for (const [primary, ...copies] of all) out.push(copies.length ? { ...primary, copies } : primary);
   return out.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
 }
 

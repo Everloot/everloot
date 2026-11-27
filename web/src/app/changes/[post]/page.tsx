@@ -54,7 +54,8 @@ async function find(segment: string): Promise<Found | null> {
 
 /** "on the EU forum", or "in a second thread on the US forum" for a repeat on the same forum. */
 const copyPlace = (entry: ChangeEntry, copy: ChangeEntry) =>
-  copy.source === "forum" && copy.region === entry.region ? `in a second thread on the ${sourceLabel(copy)}` : `on the ${sourceLabel(copy)}`;
+  copy.source === "news" ? "on Blizzard News"
+    : copy.source === "forum" && copy.region === entry.region ? `in a second thread on the ${sourceLabel(copy)}` : `on the ${sourceLabel(copy)}`;
 
 /** The search snippet: our write-up's opening when there is one, else what the page is, in our words. */
 function describe({ entry, writeup }: Found): string {

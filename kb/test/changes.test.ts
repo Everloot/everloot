@@ -275,6 +275,45 @@ test("groupAnnouncements: without a US copy the earliest is the entry; the choic
   expect(groupAnnouncements(timeline)).toHaveLength(timeline.length);
 });
 
+// The rolling hotfix thread, as stored on 2026-11-27: Blizzard renames it every day, and every reply took the new title.
+const rolling = "WoW: Forever Hotfixes - November 25, 2026";
+const hotfix = (id: string, region: "us" | "eu", topicId: number, postNumber: number, postedAt: string, title: string, excerpt: string) =>
+  stored(id, region, topicId, postedAt, title, { kind: "hotfix", postNumber, excerpt, author: "Kaivax", role: "Community Manager" });
+const hotfixes = [
+  hotfix("forum:30941234", "us", 2403040, 11, "2026-11-17T02:17:43.000Z", rolling, "November 16, 2026 Camping The Fishing Rack now provides lures for everyone."),
+  hotfix("forum:eu:6511114", "eu", 639885, 10, "2026-11-17T02:18:53.000Z", "WoW: Forever Hotfixes - November 23, 2026", "November 16, 2026 Camping The Fishing Rack now provides lures for everyone."),
+  hotfix("forum:31066529", "us", 2403040, 16, "2026-11-25T23:25:08.000Z", rolling, "November 25, 2026 Classes Druid Hurricane now correctly lands its final hit."),
+  // A reply in the thread that does not open with a date: its own day (Pacific, as Blizzard dates them) names it.
+  hotfix("forum:30899768", "us", 2403040, 10, "2026-11-14T01:30:00.000Z", rolling, "We've also fixed the camping bug."),
+  { id: "news:24315281", source: "news", url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026", title: rolling,
+    author: "Blizzard Entertainment", role: "Blizzard News", category: "Blizzard News", game: "forever", kind: "hotfix", postedAt: "2026-11-25T23:19:16.000Z", excerpt: "" },
+];
+
+test("a hotfix reply keeps the date of its own hotfixes, not the date the thread was renamed to", () => {
+  const titles = new Map(buildTimeline(hotfixes, []).map((e) => [e.id, e.title]));
+  expect(titles.get("forum:30941234")).toBe("WoW: Forever Hotfixes - November 16, 2026");
+  expect(titles.get("forum:eu:6511114")).toBe("WoW: Forever Hotfixes - November 16, 2026");
+  expect(titles.get("forum:31066529")).toBe(rolling);
+  expect(titles.get("forum:30899768")).toBe("WoW: Forever Hotfixes - November 13, 2026");
+  // A dated title on an ordinary post is the post's own; a reply that opens with no date keeps it.
+  const av = stored("forum:31066214", "us", 2429074, "2026-11-26T23:04:33.000Z", "Alterac Valley Adjustments - November 25", { postNumber: 567, excerpt: "With additional hotfixes that are now live." });
+  expect(buildTimeline([av], [])[0].title).toBe("Alterac Valley Adjustments - November 25");
+});
+
+test("groupAnnouncements: the US and EU copies of one day's hotfixes and its Blizzard News twin are one entry", () => {
+  const grouped = groupAnnouncements(buildTimeline(hotfixes, []));
+  expect(grouped.map((e) => e.id)).toEqual(["forum:31066529", "forum:30941234", "forum:30899768"]);
+  expect(grouped.find((e) => e.id === "forum:30941234")!.copies!.map((c) => c.id)).toEqual(["forum:eu:6511114"]);
+  // The news card has no text of its own: it is folded into the forum post, which links it.
+  expect(grouped[0].copies!.map((c) => c.id)).toEqual(["news:24315281"]);
+  expect(forumRegions(grouped[0])).toEqual(["us"]);
+});
+
+test("groupAnnouncements: a news article with no forum twin stays its own entry", () => {
+  const news = hotfixes.filter((p) => p.source === "news").map((p) => ({ ...p, title: "Don't Miss the WoW: Forever Comic" }));
+  expect(groupAnnouncements(buildTimeline([...hotfixes.slice(0, 3), ...news], [])).some((e) => e.id === "news:24315281")).toBe(true);
+});
+
 test("the RSS feed of the grouped timeline has one item per announcement", () => {
   const xml = renderFeed(groupAnnouncements(announced), { baseUrl: "https://everloot.app", now: seen });
   expect((xml.match(/<item>/g) ?? []).length).toBe(5);
