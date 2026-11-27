@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item pages name and link the quest an item begins, and quest pages list the items that start them, from the game files (#1586).
 - Site: dungeon and raid pages give the group size and entrance zone, each boss's level, picture and top drops, and one paged loot table for the whole instance; boss pages give the creature's level and page long loot tables (#1579).
 - Site: player and guild directories show class icons beside names, a separate race column, region chips, sortable guild columns and a fuller phone line (#1582).
 - Site: item pages show the zone each vendor stands in, a recipe's reagents and the skill where it turns yellow and grey, and list vendors first under "Get it from"; the armory talents list sets only numbers in the number font (#1575).
@@ -325,6 +326,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: quest and NPC pages no longer say nobody reported them while showing agreed facts, an NPC with no agreed spot takes its zone from where players looted its kills, and the guild and player sort menus name the chosen order once (#1585).
+- Site: page titles no longer sit lower on some pages, Lore and build-change sections on database pages use the same heading size as the sections around them, and search shows a heading for its Characters and Guilds results (#1587).
+- Site: profession pages load about half the bytes (alchemy 901 → about 450 kB) with no visible change; the recipe and AH Ledger margin rows are sent once as data instead of twice as markup (#1588).
 - Site: the first page a new server instance renders needs about a fifth less memory; the stored aggregates are read as ASCII text and parsed without a reviver, and names files are kept only as the names built from them (#1581).
 - Site: profession, guild, NPC and map data files need less memory and time to read on a new server instance (#1583).
 - Site: auction browse and realm pages are about 40% lighter (760 kB → 450 kB of HTML for 50 rows): coins come from one shared drawing and price cells carry only their amounts. They look the same (#1573).
