@@ -21,6 +21,7 @@ import { Entry } from "./EntryList";
 import Facts from "./Facts";
 import Pager, { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
+import Prose from "./Prose";
 import ReadingLayout, { RailFacts } from "./ReadingLayout";
 import SectionHeading from "./SectionHeading";
 import TooltipFrame from "./TooltipFrame";
@@ -28,6 +29,13 @@ import { qualityOf, QUALITY_TEXT } from "./quality";
 
 const render = (node: ReactNode) => renderToStaticMarkup(<>{node}</>);
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+
+describe("Prose", () => {
+  test("inline code may break anywhere, so a long path never widens the page; code blocks keep their lines", () => {
+    const html = renderToStaticMarkup(<Prose><p>At <code>/characters/&lt;ruleset&gt;/&lt;realm&gt;/&lt;name&gt;</code>.</p></Prose>);
+    expect(html).toContain("[&amp;_:not(pre)&gt;code]:[overflow-wrap:anywhere]");
+  });
+});
 
 describe("Container", () => {
   test("has two widths, wide by default", () => {
