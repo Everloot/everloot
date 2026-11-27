@@ -67,3 +67,9 @@ test("no asset files or private bucket: no cards", async () => {
   expect((await loadEquippedTips(null, [{ itemId: 30, name: "Witchblade", quality: "EPIC" }], store())).size).toBe(0);
   expect((await loadEquippedTips(parseSiteManifest(siteManifest, BASE), [{ itemId: 30, name: "Witchblade", quality: "EPIC" }], null)).size).toBe(0);
 });
+
+test("an item with only an icon in the files shows the item level the armory read", async () => {
+  const tips = await loadEquippedTips(parseSiteManifest(siteManifest, BASE)!, [{ itemId: 35, name: "Bent Staff", quality: "COMMON", level: 12 }], store());
+  expect(tips.get(35)?.lines).toEqual(["Item Level 12", "Staves", "Two-Hand"]);
+  expect(tips.get(35)?.level).toBe(12);
+});

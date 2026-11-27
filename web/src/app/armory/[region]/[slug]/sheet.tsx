@@ -52,12 +52,18 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
     ...(lastRead ? [["Last read", <time key="read" dateTime={lastRead} title={readLine(lastRead)}>{timeAgo(Date.parse(lastRead), now)}</time>] as [string, ReactNode]] : []),
   ];
   if (items.length === 0) return null;
+  // What the numbers are, said on the page and not only on hover (phones never hover); only for the numbers shown.
+  const notes = [
+    c.itemLevel !== null && c.averageItemLevel !== null ? "Ranked item level uses Everloot's 17-slot formula; Blizzard's average item level counts what Blizzard counts." : null,
+    c.gearScore !== null ? "Gear Score is Everloot's weighted item level, not the GearScore addon's number." : null,
+  ].filter((n): n is string => n !== null);
   // Counts in mono with tabular figures; the read age is words ("3 days ago"), so it is sans (docs/design/direction.md).
-  return (
+  return (<>
     <dl data-character-facts aria-label="At a glance" className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-line bg-panel px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted" {...(DT_TITLE[label] ? { title: DT_TITLE[label] } : {})}>{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
     </dl>
-  );
+    {notes.length > 0 && <p data-facts-note className="text-meta text-muted">{notes.join(" ")}</p>}
+  </>);
 }
 
 /** A board rank as a badge with its scope ("EU Normal · Item level #6 of 20,943"), linking to that board. */

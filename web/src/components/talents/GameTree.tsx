@@ -1,6 +1,6 @@
 import { canAdd, entryAtRank, rankOf } from "@/lib/talents/rules";
 import type { GameAssets } from "@/lib/talents/assets";
-import { assetOf, describeNode, nodeLabel, type Props } from "./TalentTreeView";
+import { assetOf, connectors, describeNode, nodeLabel, type Props } from "./TalentTreeView";
 
 // One tree in the game's look, used only when the asset files are there. The spec's dark background,
 // the game's own 50 px node frames (round for active talents, square for passive ones) over the real
@@ -24,7 +24,6 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
   const height = rows * PITCH;
   const x = (col: number) => LABEL + (col - 1) * PITCH + (PITCH - NODE) / 2;
   const y = (row: number) => (row - 1) * PITCH + (PITCH - NODE) / 2;
-  const byId = new Map(nodes.map((n) => [n.id, n]));
   const gateOfRow = (row: number) => Math.min(...nodes.filter((n) => n.row === row).map((n) => n.unlock?.pointsInTree ?? 0));
   const bg = assets.backgrounds.get(`${catalog.classSlug}:${tree.name}`);
   const bgUrl = bg ? frames.get(bg.element)?.url : undefined;
@@ -44,10 +43,8 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
             </span>
           ))}
           <svg aria-hidden="true" className="pointer-events-none absolute inset-0" width={width} height={height}>
-            {nodes.flatMap((n) => [...n.prereqs, ...(n.anyOf ?? [])].map((p) => {
-              const from = byId.get(p);
-              if (!from) return null;
-              const met = rankOf(ranks, p) >= from.maxRanks;
+            {connectors(nodes).map(({ from, to: n }) => {
+              const met = rankOf(ranks, from.id) >= from.maxRanks;
               const x1 = x(from.col) + NODE / 2, y1 = y(from.row) + NODE / 2;
               const x2 = x(n.col) + NODE / 2, y2 = y(n.row) + NODE / 2;
               const len = Math.hypot(x2 - x1, y2 - y1) || 1;
@@ -57,12 +54,12 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
               const back = head ? head.height : 0;
               const angle = (Math.atan2(uy, ux) * 180) / Math.PI;
               return (
-                <g key={`${p}-${n.id}`} data-lit={met || undefined}>
+                <g key={`${from.id}-${n.id}`} data-lit={met || undefined}>
                   <line x1={x1 + ux * (NODE / 2)} y1={y1 + uy * (NODE / 2)} x2={ex - ux * back} y2={ey - uy * back} stroke={met ? "#d4a017" : "#5b5b5b"} strokeWidth={4} />
                   {head && <image href={head.url} width={head.width} height={head.height} x={-head.width / 2} y={-head.height} transform={`translate(${ex} ${ey}) rotate(${angle - 90})`} />}
                 </g>
               );
-            }))}
+            })}
           </svg>
           {nodes.map((node) => {
             const rank = rankOf(ranks, node.id);

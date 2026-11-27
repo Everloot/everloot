@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Facts, type Fact, type TabItem } from "@/components/ui";
+import Link from "@/components/Link";
+import { Disclosure, Facts, type Fact, type TabItem } from "@/components/ui";
 import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
-import { characterProgression, progressionCatalogue } from "@kb/progression";
+import { characterProgression, PROGRESSION_GROUPS, progressionCatalogue } from "@kb/progression";
 import { Achievements, blizzardBossKillsLine, NO_ACHIEVEMENTS, PlayHistoryView, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
 
 /**
@@ -86,13 +87,31 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
     case "progress": {
       const progression = parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) };
       const instances = shownProgress(progression.instances);
-      // With no kill at all: one line, the notes and the every-instance list closed, not 37 rows of "no data".
+      // With no kill at all: one line, the notes, and the instances' names once behind a disclosure, not 37 rows that
+      // each repeat "no data" and a boss checklist.
       const empty = instances.every((r) => r.state === "no data");
+      if (!empty) return <ProgressionMatrix {...progression} instances={instances} notes="folded" />;
+      const links = progression.links ?? {};
       return <>
-        {empty && <p className="py-3 text-sm text-fg-2">
+        <p className="py-3 text-sm text-fg-2">
           {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
-        </p>}
-        <ProgressionMatrix {...progression} instances={instances} notes={empty ? "tucked" : "folded"} {...(empty ? { collapsed: `Every dungeon and raid (${instances.length})` } : {})} />
+        </p>
+        <ProgressionMatrix {...progression} instances={[]} notes="tucked" />
+        <Disclosure as="h3" summary={`Every dungeon and raid (${instances.length})`} wide>
+          <div className="space-y-4">
+            {PROGRESSION_GROUPS.map((group) => {
+              const rows = instances.filter((r) => r.group === group);
+              return rows.length > 0 && <section key={group} aria-label={group} className="space-y-2">
+                <h4 className="text-sm font-semibold text-fg">{group}</h4>
+                <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  {rows.map((r) => <li key={r.id} data-progression-instance={r.id}>
+                    {links[r.id] ? <Link href={links[r.id]} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.name}</Link> : <span className="text-fg-2">{r.name}</span>}
+                  </li>)}
+                </ul>
+              </section>;
+            })}
+          </div>
+        </Disclosure>
       </>;
     }
   }
