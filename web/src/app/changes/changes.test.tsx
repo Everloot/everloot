@@ -381,3 +381,25 @@ test("builds are plain cards without the blue edge", async () => {
   expect(html).not.toContain("border-l-blue-post");
   expect(html).not.toContain("data-blue-post");
 });
+
+test("the rolling hotfix thread: each reply titled for its own day, one card per day, the Blizzard News twin folded in", async () => {
+  const { buildTimeline } = await import("@/lib/changes");
+  const rolling = "WoW: Forever Hotfixes - November 25, 2026";
+  const reply = (id: string, region: "us" | "eu", n: number, postedAt: string, title: string, excerpt: string) => ({
+    id, source: "forum", region, url: `https://${region}.forums.blizzard.com/en/wow/t/wow-forever-hotfixes/${region === "us" ? 2403040 : 639885}/${n}`, title,
+    author: "Kaivax", role: "Community Manager", postedAt, category: "WoW: Forever", game: "forever", kind: "hotfix", excerpt, topicId: region === "us" ? 2403040 : 639885, postNumber: n,
+  });
+  timeline.entries = buildTimeline([
+    reply("forum:30941234", "us", 11, "2026-11-17T02:17:43.000Z", rolling, "November 16, 2026 Camping The Fishing Rack now provides lures for everyone."),
+    reply("forum:eu:6511114", "eu", 10, "2026-11-17T02:18:53.000Z", "WoW: Forever Hotfixes - November 23, 2026", "November 16, 2026 Camping The Fishing Rack now provides lures for everyone."),
+    reply("forum:31066529", "us", 16, "2026-11-25T23:25:08.000Z", rolling, "November 25, 2026 Classes Druid Hurricane now correctly lands its final hit."),
+    { id: "news:24315281", source: "news", url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026", title: rolling,
+      author: "Blizzard Entertainment", role: "Blizzard News", category: "Blizzard News", game: "forever", kind: "hotfix", postedAt: "2026-11-25T23:19:16.000Z", excerpt: "" },
+  ], []);
+  const html = await page();
+  expect(rows(html)).toBe(2);
+  expect(html.match(/>WoW: Forever Hotfixes - November 25, 2026<\/a>/g)).toHaveLength(1);
+  expect(html.match(/>WoW: Forever Hotfixes - November 16, 2026<\/a>/g)).toHaveLength(1);
+  expect(html).toContain("US · EU forum");
+  expect(html).not.toContain("news.blizzard.com");
+});

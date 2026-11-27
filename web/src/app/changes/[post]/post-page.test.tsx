@@ -212,6 +212,16 @@ test("the page says where else the announcement was posted, linking each copy", 
   }
 });
 
+test("a Blizzard News twin of the post is linked as published on Blizzard News, not as a forum", async () => {
+  const news: ChangeEntry = { ...post, id: "news:24315281", source: "news", region: undefined, at: "2026-10-20T20:00:00.000Z", url: "https://news.blizzard.com/en-us/article/24315281/x", excerpt: "" };
+  data.entries = [post, news];
+  try {
+    expect(await page(CANONICAL)).toMatch(/Also posted <span><a href="https:\/\/news\.blizzard\.com\/en-us\/article\/24315281\/x" rel="noopener"[^>]*>on Blizzard News<\/a><\/span>\./);
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});
+
 test("a write-up filed under a regional copy shows on the announcement's page, which is then indexable", async () => {
   data.writeups = new Map([["forum:eu:6443686", { ...writeup, postId: "forum:eu:6443686" }]]);
   expect((await meta(CANONICAL)).robots).toEqual({ index: true, follow: true });
