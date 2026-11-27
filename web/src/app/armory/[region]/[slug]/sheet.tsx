@@ -40,7 +40,11 @@ function itemLevelValue(c: ArmoryCharacter, value: number, shown: ReactNode): Re
  * The first line under the header: the numbers that say how geared the character is and how fresh the read is. A
  * number the read did not bring is left out, never shown as 0. The read age names its exact time on hover.
  */
-export function CharacterFacts({ character: c, lastRead, now }: { character: ArmoryCharacter; lastRead: string | null; now: number }) {
+export function CharacterFacts({ character: c, lastRead, now, computed }: {
+  character: ArmoryCharacter; lastRead: string | null; now: number;
+  /** Numbers computed on the page from the game files' item levels (lib/armory-file-levels.ts), not stored ones. */
+  computed?: { itemLevel: boolean; gearScore: boolean };
+}) {
   const d = c.details;
   const items: [string, ReactNode][] = [
     // The number the item-level board ranks (its formula on the dt); the sheet's Blizzard average is a second number.
@@ -53,7 +57,9 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
   ];
   if (items.length === 0) return null;
   // What the numbers are, said on the page and not only on hover (phones never hover); only for the numbers shown.
+  const made = [computed?.itemLevel && "Ranked item level", computed?.gearScore && "Gear Score"].filter(Boolean);
   const notes = [
+    made.length > 0 ? `${made.join(" and ")} ${made.length > 1 ? "are" : "is"} computed on this page from the game files' item levels, as Blizzard's armory no longer sends them; not ranked until a read stores them.` : null,
     c.itemLevel !== null && c.averageItemLevel !== null ? "Ranked item level uses Everloot's 17-slot formula; Blizzard's average item level counts what Blizzard counts." : null,
     c.gearScore !== null ? "Gear Score is Everloot's weighted item level, not the GearScore addon's number." : null,
   ].filter((n): n is string => n !== null);

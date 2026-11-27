@@ -20,14 +20,17 @@ export async function loadEquippedTips(assets: SiteAssets | null, items: readonl
 /**
  * `loadEquippedTips`, and the items the game files carry nothing for: no tooltip and no icon after a complete read of
  * this build's item index (indexed, nothing unreachable or broken). Any doubt leaves an item out of `unknown`, so a slow
- * or missing bucket never makes the armory page call a known item unknown. Never throws.
+ * or missing bucket never makes the armory page call a known item unknown. `levels`: the game files' item level for
+ * each item with a record there (never a card built from the armory's own fields), for the stored items Blizzard sent
+ * no level for (lib/armory-file-levels.ts). Never throws.
  */
-export async function loadEquippedItems(assets: SiteAssets | null, items: readonly EquippedItem[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unknown: Set<number> }> {
+export async function loadEquippedItems(assets: SiteAssets | null, items: readonly EquippedItem[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unknown: Set<number>; levels: Map<number, number> }> {
   const read = await readItemTips(assets, items.map((i) => i.itemId), store).catch(() => null);
-  if (!read || !assets) return { tips: new Map(), unknown: new Set() };
+  if (!read || !assets) return { tips: new Map(), unknown: new Set(), levels: new Map() };
   const complete = read.indexed && !read.unreachable && !read.degraded;
   const unknown = new Set(complete ? items.filter((i) => !read.tips.has(i.itemId) && !read.icons.has(i.itemId)).map((i) => i.itemId) : []);
-  return { tips: equippedTips(assets, read, items), unknown };
+  const levels = new Map([...read.tips].filter(([, tip]) => tip.level > 0).map(([id, tip]) => [id, tip.level]));
+  return { tips: equippedTips(assets, read, items), unknown, levels };
 }
 
 function equippedTips(assets: SiteAssets, read: { tips: Map<number, ItemTip>; icons: Map<number, string> }, items: readonly EquippedItem[]): Map<number, ItemTip> {

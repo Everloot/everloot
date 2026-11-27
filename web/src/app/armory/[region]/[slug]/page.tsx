@@ -11,6 +11,7 @@ import {
 } from "@/lib/armory";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { loadEquippedItems } from "@/lib/equipped-item-tips";
+import { withFileLevels } from "@/lib/armory-file-levels";
 import { publicArmoryLink } from "@/lib/armory-links";
 import { Equipment, readTimes } from "../../profile";
 import { characterPanel, characterTabs, DEFAULT_TAB } from "../../character-tabs";
@@ -88,7 +89,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   // The character's own region and slug are the address's (the store matches on both), so the early reads are its reads.
   const { name, sightingRead, ranksRead, linkRead, assetsRead, progressionRead } = early ?? addressReads(c.region, c.slug)!;
   const sighting = c.name.normalize("NFC").toLowerCase() === name ? sightingRead : addonSighting(c);
-  const [ranks, associated, addon, assets, { tips, unknown }, progression, seen, defaultParts, search] = await Promise.all([
+  const [ranks, associated, addon, assets, { tips, unknown, levels }, progression, seen, defaultParts, search] = await Promise.all([
     ranksRead,
     linkRead,
     linkRead.then((a) => (a?.sharesData ? addonProfile(a.identity).catch(() => null) : null)),
@@ -99,6 +100,9 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     tabParts(c, DEFAULT_TAB),
     props.searchParams,
   ]);
+  // Items stored with no level (Blizzard stopped sending them, 2026-11-24/25) show the game files' level, and a missing
+  // ranked item level and Gear Score are computed from those, each labelled. Ranks stay the stored row's.
+  const shown = withFileLevels(c, (id) => levels.get(id));
   const race = assets?.races.get(c.race.toLowerCase());
   const portrait = c.details?.avatar?.url ?? (c.gender === "FEMALE" ? race?.female : race?.male) ?? assets?.classes.get(c.class.toLowerCase())?.icon ?? null;
   const refresh = search?.refresh;
@@ -149,7 +153,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
               {addonSeenLately && <span className="text-meta text-muted">Seen in addon uploads <span className="font-mono tabular-nums">{c.addonSeen}</span></span>}
             </div>}
             {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
-            <CharacterFacts character={c} lastRead={lastRead} now={Date.now()} />
+            <CharacterFacts character={shown.character} lastRead={lastRead} now={Date.now()} computed={shown.computed} />
             <RankBadges ranks={rankBadges} />
             <ArmoryCredit at={lastRead} />
           </div>
@@ -157,7 +161,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
 
         <CharacterOverview character={c} />
 
-        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} unknown={unknown} center={<SheetSummary character={c} />} />
+        <Equipment character={shown.character} tips={tips} unknownIcon={unknownIcon} unknown={unknown} fromFiles={shown.fromFiles} center={<SheetSummary character={c} />} />
 
         <DungeonRaidSlot data={progression.dungeons} href="#progress" character={c} />
 

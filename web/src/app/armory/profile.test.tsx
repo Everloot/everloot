@@ -22,6 +22,14 @@ test("gear includes every slot, empty states and our item links without a charac
   expect(html).not.toContain("data-armory-credit");
 });
 
+test("an item level from the game files is marked as theirs in its slot, and the gear says why once", () => {
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map()} fromFiles={new Set(["MAIN_HAND"])} />);
+  expect(html).toContain('aria-label="Item level 69, from the game files"');
+  expect(html).toContain('aria-label="Item level 66"');
+  expect(html).toContain("Blizzard&#x27;s armory no longer sends item levels");
+  expect(renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map()} />)).not.toContain("from the game files");
+});
+
 test("the slots sit as a paper doll: left, an empty model space, right, then the weapons", () => {
   const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map()} />);
   const at = (slot: string) => html.indexOf(`data-equipment-slot="${slot}"`);

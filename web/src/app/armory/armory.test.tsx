@@ -428,6 +428,23 @@ describe("the character page", () => {
       expect(rank).toHaveBeenCalledTimes(1);
     });
 
+    test("a character stored with no item levels shows the game files' levels and the numbers computed from them, each labelled", async () => {
+      const bare = armoryCharacter();
+      mem.putCharacter(armoryCharacter({ itemLevel: null, gearScore: null, averageItemLevel: null, equippedItemLevel: null, equipment: bare.equipment.map((i) => ({ ...i, level: null })) }));
+      vi.doMock("@/lib/equipped-item-tips", () => ({ loadEquippedItems: async () => ({ tips: new Map(), unknown: new Set(), levels: new Map([[16846, 66], [17069, 69]]) }) }));
+      try {
+        const out = await html(pages.character("eu", "velkara-duskmantle"));
+        expect(out).toContain('aria-label="Item level 66, from the game files"');
+        expect(out).toContain('aria-label="Item level 69, from the game files"');
+        // (66 + 69) / 17 slots, floored, as the crawler counts it.
+        expect(out).toMatch(/Ranked item level<\/dt><dd[^>]*>7</);
+        expect(out).toContain("Gear Score</dt>");
+        expect(out).toContain("computed on this page from the game files&#x27; item levels");
+      } finally {
+        vi.doUnmock("@/lib/equipped-item-tips");
+      }
+    });
+
     test("the ranks read starts with the character read, not after it", async () => {
       let release!: () => void;
       const gate = new Promise<void>((r) => { release = r; });

@@ -101,6 +101,23 @@ test("item level deltas: B against A per slot, green when higher, red when lower
   expect(even).toMatch(/data-delta="0"[^>]*class="[^"]*text-muted/);
 });
 
+test("a side stored with no item levels compares on the game files' levels, each marked, and its numbers say they are computed", async () => {
+  const bare = armoryCharacter();
+  mem.putCharacter(armoryCharacter({ itemLevel: null, gearScore: null, equipment: bare.equipment.map((i) => ({ ...i, level: null })) }));
+  vi.doMock("@/lib/equipped-item-tips", () => ({ loadEquippedItems: async () => ({ tips: new Map(), unknown: new Set(), levels: new Map([[16846, 66], [17069, 69]]) }) }));
+  try {
+    const out = await page({ a: VELKARA, b: TORVIN });
+    expect(out).toContain('aria-label="Item level 66, from the game files"');
+    // The deltas use the files' levels: head 66 against Torvin's 63.
+    expect(out).toContain('data-delta="-3"');
+    // (66 + 69) / 17, floored; Torvin's stored 60 is not marked.
+    expect(out).toMatch(/Item level(?:<[^>]*>)*\s*7\*(?:<[^>]*>)*\s*60</);
+    expect(out).toContain("* Computed on this page from the game files&#x27; item levels");
+  } finally {
+    vi.doUnmock("@/lib/equipped-item-tips");
+  }
+});
+
 test("the rank lines of each side, in rankText's words", async () => {
   const out = await page({ a: VELKARA, b: TORVIN });
   // Each is ranked within its own region and ruleset.

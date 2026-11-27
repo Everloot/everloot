@@ -14,7 +14,8 @@ import {
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadSiteAssets, unknownItemIcon, type ItemTip as Tip } from "@/lib/game-assets";
-import { loadEquippedTips } from "@/lib/equipped-item-tips";
+import { loadEquippedItems } from "@/lib/equipped-item-tips";
+import { withFileLevels, type FileLevelView } from "@/lib/armory-file-levels";
 import { classText } from "@/app/players/player-view";
 import { RankBadges, type RankBadge } from "../[region]/[slug]/sheet";
 import { LEFT, readTimes, RIGHT, WEAPONS } from "../profile";
@@ -97,19 +98,25 @@ function SideHead({ which, side, ranks }: { which: "a" | "b"; side: Loaded; rank
   </section>;
 }
 
-/** The facts strip of both, one row per number. A number a read did not bring says "Not read", never 0. */
-function FactsTable({ a, b }: { a: ArmoryCharacter | null; b: ArmoryCharacter | null }) {
-  const rows: [string, (c: ArmoryCharacter) => ReactNode][] = [
-    ["Item level", (c) => c.itemLevel === null ? null : metricValue("item-level", c.itemLevel)],
-    ["Gear Score", (c) => c.gearScore === null ? null : metricValue("gear-score", c.gearScore)],
-    ["Honorable kills", (c) => c.honorableKills === null ? null : metricValue("honorable-kills", c.honorableKills)],
-    ["Achievements", (c) => c.details?.achievements ? c.details.achievements.rows.length.toLocaleString("en-US") : null],
-    ["Quests completed", (c) => c.details?.quests ? c.details.quests.completed.length.toLocaleString("en-US") : null],
+type Computed = FileLevelView["computed"] | undefined;
+
+/**
+ * The facts strip of both, one row per number. A number a read did not bring says "Not read", never 0. A number computed
+ * from the game files' item levels (lib/armory-file-levels.ts) carries a * and the note under the table.
+ */
+function FactsTable({ a, b, computed = [undefined, undefined] }: { a: ArmoryCharacter | null; b: ArmoryCharacter | null; computed?: [Computed, Computed] }) {
+  const rows: [string, (c: ArmoryCharacter) => ReactNode, keyof NonNullable<Computed> | null][] = [
+    ["Item level", (c) => c.itemLevel === null ? null : metricValue("item-level", c.itemLevel), "itemLevel"],
+    ["Gear Score", (c) => c.gearScore === null ? null : metricValue("gear-score", c.gearScore), "gearScore"],
+    ["Honorable kills", (c) => c.honorableKills === null ? null : metricValue("honorable-kills", c.honorableKills), null],
+    ["Achievements", (c) => c.details?.achievements ? c.details.achievements.rows.length.toLocaleString("en-US") : null, null],
+    ["Quests completed", (c) => c.details?.quests ? c.details.quests.completed.length.toLocaleString("en-US") : null, null],
   ];
-  const cell = (c: ArmoryCharacter | null, value: (c: ArmoryCharacter) => ReactNode) => {
+  const cell = (c: ArmoryCharacter | null, value: (c: ArmoryCharacter) => ReactNode, marked: boolean) => {
     const v = c ? value(c) : null;
-    return <td className="px-3 py-2 text-right font-mono tabular-nums">{v ?? <span className="font-sans text-fg-2">{c ? "Not read" : "—"}</span>}</td>;
+    return <td className="px-3 py-2 text-right font-mono tabular-nums">{v === null ? <span className="font-sans text-fg-2">{c ? "Not read" : "—"}</span> : <>{v}{marked && "*"}</>}</td>;
   };
+  const anyComputed = computed.some((x) => x?.itemLevel || x?.gearScore);
   return <section aria-labelledby="compare-facts" className="space-y-3">
     <SectionHeading id="compare-facts">At a glance</SectionHeading>
     <div className="overflow-x-auto rounded-card border border-line bg-panel">
@@ -119,13 +126,14 @@ function FactsTable({ a, b }: { a: ArmoryCharacter | null; b: ArmoryCharacter | 
           <th scope="col" className="px-3 py-2 text-right font-normal">{a ? fullName(a) : "—"}</th>
           <th scope="col" className="px-3 py-2 text-right font-normal">{b ? fullName(b) : "—"}</th>
         </tr></thead>
-        <tbody className="divide-y divide-line">{rows.map(([label, value]) => <tr key={label}>
+        <tbody className="divide-y divide-line">{rows.map(([label, value, key]) => <tr key={label}>
           <th scope="row" className="px-3 py-2 text-left font-normal text-muted">{label}</th>
-          {cell(a, value)}
-          {cell(b, value)}
+          {cell(a, value, key !== null && Boolean(computed[0]?.[key]))}
+          {cell(b, value, key !== null && Boolean(computed[1]?.[key]))}
         </tr>)}</tbody>
       </table>
     </div>
+    {anyComputed && <p className="text-meta text-muted">* Computed on this page from the game files&apos; item levels, as Blizzard&apos;s armory no longer sends them; not ranked until a read stores them.</p>}
   </section>;
 }
 
@@ -133,7 +141,7 @@ const qualityName = (q: string | null | undefined): Quality | undefined => QUALI
 type Item = ArmoryCharacter["equipment"][number];
 
 /** One side's item in a slot: its icon in its quality's border, its name in its quality's colour, its item level. */
-function ItemCell({ owner, item, tip, unknownIcon }: { owner: ArmoryCharacter | null; item: Item | undefined; tip: Tip | undefined; unknownIcon: string | null }) {
+function ItemCell({ owner, item, tip, unknownIcon, fromFiles = false }: { owner: ArmoryCharacter | null; item: Item | undefined; tip: Tip | undefined; unknownIcon: string | null; fromFiles?: boolean }) {
   // On a phone the pair stacks, so each half names whose it is.
   const whose = owner && <span className="text-cell-2 text-muted sm:hidden">{owner.name}</span>;
   if (!owner) return <div className="min-w-0 text-cell text-muted">—</div>;
@@ -144,7 +152,9 @@ function ItemCell({ owner, item, tip, unknownIcon }: { owner: ArmoryCharacter | 
   return <div className="flex min-w-0 items-center gap-3">
     {src && <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0"><GameIcon src={src} size={32} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /></Link>}
     <div className="min-w-0 flex-1">
-      <p className="flex items-baseline gap-2">{whose}{item.level != null && <span className="font-mono text-cell-2 tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}</p>
+      <p className="flex items-baseline gap-2">{whose}{item.level != null && (fromFiles
+        ? <span className="font-mono text-cell-2 tabular-nums text-fg-2 underline decoration-dotted underline-offset-4" title="Item level from the game files" aria-label={`Item level ${item.level}, from the game files`}>{item.level}</span>
+        : <span className="font-mono text-cell-2 tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>)}</p>
       {tip ? <ItemTip tip={tip} icon={null}>{name}</ItemTip> : name}
     </div>
   </div>;
@@ -159,7 +169,11 @@ function Delta({ a, b, bName }: { a: Item | undefined; b: Item | undefined; bNam
   return <span data-delta={d} aria-label={said} className={`self-center text-right font-mono text-cell tabular-nums ${d > 0 ? "text-accent" : d < 0 ? "text-danger" : "text-muted"}`}>{text}</span>;
 }
 
-function GearPairs({ a, b, tips, unknownIcon }: { a: ArmoryCharacter | null; b: ArmoryCharacter | null; tips: Map<number, Tip>; unknownIcon: string | null }) {
+function GearPairs({ a, b, tips, unknownIcon, fromFiles = [new Set(), new Set()] }: {
+  a: ArmoryCharacter | null; b: ArmoryCharacter | null; tips: Map<number, Tip>; unknownIcon: string | null;
+  /** Each side's slots whose level is the game files' (lib/armory-file-levels.ts). */
+  fromFiles?: [ReadonlySet<string>, ReadonlySet<string>];
+}) {
   const gear = (c: ArmoryCharacter | null) => new Map((c?.equipment ?? []).map((i) => [i.slot, i]));
   const ga = gear(a), gb = gear(b);
   return <section aria-labelledby="compare-gear" className="space-y-3">
@@ -167,13 +181,16 @@ function GearPairs({ a, b, tips, unknownIcon }: { a: ArmoryCharacter | null; b: 
       <SectionHeading id="compare-gear">Equipment</SectionHeading>
       {a && b && <p className="text-meta text-muted">Item level difference is {b.name}&apos;s against {a.name}&apos;s.</p>}
     </div>
+    {(fromFiles[0].size > 0 || fromFiles[1].size > 0) && <p className="text-meta text-muted">
+      Blizzard&apos;s armory no longer sends item levels, so the levels underlined with dots are the game files&apos; levels for the same items.
+    </p>}
     <ol className="grid gap-2">{[...LEFT, ...RIGHT, ...WEAPONS].map((slot) => {
       const ia = ga.get(slot), ib = gb.get(slot);
       return <li key={slot} data-compare-slot={slot} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 rounded-control border border-line bg-panel px-3 py-2 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)]">
         <p className="col-span-full text-cell-2 text-muted">{slotLabel(slot)}</p>
-        <ItemCell owner={a} item={ia} tip={ia ? tips.get(ia.itemId) : undefined} unknownIcon={unknownIcon} />
+        <ItemCell owner={a} item={ia} tip={ia ? tips.get(ia.itemId) : undefined} unknownIcon={unknownIcon} fromFiles={fromFiles[0].has(slot)} />
         <div className="row-span-2 flex justify-end sm:row-span-1 sm:justify-center"><Delta a={ia} b={ib} bName={b?.name ?? ""} /></div>
-        <ItemCell owner={b} item={ib} tip={ib ? tips.get(ib.itemId) : undefined} unknownIcon={unknownIcon} />
+        <ItemCell owner={b} item={ib} tip={ib ? tips.get(ib.itemId) : undefined} unknownIcon={unknownIcon} fromFiles={fromFiles[1].has(slot)} />
       </li>;
     })}</ol>
   </section>;
@@ -215,7 +232,10 @@ export default async function ArmoryComparePage(props: { searchParams: Promise<S
   const ranksOf = (c: ArmoryCharacter | null) => (c ? armoryStore().rank(c.region, c.slug).then((r) => rankBadges(c, r)).catch(() => []) : Promise.resolve([]));
   const [ra, rb] = await Promise.all([ranksOf(a), ranksOf(b)]);
   const assets = await loadSiteAssets().catch(() => null);
-  const tips = await loadEquippedTips(assets, [...(a?.equipment ?? []), ...(b?.equipment ?? [])]);
+  const { tips, levels } = await loadEquippedItems(assets, [...(a?.equipment ?? []), ...(b?.equipment ?? [])]);
+  // Items stored with no level show the game files' level; a missing item level or Gear Score is computed from them.
+  const va = a && withFileLevels(a, (id) => levels.get(id)), vb = b && withFileLevels(b, (id) => levels.get(id));
+  const none = new Set<string>();
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
   const keep = a ?? b;
   const q = (first(s.q) ?? "").trim().slice(0, 40);
@@ -229,8 +249,8 @@ export default async function ArmoryComparePage(props: { searchParams: Promise<S
           <SideHead which="b" side={lb} ranks={rb} />
         </div>
         {(!a || !b) && keep && <ComparePicker keep={keep} q={q} />}
-        <FactsTable a={a} b={b} />
-        <GearPairs a={a} b={b} tips={tips} unknownIcon={unknownIcon} />
+        <FactsTable a={va?.character ?? null} b={vb?.character ?? null} computed={[va?.computed, vb?.computed]} />
+        <GearPairs a={va?.character ?? null} b={vb?.character ?? null} tips={tips} unknownIcon={unknownIcon} fromFiles={[va?.fromFiles ?? none, vb?.fromFiles ?? none]} />
         <ArmoryCredit at={newest([...(a ? readTimes(a) : []), ...(b ? readTimes(b) : [])])} />
       </article>
     </Container>
