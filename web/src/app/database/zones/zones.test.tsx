@@ -383,6 +383,15 @@ test("a zone page shows its map art as the header icon and its map in the map sl
   expect(plain.split('class="entity-box')[1]).toContain("data-zone-preview");
 });
 
+test("the zone page title names only the lists the page has", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
+  expect((await generateMetadata(props("1436-westfall"))).title).toBe("Westfall – WoW Forever Zone: NPCs and Map");
+  store.loadCorpus.mockResolvedValue(corpus([...three(100, "Guard Orin", 1436, 40, 50), ...sidedQuest(7, 100, 12, "alliance")]));
+  expect((await generateMetadata(props("1436-westfall"))).title).toBe("Westfall – WoW Forever Zone: Quests, NPCs and Map");
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  expect((await generateMetadata(props("1436-westfall"))).title).toBe("Westfall – WoW Forever Zone: Map");
+});
+
 // A zone page reads like a zone guide: whose land it is, the creature levels players agree on, and quick facts.
 const traits = (npcId: number, name: string, mapId: number, x: number, y: number, extra: Record<string, unknown>) =>
   three(npcId, name, mapId, x, y).map((r) => ({ ...r, ...extra }));

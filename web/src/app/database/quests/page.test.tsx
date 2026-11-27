@@ -114,3 +114,8 @@ test("a filter value the list does not know is a 404", async () => {
   await expect(html({ side: "x" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html({ page: "9" })).rejects.toThrow("NEXT_NOT_FOUND");
 });
+
+test("under the title, the list says what its count holds: the quests players confirmed and the ones the files add", async () => {
+  const header = (await html()).split("data-page-header")[1]?.split("</header>")[0] ?? "";
+  expect(header).toMatch(/1 confirmed by players · 1 more from the game files, titled by the Warcraft Wiki/);
+});

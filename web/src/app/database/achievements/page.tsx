@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { AchievementEntry } from "@kb/completion";
 import Link from "@/components/Link";
 import { Card, Container, DataTable, DataTitle, FilterBar, ResultStrip, filledColumns, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
-import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
+import { achievementHref, achievementRows, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
@@ -43,7 +43,8 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   if (!q) notFound();
   const [catalog, assets] = await Promise.all([loadCatalog(), loadSiteAssets()]);
   const confirmations = catalog?.confirmations ?? false;
-  const all = catalog?.achievements ?? [];
+  // One row per achievement: a files-only twin of the same achievement folds into it (achievementRows).
+  const all = achievementRows(catalog?.achievements ?? []);
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);

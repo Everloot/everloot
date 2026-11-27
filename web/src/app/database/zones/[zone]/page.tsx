@@ -72,9 +72,11 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   // Indexed once there is something on it (a player-confirmed NPC or quest, or an entrance), and as the sitemap lists it.
   // Storage down: noindex rather than cache a thin page.
   const indexable = !facts.unreachable && hasContent(here);
+  // The title names the lists the page has (an empty tab is hidden), and always the map.
+  const topics = [here?.quests.length ? "Quests" : null, here?.npcs.some((n) => !n.vendor) ? "NPCs" : null].filter(Boolean);
   return {
     ...pageMetadata({
-      title: `${zone.name} – WoW Forever Zone: Quests, NPCs and Map`,
+      title: `${zone.name} – WoW Forever Zone: ${topics.length ? `${topics.join(", ")} and Map` : "Map"}`,
       description: `${zone.name} in WoW: Forever (${zone.continentName}): the map, the dungeon and raid entrances, and the NPCs, vendors and quests players have confirmed.`,
       path: zoneHref(zone.mapId, zone.name),
       image: `${zoneHref(zone.mapId, zone.name)}/opengraph-image`,

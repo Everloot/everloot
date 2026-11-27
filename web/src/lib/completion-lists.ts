@@ -176,9 +176,26 @@ export const titleWords = (name: string) => name.replace(NAME_SLOT, " ").replace
  * words are one row: the confirmed id and mark, the files' name (so its kind). Words the files list more than once
  * ("Sergeant %s", Alliance and Horde) pair only when as many reported titles carry them, in id order; else both stay.
  */
-export function titleRows(titles: readonly Listed<TitleEntry>[]): Listed<TitleEntry>[] {
+export function titleRows(titles: readonly Listed<TitleEntry>[]): TitleListRow[] {
   const { named, folded } = foldTitles(titles);
-  return titles.filter((t) => !folded.has(t)).map((t) => (named.has(t) ? { ...t, name: named.get(t)! } : t));
+  return titles.filter((t) => !folded.has(t)).map((t) => {
+    const files = named.get(t);
+    return files ? { ...t, name: files.name, filesId: files.titleId } : { ...t, filesId: t.confirmed ? null : t.titleId };
+  });
+}
+
+/** A title list row: `filesId` is the files' own row for it (its id when only the files list it), or null when none matched. */
+export type TitleListRow = Listed<TitleEntry> & { filesId: number | null };
+
+/**
+ * The side of a PvP rank title, by the files' row: CharTitles lists the Alliance ladder (Private to Grand Marshal,
+ * 1258-1270, and Knight-Captain, 1309) and the Horde ladder (Scout to High Warlord, 1271-1284) as separate rows, so
+ * "Sergeant %s" is there twice. Null for any other row: the files give no side.
+ */
+export function titleSide(filesId: number | null): "Alliance" | "Horde" | null {
+  if (filesId === null) return null;
+  if ((filesId >= 1258 && filesId <= 1270) || filesId === 1309) return "Alliance";
+  return filesId >= 1271 && filesId <= 1284 ? "Horde" : null;
 }
 
 /** The id of the title a game-files row merged into (titleRows), so its page can send readers to the one the list links. */
@@ -192,16 +209,51 @@ function foldTitles(titles: readonly Listed<TitleEntry>[]) {
   for (const t of titles) if (!t.confirmed && t.name.includes("%s")) files.set(titleWords(t.name), [...(files.get(titleWords(t.name)) ?? []), t]);
   const reported = new Map<string, Listed<TitleEntry>[]>();
   for (const t of titles) if (t.confirmed && !t.name.includes("%s")) reported.set(titleWords(t.name), [...(reported.get(titleWords(t.name)) ?? []), t]);
-  const named = new Map<Listed<TitleEntry>, string>();
+  const named = new Map<Listed<TitleEntry>, Listed<TitleEntry>>();
   const folded = new Map<Listed<TitleEntry>, Listed<TitleEntry>>();
   for (const [words, list] of reported) {
     const match = files.get(words);
     if (!match || match.length !== list.length) continue;
     const byId = (a: Listed<TitleEntry>, b: Listed<TitleEntry>) => a.titleId - b.titleId;
     const pieces = [...match].sort(byId);
-    [...list].sort(byId).forEach((t, i) => { named.set(t, pieces[i]!.name); folded.set(pieces[i]!, t); });
+    [...list].sort(byId).forEach((t, i) => { named.set(t, pieces[i]!); folded.set(pieces[i]!, t); });
   }
   return { named, folded };
+}
+
+/**
+ * The achievement list's rows: the files carry some achievements twice under two ids with the same name, description,
+ * category and criteria ("Novice Spelunker" 62031 and 64016). Those are one achievement: the confirmed row stays (else the
+ * lowest id) and a files-only twin folds into it. Two confirmed twins both stay: players reported each.
+ */
+export function achievementRows(list: readonly Listed<AchievementEntry>[]): Listed<AchievementEntry>[] {
+  const folded = foldAchievements(list);
+  return list.filter((a) => !folded.has(a));
+}
+
+/** The achievement a files-only twin folded into (achievementRows), so its page can send readers to the listed one. */
+export function achievementMergedInto(list: readonly Listed<AchievementEntry>[], id: number): Listed<AchievementEntry> | null {
+  for (const [twin, into] of foldAchievements(list)) if (twin.achievementId === id) return into;
+  return null;
+}
+
+function foldAchievements(list: readonly Listed<AchievementEntry>[]): Map<Listed<AchievementEntry>, Listed<AchievementEntry>> {
+  const folded = new Map<Listed<AchievementEntry>, Listed<AchievementEntry>>();
+  let files: typeof CLIENT_ACHIEVEMENTS.achievements;
+  try { files = CLIENT_ACHIEVEMENTS.achievements; } catch { return folded; }
+  const twins = new Map<string, Listed<AchievementEntry>[]>();
+  for (const a of list) {
+    const f = files[String(a.achievementId)];
+    if (!f) continue;
+    const key = JSON.stringify([f.title, f.description ?? "", f.category ?? null, f.criteria.map((c) => c.text)]);
+    twins.set(key, [...(twins.get(key) ?? []), a]);
+  }
+  for (const group of twins.values()) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => Number(b.confirmed) - Number(a.confirmed) || a.achievementId - b.achievementId);
+    for (const twin of sorted.slice(1)) if (!twin.confirmed) folded.set(twin, sorted[0]!);
+  }
+  return folded;
 }
 
 /** A title with a name in its slot, as the game shows it on a character. */

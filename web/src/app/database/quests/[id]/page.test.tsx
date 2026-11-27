@@ -29,6 +29,9 @@ vi.mock("@/lib/game-assets", () => ({
 vi.mock("@/lib/names", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/names")>()), itemNames: () => new Map() }));
 vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => data.facts, loadItemFacts: async () => ({ unreachable: true }) }));
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
+// The lore archive's match for the quest: none unless a test hands one in.
+const lore = vi.hoisted(() => ({ match: null as unknown }));
+vi.mock("@/lib/lore-links", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore-links")>()), loreFor: async () => lore.match }));
 
 import QuestPage from "./page";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -44,6 +47,7 @@ beforeEach(() => {
   data.tips = new Map();
   data.starters = [];
   data.shown = new Set();
+  lore.match = null;
   data.facts ={ npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" };
 });
 
@@ -224,4 +228,16 @@ test("Started by sits beside an agreed giver, and an item held back by the item 
   expect(out).not.toContain("/database/items/501");
   data.shown = new Set();
   expect(await html()).not.toContain(">Started by</dt>");
+});
+
+test("the quest's objective from its lore archive page is a fact near the top, labelled with its source; none without one", async () => {
+  data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
+  expect(await html()).not.toContain(">Objective</dt>");
+  lore.match = { extId: "x", name: "A quest", intro: "Slaughter 6 Mottled Boars, then return to Grull Hawkwind.", sourceId: "wiki" };
+  const out = await html();
+  const objective = fact(out, "Objective");
+  expect(objective).toContain("Slaughter 6 Mottled Boars, then return to Grull Hawkwind.");
+  expect(objective).toContain("Warcraft Wiki archive, 2023");
+  // First among the facts, before the reported title.
+  expect(out.indexOf(">Objective</dt>")).toBeLessThan(out.indexOf(">Reported title</dt>"));
 });

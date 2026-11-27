@@ -109,3 +109,10 @@ test("/contact points copyright and takedown requests at the terms", async () =>
   expect(html).toContain('href="https://support.blizzard.com/"');
   expect(visible(html)).not.toContain("can't see or change your Blizzard account");
 });
+
+test("/contact lists only what to email about; game or account support is one line sending readers to Blizzard", async () => {
+  const { default: Contact } = await import("./contact/page");
+  const html = renderToStaticMarkup(<Contact />);
+  expect(html).not.toMatch(/<h2[^>]*>(?:<[^>]*>)*Game or account support/);
+  expect(visible(html)).toContain("Not us: contact Blizzard Support for game or account support");
+});

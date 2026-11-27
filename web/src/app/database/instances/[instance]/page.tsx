@@ -169,6 +169,8 @@ export default async function InstancePage(props: Props) {
   const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; };
   // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
   // reads as names with their unconfirmed marker, not rows of [?].
+  // A row 3 installs have not reported has nothing to show in the report columns: a dash, explained once under the table.
+  const DASH = <span className="text-muted">—</span>;
   const bossColumns: SparseColumn<BossRow>[] = [
     // Each boss links its own page (lib/bosses.ts), by the name this table shows.
     { key: "name", header: "Boss", cell: (b) => {
@@ -177,14 +179,14 @@ export default async function InstancePage(props: Props) {
       const picture = pictureOf(b);
       return picture ? <span className="inline-flex items-center gap-2"><GameIcon src={picture.url} size={28} rounded="control" className="object-cover" />{shown}</span> : shown;
     } },
-    { key: "level", header: "Level", numeric: true, blank: (b) => levelOf(b) === null, cell: (b) => levelOf(b) ?? PLACEHOLDER },
-    { key: "kills", header: "Kills", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
+    { key: "level", header: "Level", numeric: true, blank: (b) => levelOf(b) === null, cell: (b) => levelOf(b) ?? DASH },
+    { key: "kills", header: "Kills", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : DASH) },
     // Short of 3, the count of installs that reported the encounter so far, beside the files' name: nothing else of theirs.
-    { key: "installs", header: "Installs", blank: (b) => !b.boss && !b.reported, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : b.reported ? <AgreementMeter count={b.reported} withText /> : PLACEHOLDER) },
-    { key: "seen", header: "Last seen", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : PLACEHOLDER) },
+    { key: "installs", header: "Installs", blank: (b) => !b.boss && !b.reported, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} withText /> : b.reported ? <AgreementMeter count={b.reported} withText /> : DASH) },
+    { key: "seen", header: "Last seen", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : DASH) },
     { key: "npcs", header: "Creatures", blank: (b) => !b.boss?.npcIds.length, cell: (b) => (b.boss?.npcIds.length
       ? b.boss.npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link></span>)
-      : PLACEHOLDER) },
+      : DASH) },
     { key: "drops", header: "Top drops", blank: (b) => topDrops(b).length === 0, cell: (b) => (
       <span className="flex flex-col gap-1">{topDrops(b).map((r) => <span key={r.itemId}>{itemLink(r.itemId)}</span>)}</span>
     ) },
@@ -204,13 +206,16 @@ export default async function InstancePage(props: Props) {
   // date, and what the game files list. Storage down: the player line says unrecorded, never zero.
   const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
   const level = levelLabel(row.level);
-  const reported = unreachable ? [] : [count(row.bosses.length, "boss", "bosses"), count(row.confirmed.length, "entrance", "entrances")];
+  // The bosses counted against the table's rows when only some are confirmed, so the line and the Installs column agree.
+  const someBosses = row.bosses.length > 0 && bosses.length > row.bosses.length;
+  const bossCount = someBosses ? `${row.bosses.length} of ${bosses.length} bosses` : count(row.bosses.length, "boss", "bosses");
+  const reported = unreachable ? [] : [bossCount, count(row.confirmed.length, "entrance", "entrances")];
   const lastSeen = unreachable ? null : [...row.bosses, ...row.confirmed].map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
   const filesList = [count(row.encounters.length, "encounter", "encounters"), count(row.files.length, "entrance", "entrances")].filter(Boolean);
   const summary = [
     `${row.raid === null ? "An instance" : row.raid ? "A raid" : "A dungeon"}${level ? `, level ${level} in the game files` : ""}.`,
     unreachable ? STORAGE_UNREACHABLE
-      : reported.some(Boolean) ? `${observedLine(reported, lastSeen, Date.now())} Each has three installs agreeing.`
+      : reported.some(Boolean) ? `${observedLine(reported, lastSeen, Date.now())} ${someBosses ? "The confirmed ones have three installs agreeing, as the Bosses tab's Installs column shows." : "Each has three installs agreeing."}`
       : row.reported > 0 ? `Nothing here is confirmed yet: ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree.`
       : observedLine([], null, Date.now()),
     filesList.length ? `The game files list ${filesList.join(" and ")}, unconfirmed until 3 installs report them.` : "The game files list no encounter or entrance for it.",
@@ -249,7 +254,8 @@ export default async function InstancePage(props: Props) {
         <DataTable
           dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
           meta={anyReport ? bossMeta : undefined}
-          footer={bosses.length > 0 && !anyBossReported ? (unreachable
+          footer={anyBossReported && bosses.some((b) => !b.boss) ? "— means not reported by 3 installs yet."
+            : bosses.length > 0 && !anyBossReported ? (unreachable
             ? "Players' reports cannot be shown right now; this list is the game files' own."
             : anyReport
               ? "No boss here has 3 installs reporting it yet. Kills and last seen show once one does."

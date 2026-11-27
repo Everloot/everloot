@@ -254,6 +254,9 @@ test("the list labels an instance the game files place no entrance for, with the
     const files = instanceRows().size;
     expect(html).toContain(`data-instance-count-note`);
     expect(text(html)).toContain(`${files} are placed by the game files; 1 more is known only from what players reported, listed by its id until a name is known.`);
+    // The same split, short, beside the title: the hub's "in game files" number and the extra rows.
+    const header = html.split("data-page-header")[1]?.split("</header>")[0] ?? "";
+    expect(text(header)).toContain(`${files} in game files · 1 from player reports only`);
   } finally {
     state.seen = { unreachable: true };
   }
@@ -484,6 +487,29 @@ test("the Bosses tab gives each reported boss its creature's picture, agreed lev
     state.loot = new Map();
     state.npcs = [];
     renders.npcs = new Map();
+  }
+});
+
+test("with some bosses confirmed, In short counts them of the table's rows, Installs reads 3 of 3, and the rest show a dash with one note", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  try {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+    const bosses = panel(html, "bosses");
+    const summary = text(html.split('data-slot="summary"')[1] ?? "");
+    expect(summary).toContain("Players reported 1 of 4 bosses");
+    expect(summary).toContain("The confirmed ones have three installs agreeing, as the Bosses tab&#x27;s Installs column shows.");
+    expect(summary).not.toContain("Each has three installs agreeing");
+    const confirmed = bosses.split("<tr").find((r) => r.includes('href="/database/bosses/2732-oggleflint"')) ?? "";
+    expect(text(confirmed)).toContain("|3 of 3|");
+    const pending = bosses.split("<tr").slice(2).filter((r) => !r.includes("2732-oggleflint"));
+    expect(pending.length).toBe(3);
+    for (const r of pending) {
+      expect(r).not.toContain("[?]");
+      expect(r).toContain("—");
+    }
+    expect(text(bosses)).toContain("— means not reported by 3 installs yet.");
+  } finally {
+    state.seen = { unreachable: true };
   }
 });
 
