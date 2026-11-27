@@ -24,6 +24,7 @@ import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
+import { UNAVAILABLE } from "@/lib/lore";
 import { questIndexable } from "@/lib/indexable";
 import { entityTitle, questDescription } from "@/lib/entity-meta";
 import { chainHref, loadCatalog } from "@/lib/completion-lists";
@@ -156,6 +157,12 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
       }}
       // No box: its level, type, side and category are the header's type line again.
       facts={!facts.unreachable && [
+        // A quest's lore archive page opens with its objective (the Lore block below shows the same paragraph): first
+        // among the facts, with its source, since the archive predates WoW: Forever.
+        ...(lore && lore !== UNAVAILABLE && lore.intro ? [{ label: "Objective", value: <>
+          {lore.intro}
+          <span className="ml-2 text-meta text-muted">Warcraft Wiki archive, 2023</span>
+        </> }] : []),
         { label: "Reported title", value: known(page.title) },
         { label: "Level", value: known(page.level), numeric: true },
         { label: "Side", value: known(sideChip || null) },

@@ -7,7 +7,7 @@ import { objectList } from "@kb/object-page";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
-import { loadCatalog, titleRows } from "@/lib/completion-lists";
+import { achievementRows, loadCatalog, titleRows } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { currencyEntries, mountEntries, petEntries, toyEntries } from "@/lib/collectibles";
 import { holidayEntries, petFamilyEntries } from "@/lib/world-events";
@@ -115,7 +115,7 @@ export default async function DatabasePage() {
     "/database/vendors": seen(readable ? publicVendors(world).length : 0),
     "/database/objects": seen(stats.unreachable ? 0 : objectList({ rates, measuredZeros, names: [] }).length),
     "/database/spells": listed(spellNames?.names.size),
-    "/database/achievements": listed(catalog?.achievements.length),
+    "/database/achievements": listed(catalog ? achievementRows(catalog.achievements).length : undefined),
     "/database/factions": listed(catalog?.factions.length),
     "/database/titles": listed(catalog ? titleRows(catalog.titles).length : undefined),
     "/database/quest-chains": listed(catalog?.chains.length),

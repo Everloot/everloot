@@ -242,3 +242,15 @@ test("what's new counts posts the way /changes folds them: a twin on the other f
   expect(block.match(/Hotfixes - November 11, 2026/g)).toHaveLength(1);
   expect(block).toMatch(/Hotfixes - November 11, 2026<\/a>(?:<[^>]*>)*\s*·\s*2 posts/);
 });
+
+test("round 5 copy: the panel notes say what each counts, the week names its window against /census, and no pending line", async () => {
+  live.ladder = { instance: null, rows: [], total: 0, raidsOpen: false };
+  const html = await render();
+  expect(panel(html, "live-ladder")).toContain("Built from boss kills that two members&#x27; addons report.");
+  expect(panel(html, "live-ladder")).not.toContain("From kills two members");
+  expect(panel(html, "live-newest")).toContain("Just confirmed by three installs.");
+  const week = panel(html, "live-week");
+  expect(week).toContain("So far this week, from 2026-11-23.");
+  expect(week).toContain("The census page counts the last 7 days, so its shares can differ.");
+  expect(html).not.toContain("Live-client verification is pending.");
+});

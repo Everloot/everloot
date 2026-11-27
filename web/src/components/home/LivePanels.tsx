@@ -32,7 +32,7 @@ const Unread = ({ what }: { what: string }) => <p role="status" className="text-
 /** Also the /database hub's "Recently confirmed" strip, under its own id and title. */
 export function NewestPanel({ facts, id = "live-newest", title = "Newly confirmed" }: { facts: HomeFact[] | null; id?: string; title?: string }) {
   return (
-    <Panel id={id} title={title} note="Reached three installs most recently." action={<Link href="/database/recent" prefetch={false} className={link}>All new facts →</Link>}>
+    <Panel id={id} title={title} note="Just confirmed by three installs." action={<Link href="/database/recent" prefetch={false} className={link}>All new facts →</Link>}>
       {facts === null ? <Unread what="The newest facts" /> : facts.length === 0 ? <p className="text-cell text-fg-2">No new public facts in the last 30 days.</p> : (
         <ol className="border-t border-line">
           {facts.map((f) => (
@@ -58,7 +58,7 @@ function LadderPanel({ ladder }: { ladder: HomeLadder | null }) {
     <Panel
       id="live-ladder"
       title="Guild ladder"
-      note={ladder?.instance ? <>{ladder.instance.name}: bosses killed, then who got there first.</> : "From kills two members' installs report."}
+      note={ladder?.instance ? <>{ladder.instance.name}: bosses killed, then who got there first.</> : "Built from boss kills that two members' addons report."}
       action={<Link href="/guilds" prefetch={false} className={link}>Full ladder →</Link>}
     >
       {ladder === null ? <Unread what="The guild ladder" /> : !ladder.instance ? <p className="text-cell text-fg-2">{ladder.raidsOpen ? LADDER_START_LINE : LADDER_LINE}</p> : (
@@ -83,9 +83,11 @@ function LadderPanel({ ladder }: { ladder: HomeLadder | null }) {
 }
 
 function WeekPanel({ week }: { week: HomeWeek | null }) {
+  // The census page opens on a rolling 7 days, this panel on the calendar week: say so, so the shares do not read as a contradiction.
   const label = week?.week ? (week.week.current ? `So far this week, from ${week.week.start}.` : `Week of ${week.week.start}.`) : undefined;
+  const differs = "The census page counts the last 7 days, so its shares can differ.";
   return (
-    <Panel id="live-week" title="This week" note={label ? `${label} Characters by class, from players who turned the census on.` : "Characters by class, from players who turned the census on."} action={<Link href="/rankings" prefetch={false} className={link}>Rankings →</Link>}>
+    <Panel id="live-week" title="This week" note={`${label ? `${label} ` : ""}Characters by class, from players who turned the census on. ${differs}`} action={<Link href="/rankings" prefetch={false} className={link}>Rankings →</Link>}>
       {week === null ? <Unread what="The census" /> : !week.week ? <p className="text-cell text-fg-2">{RANKINGS_START_LINE}</p> : week.classes.length === 0 ? <p className="text-cell text-fg-2">{COLLECTING_LINE}</p> : (
         <>
           {/* The bar is decoration; the list under it carries every share. */}

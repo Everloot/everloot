@@ -252,6 +252,20 @@ test("a Sort menu offers every column's order, for a phone where only the name c
   expect(await html(items({ sort: "-ilvl" }))).toMatch(/data-filter="sort"(?:[^<]|<(?!\/summary>))*Sort: <span class="text-fg">Item level<\/span>/);
 });
 
+test("a quality filter with no sort chosen lists by item level, highest first; a chosen sort stays", async () => {
+  const ids = (page: string) => [...(page.split("<tbody")[1] ?? "").matchAll(/<tr[^>]*>[\s\S]*?href="\/database\/items\/(\d+)/g)].map((m) => m[1]);
+  const epic = await html(items({ quality: "epic" }));
+  expect(ids(epic).length).toBeGreaterThan(0);
+  expect(ids(epic)).toEqual(ids(await html(items({ quality: "epic", sort: "-ilvl" }))));
+  expect(epic).toMatch(/aria-sort="descending"[^>]*>(?:<[^>]*>)*Item level/);
+  const menu = epic.split('data-filter="sort"')[1]?.split("</details>")[0] ?? "";
+  expect(menu).toMatch(/href="\/database\/items\?quality=epic"[^>]*>(?:<[^>]*>)*Item level, highest first/);
+  // The plain list keeps named-first, and an explicit order wins over the quality default.
+  expect(await html(items())).not.toMatch(/aria-sort="descending"[^>]*>(?:<[^>]*>)*Item level/);
+  expect(ids(await html(items({ quality: "epic", sort: "name" })))).toEqual(ids(await html(items({ quality: "epic", sort: "name" }))));
+  expect(await html(items({ quality: "epic", sort: "name" }))).toMatch(/aria-sort="ascending"[^>]*>(?:<[^>]*>)*Name/);
+});
+
 test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {
   const cloth = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
   const [dev, real] = cloth;

@@ -8,7 +8,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Badge, DataTable, filledColumns, TooltipFrame } from "@/components/ui";
 import { qualityNamed } from "@/components/ui/quality";
 import { trailFor } from "@/lib/breadcrumbs";
-import { achievementHref, isDevelopmentAchievement, loadCatalog, NO_POINTS, parseSegment, pointsText, TRACKER_NEEDS } from "@/lib/completion-lists";
+import { achievementHref, achievementMergedInto, isDevelopmentAchievement, loadCatalog, NO_POINTS, parseSegment, pointsText, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { asOfLine } from "@/lib/evidence";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
@@ -70,6 +70,9 @@ export default async function AchievementPage(props: Props) {
   // A development leftover has no page, as in the list (the catalog already drops it).
   if (isDevelopmentAchievement(id, files?.title ?? listed?.name)) notFound();
   if (catalog && !listed && !files) notFound();
+  // A files-only twin the list folded into the same achievement (achievementRows) is that achievement's page.
+  const into = catalog ? achievementMergedInto(catalog.achievements, id) : null;
+  if (into) permanentRedirect(achievementHref(into.achievementId, into.name));
   const title = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const canonical = achievementHref(id, title);
   if (`/database/achievements/${segment}` !== canonical) permanentRedirect(canonical);

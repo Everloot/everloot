@@ -121,7 +121,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     <Container width="data">
       <EdgeDegraded when={seen.unreachable} />
       <article>
-        <DataTitle title="Dungeons and raids" aside={strip} trail={trailFor("/database/instances") ?? undefined} />
+        <DataTitle title="Dungeons and raids" meta={extra > 0 && !seen.unreachable ? `${placed} in game files · ${extra} from player reports only` : undefined} aside={strip} trail={trailFor("/database/instances") ?? undefined} />
         {seen.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The entrances below are from the game files.</p>}
         {!seen.unreachable && (
           <ListNote>

@@ -9,7 +9,7 @@ import HomeTrust from "./HomeTrust";
 import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
-import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
+import { latestAddonRelease } from "@/lib/addon-release";
 import { loadTimeline, oneRowPerTitleDay, timelineDegraded } from "@/lib/changes";
 import { TYPE_LABEL, postDay, postPath } from "@kb/changes";
 import EdgeDegraded from "@/components/EdgeDegraded";
@@ -115,7 +115,7 @@ export default async function Home() {
           </ul>
           {addon && (
             <p className="text-sm text-fg-2 md:max-w-[26ch]">
-              The addon is <span className="tabular-nums text-fg">{addon.version}</span>.{ADDON_LIVE_VERIFIED ? "" : " Live-client verification is pending."} It reads the
+              The addon is <span className="tabular-nums text-fg">{addon.version}</span>. It reads the
               client and sends what you allow.
             </p>
           )}

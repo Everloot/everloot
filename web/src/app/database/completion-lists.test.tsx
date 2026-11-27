@@ -364,7 +364,7 @@ test("site search finds an agreed achievement or faction by name or id, and noth
 
 test("the title and quest chain lists apply the same three-reporter gate", async () => {
   const titles = await html(TitleList(search()));
-  expect(linked(titles, "titles")).toEqual(["4-private", "5-corporal"]);
+  expect(linked(titles, "titles")).toEqual(["5-corporal", "4-private"]);
   for (const hidden of ["Only Two Titles", "Split"]) expect(titles).not.toContain(hidden);
   expect(linked(await html(TitleList(search({ q: "corp" }))), "titles")).toEqual(["5-corporal"]);
   expect(linked(await html(TitleList(search({ sort: "-name" }))), "titles")).toEqual(["4-private", "5-corporal"]);
@@ -379,7 +379,7 @@ test("a development title stays out of the list and has no page, even once three
   serve([...rows, ...from(3, { kind: "title_catalog", titleId: 36, name: "[DNT] Test" })]);
   const titles = await html(TitleList(search()));
   expect(titles).not.toContain("[DNT]");
-  expect(linked(titles, "titles")).toEqual(["4-private", "5-corporal"]);
+  expect(linked(titles, "titles")).toEqual(["5-corporal", "4-private"]);
   await expect(TitlePage(page("36"))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
@@ -567,7 +567,7 @@ test("a confirmed title and its game-files row are one row: the files' kind, the
   // "Corporal %s" (1259). "Sergeant %s" twice (Alliance and Horde) with no report stays as two files rows.
   game.titles = [{ id: 1017, name: "%s of the Magram" }, { id: 1258, name: "Private %s" }, { id: 1259, name: "Corporal %s" }, { id: 1260, name: "Sergeant %s" }, { id: 1273, name: "Sergeant %s" }];
   const out = await html(TitleList(search()));
-  expect(linked(out, "titles")).toEqual(["4-private", "5-corporal", "1017-of-the-magram", "1260-sergeant", "1273-sergeant"]);
+  expect(linked(out, "titles")).toEqual(["5-corporal", "1017-of-the-magram", "4-private", "1260-sergeant", "1273-sergeant"]);
   expect(out).toContain("Titles in the game files or reported by players: 5, 2 confirmed by players");
   const corporal = rowOf(out, "/database/titles/5-corporal");
   expect(corporal).toContain("Corporal &lt;Name&gt;");
@@ -576,6 +576,34 @@ test("a confirmed title and its game-files row are one row: the files' kind, the
   expect(out).not.toContain('href="/database/titles/1259-corporal"');
   // Name order reads the title, not the "<Name>" slot: Corporal, of the Magram, Private, Sergeant.
   expect(linked(await html(TitleList(search({ sort: "name" }))), "titles")).toEqual(["5-corporal", "1017-of-the-magram", "4-private", "1260-sergeant", "1273-sergeant"]);
+});
+
+test("the title list sorts by the readable title unless asked, and names the side of each PvP rank the files list twice", async () => {
+  game.titles = [{ id: 1017, name: "%s of the Magram" }, { id: 1258, name: "Private %s" }, { id: 1259, name: "Corporal %s" }, { id: 1260, name: "Sergeant %s" }, { id: 1273, name: "Sergeant %s" }];
+  const out = await html(TitleList(search()));
+  expect(linked(out, "titles")).toEqual(["5-corporal", "1017-of-the-magram", "4-private", "1260-sergeant", "1273-sergeant"]);
+  expect(out).toMatch(/<th[^>]*>(?:<[^>]*>)*Side</);
+  expect(rowOf(out, "/database/titles/1260-sergeant")).toMatch(/>Alliance</);
+  expect(rowOf(out, "/database/titles/1273-sergeant")).toMatch(/>Horde</);
+  // A merged row keeps the side of its files row; a title outside the two ladders has none.
+  expect(rowOf(out, "/database/titles/5-corporal")).toMatch(/>Alliance</);
+  expect(rowOf(out, "/database/titles/1017-of-the-magram")).not.toMatch(/>(?:Alliance|Horde)</);
+  // An explicit id sort still reads by id.
+  expect(linked(await html(TitleList(search({ sort: "id" }))), "titles")).toEqual(["4-private", "5-corporal", "1017-of-the-magram", "1260-sergeant", "1273-sergeant"]);
+});
+
+test("an achievement the files carry twice (same name, text, category and criteria) lists once, the confirmed id first", async () => {
+  const spelunker = { title: "Novice Spelunker", points: 0, description: "Complete the following dungeons.", criteria: [{ text: "The Deadmines" }, { text: "Wailing Caverns" }] };
+  game.achievements = { "62031": { ...spelunker }, "64016": { ...spelunker }, "64017": { ...spelunker, criteria: [{ text: "Gnomeregan" }] } };
+  serve(from(3, ach(62031, "Novice Spelunker", "Dungeons", 0, 2)));
+  const out = await html(AchievementList(search()));
+  expect(linked(out, "achievements")).toEqual(["62031-novice-spelunker", "64017-novice-spelunker"]);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
+  expect(paths).not.toContain("/database/achievements/64016-novice-spelunker");
+  await expect(AchievementPage(page("64016-novice-spelunker"))).rejects.toThrow("REDIRECT /database/achievements/62031-novice-spelunker");
+  // With no confirmation either way, the lower id stays.
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  expect(linked(await html(AchievementList(search())), "achievements")).toEqual(["62031-novice-spelunker", "64017-novice-spelunker"]);
 });
 
 test("a merged-away title row has no sitemap entry and its page redirects to the title it merged into", async () => {

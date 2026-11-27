@@ -167,7 +167,12 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   return (
     <Container width="data">
       <article>
-        <DataTitle title="Quests" aside={strip} />
+        {/* What the total holds: the hub counts the confirmed quests, the list adds the ones the files list with a wiki title. */}
+        <DataTitle
+          title="Quests"
+          meta={facts.unreachable ? undefined : `${reported.length.toLocaleString("en-US")} confirmed by players · ${(all.length - reported.length).toLocaleString("en-US")} more from the game files, titled by the Warcraft Wiki`}
+          aside={strip}
+        />
         <FilterBar
           label="Quest filters"
           search={{ action: "/database/quests", value: q.q, placeholder: "Name or id", label: "Filter by name or id", keep }}

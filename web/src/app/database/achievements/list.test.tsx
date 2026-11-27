@@ -24,7 +24,9 @@ import { isDevelopmentAchievement } from "@/lib/completion-lists";
 const html = async (search: Record<string, string> = {}) => renderToStaticMarkup(await AchievementList({ searchParams: Promise.resolve(search) }));
 /** The listed (non-statistic) achievements the files file under `name` or a category beneath it, and their points. */
 function totals(name: string) {
-  const rows = Object.entries(CLIENT_ACHIEVEMENTS.achievements).filter(([id, a]) => !a.statistic && !isDevelopmentAchievement(Number(id), a.title) && categoryPath(a.category).some((s) => s.name === name)).map(([, a]) => a);
+  const rows = Object.entries(CLIENT_ACHIEVEMENTS.achievements).filter(([id, a]) => !a.statistic && !isDevelopmentAchievement(Number(id), a.title) && categoryPath(a.category).some((s) => s.name === name)).map(([, a]) => a)
+    // A twin the files carry twice (same name, text, category and criteria) is one row of the list.
+    .filter((a, i, all) => all.findIndex((b) => JSON.stringify([b.title, b.description ?? "", b.category ?? null, b.criteria.map((c) => c.text)]) === JSON.stringify([a.title, a.description ?? "", a.category ?? null, a.criteria.map((c) => c.text)])) === i);
   return { achievements: rows.length, points: rows.reduce((n, a) => n + a.points, 0) };
 }
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;

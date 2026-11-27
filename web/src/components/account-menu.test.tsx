@@ -87,7 +87,7 @@ describe("signed in without a shell (EVERLOOT_PROFILES off)", () => {
     await act(async () => root.render(<Header savedBuilds />));
     expect(container.querySelector('a[href="/sign-in"]')).toBeNull();
     const download = container.querySelector('a.btn[href="/addon"]');
-    expect(download?.querySelector("span")?.textContent).toBe("Download");
+    expect(download?.querySelector("span")?.textContent).toBe("Get the addon");
     expect(download?.textContent).toContain("Get the addon");
     expect(avatarButton().textContent).toBe("T");
     expect(avatarButton().querySelector("span")!.className).toContain("bg-accent");

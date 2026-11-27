@@ -38,13 +38,10 @@ export default function ContactPage() {
             <li>Bug reports</li>
             <li>Partnership questions</li>
           </ul>
-        </section>
-
-        <section aria-labelledby="support">
-          <SectionHeading id="support">Game or account support</SectionHeading>
-          <p className="text-fg-2">
-            For Battle.net login, billing, bans or in-game problems, contact{" "}
-            <a href="https://support.blizzard.com/" rel="noopener" className={link}>Blizzard Support</a>.
+          <p className="mt-4 text-fg-2">
+            Not us: contact{" "}
+            <a href="https://support.blizzard.com/" rel="noopener" className={link}>Blizzard Support</a>
+            {" "}for game or account support (Battle.net login, billing, bans or in-game problems).
           </p>
         </section>
       </div>

@@ -132,5 +132,6 @@ test("an instance nobody reported says so; one with a boss three installs killed
   // SYNTHETIC: three installs killed one Ragefire Chasm encounter.
   serve(three.map((i) => ({ ...base(`install-${i}`), kind: "encounter", encounterId: 2732, name: "Oggleflint", instanceMapId: 389, success: true, npcIds: [11517], capturedAt: "2026-10-09T20:00:00Z" })));
   const killed = await html(InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
-  expect(inShort(killed)).toMatch(/Players reported 1 boss, last seen [^.]+\. Each has three installs agreeing\./);
+  // The files list four encounters: the line counts the confirmed one of the four the Bosses tab lists.
+  expect(inShort(killed)).toMatch(/Players reported 1 of 4 bosses, last seen [^.]+\. The confirmed ones have three installs agreeing/);
 });

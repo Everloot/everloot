@@ -118,6 +118,11 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     notFound();
   }
   const { cls, sub, q } = r;
+  // With a quality chosen and no order, the list reads by item level, highest first: an epic list opens on its best gear,
+  // not its level-1 quest items. The URL carries no sort, so this order is the Sort menu's reset choice there. A name
+  // search keeps its best-match order.
+  const qualityFirst = Boolean(q.quality?.length) && !q.sort && !q.q;
+  const order: CategoryQuery["sort"] = qualityFirst ? { key: "ilvl", desc: true } : q.sort;
   // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
   // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
   // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
@@ -137,13 +142,13 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
   // A level or binding filter or sort reads the levels of every row that may show them; the tooltips are this page's only.
-  const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
+  const wide = Boolean(q.ilvl || q.req || q.bind) || order?.key === "ilvl" || order?.key === "req";
   const wideIds = wide ? base.map((row) => row[0]).filter(showsTip) : [];
   const wideAssets = wideIds.length ? await loadSiteAssets() : null;
   const levels = wide ? await loadItemLevels(wideAssets, wideIds) : null;
   const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => levels?.get(id), order: index.order };
   const match = matchItemNames(base, q, ctx);
-  const listed = listItems(base, q, ctx, match);
+  const listed = listItems(base, { ...q, sort: order }, ctx, match);
   // The items no source names ("Item N") are one line above the table unless asked for, in the unrecorded quality
   // view (which lists them by design) or by id; not when nothing in the list has a name (names out of reach),
   // where the line would hide the whole list. They sort last either way.
@@ -314,8 +319,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
       // header's first click does (levels high to low); the default, named items first, is the reset choice.
       type: "menu", key: "sort", label: "Sort",
       options: [
-        { label: "Named first", href: here({ sort: undefined }), on: !q.sort, reset: true },
-        ...ITEM_SORT_MENU.filter(([key]) => key !== "type" || !sub).map(([key, label, desc]) => ({ label, href: here({ sort: { key, desc } }), on: q.sort?.key === key })),
+        { label: q.quality?.length && !q.q ? "Item level, highest first" : "Named first", href: here({ sort: undefined }), on: !q.sort, reset: true },
+        ...ITEM_SORT_MENU.filter(([key]) => (key !== "type" || !sub) && !(q.quality?.length && !q.q && key === "ilvl")).map(([key, label, desc]) => ({ label, href: here({ sort: { key, desc } }), on: q.sort?.key === key })),
       ],
     },
   ];
@@ -421,7 +426,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             rows={shown}
             rowKey={(row) => String(row[0])}
             // The default order (named items first) is no one column, so no header shows an arrow for it.
-            sort={q.sort ? { key: q.sort.key, direction: q.sort.desc ? "desc" : "asc" } : undefined}
+            sort={order ? { key: order.key, direction: order.desc ? "desc" : "asc" } : undefined}
             sortHref={(key, dir) => here({ sort: { key: key as NonNullable<CategoryQuery["sort"]>["key"], desc: dir === "desc" } })}
             meta={(row) => [sub ? null : describe(T, row).subclass?.name, slotOf(row[3])?.name, tips.get(row[0])?.level ? `Item level ${tips.get(row[0])!.level}` : null, sourceOf(row)].filter(Boolean).join(" · ")}
             empty={empty}
