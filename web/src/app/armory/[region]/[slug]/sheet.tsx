@@ -3,9 +3,9 @@ import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import DungeonsAndRaids from "@/components/progress/DungeonsAndRaids";
 import type { DungeonsAndRaidsData } from "@/lib/dungeon-clears";
-import { metricValue, readLine } from "@/lib/armory";
+import { ARMORY_BOARDS, metricValue, readLine } from "@/lib/armory";
 import { timeAgo } from "@/lib/time";
-import { ProfessionList } from "../../profile";
+import { blizzardBossKillsLine, ProfessionList } from "../../profile";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import { guildPath, guildsOn } from "@/lib/guilds";
 import { optOutPath, type Player } from "@/lib/player-pages";
@@ -19,6 +19,16 @@ const Pair = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0"><dt className="text-cell-2 text-muted">{label}</dt><dd className="font-mono text-cell tabular-nums text-fg">{children}</dd></div>
 );
 
+const RANKED_ITEM_LEVEL = "Ranked item level";
+
+/**
+ * An item level of 0 while something is worn (a level 1 character: most slots empty and counting 0) reads as a dash
+ * that says why on hover, not a 0 that looks like a missing read.
+ */
+function itemLevelValue(c: ArmoryCharacter, value: number, shown: ReactNode): ReactNode {
+  return value === 0 && c.equipment.length > 0 ? <span title="Under 1: most slots are empty and count 0">—</span> : shown;
+}
+
 /**
  * The first line under the header: the numbers that say how geared the character is and how fresh the read is. A
  * number the read did not bring is left out, never shown as 0. The read age names its exact time on hover.
@@ -26,7 +36,8 @@ const Pair = ({ label, children }: { label: string; children: ReactNode }) => (
 export function CharacterFacts({ character: c, lastRead, now }: { character: ArmoryCharacter; lastRead: string | null; now: number }) {
   const d = c.details;
   const items: [string, ReactNode][] = [
-    ...(c.itemLevel !== null ? [["Item level", metricValue("item-level", c.itemLevel)] as [string, ReactNode]] : []),
+    // The number the item-level board ranks (its formula on the dt); the sheet's Blizzard average is a second number.
+    ...(c.itemLevel !== null ? [[RANKED_ITEM_LEVEL, itemLevelValue(c, c.itemLevel, metricValue("item-level", c.itemLevel))] as [string, ReactNode]] : []),
     ...(c.gearScore !== null ? [["Gear Score", metricValue("gear-score", c.gearScore)] as [string, ReactNode]] : []),
     ...(c.honorableKills !== null ? [["Honorable kills", metricValue("honorable-kills", c.honorableKills)] as [string, ReactNode]] : []),
     ...(d?.achievements ? [["Achievements", d.achievements.rows.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
@@ -37,7 +48,7 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
   // Counts in mono with tabular figures; the read age is words ("3 days ago"), so it is sans (docs/design/direction.md).
   return (
     <dl data-character-facts aria-label="At a glance" className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-line bg-panel px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
-      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted">{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
+      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted" {...(label === RANKED_ITEM_LEVEL ? { title: ARMORY_BOARDS["item-level"].lede } : {})}>{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
     </dl>
   );
 }
@@ -97,7 +108,7 @@ export function SheetSummary({ character: c }: { character: ArmoryCharacter }) {
   return (
     <section aria-label="Summary" data-sheet-summary className="flex h-full flex-col gap-4 rounded-card border border-edge bg-panel p-4">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {c.averageItemLevel !== null && <Pair label="Average item level">{c.averageItemLevel}</Pair>}
+        {c.averageItemLevel !== null && <Pair label="Blizzard's average item level">{itemLevelValue(c, c.averageItemLevel, c.averageItemLevel)}</Pair>}
       </dl>
       {key.length > 0 && <dl aria-label="Key stats" className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4">
         {key.map((s) => <Pair key={s.label} label={s.label}>{s.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{s.percent ? "%" : ""}</Pair>)}
@@ -110,10 +121,14 @@ export function SheetSummary({ character: c }: { character: ArmoryCharacter }) {
  * The character's dungeons and raids (components/progress/DungeonsAndRaids): synced boss kills per instance, below the
  * gear sheet so the sheet stays the first thing on the page. With no kill to list it is one muted line and the link.
  */
-export function DungeonRaidSlot({ data, href }: { data: DungeonsAndRaidsData; href: string }) {
+export function DungeonRaidSlot({ data, href, character }: { data: DungeonsAndRaidsData; href: string; character?: ArmoryCharacter }) {
   if (!data.synced || data.instances.length === 0) {
+    // Synced kills come from the Desktop App; Blizzard's play history counts kills on its own, so the line names its
+    // source and, when Blizzard lists kills, says where, rather than reading as "this character killed nothing".
+    const blizzard = character ? blizzardBossKillsLine(character) : null;
     return <p data-slot="dungeon-raid-progress" className="text-meta text-muted">
-      Dungeons &amp; raids: {data.synced ? "no boss kill is recorded in this character's synced history yet" : "no boss kills are synced for this character"}.{" "}
+      Dungeons &amp; raids: {data.synced ? "no boss kill is recorded in this character's synced history yet" : "no boss kills synced through the Everloot Desktop App for this character"}.{" "}
+      {blizzard && <>{blizzard}{" "}</>}
       <a href={href} className={link}>Every instance</a>
     </p>;
   }

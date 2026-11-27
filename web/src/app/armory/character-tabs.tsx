@@ -4,7 +4,8 @@ import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
 import { characterProgression, progressionCatalogue } from "@kb/progression";
-import { Achievements, NO_ACHIEVEMENTS, PlayHistoryView, ProfessionList, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
+import { Achievements, blizzardBossKillsLine, NO_ACHIEVEMENTS, PlayHistoryView, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
+import { link } from "./parts";
 
 /**
  * The character sheet's tabs: one per part of a Blizzard profile the armory stores, below the gear sheet (which is the
@@ -31,10 +32,13 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   reputations: notRead("reputations"),
   quests: notRead("completed quests"),
   history: notRead("play history"),
-  progress: "No synced boss kills are available for this character yet.",
+  progress: "No boss kills synced through the Everloot Desktop App for this character yet.",
 };
 
-const Empty = ({ id }: { id: CharacterTabId }) => <p data-empty-tab={id} className="py-3 text-sm text-fg-2">{EMPTY_TAB[id]}</p>;
+/** Blizzard's API gives no talents below level 10, where the game gives no talent points. */
+export const NO_TALENT_POINTS = "No talent points before level 10.";
+
+const Empty = ({ id, text = EMPTY_TAB[id] }: { id: CharacterTabId; text?: string }) => <p data-empty-tab={id} className="py-3 text-sm text-fg-2">{text}</p>;
 
 export interface SheetParts {
   /** Achievement categories that players have confirmed, by achievement id. */
@@ -55,7 +59,7 @@ export const isCharacterTab = (id: string): id is CharacterTabId => CHARACTER_TA
 export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: SheetParts): ReactNode {
   const d = c.details;
   switch (id) {
-    case "talents": return d?.talents?.trees.length ? <TalentTrees character={c} trees={d.talents.trees} open /> : <Empty id={id} />;
+    case "talents": return d?.talents?.trees.length ? <TalentTrees character={c} trees={d.talents.trees} open /> : <Empty id={id} text={c.level < 10 ? NO_TALENT_POINTS : undefined} />;
     case "stats": return d?.statistics?.rows.length ? <StatList rows={d.statistics.rows} /> : <Empty id={id} />;
     case "pvp": {
       const pvp: Fact[] = [
@@ -67,12 +71,17 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
     case "achievements": return !d?.achievements ? <Empty id={id} /> : d.achievements.rows.length
       ? <Achievements rows={d.achievements.rows} categories={parts.categories ?? new Map()} />
       : <p className="py-3 text-sm text-fg-2">{NO_ACHIEVEMENTS}</p>;
-    case "professions": return d?.professions?.rows.length ? <ProfessionList rows={d.professions.rows} /> : <Empty id={id} />;
+    // The bars sit in the overview above the gear (sheet.tsx CharacterOverview); the tab points there, not repeats them.
+    case "professions": return d?.professions?.rows.length
+      ? <p className="py-3 text-sm text-fg-2">The profession bars are with the specialization above the gear. <a href="#armory-overview-professions" className={link}>Go to professions</a></p>
+      : <Empty id={id} />;
     case "reputations": return d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : <Empty id={id} />;
     case "quests": return d?.quests ? <QuestCount completed={d.quests.completed} /> : <Empty id={id} />;
-    case "history": return d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : <Empty id={id} />;
+    case "history": return d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} source /> : <Empty id={id} />;
     case "progress": return <>
-      {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">{EMPTY_TAB.progress}</p>}
+      {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">
+        {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
+      </p>}
       <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} />
     </>;
   }

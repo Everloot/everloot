@@ -45,6 +45,21 @@ test("every equipped slot shows an icon in its quality border: its own art, or t
   expect(noArt.match(/134400\.webp/g)).toHaveLength(2);
 });
 
+test("an item the game files do not know keeps Blizzard's name, gets an armory-only tooltip and no link to a nameless page", () => {
+  // Only the head has a game-file tooltip; the main hand (17069) is unknown to the files.
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip()]])} unknownIcon={UNKNOWN} />);
+  const slot = html.slice(html.indexOf('data-equipment-slot="MAIN_HAND"'));
+  const mainHand = slot.slice(0, slot.indexOf("</li>"));
+  expect(mainHand).toContain("Striker&#x27;s Mark");
+  expect(mainHand).not.toContain('href="/database/items/17069"');
+  // Its own tooltip, so the shared hover card (which would ask /card/item/17069 and get a 404) never attaches.
+  expect(mainHand).toContain("data-item-tip");
+  expect(mainHand).toContain("Item level 69");
+  expect(mainHand).toContain("Not in the game files yet");
+  // A known item still links its page.
+  expect(html).toContain('href="/database/items/16846"');
+});
+
 test("supported details show their numbers and useful tools; missing categories stay absent", () => {
   const details = { revision: 1 as const, statistics: { asOf: "2026-11-12T12:00:00.000Z", rows: [{ label: "Intellect", value: 69, percent: false }] }, talents: { asOf: "2026-11-12T12:00:00.000Z", trees: [{ name: "Demonology", points: 14, talents: [{ name: "Unholy Power", rank: 5 }] }] }, professions: { asOf: "2026-11-12T12:00:00.000Z", rows: [{ name: "Alchemy", rank: 66, max: 150 }] } };
   const character = armoryCharacter({ class: "Warlock", classId: 9, details });

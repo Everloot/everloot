@@ -159,7 +159,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
 
         <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} />} />
 
-        <DungeonRaidSlot data={progression.dungeons} href="#progress" />
+        <DungeonRaidSlot data={progression.dungeons} href="#progress" character={c} />
 
         {seen && <AddonSighting seen={seen} />}
 

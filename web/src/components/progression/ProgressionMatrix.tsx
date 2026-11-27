@@ -4,6 +4,9 @@ import { PROGRESSION_BUILD, PROGRESSION_GROUPS, trackedDungeons, type CharacterP
 import { Badge } from "@/components/ui";
 import { SPACE } from "@/design/tokens";
 
+/** "1 boss", "8 bosses". */
+const bosses = (n: number) => `${n} ${n === 1 ? "boss" : "bosses"}`;
+
 export interface ProgressionMatrixProps {
   instances: readonly (CharacterProgress | GuildProgress)[];
   guild?: boolean;
@@ -43,7 +46,7 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
             </div>
           </div>
           <div className="space-y-2">
-            <p className="font-mono text-sm tabular-nums text-fg-2">{r.killed === null ? `${r.total} bosses` : `${r.killed} / ${r.total} bosses`}</p>
+            <p className="font-mono text-sm tabular-nums text-fg-2">{r.killed === null ? bosses(r.total) : `${r.killed} / ${bosses(r.total)}`}</p>
             {r.killed !== null && <div role="progressbar" aria-label={`${r.name}: bosses ${guild ? "counted" : "killed"}`} aria-valuemin={0} aria-valuemax={r.total} aria-valuenow={r.killed} className="h-1 overflow-hidden bg-line" style={{ borderRadius: SPACE[0] }}>
               <div className="h-1 bg-fg-2" style={{ borderRadius: SPACE[0], width: `${r.total ? r.killed / r.total * 100 : 0}%` }} />
             </div>}

@@ -159,7 +159,7 @@ describe("the character page", () => {
     expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('role="tablist"'));
     const summary = out.slice(at("data-sheet-summary"), at('data-equipment-slot="HANDS"'));
     // The item level, Gear Score and ranks moved up to the facts strip and the rank badges; the summary keeps the rest.
-    for (const text of ["Average item level", "58", "4,512", "412"]) expect(summary).toContain(text);
+    for (const text of ["Blizzard&#x27;s average item level", "58", "4,512", "412"]) expect(summary).toContain(text);
     for (const text of ["57.41", "Gear Score", "#2 of 2"]) expect(summary).not.toContain(text);
     // A stat beyond the key ones stays in the Stats tab only.
     expect(summary).not.toContain("Fire resistance");
@@ -224,7 +224,7 @@ describe("the character page", () => {
       const textOf = (markup: string) => [...`>${markup}<`.matchAll(/>([^<]*)</g)].map((t) => t[1]).join("");
       const pairs = [...strip.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textOf(m[2])]);
       expect(pairs).toEqual([
-        ["Item level", "57.41"], ["Gear Score", "61.2"], ["Honorable kills", "1,234"],
+        ["Ranked item level", "57.41"], ["Gear Score", "61.2"], ["Honorable kills", "1,234"],
         ["Achievements", "3"], ["Quests completed", "4"], ["Last read", "3 days ago"],
       ]);
       // The exact read time stays one hover away.
@@ -293,7 +293,7 @@ describe("the character page", () => {
       // "3 days ago" is words: the Last read value is sans; the counts beside it stay mono.
       const strip = out.slice(out.indexOf("data-character-facts"), out.indexOf("data-rank-badges"));
       expect(strip).toMatch(/Last read<\/dt><dd class="(?![^"]*font-mono)[^"]*"><time/);
-      expect(strip).toMatch(/Item level<\/dt><dd class="[^"]*font-mono tabular-nums/);
+      expect(strip).toMatch(/Ranked item level<\/dt><dd class="[^"]*font-mono tabular-nums/);
     });
 
     test("the facts strip follows the header in one block, with no empty row between them", async () => {
@@ -643,6 +643,6 @@ test("a character page shows its dungeons and raids where the dungeon progress l
   expect(line).toContain("Dungeons &amp; raids");
   expect(line).toContain('href="#progress"');
   // No storage in this test: no synced history is unknown, never 0 cleared.
-  expect(line).toContain("no boss kills are synced for this character");
+  expect(line).toContain("no boss kills synced through the Everloot Desktop App for this character");
   expect(out.indexOf('data-slot="dungeon-raid-progress"')).toBeLessThan(out.indexOf('id="progress"'));
 });

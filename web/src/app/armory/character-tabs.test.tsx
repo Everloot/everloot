@@ -39,7 +39,8 @@ test("a character with every part stored draws every tab, none of them empty", (
   expect(html).toContain("Intellect");
   expect(html).toContain("1,234");
   expect(html).toContain('href="/database/achievements/6"');
-  expect(html).toContain("66 / 150");
+  // The profession bars live in the overview above the tabs; the tab links to them.
+  expect(html).toContain('href="#armory-overview-professions"');
   expect(html).toContain('href="/database/factions/530"');
   expect(html).toMatch(/>3<\/span> completed quests/);
 });

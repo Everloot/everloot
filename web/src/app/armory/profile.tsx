@@ -7,6 +7,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
+import { qualityColor } from "@/lib/item-names";
 import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, rankText, slotLabel, type ArmoryMetric } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
@@ -36,13 +37,22 @@ export function Equipment({ character: c, tips, unknownIcon = null, heading = tr
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
   const slot = (key: string, mirror: boolean) => {
     const item = equipped.get(key);
-    const tip = item ? tips.get(item.itemId) : undefined;
+    const known = item ? tips.get(item.itemId) : undefined;
+    // With the asset files read (`unknownIcon`), an item they have no record of is one the game files do not know yet:
+    // its database page would be nameless and its hover card a 404, so it gets no link and a tooltip from what
+    // Blizzard's armory read (name, quality, item level, slot) instead.
+    const unknown = item && !known && unknownIcon ? armoryOnlyTip(item, key, unknownIcon) : undefined;
+    const tip = known ?? unknown;
     const src = tip?.icon ?? unknownIcon;
-    const href = item ? `/database/items/${item.itemId}` : "";
-    const icon = item && src
-      ? <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0"><GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /></Link>
+    const href = item && !unknown ? `/database/items/${item.itemId}` : "";
+    const art = item && src ? <GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /> : null;
+    const icon = art
+      ? (href ? <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0">{art}</Link> : <span aria-hidden="true" className="shrink-0">{art}</span>)
       : <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-sm border border-dashed border-line" />;
-    const name = item && <Link href={href} className={`text-cell underline decoration-edge underline-offset-4 [overflow-wrap:anywhere] hover:decoration-fg ${quality(item.quality)}`}>{item.name}</Link>;
+    const nameClass = `text-cell [overflow-wrap:anywhere] ${quality(item?.quality ?? null)}`;
+    const name = item && (href
+      ? <Link href={href} className={`${nameClass} underline decoration-edge underline-offset-4 hover:decoration-fg`}>{item.name}</Link>
+      : <span tabIndex={0} className={nameClass}>{item.name}</span>);
     return <li key={key} data-equipment-slot={key} className={`flex min-h-14 min-w-0 items-center gap-3 rounded-control border border-line bg-panel px-2 py-2 ${mirror ? "lg:flex-row-reverse lg:text-right" : ""}`}>
       {icon}
       <div className="min-w-0 flex-1">
@@ -68,7 +78,18 @@ export function Equipment({ character: c, tips, unknownIcon = null, heading = tr
   </section>;
 }
 
-type Achievement = { id: number; name: string; completedAt: string };
+/** A tooltip for an equipped item the game files do not know, from the fields Blizzard's armory read; nothing invented. */
+function armoryOnlyTip(item: ArmoryCharacter["equipment"][number], slot: string, icon: string): Tip {
+  const q = qualityName(item.quality);
+  return {
+    name: item.name, color: qualityColor(q ? QUALITIES.indexOf(q) : 1), quality: q ? q[0]!.toUpperCase() + q.slice(1) : "Common", icon,
+    lines: [...(item.level != null ? [`Item level ${item.level}`] : []), slotLabel(slot)],
+    partial: true, why: [], label: "From Blizzard's armory. Not in the game files yet, so it has no database page.",
+    level: item.level ?? 0, required: 0, binding: 0,
+  };
+}
+
+type Achievement ={ id: number; name: string; completedAt: string };
 /** The achievements shown open before the rest close under a disclosure. */
 export const OPEN_ACHIEVEMENTS = 5;
 
@@ -155,8 +176,14 @@ export function ProfessionList({ rows, grid = false }: { rows: NonNullable<Detai
   </>;
 }
 
+/** The game's standings, lowest first: a row without Blizzard's tier is placed by its standing's name. */
+const STANDINGS = ["hated", "hostile", "unfriendly", "neutral", "friendly", "honored", "revered", "exalted"];
+const standingOf = (r: { standing: string; tier?: number }) => r.tier ?? STANDINGS.indexOf(r.standing.toLowerCase());
+
+/** Highest standing first (Exalted), then by name. */
 export function ReputationList({ rows }: { rows: NonNullable<Details["reputations"]>["rows"] }) {
-  return <ul className="divide-y divide-line">{rows.map((r) => <li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+  const sorted = [...rows].sort((a, b) => standingOf(b) - standingOf(a) || a.name.localeCompare(b.name));
+  return <ul className="divide-y divide-line">{sorted.map((r) =><li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
     <Link href={`/database/factions/${r.id}`} className={link}>{r.name}</Link>
     <span className="shrink-0 text-fg-2">{r.standing}</span>
   </li>)}</ul>;
@@ -177,8 +204,13 @@ export interface HistoryRank { metric: ArmoryMetric; rank: number; of: number; t
  * Blizzard's play history: the six ranked counts first, each with its rank when the character has one, then every
  * category as Blizzard groups it. A count the read did not bring says "Not read", never 0.
  */
-export function PlayHistoryView({ history, ranks = [] }: { history: NonNullable<Details["playHistory"]>; ranks?: readonly HistoryRank[] }) {
+export function PlayHistoryView({ history, ranks = [], source = false }: { history: NonNullable<Details["playHistory"]>; ranks?: readonly HistoryRank[]; source?: boolean }) {
   return <div className="space-y-6">
+    {source && <p data-history-source className="text-sm text-fg-2">
+      From Blizzard&apos;s API play history, read <span className="font-mono tabular-nums">{history.asOf.slice(0, 10)}</span>. Blizzard
+      keeps these counts on its own, so its quests completed can differ from the completed-quest list in the numbers
+      above, and its boss kills are not the kills synced through the Everloot Desktop App.
+    </p>}
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {PLAY_HISTORY_METRICS.map((m) => {
         const value = history.ranked[HISTORY_COUNT[m]];
@@ -198,6 +230,16 @@ export function PlayHistoryView({ history, ranks = [] }: { history: NonNullable<
       </li>)}</ul>
     </div>)}
   </div>;
+}
+
+/**
+ * When Blizzard's play history counts a boss kill, the sentence that says so and when it was read; null otherwise.
+ * Synced kills (Desktop App) and these counts are separate sources, so a "no synced kills" line adds this one.
+ */
+export function blizzardBossKillsLine(c: ArmoryCharacter): string | null {
+  const h = c.details?.playHistory;
+  const kills = h?.groups.some((g) => /boss kills/i.test(g.name) && g.rows.some((r) => r.value > 0));
+  return h && kills ? `Blizzard's API lists boss kills in Play history, read ${h.asOf.slice(0, 10)}.` : null;
 }
 
 /** A read that asked for achievements and found none completed. */
