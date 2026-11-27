@@ -332,3 +332,27 @@ test("Same day and More from list one row per title and day, saying how many pos
     data.entries = [sky, eu, post, build, older, euOnly];
   }
 });
+
+test("Newer and Older step through the list's rows, in the order of the day shown, never to this post's own row", async () => {
+  // The page's card and Newer/Older: [label, address] in the order they show.
+  const steps = (html: string) => [...html.slice(html.indexOf("data-nearby"), html.indexOf("<aside")).matchAll(/<a href="([^"]+)"[^>]*><span class="text-meta text-muted">(Newer|Older)<\/span>/g)].map((m) => [m[2], m[1]]);
+  const reply = (id: string, n: number, at: string, title: string, topicId: number): ChangeEntry => ({ ...kaivax(id, "us", n, at, title, `${title} ${n}.`, "post"), topicId });
+  const PVP = "PvP Faction Balance Updates - November 10";
+  const pvp = [reply("forum:30830227", 1, "2026-11-10T02:05:13.558Z", PVP, 2408781), reply("forum:30830930", 170, "2026-11-10T03:30:00.000Z", PVP, 2408781)];
+  // Posted after PvP's reply, but dated the 9th by its title.
+  const nov9 = { ...kaivax("forum:30831500", "us", 3, "2026-11-10T04:00:00.000Z", "WoW: Forever Hotfixes - November 9, 2026", "Fixed a thing."), topicId: 2402000 };
+  data.entries = [...thread, ...pvp, nov9, older];
+  try {
+    // November 11's second reply: its twin under the same title and day is its own row, not Older.
+    expect(steps(await page("us-30863849-wow-forever-hotfixes-november-11-2026"))).toEqual([
+      ["Newer", `/changes/${NOV12_PAGE}`],
+      ["Older", "/changes/us-30830930-pvp-faction-balance-updates-november-10"],
+    ]);
+    expect(steps(await page("us-30830930-pvp-faction-balance-updates-november-10"))).toEqual([
+      ["Newer", "/changes/us-30863849-wow-forever-hotfixes-november-11-2026"],
+      ["Older", "/changes/us-30831500-wow-forever-hotfixes-november-9-2026"],
+    ]);
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});

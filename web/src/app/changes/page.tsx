@@ -5,7 +5,7 @@ import AdSlot from "@/components/AdSlot";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl, stripBelow } from "@/components/ui";
-import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, foldTitleDay, forumRegions, loadTimeline, parseFilter, postDay, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter, type TitleDayRow } from "@/lib/changes";
+import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, foldTitleDay, forumRegions, loadTimeline, newestFirst, parseFilter, postDay, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter, type TitleDayRow } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { changesJsonLd } from "@/lib/jsonld";
@@ -88,13 +88,13 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     && (!since || e.at >= since));
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (e: ChangeEntry) => sort.key === "type" ? TYPE_LABEL[e.type] : sort.key === "title" ? e.title.toLowerCase()
-    : sort.key === "author" ? e.author?.toLowerCase() ?? null : sort.key === "source" ? SOURCE_LABEL(e) || null : e.at;
+    : sort.key === "author" ? e.author?.toLowerCase() ?? null : sort.key === "source" ? SOURCE_LABEL(e) || null : `${postDay(e)} ${e.at}`;
   const dir = sort.desc ? -1 : 1;
-  // Empty keys last either way; ties newest first.
+  // Empty keys last either way; ties newest first. Dates go by the day a card shows (postDay), then posting time.
   const rows = [...matched].sort((a, b) => {
     const ka = key(a), kb = key(b);
     const c = ka === kb ? 0 : ka === null ? 1 : kb === null ? -1 : ka.localeCompare(kb) * dir;
-    return c || b.at.localeCompare(a.at) || a.id.localeCompare(b.id);
+    return c || newestFirst(a, b);
   });
   // One card per title and day: the replies Blizzard posts in a thread that day all carry its title.
   const folded = foldTitleDay(rows);

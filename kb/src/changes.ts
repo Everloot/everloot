@@ -193,7 +193,7 @@ export function buildTimeline(posts: unknown[], builds: unknown[]): ChangeEntry[
       title: `${GAME_LABEL[game]} build ${version}`, url: null, version, diffUrl: safeHttpUrl(raw.diffUrl),
     });
   }
-  return [...fromPosts, ...fromBuilds].sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+  return [...fromPosts, ...fromBuilds].sort(newestFirst);
 }
 
 const DAY_MONTH = /\b(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December)\b/g;
@@ -258,6 +258,14 @@ function titledDay(title: string, at: string): string | null {
  */
 export function postDay(e: Pick<ChangeEntry, "type" | "title" | "at">): string {
   return (e.type !== "build" && titledDay(e.title, e.at)) || e.at.slice(0, 10);
+}
+
+/**
+ * The timeline's order: the newest day a list shows (postDay) first, then the newest posting time, then by id. Sorting
+ * by posting time alone put "Hotfixes - November 11", posted after midnight UTC, above the 12th's posts.
+ */
+export function newestFirst(a: Pick<ChangeEntry, "type" | "title" | "at" | "id">, b: Pick<ChangeEntry, "type" | "title" | "at" | "id">): number {
+  return postDay(b).localeCompare(postDay(a)) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id);
 }
 
 /** A title with the day it names taken out: "PvP Updates - November 10" and "PvP Updates - 11 November" read the same. */
@@ -328,7 +336,7 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
     else out.push(e);
   }
   for (const [primary, ...copies] of all) out.push(copies.length ? { ...primary, copies } : primary);
-  return out.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+  return out.sort(newestFirst);
 }
 
 /** The forums an announcement was posted on, US first; empty for Bluesky and builds. */
@@ -458,7 +466,9 @@ export function renderFeed(entries: ChangeEntry[], site: { baseUrl: string; now:
       "    </item>",
     ].join("\n");
   });
-  return renderRssChannel(items, { baseUrl: base, now: entries[0] ? new Date(entries[0].at) : site.now });
+  // Ordered by the day shown, the first entry is not always the newest posted.
+  const newest = entries.reduce<string | null>((max, e) => (max === null || e.at > max ? e.at : max), null);
+  return renderRssChannel(items, { baseUrl: base, now: newest ? new Date(newest) : site.now });
 }
 
 /** Shared RSS envelope for the game timeline and the public database facts. Item XML is escaped by the caller. */

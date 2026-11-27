@@ -401,6 +401,23 @@ test("postDay: the day a title names when it is within a day of the post, else t
   expect(rows.map((r) => postDay(r.entry))).toEqual(["2026-11-12", "2026-11-11"]);
 });
 
+test("the timeline is newest day first by the day each entry shows (postDay), then by posting time", () => {
+  // November 11's hotfix reply went up at 00:48 UTC on the 12th; the screenshot thread at 00:30 is the 12th's.
+  const hotfix = stored("forum:30863849", "us", 2403040, "2026-11-12T00:48:47.076Z", "WoW: Forever Hotfixes - November 11, 2026", { kind: "hotfix", excerpt: "Druid Feral." });
+  const shots = stored("forum:30863700", "us", 2403500, "2026-11-12T00:30:00.000Z", "Share your screenshots", { excerpt: "Post them here." });
+  const evening = stored("forum:30860000", "us", 2403400, "2026-11-11T20:00:00.000Z", "Realm restarts", { excerpt: "Realms restart." });
+  const build = { key: "b", product: "wowf", buildId: 1, version: "1.60.1.70888", firstSeen: "2026-11-11T22:00:00Z" };
+  const want = ["Share your screenshots", "WoW: Forever Hotfixes - November 11, 2026", "WoW: Forever build 1.60.1.70888", "Realm restarts"];
+  const timeline = buildTimeline([evening, hotfix, shots], [build]);
+  expect(timeline.map((e) => e.title)).toEqual(want);
+  const grouped = groupAnnouncements(timeline);
+  expect(grouped.map((e) => e.title)).toEqual(want);
+  // The feed keeps the order; its build date is still the newest posting time.
+  const xml = renderFeed(grouped, { baseUrl: "https://everloot.app", now: seen });
+  expect(xml).toContain("<lastBuildDate>Thu, 12 Nov 2026 00:48:47 GMT</lastBuildDate>");
+  expect([...xml.matchAll(/<item>\s*<title>[^:]+: ([^<]+)<\/title>/g)].map((m) => m[1])).toEqual(want);
+});
+
 test("groupAnnouncements: a news article with no forum twin stays its own entry", () => {
   const news = hotfixes.filter((p) => p.source === "news").map((p) => ({ ...p, title: "Don't Miss the WoW: Forever Comic" }));
   expect(groupAnnouncements(buildTimeline([...hotfixes.slice(0, 3), ...news], [])).some((e) => e.id === "news:24315281")).toBe(true);
