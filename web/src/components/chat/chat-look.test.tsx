@@ -25,7 +25,10 @@ test("no starting question asks where an item drops, which the public data canno
     expect(text).not.toMatch(/drops?/i);
     expect(itemQuery(text), text).toBeNull();
   }
-  expect(WELCOME.map((s) => s.text)).toContain("Where is Hogger?");
+  // Everloot holds no agreed position for Hogger (npc_page 448, 11/27), so "Where is Hogger?" answered with lore only;
+  // the Deadmines' entrance zone is in the game files, with a link to the instance page.
+  expect(WELCOME.map((s) => s.text)).toContain("Where is the Deadmines entrance?");
+  expect(WELCOME.map((s) => s.text)).not.toContain("Where is Hogger?");
 });
 
 test("a card shows the game icon when the page has one, and the drawn glyph without it", () => {

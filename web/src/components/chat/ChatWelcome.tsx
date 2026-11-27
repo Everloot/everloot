@@ -9,7 +9,7 @@ type Glyph = "place" | "class" | "changes" | "market";
 
 /** The four starting questions, each with the game icon (when the page has one) or a drawn glyph. */
 export const WELCOME: { text: string; glyph: Glyph; icon?: keyof ChatIcons }[] = [
-  { text: "Where is Hogger?", glyph: "place" },
+  { text: "Where is the Deadmines entrance?", glyph: "place" },
   { text: "Plan a level 40 Fury warrior", glyph: "class", icon: "warrior" },
   { text: "What changed in the last build?", glyph: "changes" },
   { text: "What sells best on my realm?", glyph: "market" },

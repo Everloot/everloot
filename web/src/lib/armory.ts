@@ -189,7 +189,11 @@ const CLASS_BY_ID: Record<number, string> = {
 };
 const RACE_BY_ID: Record<number, string> = {
   1: "Human", 2: "Orc", 3: "Dwarf", 4: "Night Elf", 5: "Undead", 6: "Tauren", 7: "Gnome", 8: "Troll",
+  // Blizzard's playable-race index for Forever (static-forever-us, read 2026-11-27) and the client's ChrRaces agree.
+  95: "High Order Skyborne", 96: "Windshaper Skyborne",
 };
+/** The race names the armory stores, as Blizzard's API spells them: Skyborne is one race per side. */
+export const ARMORY_RACES: readonly string[] = Object.values(RACE_BY_ID);
 export const UNKNOWN = "Unknown";
 export const classTokenOfId = (id: number | null | undefined): string | null => (id == null ? null : CLASS_BY_ID[id] ?? null);
 export const raceOfId = (id: number | null | undefined): string => (id == null ? UNKNOWN : RACE_BY_ID[id] ?? UNKNOWN);
@@ -229,6 +233,29 @@ export function rankText(r: { rank: number; of: number; tied?: number | null }):
   // Everyone above, plus the character and everyone on its value.
   const percent = ((r.rank + r.tied) / r.of) * 100;
   return r.of >= RANK_TOP_SHARE_MIN_BOARD && percent <= RANK_TOP_SHARE_MAX_PERCENT ? `${base(tie)} · ${topShare(percent)}` : base(tie);
+}
+
+/** A count of 0 shares the last place with everyone else at 0, so it shows without a rank. */
+export const rankable = (value: number | null | undefined): boolean => typeof value === "number" && value > 0;
+
+/** The character's own value on each board, by the database's metric key; undefined when it was not read. */
+export function boardValue(
+  c: { itemLevel: number | null; gearScore: number | null; honorableKills: number | null; details?: { playHistory?: { ranked: Partial<Record<string, number>> } } },
+  key: string,
+): number | null | undefined {
+  const ranked = c.details?.playHistory?.ranked;
+  switch (key) {
+    case "item_level": return c.itemLevel;
+    case "gear_score": return c.gearScore;
+    case "honorable_kills": return c.honorableKills;
+    case "quests_completed": return ranked?.quests;
+    case "creatures_killed": return ranked?.creatures;
+    case "fish_caught": return ranked?.fish;
+    case "flight_paths": return ranked?.flights;
+    case "dungeons_entered": return ranked?.dungeons;
+    case "total_deaths": return ranked?.deaths;
+    default: return undefined;
+  }
 }
 
 /** "Read 2026-11-09 14:05 UTC": when the crawler last read the row, or that it is unrecorded. */

@@ -242,6 +242,17 @@ test("merging adds new posts, keeps first-seen and a maintainer's summary, and s
   expect(kept.firstSeen).toBe(now.toISOString());
 });
 
+test("merging keeps the title a forum post had when it was captured, though the thread was renamed since", () => {
+  const first = mergePosts(emptyStore(), forumSample().map((p) => ({ ...p, title: "WoW: Forever Hotfixes - November 16, 2026" })));
+  const renamed = forumSample().map((p) => ({ ...p, title: "WoW: Forever Hotfixes - November 25, 2026", excerpt: "Fixed the camping bug." }));
+  const again = mergePosts(first.store, renamed);
+  expect(again.store.posts.map((p) => p.title)).toEqual(["WoW: Forever Hotfixes - November 16, 2026", "WoW: Forever Hotfixes - November 16, 2026"]);
+  expect(again.store.posts[0].excerpt).toBe("Fixed the camping bug.");
+  // A hotfix reply first captured after the rename is named for the hotfixes it opens with.
+  const late = mergePosts(emptyStore(), forumSample().map((p) => ({ ...p, kind: "hotfix" as const, title: "WoW: Forever Hotfixes - November 25, 2026", excerpt: "November 20, 2026 Classes Rogue fixes." })));
+  expect(late.store.posts.map((p) => p.title)).toEqual(["WoW: Forever Hotfixes - November 20, 2026", "WoW: Forever Hotfixes - November 20, 2026"]);
+});
+
 test("robots: the forum's rules block category and topic .rss, search and group pages, and allow the JSON we read", () => {
   expect(robotsAllows(robots, "/en/wow/about.json")).toBe(true);
   expect(robotsAllows(robots, "/en/wow/c/wow-forever/346/l/latest.json?per_page=100&page=2")).toBe(true);
