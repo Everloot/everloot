@@ -20,18 +20,18 @@ export interface EntryProps {
   href?: string;
   /** Heading level of the title: h2 when the entries are the page's sections, h3 under a SectionHeading. */
   as?: "h2" | "h3" | "p";
-  /** The small mono line above the title: type, source, date. */
+  /** The small line above the title: type, source, date. Sans with tabular figures, since it holds words. */
   meta?: ReactNode;
   /** Links or buttons at the foot of the entry. */
   actions?: ReactNode;
   children?: ReactNode;
 }
 
-/** One entry: a mono meta line, the title, a few lines of text, then its actions. */
+/** One entry: a meta line, the title, a few lines of text, then its actions. */
 export function Entry({ title, href, as: Tag = "h2", meta, actions, children }: EntryProps) {
   return (
     <li data-entry className="min-w-0 space-y-2 p-4 sm:p-6">
-      {meta && <p className="font-mono text-xs text-muted">{meta}</p>}
+      {meta && <p className="text-xs tabular-nums text-muted">{meta}</p>}
       <Tag className="text-lg font-semibold leading-snug text-fg [overflow-wrap:anywhere]">
         {href ? <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{title}</Link> : title}
       </Tag>

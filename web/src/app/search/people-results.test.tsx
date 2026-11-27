@@ -58,6 +58,18 @@ test("more than the group lists links to the full search on its own page, and a 
   expect(container.querySelector("#results-guild")).toBeNull();
 });
 
+test("each group opens on a visible heading with its count, like the database groups above it", async () => {
+  reply.body = { characters: { results: [character("Thrallina")], total: 1 } };
+  await show("thrall");
+  const h2 = container.querySelector("#results-character-heading")!;
+  expect(h2.tagName).toBe("H2");
+  expect(h2.className).not.toContain("sr-only");
+  expect(h2.className).toContain("text-h2-sm");
+  expect(h2.textContent).toBe("Characters (1)");
+  // The table's own headers name the columns, as the other groups' do.
+  expect([...container.querySelectorAll("#results-character th")].map((th) => th.textContent)).toEqual(["Name", "About"]);
+});
+
 test("no rows, or a failed request, leaves the fallback", async () => {
   await show("zzz");
   expect(container.textContent).toBe("Nothing matches that.");

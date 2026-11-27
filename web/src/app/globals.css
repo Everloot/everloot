@@ -117,6 +117,12 @@ body:has([data-banner]) {
   padding-top: 1rem;
 }
 
+/* Nothing is drawn above a page's title, so it never takes a stack's gap: Tailwind 3's space-y-* gives every child
+   after the first a top margin, and a JSON-LD <script> or an icon <style> before the header counts as a child. */
+#main-content [data-page-header] {
+  margin-top: 0;
+}
+
 /* Controls on data pages (filter buttons, pager, tabs): 32 px tall with 13 px text, 40 px on phones.
    Put `.ctl` on the control; inputs keep 16 px text on phones so iOS does not zoom. */
 .ctl,

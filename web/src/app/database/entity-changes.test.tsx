@@ -33,3 +33,9 @@ test("reads the committed build records: Vampiric Embrace changed in 71037, and 
   // Booming Voice changed only in 70790, before launch, so it is a spoiler and gives nothing.
   expect(changesFor({ kind: "spell", id: 12321 })).toEqual([]);
 });
+
+test("opens on the data-section heading of an entity page, not the 20 px hub one", () => {
+  const html = renderToStaticMarkup(<EntityChanges changes={changes} name="Mutilate" />);
+  expect(html).toMatch(/<h2 id="entity-changes" class="[^"]*text-h2-sm[^"]*">Changes across builds<\/h2>/);
+  expect(html).not.toContain("text-xl");
+});

@@ -30,7 +30,7 @@ export default function EntityChanges({ changes, name }: { changes: EntityBuildC
   if (!changes.length) return null;
   return (
     <section aria-labelledby="entity-changes">
-      <SectionHeading id="entity-changes" note="From the game files of each build: found in game files, unconfirmed.">Changes across builds</SectionHeading>
+      <SectionHeading id="entity-changes" size="data" note="From the game files of each build: found in game files, unconfirmed.">Changes across builds</SectionHeading>
       <ol className="space-y-4" aria-label={`${name}: changes across builds`}>
         {changes.map((b) => (
           <li key={b.id}>

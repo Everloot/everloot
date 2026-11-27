@@ -17,6 +17,7 @@ import Card from "./Card";
 import Container from "./Container";
 import DataTable, { filledColumns, type Column, type SparseColumn } from "./DataTable";
 import EmptyState, { installsNeeded } from "./EmptyState";
+import { Entry } from "./EntryList";
 import Facts from "./Facts";
 import Pager, { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
@@ -100,6 +101,31 @@ describe("SectionHeading", () => {
     const h3 = render(<SectionHeading as="h3">Used in</SectionHeading>);
     expect(h2).toMatch(/<h2 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h2>/);
     expect(h3).toMatch(/<h3 class="scroll-mt-24 text-xl font-semibold tracking-tight text-fg">Used in<\/h3>/);
+  });
+
+  test("size data is the data-section step of a database or entity page, 8 px over its content", () => {
+    const html = render(<SectionHeading size="data" id="lore" note="From the archive">Lore</SectionHeading>);
+    expect(html).toMatch(/^<div class="mb-2">/);
+    expect(html).toMatch(/<h2 id="lore" class="scroll-mt-24 text-h2-sm font-semibold text-fg sm:text-h2">Lore<\/h2>/);
+    expect(html).not.toContain("text-xl");
+    expect(html).toMatch(/<p class="mt-1 text-meta text-muted">From the archive<\/p>/);
+  });
+});
+
+describe("Page header spacing", () => {
+  test("the title never takes a stack's gap from an invisible script or style before it", () => {
+    // Tailwind 3's space-y-* puts a top margin on every child after the first, and a page's JSON-LD <script> or
+    // icon <style> counts as one, which pushed /players' title 24 px lower than every other page's.
+    const css = readFileSync(fileURLToPath(new URL("../../app/globals.css", import.meta.url)), "utf8");
+    expect(css).toMatch(/#main-content \[data-page-header\] \{\s*margin-top: 0;\s*\}/);
+  });
+});
+
+describe("Entry", () => {
+  test("the meta line is sans with tabular figures: it holds words as well as dates", () => {
+    const html = render(<Entry title="Questie" meta="Lua · MIT · 2026-11-10" />);
+    expect(html).toMatch(/<p class="text-xs tabular-nums text-muted">Lua · MIT · 2026-11-10<\/p>/);
+    expect(html).not.toContain("font-mono");
   });
 });
 
