@@ -110,7 +110,8 @@ export default async function FactionPage(props: Props) {
         </TooltipFrame>
       )}
       facts={entry && [
-        ...(files ? [{ label: "Header", value: files.header ? "Yes" : "No" }] : []),
+        // Only a header says so: "Header: No" tells a reader nothing.
+        ...(files?.header ? [{ label: "Header", value: "Yes" }] : []),
         ...(parent ? [{ label: "Parent faction", value: parent }] : []),
         ...(entry.major ? [{ label: "Kind", value: "Major faction" }] : []),
         ...(children.length ? [{ label: "Sub-factions", value: children.length, numeric: true }] : []),

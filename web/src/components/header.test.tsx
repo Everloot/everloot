@@ -90,6 +90,10 @@ test("the phone menu lists the bar's menus in order and keeps Chat, Docs and Abo
 test("the item holding the page is marked, by its longest matching link", () => {
   expect(currentItem("/database/items/2589")).toBe("Database");
   expect(currentItem("/map/kalimdor")).toBe("Database");
+  // Guides also links the dungeon list, but a dungeon page is a database page, as its boss pages are.
+  expect(currentItem("/database/instances")).toBe("Database");
+  expect(currentItem("/database/instances/36-deadmines")).toBe("Database");
+  expect(currentItem("/database/bosses/2747-edwin-vancleef")).toBe("Database");
   expect(currentItem("/tools")).toBe("Tools");
   expect(currentItem("/tools/talents/mage")).toBe("Tools");
   expect(currentItem("/tools/gold-ledger")).toBe("Profile");

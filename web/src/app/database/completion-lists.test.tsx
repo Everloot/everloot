@@ -214,6 +214,34 @@ test("the achievement list shows what three reporters agree on and hides the res
   for (const col of ["Name", "Category", "Points", "Criteria", "ID"]) expect(out).toContain(`>${col}`);
 });
 
+test("the faction list leaves out the Header column when no row has one", async () => {
+  game.factions = [{ id: 72, name: "Stormwind", shown: true }];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const out = await html(FactionList(search()));
+  expect(out).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Header</);
+  expect(out).toMatch(/<th[^>]*>(?:<[^>]*>)*Name</);
+});
+
+test("the title list leaves out the Kind column when no title says prefix or suffix", async () => {
+  game.titles = [{ id: 7, name: "Champion" }];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  expect(await html(TitleList(search()))).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Kind</);
+  game.titles = [{ id: 7, name: "%s, Champion" }];
+  expect(await html(TitleList(search()))).toMatch(/<th[^>]*>(?:<[^>]*>)*Kind</);
+});
+
+test("an achievement's criteria table leaves out Required when no criterion needs more than one", async () => {
+  game.achievements = {
+    "50": { title: "Loremaster", points: 10, criteria: [{ text: "Eastern Kingdoms" }, { text: "Kalimdor" }] },
+    "60": { title: "Skilled", points: 10, criteria: [{ text: "First Aid", amount: 75 }, { text: "Cooking" }] },
+  };
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const none = await html(AchievementPage(page("50-loremaster")));
+  expect(none).toContain("Eastern Kingdoms");
+  expect(none).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Required</);
+  expect(await html(AchievementPage(page("60-skilled")))).toMatch(/<th[^>]*>(?:<[^>]*>)*Required</);
+});
+
 test("the faction list shows the standing header, and a faction with no header still lists", async () => {
   const out = await html(FactionList(search()));
   expect(linked(out, "factions")).toEqual(["69-darnassus", "76-orgrimmar", "529-argent-dawn"]);
@@ -280,7 +308,8 @@ test("a bare id or a wrong slug redirects to the canonical address", async () =>
 test("a faction page says whether it is a header, links the files' parent, and shows its id once", async () => {
   game.factions = [{ id: 469, name: "Alliance", shown: true }, { id: 69, name: "Darnassus", shown: true, parentId: 469 }, { id: 529, name: "Argent Dawn", shown: true }];
   const out = await html(FactionPage(page("69-darnassus")));
-  expect(out).toMatch(/>Header<\/dt><dd[^>]*>No<\/dd>/);
+  // "Header: No" says nothing a reader needs: the fact shows only for a header.
+  expect(out).not.toMatch(/>Header<\/dt>/);
   expect(out).toMatch(/>Parent faction<\/dt><dd[^>]*><a href="\/database\/factions\/469-alliance"[^>]*>Alliance<\/a><\/dd>/);
   expect(out).not.toContain("Not reported");
   expect(out).not.toMatch(/>ID<\/dt>/);

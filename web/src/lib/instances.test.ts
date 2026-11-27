@@ -77,15 +77,15 @@ describe("instance rows", () => {
     expect(bossLine(stockade.bosses[1]!)).toBe("Hogger (4 kills) from 3 installs, last seen 2026-10-21");
   });
 
-  test("the files' encounters merge player-first: reported bosses lead, a nameless one borrows the files' name, the rest follow unconfirmed", () => {
+  test("the files' encounters merge in the files' order: a reported boss takes its files place, a nameless one borrows the files' name, the rest stay unconfirmed", () => {
     const files = { "34": [{ id: 3, name: "Synthetic Jailer" }, { id: 1, name: "Files Warden" }, { id: 2, name: "Files Hogger" }] };
     const stockade = rowsWith(seen, data, files).get(34)!;
     expect(stockade.encounters).toEqual(files["34"]);
     const unnamed = { ...stockade, bosses: stockade.bosses.map((b) => (b.encounterId === 2 ? { ...b, name: null } : b)) };
     expect(bossRows(unnamed).map((r) => [r.encounterId, r.name, r.filesName, r.boss !== null])).toEqual([
+      [3, "Synthetic Jailer", true, false],
       [1, "Warden", false, true],
       [2, "Files Hogger", true, true],
-      [3, "Synthetic Jailer", true, false],
     ]);
     // An instance the files list bosses for but nobody has entered has no row: the list never adds one.
     expect(rowsWith(seen, data, { "777": [{ id: 9, name: "Nobody's Boss" }] }).has(777)).toBe(false);
@@ -102,9 +102,10 @@ describe("instance rows", () => {
       kill("install-c", 5, "Nobody", "2026-10-20T11:00:00Z"),
     ] } };
     const stockade = rowsWith(short, data, files).get(34)!;
+    // Hogger (2) is confirmed but in no files list: it follows the files' rows.
     expect(stockade.reportedBosses).toEqual(new Map([[3, 2], [5, 1]]));
     expect(bossRows(stockade).map((r) => [r.encounterId, r.boss !== null, r.reported])).toEqual([
-      [1, true, 0], [2, true, 0], [3, false, 2], [4, false, 0],
+      [1, true, 0], [3, false, 2], [4, false, 0], [2, true, 0],
     ]);
     // Storage down or nothing reported: every files row is at 0.
     expect(bossRows({ bosses: [], encounters: files["34"], reportedBosses: new Map() }).map((r) => r.reported)).toEqual([0, 0, 0]);

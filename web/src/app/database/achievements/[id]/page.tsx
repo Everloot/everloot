@@ -5,7 +5,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import EntityLink from "@/components/EntityLink";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import ItemTip from "@/components/game/ItemTip";
-import { Badge, DataTable, TooltipFrame } from "@/components/ui";
+import { Badge, DataTable, filledColumns, TooltipFrame } from "@/components/ui";
 import { qualityNamed } from "@/components/ui/quality";
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, isDevelopmentAchievement, loadCatalog, NO_POINTS, parseSegment, pointsText, TRACKER_NEEDS } from "@/lib/completion-lists";
@@ -147,13 +147,14 @@ export default async function AchievementPage(props: Props) {
           <DataTable
             dense
             caption={`Criteria of ${title}${fromReports ? ", as three installs reported them" : ""}`}
-            columns={[
+            // Required is left out when no criterion needs more than one.
+            columns={filledColumns<Criterion & { i: number }>([
               {
                 key: "text", header: "Criterion",
                 cell: (c: Criterion) => (fromReports ? c.text : <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{c.text}</span>),
               },
-              { key: "required", header: "Required", numeric: true, cell: (c: Criterion) => (c.required > 1 ? c.required : null) },
-            ]}
+              { key: "required", header: "Required", numeric: true, blank: (c) => !(c.required > 1), cell: (c: Criterion) => (c.required > 1 ? c.required : null) },
+            ], fileCriteria.map((c, i) => ({ ...c, i })))}
             rows={fileCriteria.map((c, i) => ({ ...c, i }))}
             rowKey={(c) => String(c.i)}
           />

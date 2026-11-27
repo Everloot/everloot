@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { FactionEntry } from "@kb/completion";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl, stripBelow } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, filledColumns, ResultStrip, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import Link from "@/components/Link";
 import { factionChildren, factionHref, factionInFiles, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
@@ -58,9 +58,10 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
 
   const dash = <span className="text-muted">—</span>;
   const listed = new Set(all.map((x) => x.factionId));
-  const columns: Column<Listed<FactionEntry>>[] = [
+  // A column with nothing in any row of the list (no header reported yet) is left out, not a column of dashes.
+  const columns: SparseColumn<Listed<FactionEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={factionHref(x.factionId, x.name)} tone={sideTone(x.header)}>{x.name}</NameCell> },
-    { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
+    { key: "header", header: "Header", sortable: true, blank: (x) => !x.header, cell: (x) => x.header ?? dash },
     // The parent the game files name, linked when it has a page; the count of the factions they list under this one.
     { key: "parent", header: "Parent", cell: (x) => {
       const p = factionInFiles(x.factionId)?.parent;
@@ -108,7 +109,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
           <DataTable
             dense
             caption={listCaption("factions", rows, confirmations)}
-            columns={columns}
+            columns={filledColumns(columns, all)}
             rows={shown}
             rowKey={(x) => String(x.factionId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}

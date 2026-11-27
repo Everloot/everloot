@@ -95,10 +95,12 @@ export function navItems({ guilds = false, players = false, savedBuilds = false,
 const isCurrent = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 /** Where the page sits in the bar: the longest matching link and its item, so /tools/gold-ledger is Profile's Gold
- *  ledger, not the Tools menu's "All tools". Every switch counts as on, so a page behind one still marks its item. */
+ *  ledger, not the Tools menu's "All tools". Every switch counts as on, so a page behind one still marks its item.
+ *  A /database page is Database's even where another menu also links it (Guides' "Dungeons and raids"). */
 function currentPlace(path: string): { label: string; href: string } | undefined {
   let best: { label: string; href: string } | undefined;
   for (const item of navItems({ guilds: true, players: true, profiles: true, savedBuilds: true, reviewedGuides: true })) {
+    if (item.label !== "Database" && isCurrent(path, "/database")) continue;
     for (const href of item.links ? item.links.map((l) => l.href) : [item.href]) {
       if (isCurrent(path, href) && (!best || href.length > best.href.length)) best = { label: item.label, href };
     }

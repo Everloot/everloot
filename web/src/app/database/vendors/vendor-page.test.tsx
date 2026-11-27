@@ -69,6 +69,21 @@ test("Sells prices leave out zero coins as the game does, and on a phone the pri
   expect(sells).toMatch(/<th scope="col"[^>]*hidden sm:table-cell[^>]*>(?:<[^>]*>)*Reported/);
 });
 
+test("an item agreed at two prices is one row at the higher price, with the other price players saw as a note", async () => {
+  // SYNTHETIC, in the shape of Barkeep Hann's Melon Juice: 3 installs at 5s, 3 at 4s 50c.
+  facts.vendors = [
+    ...installs.map((installId) => ({ installId, vendorNpcId: 1125, itemId: 117, priceCopper: 500, capturedAt: at })),
+    ...["four", "five", "six"].map((installId) => ({ installId, vendorNpcId: 1125, itemId: 117, priceCopper: 450, capturedAt: at })),
+  ];
+  const out = await html();
+  const sells = panel(out, "goods");
+  const rows = sells.split("<tr").filter((r) => r.includes('href="/database/items/117"'));
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toContain("5 silver</span>");
+  expect(rows[0]).toMatch(/data-other-prices[^>]*>players also saw (?:<!-- -->)?(?:<[^>]*>)*.*4 silver 50 copper.*\(likely a reputation discount\)/);
+  expect(out).toMatch(/role="tab"[^>]*>Sells<span[^>]*> \(1\)<\/span>/);
+});
+
 test("storage down: no reaction, zone or counts stated", async () => {
   facts.unreachable = true;
   const out = await html();

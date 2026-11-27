@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "@kb/completion";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
+import { Container, DataTable, DataTitle, FilterBar, filledColumns, ResultStrip, type SparseColumn, stripBelow } from "@/components/ui";
 import { loadCatalog, titleDisplayName, titleFilesName, titleHref, titlePlacement, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
@@ -39,9 +39,11 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
-  const columns: Column<Listed<TitleEntry>>[] = [
+  const placement = (x: Listed<TitleEntry>) => titlePlacement(x.name.includes("%s") ? x.name : titleFilesName(x.titleId) ?? "");
+  // A column with nothing in any row of the list (no placement known) is left out, not a column of dashes.
+  const columns: SparseColumn<Listed<TitleEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={titleHref(x.titleId, x.name)}>{titleDisplayName(x.name)}</NameCell> },
-    { key: "kind", header: "Kind", cell: (x) => { const p = titlePlacement(x.name.includes("%s") ? x.name : titleFilesName(x.titleId) ?? ""); return p === "prefix" ? "Prefix" : p === "suffix" ? "Suffix" : <span className="text-muted">—</span>; } },
+    { key: "kind", header: "Kind", blank: (x) => placement(x) === null, cell: (x) => { const p = placement(x); return p === "prefix" ? "Prefix" : p === "suffix" ? "Suffix" : <span className="text-muted">—</span>; } },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];
@@ -69,7 +71,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
           <DataTable
             dense
             caption={listCaption("titles", rows, confirmations)}
-            columns={columns}
+            columns={filledColumns(columns, all)}
             rows={shown}
             rowKey={(x) => String(x.titleId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}

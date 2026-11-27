@@ -229,10 +229,12 @@ export default async function InstancePage(props: Props) {
     { label: "Level", value: levelLabel(row.level) ?? <span className="text-muted">–</span> },
     ...(players ? [{ label: "Players", value: <>{players}{filesNote("in the files, by difficulty")}</>, numeric: true }] : []),
     ...(entrance ? [{ label: "Entrance", value: <>{placeCell(entrance)}{!row.confirmed.length && filesNote("in the files")}</> }] : []),
-    { label: "Difficulty", value: <>
-      {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
-      {row.difficulties.length > 0 && filesNote(`in the files, ${difficultyList(row.difficulties)}`)}
-    </> },
+    // The difficulty 3 installs agree on, with the files' list beside it; with no agreement, the files' own names stand
+    // as the value, labelled as theirs, rather than an unknown marker beside them.
+    { label: "Difficulty", value: row.difficulty !== null
+      ? <>{difficultyLabel(row.difficulty)}{row.difficulties.length > 0 && filesNote(`in the files, ${difficultyList(row.difficulties)}`)}</>
+      : row.difficulties.length > 0 ? <>{difficultyList(row.difficulties)}{filesNote("from the game files")}</>
+      : PLACEHOLDER },
     { label: "Bosses reported", value: <>
       {unreachable ? PLACEHOLDER : row.bosses.length}
       {row.encounters.length > 0 && filesNote(`in the files, ${row.encounters.length}`)}
@@ -271,13 +273,18 @@ export default async function InstancePage(props: Props) {
               boss={(id) => { const b = lootBosses.find((x) => x.encounterId === id)!; return <Link href={b.href} className={link}>{b.name}</Link>; }}
               pages={{ page: dropPage, href: (page) => `${listHref(canonical, [["drops", page === 1 ? undefined : String(page)]])}#loot` }}
             />
-            <ul className="space-y-1 text-meta">
-              {lootBosses.map((b) => (
+            {/* The bosses with no creature tied yet share one line, rather than the same sentence once per boss. */}
+            {lootBosses.some((b) => b.npcIds.length === 0) && (
+              <p data-boss-loot-pending className="text-meta text-fg-2">
+                {"Not reported yet: "}
+                {lootBosses.filter((b) => b.npcIds.length === 0).map((b, i) => <span key={b.encounterId}>{i > 0 && ", "}<Link href={b.href} className={link}>{b.name}</Link></span>)}
+                {". Boss loot shows once 3 installs report which creature dropped it."}
+              </p>
+            )}
+            {lootBosses.some((b) => b.npcIds.length > 0) && <ul className="space-y-1 text-meta">
+              {lootBosses.filter((b) => b.npcIds.length > 0).map((b) => (
                 <li key={b.encounterId} data-boss-loot={b.encounterId}>
                   <Link href={b.href} className={`${link} font-semibold`}>{b.name}</Link>
-                  {b.npcIds.length === 0 && (
-                    <span className="ml-2 text-fg-2">Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.</span>
-                  )}
                   {b.npcIds.map((id) => {
                     const table = lootTables.get(id)!;
                     return (
@@ -292,7 +299,7 @@ export default async function InstancePage(props: Props) {
                   })}
                 </li>
               ))}
-            </ul>
+            </ul>}
           </div>
         ),
     },

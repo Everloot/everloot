@@ -209,15 +209,17 @@ test("a boss whose creature one install looted shows the reported rate; one nobo
   }
 });
 
-test("the loot section lists every boss and says each one with no creature is not reported yet, and that storage is down when it is", async () => {
+test("the loot section names every boss with no creature yet in one line, not once per boss, and says storage is down when it is", async () => {
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517).slice(0, 1) } };
   state.loot = looted(11517, INSTALLS, 2);
   try {
     const none = await lootOf("389-ragefire-chasm");
     // The files list four encounters; one install is short of 3, so no creature is tied to any of them.
-    expect(none.match(/data-boss-loot=/g)).toHaveLength(4);
-    expect(text(none).match(/Not reported yet: no creature is tied to this boss\./g)).toHaveLength(4);
-    expect(text(none)).toContain("|Oggleflint|");
+    expect(none.match(/data-boss-loot=/g)).toBeNull();
+    expect(none.match(/data-boss-loot-pending/g)).toHaveLength(1);
+    expect(none.match(/Boss loot shows once 3 installs report which creature dropped it\./g)).toHaveLength(1);
+    expect(none).not.toContain("no creature is tied to this boss");
+    expect(text(none)).toContain("Not reported yet: |Oggleflint|, |Taragaman the Hungerer|");
     expect(none).not.toContain("/database/items/");
     expect(none).not.toContain("/database/npcs/");
   } finally {
@@ -240,6 +242,11 @@ test("the list labels an instance the game files place no entrance for, with the
     expect(row).toMatch(/title="The game files place no entrance for this instance[^"]*"/);
     // A named instance carries no such label.
     expect(html.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"'))).not.toContain("no entrance in the game files");
+    // The note squares the list's count with the hub's "in game files" one: the extra row is the players'.
+    const { instanceRows } = await import("@/lib/instances");
+    const files = instanceRows().size;
+    expect(html).toContain(`data-instance-count-note`);
+    expect(text(html)).toContain(`${files} are placed by the game files; 1 more is known only from what players reported, listed by its id until a name is known.`);
   } finally {
     state.seen = { unreachable: true };
   }
@@ -287,8 +294,9 @@ test("an instance's page lists the quests 3 installs file under its name, with i
     expect(quests).not.toContain("/database/quests/1014");
     // Every boss the files list is in the loot section, none with a creature tied yet.
     const loot = await lootOf("33-shadowfang-keep");
-    expect(loot.match(/data-boss-loot=/g)).toHaveLength(8);
-    expect(text(loot)).toContain("|Archmage Arugal|Not reported yet: no creature is tied to this boss.");
+    expect(loot.match(/data-boss-loot-pending/g)).toHaveLength(1);
+    expect(loot.match(/<a [^>]*href="\/database\/bosses\//g)).toHaveLength(8);
+    expect(text(loot)).toContain("|Archmage Arugal|. Boss loot shows once 3 installs report which creature dropped it.");
   } finally {
     state.seen = { unreachable: true };
     state.quests = [];
@@ -432,6 +440,11 @@ test("an instance's facts give the group size the files give its difficulties an
   const entrance = deadmines.split(">Entrance<")[1]?.split("</dd>")[0] ?? "";
   expect(entrance).toMatch(/href="\/database\/zones\/[^"]+"/);
   expect(entrance).toMatch(/href="\/map\?[^"]+"/);
+  // No difficulty agreed by installs: the files' name is the value, labelled as theirs, not [?] beside it.
+  const difficulty = deadmines.split(">Difficulty<")[1]?.split("</dd>")[0] ?? "";
+  expect(difficulty).toMatch(/<dd[^>]*>Normal<span[^>]*><span data-badge="files"/);
+  expect(difficulty).toMatch(/<\/span>from the game files<\/span>$/);
+  expect(text(deadmines)).not.toMatch(/\|Difficulty\|\[\?\]/);
   // Molten Core's difficulties are for 20 and for 40 players in the files.
   expect(text(await facts("409-molten-core"))).toMatch(/\|Players\|20 or 40\|/);
 });

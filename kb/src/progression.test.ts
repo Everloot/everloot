@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
 import encounters from "../../web/src/data/game-data/client-encounters.json";
+import map from "../../web/src/data/game-data/map.json";
+import { playableEncounters } from "./encounter-set.js";
 import { characterProgression, dungeonProgress, progressionCatalogue, rosterProgression, trackedDungeons, type ProgressionKill } from "./progression.js";
 
 const empty = { entrances: [], encounters: [] };
@@ -30,7 +32,13 @@ test("every client instance but a development leftover, and every unique boss, s
     const ids = rows.filter((r) => r.group === group).map((r) => r.id);
     expect(ids).toEqual([...ids].sort((a, b) => a - b));
   }
-  for (const r of rows) expect(r.bosses.map((b) => b.id)).toEqual([...new Set(encounters.instances[String(r.id) as keyof typeof encounters.instances].map((b) => b.id))]);
+  for (const r of rows) {
+    const files = encounters.instances[String(r.id) as keyof typeof encounters.instances] as { id: number; difficultyId?: number }[];
+    expect(r.bosses.map((b) => b.id)).toEqual([...new Set(playableEncounters(files, map.entrances.find((e) => e.mapId === r.id)?.difficultyIds).map((b) => b.id))]);
+  }
+  // One copy per boss, not one per difficulty: Blackfathom Deeps has 7 bosses, not 21 rows; Sunken Temple 8, not 24.
+  expect(rows.find((r) => r.id === 48)?.bosses).toHaveLength(7);
+  expect(rows.find((r) => r.id === 109)?.bosses).toHaveLength(8);
   expect(rows.find((r) => r.id === 2789)).toMatchObject({ group: "World bosses", unconfirmed: true });
 });
 
