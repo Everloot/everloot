@@ -7,6 +7,11 @@ const store = vi.hoisted(() => ({
   facts: { npcs: [], quests: [], vendors: [], unreachable: false } as Record<string, unknown>,
   npcs: [] as unknown[],
   quests: [] as { giverNpcId: number | null; turnInNpcId: number | null }[],
+  wiki: null as { version: string; names: Map<number | string, { name: string; wikiPage: string }> } | null,
+}));
+vi.mock("@/lib/wiki-entity-names", async (original) => ({
+  ...(await original<typeof import("@/lib/wiki-entity-names")>()),
+  loadWikiEntityNames: async () => store.wiki,
 }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: async () => store.facts,
@@ -37,6 +42,7 @@ beforeEach(() => {
   store.facts = { npcs: [], quests: [], vendors: [], unreachable: false };
   store.npcs = [npc({ npcId: 101, name: "Npc Alpha", level: 12 }), npc({ npcId: 102, name: "Npc Beta", level: 30 })];
   store.quests = [{ giverNpcId: 202, turnInNpcId: null }];
+  store.wiki = null;
 });
 
 test("the list is titled NPCs and links each NPC's page, a quest giver with no agreed facts by its id", async () => {
@@ -90,4 +96,21 @@ test("a rank above normal is a badge and the zone links its page", async () => {
   expect(page).not.toMatch(/data-badge="neutral"[^>]*>Normal</);
   expect(page).toContain(">Normal<");
   expect(page).toContain('<a href="/database/zones/1426-synthetic-hills">Synthetic Hills</a>');
+});
+
+test("an NPC its own page names from the Warcraft Wiki is listed, searched and sorted by that name, as on its page", async () => {
+  // NPC 103: one install's unanimous name matches a wiki NPC name (the NPC page's rule, shownNpcName). NPC 104: a
+  // report the wiki does not know stays "NPC 104", as on its page.
+  store.facts = {
+    npcs: [], quests: [], vendors: [], unreachable: false,
+    agreedNpcs: new Map([[103, { npcId: 103, reportedName: "npc gamma" }], [104, { npcId: 104, reportedName: "npc unknown" }]]),
+  };
+  store.wiki = { version: "1", names: new Map([["npc gamma", { name: "Npc Gamma", wikiPage: "https://warcraft.wiki.gg/wiki/Npc_Gamma" }]]) };
+  store.npcs = [npc({ npcId: 103, drops: 4 }), npc({ npcId: 104, drops: 2 })];
+  const page = await html();
+  expect(page).toMatch(/<a href="\/database\/npcs\/103">Npc Gamma<\/a>(?:<[^>]*>)*\s*\(name from the warcraft wiki\)/);
+  expect(page).toContain('<a href="/database/npcs/104">NPC 104</a>');
+  const found = await html({ q: "gamma" });
+  expect(found).toContain('<a href="/database/npcs/103">Npc Gamma</a>');
+  expect(found).not.toContain('href="/database/npcs/104"');
 });

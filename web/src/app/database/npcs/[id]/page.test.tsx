@@ -2,12 +2,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "@kb/world-pages";
 
-const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn(), sightings: vi.fn(), tips: vi.fn(), loot: vi.fn() }));
+const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn(), renders: vi.fn(), sightings: vi.fn(), tips: vi.fn(), loot: vi.fn(), icons: new Map<number, string>(), names: null as unknown }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: mocks.world, computeRollups: mocks.rollup, loadItemFacts: mocks.items,
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
 }));
-vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: mocks.tips }));
+vi.mock("@/lib/game-assets", () => ({
+  loadSiteAssets: async () => null, loadItemTips: mocks.tips,
+  readItemTips: async (assets: unknown, ids: number[]) => ({ tips: await mocks.tips(assets, ids), icons: mocks.icons, unreachable: false, degraded: false, indexed: true }),
+}));
+// The names the item lists and hover cards read: every id shown, no names file, unless a test hands the page some.
+vi.mock("@/lib/item-view", () => ({
+  loadListNames: async () => mocks.names ?? { agreed: new Map(), matched: null, showsTip: () => true, named: { has: () => false }, degraded: false, unreachable: false },
+}));
 // The real loot table unless a test hands the page one.
 vi.mock("@kb/loot-tables", async (importOriginal) => {
   const real = await importOriginal<typeof import("@kb/loot-tables")>();
@@ -43,6 +50,8 @@ beforeEach(() => {
   mocks.renders.mockResolvedValue(null);
   mocks.tips.mockResolvedValue(new Map());
   mocks.loot.mockReturnValue(undefined);
+  mocks.icons = new Map();
+  mocks.names = null;
   mocks.sightings.mockResolvedValue({ unreachable: false, instances: { entrances: [], encounters: [] } });
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
@@ -335,4 +344,25 @@ test("goods and drops show the item's icon and quality colour, and drops sort by
   expect(byName).toContain('aria-sort="descending"');
   const byRate = panel(await html({ sort: "rate" }), "drops");
   expect(byRate.indexOf(">Linen<")).toBeLessThan(byRate.indexOf(">Apple<"));
+});
+
+test("a drop row shows the name, icon, quality and unconfirmed mark the item's own page and hover card show", async () => {
+  // SYNTHETIC ids. 990001: the files give only an icon (no tooltip, no name). 990002: named only by the names file's game
+  // file name, quality 2. 990003: a tooltip, but no page shows the item (not reported, no name): nothing from the files.
+  const row = (itemId: number) => ({ sourceNpcId: 1125, itemId, withItem: 1, windows: 4, installs: 3, rate: 0.25, first: null, last: null });
+  mocks.loot.mockReturnValue({ npcId: 1125, state: "rated", span: { windows: 4, installs: 3, first: null, last: null }, rows: [990001, 990002, 990003].map(row), missingInstalls: 0 });
+  mocks.rollup.mockResolvedValue({ rates: [990001, 990002, 990003].map((itemId) => ({ itemId, sourceNpcId: 1125, reporters: 1 })), measuredZeros: [], stats: { unreachable: false } });
+  mocks.icons = new Map([[990001, "https://assets.example.test/icons/only.png"]]);
+  mocks.tips.mockImplementation(async (_: unknown, ids: number[]) => new Map(ids.filter((id) => id === 990003).map((id) => [id, { name: "Hidden Blade", quality: "Epic", color: "#fff", icon: "https://assets.example.test/icons/hidden.png", lines: [], partial: false, why: [] }])));
+  mocks.names = {
+    agreed: new Map(), named: { has: () => true }, degraded: false, unreachable: false,
+    matched: { version: "1", wiki: { name: "w", url: "u" }, names: new Map([[990002, { name: "Files Cloak", color: "#1eff00", quality: 2, wikiPage: null, source: "files" }]]) },
+    showsTip: (id: number) => id !== 990003,
+  };
+  const drops = panel(await html(), "drops");
+  expect(drops).toMatch(/<img[^>]*src="https:\/\/assets.example.test\/icons\/only.png"[^>]*\/><a [^>]*href="\/database\/items\/990001">Item 990001</);
+  expect(drops).toMatch(/<a class="[^"]*text-q-uncommon[^"]*" href="\/database\/items\/990002">Files Cloak<\/a>(?:<[^>]*>)*<span data-badge="files"/);
+  expect(drops).toContain(">Item 990003<");
+  expect(drops).not.toContain("Hidden Blade");
+  expect(drops).not.toContain("hidden.png");
 });

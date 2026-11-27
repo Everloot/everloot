@@ -12,6 +12,7 @@ import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadItemLevels, loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
+import { loadItemIcons } from "@/lib/item-icons";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
@@ -174,8 +175,11 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const assets = wide ? wideAssets : shownIds.length ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, shownIds);
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
+  // A named row the files give only an icon for (no tooltip) draws that icon, as its page does, not the question mark.
+  const bare = shownIds.filter((id) => !tips.get(id)?.icon && names.get(id));
+  const iconOnly = assets && bare.length ? await loadItemIcons(assets, bare) : new Map<number, string>();
   // The icon column, with the game's question mark where a row has no icon, only with the asset files.
-  const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
+  const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || iconOnly.has(row[0]) || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
   const here = (over: Partial<CategoryQuery>) => link(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
   const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
 
@@ -202,7 +206,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         return (
           <NameCell
             href={`/database/items/${row[0]}`}
-            icon={unknownIcon && (tip?.icon || unknownIcon)}
+            icon={unknownIcon && (tip?.icon || iconOnly.get(row[0]) || unknownIcon)}
             quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined}
             tone={colour}
             style={name?.color ? { color: name.color } : undefined}

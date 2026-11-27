@@ -15,7 +15,6 @@ import { publicZones, zoneByMapId, zoneHref } from "@/lib/zones";
 import { killZones } from "@/lib/farming";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Badge, DataTable, Tabs, TooltipFrame, type SortDirection } from "@/components/ui";
-import { qualityNamed } from "@/components/ui/quality";
 import ItemTip from "@/components/game/ItemTip";
 import { EMPTY, EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
@@ -31,6 +30,7 @@ import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames } from "@/lib/names";
 import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemLooks } from "@/lib/item-look";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { npcIndexable } from "@/lib/indexable";
@@ -124,12 +124,12 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
   const zoneLinks = (zones: { mapId: number; name: string }[]) => zones.map((z, i) => (
     <span key={z.mapId}>{i > 0 && ", "}<Link href={zoneHref(z.mapId, z.name)} className={LINK}>{z.name}</Link></span>
   ));
-  // Item names (and icons, when the game files have them) for the drop and goods lists; an item nobody named stays "Item N".
-  const itemFacts = unreachable || (dropped.length === 0 && goods.length === 0) ? null : await loadItemFacts();
+  // Item names (and icons, when the game files have them) for the goods list; an item nobody named stays "Item N".
+  const itemFacts = unreachable || goods.length === 0 ? null : await loadItemFacts();
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const pins = unreachable ? [] : page.pins;
   const assets = dropped.length > 0 || goods.length > 0 || pins.length > 0 ? await loadSiteAssets() : null;
-  const tips = await loadItemTips(assets, [...dropped.map((row) => row.itemId), ...goods.map((o) => o.itemId)]);
+  const tips = await loadItemTips(goods.length ? assets : null, goods.map((o) => o.itemId));
   // The map slot draws every agreed position on its zone's art; the pin table below is its text.
   const mapZones = entityMapZones(pins.map((p) => ({ kind: "npc", mapId: p.mapId, x: p.x, y: p.y, label: title, agreed: true })), assets?.maps);
   const art = zone ? assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) : undefined;
@@ -137,7 +137,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
   const loot = await loadLootTables();
   const table = npcLootTable(loot.tables, npcId);
-  const itemName = (itemId: number) => names.get(itemId) ?? tips.get(itemId)?.name ?? null;
+  // The drop rows name, colour and draw each item as its own page and hover card do (lib/item-look.ts).
+  const look = table.rows.length ? await loadItemLooks(assets, table.rows.map((r) => r.itemId)) : null;
+  const itemName = (itemId: number) => look?.(itemId).name?.name ?? null;
   const lootTable = { ...table, rows: sortRows([...table.rows], (r) => drops.key === "item" ? itemName(r.itemId)?.toLowerCase() ?? null : drops.key === "with" ? r.withItem : r.rate, drops.desc, (r) => r.itemId) };
   const dropHref = (key: string, dir: SortDirection) => {
     const sort = sortParam(nextSort(key, dir, DROP_DEFAULT));
@@ -231,7 +233,11 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
                   table={lootTable}
                   title={title}
                   dataAsOf={loot.dataAsOf}
-                  item={(itemId) => <ItemTip tip={tips.get(itemId)}><EntityLink kind="item" id={itemId} name={itemName(itemId)} quality={qualityNamed(tips.get(itemId)?.quality)} /></ItemTip>}
+                  item={(itemId) => {
+                    const x = look!(itemId);
+                    // The tooltip draws its own icon in front; an item the files give only an icon for draws it in the link.
+                    return <ItemTip tip={x.tip}><EntityLink kind="item" id={itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} /></ItemTip>;
+                  }}
                   sort={{ key: drops.key, direction: drops.desc ? "desc" : "asc" }}
                   sortHref={dropHref}
                   pages={{ page: dropPage, href: dropPageHref }}
