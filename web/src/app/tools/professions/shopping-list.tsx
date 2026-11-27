@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Card, CopyButton, Input, SectionHeading } from "@/components/ui";
 import { formatCopper } from "@kb/profession-path";
-import { cheapestPrices, planShopping, type ListedPrice, type PlannerRecipe, type SearchRecipe } from "@/lib/profession-planner";
+import { cheapestPrices, planShopping, unpackRecipes, type ListedPrice, type PackedRecipe, type ShoppingCatalog } from "@/lib/profession-planner";
 import { SELECT_CLASS } from "./controls";
 import { realmRuleset, RULESET_LABEL } from "@/lib/realms";
 
@@ -12,7 +12,13 @@ const HOUSES = ["Alliance","Horde","Neutral"];
 type Preferences = { realm: string; ruleset: string; houses: string[] };
 const defaults: Preferences = { realm:"",ruleset:"pvp",houses:HOUSES };
 function remember(p: Preferences) { try { localStorage.setItem(KEY,JSON.stringify(p)); } catch { /* Device storage can be unavailable. */ } }
-export default function ShoppingList({ profession, recipes, catalog = [], from = 1, to = 300 }: { profession: string; recipes: PlannerRecipe[]; catalog?: SearchRecipe[]; from?: number; to?: number }) {
+/** An item's shown name and whether only the game files name it: the page's item lookup, shared with the recipe tables. */
+type ItemName = { name: string; files?: true };
+const NO_CATALOG: ShoppingCatalog = { reagents: [], taught: {} };
+/** `recipes` and `catalog` arrive packed (profession-planner.ts), so the page's RSC data carries ids and numbers, not item names per recipe. */
+export default function ShoppingList({ profession, recipes: packed, catalog = NO_CATALOG, items = {}, from = 1, to = 300 }: { profession: string; recipes: PackedRecipe[]; catalog?: ShoppingCatalog; items?: Record<number, ItemName>; from?: number; to?: number }) {
+  const recipes = useMemo(()=>unpackRecipes(packed,profession),[packed,profession]);
+  const itemName = (id:number) => items[id]?.name ?? `Item ${id}`;
   const totalRef = useRef<HTMLParagraphElement>(null);
   const [ready,setReady] = useState(false);
   const [start,setStart] = useState(String(from));
@@ -66,19 +72,16 @@ export default function ShoppingList({ profession, recipes, catalog = [], from =
   const prices = useMemo(()=>cheapestPrices(listed.key===priceKey ? listed.rows : [],prefs.houses),[listed,priceKey,prefs.houses]);
   const ids = useMemo(()=>{
     const byName = new Map<string,Set<number>>();
-    for (const r of catalog) for (const x of r.reagents) {
-      const key=x.name.trim().toLowerCase(); const matches=byName.get(key) ?? new Set<number>();matches.add(x.itemId);byName.set(key,matches);
+    for (const id of catalog.reagents) {
+      const key=(items[id]?.name ?? `Item ${id}`).trim().toLowerCase(); const matches=byName.get(key) ?? new Set<number>();matches.add(id);byName.set(key,matches);
     }
     return new Map([...byName].filter(([,ids])=>ids.size===1).map(([name,ids])=>[name,[...ids][0]]));
-  },[catalog]);
+  },[catalog,items]);
   const byName = Object.fromEntries([...ids].flatMap(([name,id])=>prices[id] ? [[name,prices[id].copper]] : []));
   let error="";
   let plan: ReturnType<typeof planShopping> | null = null;
   try { if (ready && start!=="" && end!=="") plan=planShopping(recipes,profession,Number(start),Number(end),skipped,byName); } catch(e) {error=(e as Error).message;}
-  const requirements = (name:string) => {
-    const matches=catalog.filter(r=>r.profession===profession && r.name.trim().toLowerCase()===name.trim().toLowerCase());
-    return matches.length===1 ? matches[0].recipeItems : [];
-  };
+  const requirements = (name:string) => (catalog.taught[name.trim().toLowerCase()] ?? []).map(itemId=>({itemId,name:itemName(itemId),unconfirmed:items[itemId]?.files}));
   const sourceText = (name:string) => {
     const items=requirements(name);
     return items.length ? "Teaching item (game files, unconfirmed): " + items.map(x=>`Item ${x.itemId}: source not confirmed yet`).join("; ") : "Recipe item requirement: Not confirmed yet";
