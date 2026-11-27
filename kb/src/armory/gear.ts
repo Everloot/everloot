@@ -8,7 +8,8 @@ export interface EquipmentItem {
   quality: { type: string };
   inventory_type: { type: string };
 }
-const slots: Record<string, RankedSlot | null> = {
+/** Each armory slot's ranked slot; shirt, tabard and ammo are not ranked. */
+export const slots: Record<string, RankedSlot | null> = {
   SHIRT: null,
   TABARD: null,
   AMMO: null,

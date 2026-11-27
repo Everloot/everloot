@@ -105,18 +105,22 @@ type Computed = FileLevelView["computed"] | undefined;
  * from the game files' item levels (lib/armory-file-levels.ts) carries a * and the note under the table.
  */
 function FactsTable({ a, b, computed = [undefined, undefined] }: { a: ArmoryCharacter | null; b: ArmoryCharacter | null; computed?: [Computed, Computed] }) {
-  const rows: [string, (c: ArmoryCharacter) => ReactNode, keyof NonNullable<Computed> | null][] = [
+  const rows: [string, (c: ArmoryCharacter) => ReactNode, "itemLevel" | "gearScore" | null][] = [
     ["Item level", (c) => c.itemLevel === null ? null : metricValue("item-level", c.itemLevel), "itemLevel"],
     ["Gear Score", (c) => c.gearScore === null ? null : metricValue("gear-score", c.gearScore), "gearScore"],
     ["Honorable kills", (c) => c.honorableKills === null ? null : metricValue("honorable-kills", c.honorableKills), null],
     ["Achievements", (c) => c.details?.achievements ? c.details.achievements.rows.length.toLocaleString("en-US") : null, null],
     ["Quests completed", (c) => c.details?.quests ? c.details.quests.completed.length.toLocaleString("en-US") : null, null],
   ];
-  const cell = (c: ArmoryCharacter | null, value: (c: ArmoryCharacter) => ReactNode, marked: boolean) => {
+  // A side with too few known item levels says so in place of its item level and Gear Score, never a number.
+  const missing = (side: Computed, key: string | null) =>
+    key !== null && side?.withheld ? `Not enough item levels known yet (${side.slots} of 17 slots)` : "Not read";
+  const cell = (c: ArmoryCharacter | null, value: (c: ArmoryCharacter) => ReactNode, side: Computed, key: "itemLevel" | "gearScore" | null) => {
     const v = c ? value(c) : null;
-    return <td className="px-3 py-2 text-right font-mono tabular-nums">{v === null ? <span className="font-sans text-fg-2">{c ? "Not read" : "—"}</span> : <>{v}{marked && "*"}</>}</td>;
+    const marked = key !== null && Boolean(side?.[key]);
+    return <td className="px-3 py-2 text-right font-mono tabular-nums">{v === null ? <span className="font-sans text-fg-2">{c ? missing(side, key) : "—"}</span> : <>{v}{marked && "*"}</>}</td>;
   };
-  const anyComputed = computed.some((x) => x?.itemLevel || x?.gearScore);
+  const made = ([[a, computed[0]], [b, computed[1]]] as const).filter(([c, x]) => c && (x?.itemLevel || x?.gearScore));
   return <section aria-labelledby="compare-facts" className="space-y-3">
     <SectionHeading id="compare-facts">At a glance</SectionHeading>
     <div className="overflow-x-auto rounded-card border border-line bg-panel">
@@ -128,12 +132,12 @@ function FactsTable({ a, b, computed = [undefined, undefined] }: { a: ArmoryChar
         </tr></thead>
         <tbody className="divide-y divide-line">{rows.map(([label, value, key]) => <tr key={label}>
           <th scope="row" className="px-3 py-2 text-left font-normal text-muted">{label}</th>
-          {cell(a, value, key !== null && Boolean(computed[0]?.[key]))}
-          {cell(b, value, key !== null && Boolean(computed[1]?.[key]))}
+          {cell(a, value, computed[0], key)}
+          {cell(b, value, computed[1], key)}
         </tr>)}</tbody>
       </table>
     </div>
-    {anyComputed && <p className="text-meta text-muted">* Computed on this page from the game files&apos; item levels, as Blizzard&apos;s armory no longer sends them; not ranked until a read stores them.</p>}
+    {made.length > 0 && <p className="text-meta text-muted">* Computed on this page from the game files&apos; item levels, as Blizzard&apos;s armory no longer sends them, leaving out items with no known level ({made.map(([c, x]) => `${c!.name}: computed from ${x!.slots} of 17 slots`).join("; ")}); not ranked until a read stores them.</p>}
   </section>;
 }
 

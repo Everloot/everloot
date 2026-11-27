@@ -286,6 +286,11 @@ main p a, main .list-disc a {
 .dir-hide {
   @apply text-xs text-muted underline-offset-4 hover:underline;
 }
+/* A dot between the name and its hide link; inline-block keeps the link's underline off it. */
+.dir-hide::before {
+  content: "·";
+  @apply mr-1.5 inline-block no-underline;
+}
 .lnk {
   @apply text-fg underline decoration-edge underline-offset-4 hover:decoration-fg;
 }

@@ -157,9 +157,6 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
       }}
       // No box: its level, type, side and category are the header's type line again.
       facts={!facts.unreachable && [
-        // The opening paragraph of the quest's lore archive page: the wiki's blurb, not the in-game objective, so the
-        // label names it and its source (the archive predates WoW: Forever). The Lore block below then omits it.
-        ...(lore && lore !== UNAVAILABLE && lore.intro ? [{ label: "About this quest (Warcraft Wiki, 2023)", value: lore.intro }] : []),
         { label: "Reported title", value: known(page.title) },
         { label: "Level", value: known(page.level), numeric: true },
         { label: "Side", value: known(sideChip || null) },
@@ -187,6 +184,14 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         { label: "End", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
         { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
       ]}
+      // The opening paragraph of the quest's lore archive page: the wiki's blurb, not the in-game objective, so its
+      // heading names it and its source (the archive predates WoW: Forever). A paragraph of its own at the main
+      // column's width, not a quick fact: the facts' narrow value column squeezed it to a word a line. The Lore block
+      // below then omits it.
+      notices={lore && lore !== UNAVAILABLE && lore.intro && <section data-quest-about aria-labelledby="quest-about" className="mb-6">
+        <h2 id="quest-about" className="text-meta text-muted">About this quest (Warcraft Wiki, 2023)</h2>
+        <p className="mt-1 text-cell text-fg">{lore.intro}</p>
+      </section>}
       summary={summary}
       map={mapZones.length > 0 && <EntityMap name={title} zones={mapZones} />}
       main={<>{chain && (

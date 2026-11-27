@@ -26,9 +26,11 @@ test("the two item levels each say what they are: the ranked 17-slot number and 
 
 test("a ranked item level and Gear Score computed from the game files' levels say so on the page", () => {
   const c = armoryCharacter({ itemLevel: 7, gearScore: 8 });
-  const facts = renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} computed={{ itemLevel: true, gearScore: true }} />);
+  const facts = renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} computed={{ itemLevel: true, gearScore: true, slots: 15, withheld: false }} />);
   expect(facts).toMatch(/Ranked item level<\/dt><dd[^>]*>7</);
   expect(facts).toContain("Ranked item level and Gear Score are computed on this page from the game files&#x27; item levels");
+  // Only from the slots whose level is known, and it says how many.
+  expect(facts).toContain("computed from 15 of 17 slots");
   expect(facts).toContain("not ranked until a read stores them");
   // Stored numbers say nothing of the kind.
   expect(renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} />)).not.toContain("computed on this page");
@@ -113,4 +115,12 @@ test("QA round 2: an empty item level and a Gear Score of 0 both read as a dash,
 test("QA round 4: Gear Score on the character page says it is Everloot's weighted item level", () => {
   const facts = renderToStaticMarkup(<CharacterFacts character={armoryCharacter()} lastRead={null} now={0} />);
   expect(facts).toMatch(/title="Everloot&#x27;s weighted item level: [^"]*Not the GearScore addon&#x27;s number\.">Gear Score<\/dt>/);
+});
+
+test("with too few known item levels the page shows no ranked item level or Gear Score, and says why", () => {
+  const c = armoryCharacter({ itemLevel: null, gearScore: null });
+  const facts = renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} computed={{ itemLevel: false, gearScore: false, slots: 3, withheld: true }} />);
+  expect(facts).toMatch(/Ranked item level<\/dt><dd[^>]*>(?:<[^>]*>)*Not enough item levels known yet</);
+  expect(facts).toContain("Item levels are known for 3 of 17 slots");
+  expect(facts).not.toContain("computed on this page");
 });

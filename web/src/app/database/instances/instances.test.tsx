@@ -123,7 +123,8 @@ test("on night one, each boss one install reported shows 1 of 3, and nothing it 
     expect(text(row)).toContain("|1 of 3|");
     expect(text(row)).toContain("1 of 3 installs reported");
     expect(text(bosses)).toContain("No boss here has 3 installs reporting it yet. Kills and last seen show once one does.");
-    expect(text(html)).toMatch(/\|Bosses confirmed\|0 of 4\|/);
+    // Four waiting: a count, not four names.
+    expect(text(html)).toMatch(/\|Bosses confirmed\|0 of 4 confirmed · 4 waiting\|/);
   } finally {
     state.seen = { unreachable: true };
   }
@@ -137,7 +138,9 @@ test("the facts say how many bosses are confirmed out of the files' list, and wh
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances, encounters } };
   try {
     const facts = text(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) })));
-    expect(facts).toMatch(/\|Bosses confirmed\|3 of 4\|unconfirmed\|the game files list 4\|/);
+    // The one still waiting is named from the files' list, and the row carries no unconfirmed marker: 3 are confirmed.
+    expect(facts).toMatch(/\|Bosses confirmed\|3 of 4 confirmed · 1 waiting \([A-Z][^)|]+\)\|/);
+    expect(facts).not.toMatch(/\|Bosses confirmed\|[^|]*\|unconfirmed\|/);
     expect(facts).not.toContain("Bosses reported");
     expect(facts).toMatch(/\|Entrance\|[^]*?in the files; 3 installs zoned in, not yet 3 from the same place\|/);
   } finally {

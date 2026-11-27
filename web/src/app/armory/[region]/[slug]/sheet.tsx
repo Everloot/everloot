@@ -7,6 +7,7 @@ import { ARMORY_BOARDS, metricValue, readLine } from "@/lib/armory";
 import { timeAgo } from "@/lib/time";
 import { blizzardBossKillsLine, ProfessionList } from "../../profile";
 import type { ArmoryCharacter } from "@/lib/armory-store";
+import { MIN_KNOWN_SLOTS, type FileLevelView } from "@/lib/armory-file-levels";
 import { guildPath, guildsOn } from "@/lib/guilds";
 import { optOutPath, type Player } from "@/lib/player-pages";
 import { PLAYER_SIGHTING_LINE } from "@/app/players/player-view";
@@ -43,12 +44,15 @@ function itemLevelValue(c: ArmoryCharacter, value: number, shown: ReactNode): Re
 export function CharacterFacts({ character: c, lastRead, now, computed }: {
   character: ArmoryCharacter; lastRead: string | null; now: number;
   /** Numbers computed on the page from the game files' item levels (lib/armory-file-levels.ts), not stored ones. */
-  computed?: { itemLevel: boolean; gearScore: boolean };
+  computed?: FileLevelView["computed"];
 }) {
   const d = c.details;
+  const withheld = Boolean(computed?.withheld) && c.itemLevel === null;
   const items: [string, ReactNode][] = [
     // The number the item-level board ranks (its formula on the dt); the sheet's Blizzard average is a second number.
-    ...(c.itemLevel !== null ? [[RANKED_ITEM_LEVEL, itemLevelValue(c, c.itemLevel, metricValue("item-level", c.itemLevel))] as [string, ReactNode]] : []),
+    ...(c.itemLevel !== null ? [[RANKED_ITEM_LEVEL, itemLevelValue(c, c.itemLevel, metricValue("item-level", c.itemLevel))] as [string, ReactNode]]
+      // Too few item levels known to compute one: said in place, never a number from unknown slots counted 0.
+      : withheld ? [[RANKED_ITEM_LEVEL, <span key="few" className="block font-sans text-sm leading-5 text-fg-2">Not enough item levels known yet</span>] as [string, ReactNode]] : []),
     ...(c.gearScore !== null ? [["Gear Score", itemLevelValue(c, c.gearScore, metricValue("gear-score", c.gearScore))] as [string, ReactNode]] : []),
     ...(c.honorableKills !== null ? [["Honorable kills", metricValue("honorable-kills", c.honorableKills)] as [string, ReactNode]] : []),
     ...(d?.achievements ? [["Achievements", d.achievements.rows.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
@@ -59,7 +63,8 @@ export function CharacterFacts({ character: c, lastRead, now, computed }: {
   // What the numbers are, said on the page and not only on hover (phones never hover); only for the numbers shown.
   const made = [computed?.itemLevel && "Ranked item level", computed?.gearScore && "Gear Score"].filter(Boolean);
   const notes = [
-    made.length > 0 ? `${made.join(" and ")} ${made.length > 1 ? "are" : "is"} computed on this page from the game files' item levels, as Blizzard's armory no longer sends them; not ranked until a read stores them.` : null,
+    made.length > 0 ? `${made.join(" and ")} ${made.length > 1 ? "are" : "is"} computed on this page from the game files' item levels, as Blizzard's armory no longer sends them: computed from ${computed!.slots} of 17 slots, leaving out items with no known level; not ranked until a read stores them.` : null,
+    withheld ? `Item levels are known for ${computed!.slots} of 17 slots: Ranked item level and Gear Score need at least ${MIN_KNOWN_SLOTS}, as Blizzard's armory no longer sends item levels and the game files lack some items.` : null,
     c.itemLevel !== null && c.averageItemLevel !== null ? "Ranked item level uses Everloot's 17-slot formula; Blizzard's average item level counts what Blizzard counts." : null,
     c.gearScore !== null ? "Gear Score is Everloot's weighted item level, not the GearScore addon's number." : null,
   ].filter((n): n is string => n !== null);

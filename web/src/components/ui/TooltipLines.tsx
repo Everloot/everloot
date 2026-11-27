@@ -32,8 +32,9 @@ export default function TooltipLines({ lines, links }: { lines: readonly string[
         if (t.kind === "pair") {
           return (
             <p key={i} data-tip-pair className="flex justify-between gap-4">
-              <span>{t.left}</span>
-              <span className="sr-only">, </span>
+              {/* The screen readers' comma, inline at zero size right after the left half's words: an sr-only span is
+                  absolute, so a block of its own, and the pair read "Shoulder , Cloth". */}
+              <span>{t.left}<span className="text-[0px]">, </span></span>
               <span className="text-right">{t.right}</span>
             </p>
           );

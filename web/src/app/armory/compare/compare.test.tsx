@@ -113,6 +113,23 @@ test("a side stored with no item levels compares on the game files' levels, each
     // (66 + 69) / 17, floored; Torvin's stored 60 is not marked.
     expect(out).toMatch(/Item level(?:<[^>]*>)*\s*7\*(?:<[^>]*>)*\s*60</);
     expect(out).toContain("* Computed on this page from the game files&#x27; item levels");
+    expect(out).toContain("Velkara: computed from 17 of 17 slots");
+  } finally {
+    vi.doUnmock("@/lib/equipped-item-tips");
+  }
+});
+
+test("a side with too few known item levels shows no item level or Gear Score, never a number from unknown slots counted 0", async () => {
+  // Head and main hand from the files; the other 15 slots worn with no level anywhere.
+  const worn = ["NECK", "SHOULDER", "BACK", "CHEST", "WRIST", "HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2", "OFF_HAND", "RANGED"]
+    .map((slot, i) => ({ slot, itemId: 5000 + i, name: slot, level: null, quality: "RARE", inventoryType: slot }));
+  mem.putCharacter(armoryCharacter({ itemLevel: null, gearScore: null, equipment: [...armoryCharacter().equipment.map((i) => ({ ...i, level: null })), ...worn] }));
+  vi.doMock("@/lib/equipped-item-tips", () => ({ loadEquippedItems: async () => ({ tips: new Map(), unknown: new Set(), levels: new Map([[16846, 66], [17069, 69]]) }) }));
+  try {
+    const out = await page({ a: VELKARA, b: TORVIN });
+    expect(out).toMatch(/Item level(?:<[^>]*>)*\s*Not enough item levels known yet \(2 of 17 slots\)(?:<[^>]*>)*\s*60</);
+    expect(out).toMatch(/Gear Score(?:<[^>]*>)*\s*Not enough item levels known yet \(2 of 17 slots\)/);
+    expect(out).not.toContain("* Computed on this page");
   } finally {
     vi.doUnmock("@/lib/equipped-item-tips");
   }
