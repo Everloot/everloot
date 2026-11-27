@@ -437,6 +437,9 @@ function AddonSection({ addon }: { addon: GuildPageData }) {
   );
 }
 
+/** "30.8 (931 read)": on a phone the count moves under the average whole, never split as "(931" over "read)". */
+const averageRead = (average: number, read: number) => <>{`${metricValue("item-level", average)} `}<span className="whitespace-nowrap">({read} read)</span></>;
+
 /** The guild at a glance, under its header: roster size, members read, level 60s, average item level, roster read, and the class mix as one bar. */
 function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary; activity: ReactNode }) {
   const read = members.filter((m) => m.stored).length;
@@ -453,10 +456,10 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
         { label: "Level 60 on the roster", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
         {
           label: "Average item level",
-          value: s.averageItemLevel === null ? "Not read" : `${metricValue("item-level", s.averageItemLevel)} (${s.itemLevelsRead} read)`,
+          value: s.averageItemLevel === null ? "Not read" : averageRead(s.averageItemLevel, s.itemLevelsRead),
           numeric: s.averageItemLevel !== null,
         },
-        ...(average60 === null ? [] : [{ label: "Average item level at 60", value: `${metricValue("item-level", average60)} (${at60.length} read)`, numeric: true }]),
+        ...(average60 === null ? [] : [{ label: "Average item level at 60", value: averageRead(average60, at60.length), numeric: true }]),
         { label: "Roster read", value: day(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
       {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}

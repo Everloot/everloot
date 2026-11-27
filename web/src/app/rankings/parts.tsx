@@ -1,8 +1,7 @@
 import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
-import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
-import { axisStep } from "@/lib/chart-axis";
+import { CLASS_BG, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
@@ -11,12 +10,11 @@ import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
+import { StackedWeeksChart, WeeklyTotalsChart } from "./charts";
+import { fill, nameOf, number, percent, weekLabel, weekTick } from "./chart-words";
 
+export { percent, weekLabel };
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-const number = (n: number) => n.toLocaleString("en-US");
-/** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
-export const percent = (share: number) => `${Math.round(share * 100)}%`;
-export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (from ${w.start})` : `Week of ${w.start}`);
 
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
@@ -242,11 +240,7 @@ export function StartState() {
   );
 }
 
-/** A race carries its faction (Skyborne is on both sides). */
-const nameOf = (s: ChartSeries) => (s.faction && s.label !== s.faction ? `${s.label} (${s.faction})` : s.label);
-const weekTick = (w: RankingWeek) => (w.current ? "so far" : w.start.slice(5));
 const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_STROKE, s.classToken) : "stroke-fg-2");
-const fill = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_FILL, s.classToken) : "fill-fg-2");
 const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_BG, s.classToken) : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
 
 const W = 720;
@@ -324,62 +318,18 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
   );
 }
 
-const SW = 720;
-const SH = 300;
-const SPAD = { left: 40, right: 16, top: 20, bottom: 28 };
-/** The space between two segments of a bar, in chart units. */
-const GAP = 2;
-
 /**
  * The hub's hero: one bar per week, each stacked from the series' shares of that week's characters, bottom up in
- * the newest week's rank order. Inline SVG, drawn on the server, in a card. A hidden count has no segment, so a
+ * the newest week's rank order. Drawn at its measured width (StackedWeeksChart), in a card. A hidden count has no segment, so a
  * week missing one is marked partial and the legend says why once. Every segment is named in the legend.
  */
 export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: RankingWeek[]; series: ChartSeries[]; hidden?: boolean; title: string }) {
-  const plotW = SW - SPAD.left - SPAD.right;
-  const plotH = SH - SPAD.top - SPAD.bottom;
-  const slot = plotW / weeks.length;
-  const barW = Math.min(56, slot * 0.64);
-  const x = (i: number) => SPAD.left + slot * i + (slot - barW) / 2;
-  const y = (v: number) => SPAD.top + (1 - v) * plotH;
   // A week with no numbers at all is still collecting; one missing a few is partial.
   const partial = weeks.map((_, i) => (series.every((s) => s.points[i] === null) ? "collecting" : series.some((s) => s.points[i] === null) ? "partial" : null));
-  const bars = weeks.map((w, i) => {
-    let top = y(0);
-    const segments = series.flatMap((s) => {
-      const p = s.points[i];
-      if (p === null) return [];
-      const h = Math.min(p * plotH, top - SPAD.top);
-      top -= h;
-      return [{ key: s.key, name: nameOf(s), y: top, h: Math.max(0, h - GAP), p, fill: fill(s) }];
-    });
-    return { week: w, i, top, segments };
-  });
   return (
     <Card>
       <figure data-stacked-chart className="min-w-0">
-        <svg viewBox={`0 0 ${SW} ${SH}`} role="img" aria-label={title} className="h-auto w-full">
-          <title>{title}</title>
-          {[0, 0.5, 1].map((v) => (
-            <g key={v}>
-              <line x1={SPAD.left} x2={SW - SPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-              <text x={SPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{percent(v)}</text>
-            </g>
-          ))}
-          {bars.map(({ week, i, top, segments }) => (
-            <g key={week.start}>
-              {segments.map((seg) => (
-                <rect key={seg.key} x={x(i)} y={seg.y} width={barW} height={seg.h} rx={1} className={seg.fill}>
-                  <title>{`${seg.name}, ${weekLabel(week)}: ${percent(seg.p)}`}</title>
-                </rect>
-              ))}
-              {partial[i] && (
-                <text x={x(i) + barW / 2} y={top - 6} textAnchor="middle" className="fill-muted text-caption">{partial[i]}</text>
-              )}
-              <text x={x(i) + barW / 2} y={SH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(week)}</text>
-            </g>
-          ))}
-        </svg>
+        <StackedWeeksChart weeks={weeks} series={series} partial={partial} title={title} />
         <figcaption className="mt-3 space-y-2">
           <ul aria-label="Legend" className="flex flex-wrap gap-x-4 gap-y-1 text-cell-2 text-fg-2">
             {series.map((s) => (
@@ -502,50 +452,15 @@ export function MetricTiles({ m }: { m: HubMetrics }) {
   );
 }
 
-const TW = 720;
-const TH = 200;
-const TPAD = { left: 48, right: 16, top: 22, bottom: 28 };
-
 /**
- * Characters counted each week, one bar a week, each labelled with its number. Inline SVG drawn on the server;
- * a collecting week has no bar and says so. The table under it holds the same numbers.
+ * Characters counted each week, one bar a week, each labelled with its number, drawn at its measured width
+ * (WeeklyTotalsChart); a collecting week has no bar and says so. The table under it holds the same numbers.
  */
 export function WeeklyTotals({ points }: { points: { week: RankingWeek; count: CensusCount }[] }) {
-  const step = axisStep(Math.max(...points.map((p) => p.count ?? 0)));
-  const top = step * 2;
-  const plotW = TW - TPAD.left - TPAD.right;
-  const plotH = TH - TPAD.top - TPAD.bottom;
-  const slot = plotW / points.length;
-  const barW = Math.min(48, slot * 0.6);
-  const x = (i: number) => TPAD.left + slot * i + (slot - barW) / 2;
-  const y = (v: number) => TPAD.top + (1 - v / top) * plotH;
   const title = "Characters counted each week";
   return (
     <figure data-weekly-totals className="min-w-0">
-      <svg viewBox={`0 0 ${TW} ${TH}`} role="img" aria-label={`${title}, ${points.length} weeks`} className="h-auto w-full">
-        <title>{title}</title>
-        {[0, step, top].map((v) => (
-          <g key={v}>
-            <line x1={TPAD.left} x2={TW - TPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-            <text x={TPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{number(v)}</text>
-          </g>
-        ))}
-        {points.map((p, i) => (
-          <g key={p.week.start}>
-            {p.count === null ? (
-              <text x={x(i) + barW / 2} y={y(0) - 6} textAnchor="middle" className="fill-muted text-caption">collecting</text>
-            ) : (
-              <>
-                <rect x={x(i)} y={y(p.count)} width={barW} height={Math.max(0, y(0) - y(p.count))} rx={2} className="fill-fg-2">
-                  <title>{`${weekLabel(p.week)}: ${number(p.count)} characters`}</title>
-                </rect>
-                <text x={x(i) + barW / 2} y={y(p.count) - 6} textAnchor="middle" className="fill-fg-2 font-mono text-caption">{number(p.count)}</text>
-              </>
-            )}
-            <text x={x(i) + barW / 2} y={TH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(p.week)}</text>
-          </g>
-        ))}
-      </svg>
+      <WeeklyTotalsChart points={points} title={title} />
       <figcaption className="mt-3">
         <ChartTable
           caption={title}

@@ -32,8 +32,9 @@ export function tabFromHash(hash: string, ids: string[]): string | null {
  * address can be shared. Arrow keys, Home and End move between tabs (WAI-ARIA tabs pattern, automatic
  * activation). Only the tabs with rows are drawn, so the strip starts with one and it is open on the server and
  * without JavaScript. When no tab has rows there is no strip: `empty`, or else the first tab's panel (its one line).
+ * `wrap`: a long strip wraps onto a second line on a narrow screen instead of scrolling, so no tab hides past the edge.
  */
-export default function Tabs({ label, tabs: all, empty, inFrame = false, className = "" }: { label: string; tabs: TabItem[]; empty?: ReactNode; inFrame?: boolean; className?: string }) {
+export default function Tabs({ label, tabs: all, empty, inFrame = false, wrap = false, className = "" }: { label: string; tabs: TabItem[]; empty?: ReactNode; inFrame?: boolean; wrap?: boolean; className?: string }) {
   const uid = useId();
   const tabs = filledTabs(all);
   const ids = tabs.map((t) => t.id);
@@ -83,7 +84,7 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
       {/* The hairline sits outside the scrolling list, so a narrow screen scrolls the tabs and not the page. */}
       <div className="border-b border-line">
       {/* On a narrow screen the open tab is kept in view and an arrow marks a cut edge (ScrollRow). */}
-      <ScrollRow role="tablist" aria-label={label} watch={selected} surface={inFrame ? "bg-panel" : "bg-canvas"} className={`flex ${TAB_SCROLL} ${inFrame ? "px-2" : ""}`}>
+      <ScrollRow role="tablist" aria-label={label} watch={selected} surface={inFrame ? "bg-panel" : "bg-canvas"} className={`flex ${wrap ? "flex-wrap" : TAB_SCROLL} ${inFrame ? "px-2" : ""}`}>
         {tabs.map((tab) => {
           const on = tab.id === selected;
           return (

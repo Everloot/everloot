@@ -216,7 +216,7 @@ describe("the guild page summary", () => {
     expect(out).toContain("bg-class-warrior");
     expect(out).toContain("2 (66.7%)");
     expect(out).toContain("1 (33.3%)");
-    expect(out).toContain("53.7 (2 read)");
+    expect(out).toContain('53.7 <span class="whitespace-nowrap">(2 read)</span>');
     expect(out).toContain("2026-11-09");
     expect(out).toContain('"name":"Guilds","item":"https://everloot.app/guilds"'); // the trail runs Home › Guilds › the guild
     expect(out).toContain('href="/armory/eu/torvin-ashbrook"');
@@ -227,7 +227,7 @@ describe("the guild page summary", () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     expect(out).not.toContain("Torvin");
     expect(out).not.toContain("Warrior");
-    expect(out).toContain("57.4 (1 read)");
+    expect(out).toContain('57.4 <span class="whitespace-nowrap">(1 read)</span>');
     await playerStore().suppressGuild("EU1 Realm 2 Normal", "Ember Wardens");
     await expect(pages.guild("eu", "ember-wardens")).rejects.toThrow("NEXT_NOT_FOUND");
   });
@@ -255,7 +255,7 @@ test("the summary strip drops the region the header already gives; the class bar
   const strip = out.slice(out.indexOf("data-guild-summary"), out.indexOf('aria-labelledby="guild-top"'));
   expect(strip).not.toContain(">Region<");
   expect(strip).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
-  expect(strip).toContain("53.7 (2 read)");
+  expect(strip).toContain('53.7 <span class="whitespace-nowrap">(2 read)</span>');
   const bar = strip.slice(strip.indexOf("data-class-bar"));
   expect(bar).toContain('aria-label="Class mix: Hunter 2, Warrior 1"');
   expect(bar).toContain("bg-class-hunter");
@@ -552,7 +552,7 @@ describe("QA round 2: guild counts and the item level order", () => {
     expect(out).toMatch(/Roster members read<\/dt>/);
     expect(out).not.toMatch(/>Members read<\/dt>/);
     // Velkara (60, 57.41) is the one member at 60 with an item level read.
-    expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 \(1 read\)<\/dd>/);
+    expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 <span class="whitespace-nowrap">\(1 read\)<\/span><\/dd>/);
     const dir = await html(pages.directory());
     expect(dir).toMatch(/It can be higher than the guild page&#x27;s count, because each character is counted as of its own read/);
   });
