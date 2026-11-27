@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
 
-import BlizzardAuctionPage, { dynamic, metadata } from "./page";
+import BlizzardAuctionPage, { dynamic, generateMetadata } from "./page";
 import { BlizzardAuctions, blizzardTime } from "./blizzard-auctions";
 
 // Invented Blizzard rows. House 110's items and commodities were published at different times.
@@ -96,9 +96,14 @@ test("the page credits Blizzard, names the item, links back with a plain link an
   await expect(render("0")).rejects.toThrow("NOT_FOUND");
 });
 
-test("the page is rendered per request and kept out of search", () => {
+test("the page is rendered per request, kept out of search, and its title names the item", async () => {
   expect(dynamic).toBe("force-dynamic");
+  const metadata = await generateMetadata({ params: Promise.resolve({ id: "2589" }) });
   expect(metadata.robots).toEqual({ index: false, follow: false });
+  expect(metadata.title).toBe("Linen Cloth: Blizzard auction house data");
+  expect((await generateMetadata({ params: Promise.resolve({ id: "77" }) })).title).toBe("Item 77: Blizzard auction house data");
+  // An id the page refuses gets the plain title, never a read.
+  expect((await generateMetadata({ params: Promise.resolve({ id: "0" }) })).title).toBe("Blizzard auction house data");
 });
 
 test("nothing in the route's tree can place an ad", () => {

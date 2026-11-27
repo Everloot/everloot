@@ -1,5 +1,5 @@
 import { percent } from "./auction-house";
-import { reportRegion, reportRuleset } from "./auction-report";
+import { reportHeadline, reportRegion, reportRuleset } from "./auction-report";
 import { assetsBaseUrl } from "@/lib/talents/assets";
 import { FETCH_TIMEOUT_MS, REVALIDATE_SECONDS } from "@/lib/game-assets";
 import { ImageResponse } from "next/og";
@@ -233,7 +233,7 @@ export async function renderAuctionReportCard(report: import("./auction-report")
   ] : [];
   return new ImageResponse(<div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: tall ? "60px" : "40px 60px", background: c.canvas, color: c.fg, fontFamily: "Geist" }}>
     <div style={{ display: "flex", fontSize: 28, color: c.accent }}>Everloot · Daily auction report · {report.date} UTC{icon && <img alt="" src={icon} width={48} height={48} style={{ marginLeft: 16 }} />}</div>
-    <div style={{ display: "block", lineClamp: 2, fontSize: tall ? 52 : 32, fontWeight: 700, marginTop: 22 }}>{report.headline}</div>
+    <div style={{ display: "block", lineClamp: 2, fontSize: tall ? 52 : 32, fontWeight: 700, marginTop: 22 }}>{reportHeadline(report)}</div>
     <div style={{ display: "flex", fontSize: 28, marginTop: 18 }}>{report.houses.length} houses covered · {report.goods} goods tracked</div>
     <div style={{ display: "flex", fontSize: 22, color: c.muted, marginTop: 16 }}>Listed asking prices from scans, not sales. Thin days and outliers excluded from comparisons.</div>
     <div style={{ display: "flex", flexDirection: "column", marginTop: tall ? 24 : 0, gap: 10 }}>{lines.map((line,i) => <div key={i} style={{ display: "block", lineClamp: 2, fontSize: 24, paddingBottom: 8, borderBottom: `1px solid ${c.line}` }}>{line}</div>)}</div>

@@ -9,7 +9,7 @@ import { storedMarketBoards, type MarketBoards } from "@/lib/market-boards";
 import { reportDates } from "@/lib/auction-report-store";
 import { reportHref } from "@/lib/auction-report";
 import {
-  AH_PATH, HOUSES, changesHref, findBoard, houseCounts, houseParam, houseSlug, itemHref, percent, realmHref, slugParam, slugWords,
+  AH_PATH, HOUSES, changesHref, findBoard, houseCounts, houseParam, houseSlug, itemHref, newestScanDay, percent, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { NO_CHANGE_STATES, STATE_RULE, weeklyChanges, type Compared, type NotCompared, type WeeklyChanges } from "@/lib/market-changes";
 import { AGREEMENT_NEEDED, Card, Container, DataTable, DataTitle, Disclosure, EmptyState, SectionHeading, type Column } from "@/components/ui";
@@ -19,7 +19,6 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, Facts, ItemLink, RealmName, count } from "../../parts";
 import { RealmHousePicker } from "../../RealmHousePicker";
-import TimeAgo from "../../TimeAgo";
 
 type Search = Record<string, string | string[] | undefined>;
 type Props = { params: Promise<{ realm: string }>; searchParams?: Promise<Search> };
@@ -29,6 +28,7 @@ export const dynamic = "force-dynamic";
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] ?? "" : value ?? "");
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+const dayNumber = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 
 /** The realm's house with the most priced items, in the game's house order on a tie; null when no house has a board. */
 function busiestHouseOf(stored: MarketBoards, slug: string): AuctionHouse | null {
@@ -87,6 +87,7 @@ export default async function MarketChangesPage(props: Props) {
   const path = changesHref({ slug });
   const trail: Crumb[] = [...trailFor(AH_PATH)!, { name: realmName, path: realmHref({ slug }) }, { name: "Market changes", path }];
   const changes = board ? weeklyChanges(board, now) : null;
+  const newest = board ? newestScanDay(board.rows) : null;
 
   // Names and art for the rows shown, from the stored boards' names first; the art is the item pages' tooltips.
   const ids = changes ? [...changes.risers, ...changes.fallers, ...changes.notCompared].map((c) => c.row.value.itemId) : [];
@@ -134,13 +135,22 @@ export default async function MarketChangesPage(props: Props) {
   const statesPresent = changes ? NO_CHANGE_STATES.filter((s) => changes.counts[s] > 0) : [];
 
   const baselines = (c: WeeklyChanges) => (!c.baselineDays ? "" : c.baselineDays.earliest === c.baselineDays.latest ? ` (these rows use ${c.baselineDays.earliest})` : ` (these rows use ${c.baselineDays.earliest} to ${c.baselineDays.latest})`);
-  const period = (c: WeeklyChanges) => (
+  const ownScans = (c: WeeklyChanges) => c.ownScans && " Some days are public under 3 reporters because Everloot's own installs scanned them; their reporter count says so.";
+  // With no compared row there is no week end or start to name: the newest scan day says why instead.
+  const period = (c: WeeklyChanges) => (c.endDay && c.startDay ? (
     <p className="text-meta text-fg-2">
       End: <span className="text-fg">{c.endDay}</span>, each item&apos;s newest solid day (today or yesterday, UTC).
       Start: <span className="text-fg">{c.startDay}</span>, 7 days earlier; a baseline may fall up to 3 days before that{baselines(c)}.
-      Each row names its own two days.{c.ownScans && " Some days are public under 3 reporters because Everloot's own installs scanned them; their reporter count says so."}
+      Each row names its own two days.{ownScans(c)}
     </p>
-  );
+  ) : (
+    <p className="text-meta text-fg-2">
+      {newest && dayNumber(newest) < dayNumber(now.toISOString().slice(0, 10)) - 1
+        ? <>No week comparison: the newest scan in this house is {scanDayText(newest, now)}, older than yesterday (UTC), so the week has no current end.</>
+        : "No week comparison yet: no item here has a solid day today or yesterday with one 7 to 10 days before it."}
+      {ownScans(c)}
+    </p>
+  ));
 
   let body;
   if (!stored) {
@@ -168,7 +178,7 @@ export default async function MarketChangesPage(props: Props) {
             rows={changes.notCompared}
             rowKey={(c) => String(c.row.value.itemId)}
             meta={(c) => <>{c.state} · {c.row.value.day} · {units(c)} units</>}
-            footer={<span>{changes.notCompared.length < changes.notComparedTotal ? `${changes.notCompared.length} of ${count(changes.notComparedTotal, "item")}` : count(changes.notComparedTotal, "item")}: {statesPresent.map((s) => `${changes.counts[s]} ${s}`).join(", ") || "none"} · {scope}</span>}
+            footer={<span>{changes.notCompared.length < changes.notComparedTotal ? `${changes.notCompared.length} of ${count(changes.notComparedTotal, "item")}` : count(changes.notComparedTotal, "item")}: {statesPresent.map((s) => `${changes.counts[s].toLocaleString("en-US")} ${s}`).join(", ") || "none"} · {scope}</span>}
             empty={<p className="px-3 py-4 text-cell text-fg-2">Every priced item here has a week comparison.</p>}
           />
           {statesPresent.length > 0 && (
@@ -194,7 +204,7 @@ export default async function MarketChangesPage(props: Props) {
           meta={market.state && (
             <Facts items={[
               shown ? `${shown} auction house` : "No house priced yet",
-              board && board.updatedAt !== null ? <>Scans up to <TimeAgo at={board.updatedAt} renderedAt={now.getTime()} /></> : "Scan time unrecorded",
+              newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet",
               ...(board ? [`${count(board.reporters, "reporter")} this week`] : []),
             ]} />
           )}

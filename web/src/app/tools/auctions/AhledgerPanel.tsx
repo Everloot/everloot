@@ -37,7 +37,7 @@ export function AhledgerPanel({ title, state, credit, controls, children }: {
     {state === "loading" && <p role="status" className="text-meta text-fg-2">Reading AH Ledger…</p>}
     {state === "failed" && <p role="status" className="text-meta text-fg-2">AH Ledger could not be read right now. Try again in a few minutes.</p>}
     {state === "ready" && children}
-    <p className="text-meta text-fg-2"><a href={credit?.url ?? AHLEDGER_SITE} rel="noopener">Prices from AHledger</a></p>
+    <p className="text-meta text-fg-2"><a href={credit?.url ?? AHLEDGER_SITE} rel="noopener">Prices from AH Ledger</a></p>
   </section>;
 }
 

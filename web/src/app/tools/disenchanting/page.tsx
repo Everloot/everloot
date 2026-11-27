@@ -186,7 +186,9 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
           {`Bands: found in game files, unconfirmed (build ${DISENCHANT_BUILD}). Results: disenchants recorded by the Everloot addon, shown once ${INDEPENDENT_INSTALLS} installs disenchanted in a band. Prices: players' auction scans, one auction house at a time.`}
         </p>
         <section aria-labelledby="disenchant-bands">
-          <SectionHeading id="disenchant-bands" note={where ? `Average material value per disenchant in ${where}${anyFloor ? "; \"at least\" where a material has no price there" : ""}.` : "The chance of each material and how many come out at once."}>What each band gives</SectionHeading>
+          <SectionHeading id="disenchant-bands" note={where && board ? `Average material value per disenchant in ${where}${anyFloor ? "; \"at least\" where a material has no price there" : ""}.`
+            : where ? `No ${house} prices yet on ${realmName}, so values are hidden. The chance of each material and how many come out at once.`
+            : "The chance of each material and how many come out at once."}>What each band gives</SectionHeading>
           {view.unreachable
             ? <Card><p className="text-fg-2" role="status">Disenchant results are unavailable right now. They are unrecorded, not zero.</p></Card>
             : <DataTable

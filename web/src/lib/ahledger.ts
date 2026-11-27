@@ -166,7 +166,8 @@ export function priceHistory(body: unknown): AhledgerHistory {
 }
 
 /** Estimated sales a day, to one decimal; "unrecorded" when AH Ledger has too few scans for one. */
-export const salesText = (n: number | null) => n === null ? "unrecorded" : n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+/** Estimated sales a day, whole numbers: "40,392"; a rate above zero that rounds to nothing says "under 1". */
+export const salesText = (n: number | null) => n === null ? "unrecorded" : n > 0 && n < 0.5 ? "under 1" : Math.round(n).toLocaleString("en-US");
 
 export interface AhledgerCraft { spellId: number; name: string; skill: number | null; cost: number | null; netValue: number | null; margin: number | null; salesPerDay: number | null; profitPerDay: number | null }
 export function craftingMargins(body: unknown): AhledgerCraft[] {

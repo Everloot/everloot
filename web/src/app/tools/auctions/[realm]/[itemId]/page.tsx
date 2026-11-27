@@ -15,11 +15,10 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
   AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseSlug, indexable, itemHref, itemIdParam,
-  itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, slugParam, slugWords,
+  itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
-import TimeAgo from "../../TimeAgo";
 import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
@@ -85,6 +84,8 @@ export default async function RealmItemPage(props: Props) {
   const ruleset = realmRuleset(realm);
   const region = realmRegion(realm);
   const ahledger = region ? ahledgerMarkets(ruleset, region) : [];
+  // The history opens on the page's own house when AH Ledger has a market for it (none for Neutral).
+  const houseMarket = ahledger.find((m) => row && m.split(".")[2] === row.house.toLowerCase()) ?? ahledger[0];
   const moves = row ? ([1, 7] as const).flatMap((span) => {
     const move = priceMove(row, span, now);
     return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${move.from.day} to ${move.to.day}` }] : [];
@@ -114,7 +115,7 @@ export default async function RealmItemPage(props: Props) {
         meta={v && (
           <Facts items={[
             `${row.house} auction house`,
-            row.updatedAt !== null ? <>Updated <TimeAgo key="t" at={row.updatedAt} renderedAt={now.getTime()} /></> : `Newest public day ${v.day}`,
+            `Newest scan ${scanDayText(v.day, now)}`,
             reportersText(v.reporters),
           ]} />
         )}
@@ -180,10 +181,11 @@ export default async function RealmItemPage(props: Props) {
           <AhledgerPrices
             itemId={itemId}
             title={`AH Ledger prices, ${RULESET_LABEL[ruleset as keyof typeof RULESET_LABEL]} ${REGION_LABEL[region]}`}
+            caption={`AH Ledger prices for ${label}, ${RULESET_LABEL[ruleset as keyof typeof RULESET_LABEL]} ${REGION_LABEL[region]}, each faction's house`}
             regions={[{ label: REGION_LABEL[region], markets: ahledger }]}
           />
         )}
-        {ahledger[0] && <AhledgerHistory itemId={itemId} defaultMarket={ahledger[0]} />}
+        {houseMarket && <AhledgerHistory itemId={itemId} defaultMarket={houseMarket} />}
 
         <Contribute />
 
