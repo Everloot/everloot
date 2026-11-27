@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { HomeFact, HomeLadder, HomeWeek } from "@/lib/home-live";
+import type { CoverageSummary } from "@/lib/coverage-summary";
+import type { ChangeEntry } from "@/lib/changes";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
@@ -9,13 +11,30 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
-vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn, revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+// Each call of a kept read is recorded with its lifetime: Next lowers the page's own lifetime to the shortest it sees.
+const kept = vi.hoisted(() => ({ calls: [] as { key: string; revalidate: unknown }[] }));
+vi.mock("next/cache", () => ({
+  unstable_cache: <T extends (...args: never[]) => unknown>(fn: T, key?: string[], opts?: { revalidate?: unknown }) =>
+    ((...args: Parameters<T>) => { kept.calls.push({ key: (key ?? []).join(","), revalidate: opts?.revalidate }); return fn(...args); }) as T,
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+}));
 
 const live = vi.hoisted(() => ({
   newest: null as HomeFact[] | null,
   ladder: null as HomeLadder | null | undefined,
   week: null as HomeWeek | null,
+  coverage: null as CoverageSummary | null,
+  timeline: undefined as ChangeEntry[] | undefined,
 }));
+vi.mock("@/lib/coverage-summary", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/coverage-summary")>()),
+  loadCoverageSummary: async () => live.coverage,
+}));
+vi.mock("@/lib/changes", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/changes")>();
+  return { ...real, loadTimeline: async () => live.timeline ?? real.loadTimeline() };
+});
 vi.mock("@/lib/home-live", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/home-live")>()),
   loadHomeNewest: async () => live.newest,
@@ -51,10 +70,15 @@ const WEEK: HomeWeek = {
   movers: [{ def: RANKINGS[0], row: { key: "MAGE", label: "Mage", classToken: "MAGE", count: 30, share: 0.15, rank: 2, change: { dir: "up", by: 3 } }, href: "/census?class=MAGE" }],
 };
 
+const COVERAGE: CoverageSummary = { installs: 40, confirmed: 1200, waiting: 300, dataAsOf: "2026-11-27T10:00:00.000Z", build: "71139" };
+
 beforeEach(() => {
   live.newest = NEWEST;
   live.ladder = LADDER;
   live.week = WEEK;
+  live.coverage = COVERAGE;
+  live.timeline = undefined;
+  kept.calls = [];
 });
 
 const render = async () => renderToStaticMarkup(await Home());
@@ -143,4 +167,51 @@ test("the live panels link no armory page: the landing page carries an ad slot",
   const html = await render();
   const live = ["live-newest", "live-ladder", "live-week"].map((id) => panel(html, id)).join("");
   expect(live).not.toMatch(/href="\/(armory|characters|players|blizzard-auctions)/);
+});
+
+// The build renders "/" with no storage settings, and that render is the page served until it goes stale; a failed
+// read on a fresh instance is the same. Either must go stale within seconds, not the page's five minutes.
+const DEGRADED_TAG = /<meta name="everloot-degraded" content="1"\/>/;
+const shortened = () => kept.calls.filter((c) => typeof c.revalidate === "number" && c.revalidate < 60);
+
+test("a render with every read healthy keeps the page's five minutes and carries no degraded marker", async () => {
+  const html = await render();
+  expect(html).not.toMatch(DEGRADED_TAG);
+  expect(shortened()).toEqual([]);
+});
+
+test.each(["newest", "ladder", "week", "coverage"] as const)("when the %s read fails, the render is marked degraded and kept only seconds", async (which) => {
+  live[which] = null;
+  const html = await render();
+  expect(html).toMatch(DEGRADED_TAG);
+  expect(shortened()).toHaveLength(1);
+  expect(shortened()[0].revalidate).toBeLessThanOrEqual(15);
+});
+
+test("with the guild pages off, the missing ladder is not a failure", async () => {
+  live.ladder = undefined;
+  const html = await render();
+  expect(html).not.toMatch(DEGRADED_TAG);
+  expect(shortened()).toEqual([]);
+});
+
+const post = (id: string, at: string, title: string, extra: Partial<ChangeEntry> = {}): ChangeEntry =>
+  ({ id, type: "post", game: "forever", at, title, url: `https://us.forums.blizzard.com/en/wow/t/x/${id}`, source: "forum", region: "us", topicId: Number(id.replace(/\D/g, "")), ...extra }) as ChangeEntry;
+
+test("what's new shows two posts with the same title on the same day as one row, linked to the newer, saying 2 posts", async () => {
+  live.timeline = [
+    post("forum:31066214", "2026-11-25T21:00:00.000Z", "Alterac Valley Adjustments - November 25"),
+    post("forum:31062986", "2026-11-25T18:00:00.000Z", "Alterac Valley Adjustments - November 25"),
+    post("forum:31000001", "2026-11-24T18:00:00.000Z", "Hotfixes - November 24"),
+  ];
+  const html = await render();
+  const start = html.indexOf('id="whats-new"');
+  const block = html.slice(start, html.indexOf("</section>", start));
+  expect(block.match(/Alterac Valley Adjustments - November 25/g)).toHaveLength(1);
+  expect(block).toContain('href="/changes/us-31066214');
+  expect(block).not.toContain("us-31062986");
+  expect(block).toMatch(/Alterac Valley Adjustments - November 25<\/a>(?:<[^>]*>)*\s*·\s*2 posts/);
+  // A title on its own day keeps its own row, with no count.
+  expect(block).toContain("Hotfixes - November 24");
+  expect(block).not.toMatch(/1 posts?/);
 });

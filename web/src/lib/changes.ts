@@ -38,6 +38,21 @@ export async function loadTimeline(): Promise<ChangeEntry[]> {
   return timeline.get();
 }
 
+/**
+ * The newest `n` rows of a timeline (newest first), one per title per day (UTC): Blizzard sometimes posts twice under
+ * one title in a day, and the folded timeline keeps both. The row is the newest of them; `posts` counts them all.
+ */
+export function oneRowPerTitleDay(entries: readonly ChangeEntry[], n: number): { entry: ChangeEntry; posts: number }[] {
+  const rows = new Map<string, { entry: ChangeEntry; posts: number }>();
+  for (const entry of entries) {
+    const key = `${entry.at.slice(0, 10)}|${entry.title}`;
+    const row = rows.get(key);
+    if (row) row.posts += 1;
+    else if (rows.size < n) rows.set(key, { entry, posts: 1 });
+  }
+  return [...rows.values()];
+}
+
 /** For tests: forget the kept timeline. */
 export const forgetTimeline = () => timeline.forget();
 

@@ -10,15 +10,16 @@ import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
-import { loadTimeline } from "@/lib/changes";
+import { loadTimeline, oneRowPerTitleDay } from "@/lib/changes";
 import { TYPE_LABEL, postPath } from "@kb/changes";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { longDate } from "@/data/wow-forever";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
 import { FEED } from "@/lib/seo";
 import { launchArt, loadSiteAssets } from "@/lib/game-assets";
 import { BannerArt } from "@/components/game/PageBanner";
 import LivePanels from "@/components/home/LivePanels";
-import { loadHomeLadder, loadHomeNewest, loadHomeWeek } from "@/lib/home-live";
+import { keepBriefly, loadHomeLadder, loadHomeNewest, loadHomeWeek } from "@/lib/home-live";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
@@ -40,14 +41,20 @@ export default async function Home() {
   const launch = launchArt(assets);
   const addon = latestAddonRelease();
   // What's new: the newest entries the site's own timeline holds, newest first.
-  // One line per announcement: loadTimeline already folds the regional copies together.
-  const newest = (await loadTimeline()).slice(0, 4);
+  // One line per announcement: loadTimeline already folds the regional copies together, and two posts under one
+  // title on one day are one line too.
+  const newest = oneRowPerTitleDay(await loadTimeline(), 4);
   // The live row: addon and game-file data only, never the armory's (this page may carry an ad slot). Each panel
   // has its own read and says so on its own when that read fails.
   const [coverage, newestFacts, ladder, week] = await Promise.all([loadCoverageSummary(), loadHomeNewest(), loadHomeLadder(), loadHomeWeek()]);
+  // A render missing any of them (the build's, or a cold instance's) is kept seconds, not five minutes. The ladder is
+  // undefined, not failed, while the guild pages are off.
+  const degraded = coverage === null || newestFacts === null || ladder === null || week === null;
+  if (degraded) await keepBriefly();
 
   return (
     <div className="space-y-18">
+      <EdgeDegraded when={degraded} />
       <JsonLd data={organizationJsonLd()} />
       <JsonLd data={websiteJsonLd()} />
 
@@ -91,7 +98,7 @@ export default async function Home() {
         <SectionHeading id="whats-new" action={<Link href="/changes" className={link}>Every change →</Link>}>What's new</SectionHeading>
         <Card className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
           <ul className="min-w-0 space-y-2">
-            {newest.map((e) => (
+            {newest.map(({ entry: e, posts }) => (
               <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
                 <span className="font-mono text-xs text-muted">{TYPE_LABEL[e.type]}</span>
                 {postPath(e) ? (
@@ -99,6 +106,7 @@ export default async function Home() {
                 ) : (
                   <span className="text-fg">{e.title}</span>
                 )}
+                {posts > 1 && <span className="text-muted">· {posts} posts</span>}
                 <span className="text-muted">· {longDate(e.at.slice(0, 10))}</span>
               </li>
             ))}
