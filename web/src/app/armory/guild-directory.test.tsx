@@ -500,6 +500,7 @@ describe("QA round 1: rosters and the directory", () => {
   test("each Level 60 count says what it counts: characters read on /guilds, the Blizzard roster on the guild page", async () => {
     const dir = await html(pages.directory());
     expect(dir).toContain("Level 60 read");
+    expect(dir).toContain('title="Counted when each character was read; can exceed the roster&#x27;s count.">Level 60 read');
     expect(dir).toMatch(/Level 60 read counts the characters read at level 60/);
     const guild = await html(pages.guild("eu", "ember-wardens"));
     expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
@@ -517,7 +518,7 @@ describe("QA round 1: rosters and the directory", () => {
 });
 
 describe("QA round 2: guild counts and the item level order", () => {
-  test("without the database's minimum the item level order drops guilds under 10 members read from the page and counts the rest", async () => {
+  test("without the database's minimum the item level order says the plain rule, with no promise of an update", async () => {
     const real = mem.guildDirectory.bind(mem);
     vi.spyOn(mem, "guildDirectory").mockImplementation(async (f) => {
       const page = await real({ ...f, minRead: undefined });
@@ -525,10 +526,11 @@ describe("QA round 2: guild counts and the item level order", () => {
     });
     const out = await html(pages.directory({ sort: "item-level" }));
     expect(out).not.toContain("until the database update is applied");
-    // The fixture's guilds have 1 and 0 members read: neither ranks.
+    expect(out).not.toContain("next database update");
+    // The fixture's guilds have 1 and 0 members read: neither ranks, and no count of every guild is shown.
     expect(out).not.toContain(">Ember Wardens<");
-    expect(out).toContain("Showing 0 ranked guilds on this page");
-    expect(out).toContain("the minimum turns on with the next database update");
+    expect(out).toContain("No guild has 10 members read or more yet.");
+    expect(out).not.toContain("data-result-strip");
   });
 
   test("the guild page labels its read count as roster members read and shows the level 60 average", async () => {
@@ -543,3 +545,55 @@ describe("QA round 2: guild counts and the item level order", () => {
   });
 });
 
+
+describe("QA round 4: the item level order without the database's minimum", () => {
+  /** `n` guilds in average item level order, every `every`th with 12 members read and the rest with 3. */
+  function unfiltered(n: number, every: number) {
+    const all = Array.from({ length: n }, (_, i) => ({
+      region: "eu", slug: `g-${i}`, name: `Guild ${i}`, faction: "Horde", rulesetId: 2, ruleset: "Normal", memberCount: 20,
+      membersRead: i % every === every - 1 ? 12 : 3, averageItemLevel: 60 - i / 100, level60: 1, fetchedAt: "2026-11-09T09:00:00.000Z",
+    }));
+    return vi.spyOn(mem, "guildDirectory").mockImplementation(async (f) => ({ rows: all.slice(f.offset, f.offset + Math.min(f.limit, 100)), total: all.length }));
+  }
+
+  test("reads further pages of the order until a full page qualifies, and counts what qualifies", async () => {
+    const spy = unfiltered(240, 4);
+    const out = await html(pages.directory({ sort: "item-level" }));
+    // 60 of the 240 qualify; every one of them is found, so the strip counts 60, not 240.
+    expect(out).toMatch(/data-result-strip[^>]*><span[^>]*><span[^>]*>60<\/span> guilds<\/span>/);
+    expect(out).toContain(">Guild 3<");
+    expect(out).toContain(">Guild 199<");
+    expect(out).not.toContain(">Guild 0<");
+    expect((out.match(/class="dir-name"/g) ?? []).length).toBe(50);
+    expect(out).toContain("Ranked by average item level: guilds with at least 10 members read.");
+    expect(out).not.toContain("Counted among");
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(6);
+    // Page 2 holds the last 10.
+    const two = await html(pages.directory({ sort: "item-level", p: "2" }));
+    expect((two.match(/class="dir-name"/g) ?? []).length).toBe(10);
+    expect(two).toContain(">Guild 239<");
+  });
+
+  test("stops after five reads and says how far it looked", async () => {
+    const spy = unfiltered(5000, 20);
+    const out = await html(pages.directory({ sort: "item-level" }));
+    // 500 rows read hold 25 that qualify.
+    expect(spy.mock.calls.length).toBe(6);
+    expect((out.match(/class="dir-name"/g) ?? []).length).toBe(25);
+    expect(out).toContain("guilds found");
+    expect(out).not.toMatch(/5,000<\/span> guilds/);
+    expect(out).toContain("Counted among the 500 guilds with the highest average item level.");
+  });
+
+  test("a guild with no read time shows a dash, and the read time names what it is the newest of", async () => {
+    const spy = vi.spyOn(mem, "guildDirectory").mockResolvedValue({ rows: [{
+      region: "eu", slug: "spite", name: "spite", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 48,
+      membersRead: 41, averageItemLevel: 41.8, level60: 18, fetchedAt: "",
+    }], total: 1 });
+    const out = await html(pages.directory());
+    expect(out).toMatch(/<td[^>]*><span class="text-muted">—<\/span><\/td>/);
+    spy.mockRestore();
+    const listed = await html(pages.directory());
+    expect(listed).toMatch(/Newest read among the guilds listed: 2026-11-09/);
+  });
+});

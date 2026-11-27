@@ -52,7 +52,8 @@ test("the strip holds Talents to Progress (the gear is the sheet above it) and n
 test("Progress always holds the full catalogue and renders only the permitted history supplied by its loader", () => {
   const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
   const unknown = render();
-  expect([...unknown.matchAll(/data-progression-instance=/g)]).toHaveLength(catalogue.length);
+  // Every instance but the two the files give no place of their own (unnamed 3002, the one-boss "Naxxramas" 2921).
+  expect([...unknown.matchAll(/data-progression-instance=/g)]).toHaveLength(catalogue.length - 2);
   expect(unknown).toContain("no data from this character");
   const progress = characterTabs(full, { progression: {
     instances: characterProgression(catalogue, [{ instanceMapId: 33, encounterId: 2748, lastKillAt: at }]),
@@ -70,7 +71,8 @@ test("a character with partial data keeps every tab, and each empty one says why
   expect(emptyIds(html)).toEqual(CHARACTER_TABS.filter(([id]) => id !== "progress").map(([id]) => id));
   for (const sentence of Object.values(EMPTY_TAB)) {
     expect(html).toContain(sentence.replaceAll("'", "&#x27;"));
-    expect(sentence.match(/[.!?]/g)).toHaveLength(1);
+    // Progress says what is missing and where kills come from, the one line that tab shows.
+    expect(sentence.match(/[.!?]/g)).toHaveLength(sentence === EMPTY_TAB.progress ? 2 : 1);
   }
   expect(EMPTY_TAB.talents).toBe("The last read from Blizzard's API did not include talents for this character.");
   // The gear is the page's sheet, never a tab.
@@ -108,12 +110,43 @@ test("a character read before play history, or with none to read, has the tab sa
   expect(emptyIds(render(none))).toContain("history");
 });
 
-test("QA round 2: Progress opens with one line, the rest of how kills are counted folded under a disclosure", () => {
-  const progress = characterTabs(full, {}).find((t) => t.id === "progress")!;
+test("QA round 2: Progress with kills opens with one line, the rest of how kills are counted folded under a disclosure", () => {
+  const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
+  const progress = characterTabs(full, { progression: {
+    instances: characterProgression(catalogue, [{ instanceMapId: 33, encounterId: 2748, lastKillAt: at }]),
+  } }).find((t) => t.id === "progress")!;
   const html = renderToStaticMarkup(<>{progress.panel}</>);
   const fold = html.indexOf("How this is counted");
   expect(fold).toBeGreaterThan(-1);
   expect(html.indexOf("Kills come from linked characters")).toBeLessThan(fold);
   for (const later of ["Lifetime progress counts each boss once", "Not seen open yet means", "raid overview"]) expect(html.indexOf(later)).toBeGreaterThan(fold);
   expect(html.indexOf("How this is counted")).toBeLessThan(html.indexOf("data-progression-instance="));
+});
+
+test("QA round 4: with no kill at all Progress is one line, its notes and the instance list closed", () => {
+  const progress = characterTabs(full, {}).find((t) => t.id === "progress")!;
+  const html = renderToStaticMarkup(<>{progress.panel}</>);
+  expect(html).toContain("No boss kills synced yet. Kills come from the Everloot Desktop App.");
+  // One paragraph before the disclosures: the notes, then every instance, each behind its own.
+  const firstDisclosure = html.indexOf("<details");
+  expect(html.slice(0, firstDisclosure).match(/<\/p>/g)).toHaveLength(1);
+  expect(html.indexOf("Kills come from linked characters")).toBeGreaterThan(firstDisclosure);
+  expect(html).toMatch(/Every dungeon and raid \(\d+\)/);
+  expect(html.indexOf("Every dungeon and raid")).toBeLessThan(html.indexOf("data-progression-instance="));
+});
+
+test("QA round 4: Progress leaves out the unnamed map and shows Naxxramas once, under Raids", () => {
+  const html = renderToStaticMarkup(<>{characterTabs(full, {}).find((t) => t.id === "progress")!.panel}</>);
+  expect(html).not.toContain("Instance 3002");
+  expect(html).not.toContain('data-progression-instance="2921"');
+  expect(html.match(/>Naxxramas</g)).toHaveLength(1);
+  const raids = html.slice(html.indexOf('aria-label="Raids"'));
+  expect(raids).toContain('data-progression-instance="533"');
+  // A kill recorded on such a map keeps its row.
+  const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
+  const mograine = catalogue.find((r) => r.id === 2921)!.bosses[0]!.id;
+  const kept = renderToStaticMarkup(<>{characterTabs(full, { progression: {
+    instances: characterProgression(catalogue, [{ instanceMapId: 2921, encounterId: mograine, lastKillAt: at }]),
+  } }).find((t) => t.id === "progress")!.panel}</>);
+  expect(kept).toContain('data-progression-instance="2921"');
 });

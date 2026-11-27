@@ -158,7 +158,8 @@ describe("player directory", () => {
     expect(arla.match(/<td class="dt-td dt-num dt-fold">—<\/td>/g)).toHaveLength(2);
     expect(arla).not.toContain("GS 0");
     expect(arla).not.toContain("ilvl 0");
-    expect(html).toContain("Gear Score weighs each item level by its slot");
+    // QA round 4: the number is Everloot's own, not the GearScore addon's.
+    expect(html).toContain("Gear Score here is Everloot&#x27;s weighted item level, not the GearScore addon&#x27;s number: it weighs each item level by its slot");
   });
 
   test("the sort menu names the chosen order once", async () => {

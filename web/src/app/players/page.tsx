@@ -340,7 +340,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                 action={active ? { href: "/players", label: "Clear filters" } : q ? { href: "/players", label: "Clear the search" } : { href: ARMORY_SUBMIT_PATH, label: "Add a character" }}
               />
             )}
-            {rows.length > 0 && armory && <p className="text-meta text-muted">Gear Score weighs each item level by its slot&apos;s stat budget, so it can rank characters differently from item level.</p>}
+            {rows.length > 0 && armory && <p className="text-meta text-muted">Gear Score here is Everloot&apos;s weighted item level, not the GearScore addon&apos;s number: it weighs each item level by its slot&apos;s stat budget, so it can rank characters differently from item level.</p>}
             {directory && directory.rows.length > 0 && <ArmoryCredit at={newest(directory.rows.map((r) => r.fetchedAt))} />}
             {sightings.length > 0 && <>
               <h3 className="text-h2-sm text-fg">Seen by the addon</h3>

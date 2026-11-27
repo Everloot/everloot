@@ -172,18 +172,12 @@ describe("the character page", () => {
     expect(header).toContain('href="/armory/eu/guilds/ember-wardens"');
   });
 
-  test("the dungeons and raids slot sits below the gear sheet and above the tabs, one muted line when nothing is synced", async () => {
+  test("with nothing synced the page has no dungeons and raids line above the tabs; the Progress tab says it", async () => {
     const out = await html(pages.character("eu", "velkara-duskmantle"));
-    const at = (s: string) => out.indexOf(s);
-    expect(out).toContain('data-slot="dungeon-raid-progress"');
-    expect(at('data-equipment-slot="RANGED"')).toBeLessThan(at('data-slot="dungeon-raid-progress"'));
-    expect(at('data-slot="dungeon-raid-progress"')).toBeLessThan(at('role="tablist"'));
-    const slot = out.slice(at('data-slot="dungeon-raid-progress"'), at('role="tablist"'));
-    // No heading, no explainer paragraph: one line and its link to every instance.
-    expect(slot).not.toContain("data-dungeons-raids");
-    expect(slot).not.toContain("<h2");
-    expect(slot.match(/<\/p>/g) ?? []).toHaveLength(1);
-    expect(slot).toContain('href="#progress"');
+    expect(out).not.toContain('data-slot="dungeon-raid-progress"');
+    expect(out).not.toContain("no boss kills synced through the Everloot Desktop App for this character");
+    // The Progress tab loads when opened, so the page itself says it at most once.
+    expect((out.match(/No boss kills synced/g) ?? []).length).toBeLessThanOrEqual(1);
   });
 
   describe("the first screen", () => {
@@ -637,12 +631,3 @@ test("classification filters reach storage, preserve each other in links and lin
   await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
-test("a character page shows its dungeons and raids where the dungeon progress line was, linked to the full checklist", async () => {
-  const out = await html(pages.character("eu", "velkara-duskmantle"));
-  const line = out.split('data-slot="dungeon-raid-progress"')[1]?.split("</p>")[0] ?? "";
-  expect(line).toContain("Dungeons &amp; raids");
-  expect(line).toContain('href="#progress"');
-  // No storage in this test: no synced history is unknown, never 0 cleared.
-  expect(line).toContain("no boss kills synced through the Everloot Desktop App for this character");
-  expect(out.indexOf('data-slot="dungeon-raid-progress"')).toBeLessThan(out.indexOf('id="progress"'));
-});

@@ -53,3 +53,13 @@ test("a character's talent shows the amount of the rank they hold, and a tiered 
   await focus(53);
   expect(tip()).toMatch(/^Tier oneRank 1\/3Text of Tier one\./);
 });
+
+test("QA round 4: an armory talent tooltip names the game files and the build, without the database's unconfirmed wording", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(manifest)));
+  await act(async () => root.render(<ArmoryTalentTrees catalog={catalog} ranks={{ 11: { rank: 2 } }} />));
+  await act(async () => { container.querySelector<HTMLElement>("#talent-11")!.focus(); });
+  const tip = document.querySelector("[data-talent-tooltip]")?.textContent ?? "";
+  expect(tip).toContain("From the game files (build 9.9.9.1)");
+  expect(tip).not.toContain("unconfirmed");
+});
