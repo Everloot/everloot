@@ -329,6 +329,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: /changes, its feed and What's new list posts by the day each card shows, so a hotfix posted after midnight UTC sits with its own day; Newer and Older on a post page follow that order and skip the post's own same-title replies (#1643).
+- Site: armory characters stored without item levels show the game files' level for each item, and a ranked item level and Gear Score computed from them, each labelled (#1644).
+- Site: quest pages label the Warcraft Wiki blurb as such and show it once; instance facts read "Bosses confirmed: 7 of 8" and say why an entrance is still unconfirmed; item lists explain wiki names once above the table; map links no longer leave a stray ": Zone at x, y" line; the AH Ledger history panel says when AH Ledger's history is unavailable (#1645).
 - Site: zone pages' Items table names, colours and draws items as their item pages do; the sitemap lists each merged title once and the merged-away title page redirects to it; /search shows "Searching…" as soon as a new query is submitted (#1636).
 - Site: /changes dates each card by the day its title names, shows a post made on both forums as one card even when the US and EU titles name different days, and a post page lists each post once across Newer/Older, Same day and More from (#1637).
 - Site: titles sort by name and show the side of each PvP rank, achievements the files list twice appear once, the boss table matches its In short line, quality-filtered item lists open on the highest item level, quest pages show the objective first, list headers say what their counts cover, and the AH Ledger chart axis ignores a lone outlier (#1638).
