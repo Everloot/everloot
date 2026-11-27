@@ -402,4 +402,21 @@ describe("labels", () => {
     const a = [at("a", 500, 250, 5), at("b", 505, 250, 5, "Silverpine Forest"), at("c", 100, 100, 1)];
     expect(placeLabels(a, view, 1000, 11).map((l) => l.id)).toEqual(placeLabels([...a].reverse(), view, 1000, 11).map((l) => l.id));
   });
+
+  test("a label on a pin moves just below it (or above, when below is taken or off the map); the pin stays put", () => {
+    // Undercity's name sits on the city's centre, where its flight master and entrance pins are.
+    const [moved] = placeLabels([at("z1458", 500, 250, 10, "Undercity")], view, 1000, 11, [{ x: 500, y: 250 }]);
+    expect(moved!.x).toBe(500);
+    expect(moved!.y).toBeGreaterThan(250 + 13);
+    // Below is off the map, so it goes above.
+    const [up] = placeLabels([at("z1", 500, 480, 10, "Wetlands")], view, 1000, 11, [{ x: 500, y: 480 }]);
+    expect(up!.y).toBeLessThan(480 - 13);
+    // A label clear of every pin keeps its place.
+    expect(placeLabels([at("z2", 500, 250, 10, "Ironforge")], view, 1000, 11, [{ x: 100, y: 100 }])[0]!.y).toBe(250);
+    // Covered both ways: it gives way rather than covering a pin.
+    expect(placeLabels([at("z3", 500, 250, 10, "Ironforge")], view, 1000, 11, [{ x: 500, y: 250 }, { x: 500, y: 278 }, { x: 500, y: 222 }])).toEqual([]);
+    // A pin's own name, 14 px to its right, is not on it.
+    const own = { id: "e1", text: "Deadmines", x: 514, y: 250, priority: 60, align: "start" as const };
+    expect(placeLabels([own], view, 1000, 11, [{ x: 500, y: 250 }])).toEqual([own]);
+  });
 });

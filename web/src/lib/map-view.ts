@@ -437,21 +437,44 @@ export function labelFontPx(zoom: number): number {
 
 export interface LabelCandidate { id: string; text: string; x: number; y: number; priority: number; align: "middle" | "start" }
 
+/** Half the size of a pin on the map, in pixels (its icon is 26 px square). */
+const PIN_HALF_PX = 13;
+
 /**
  * Which labels to draw. Greedy by priority: a label is drawn when it lies wholly inside the view and does
  * not overlap one already drawn, so a lower-priority label gives way. (x, y) is the anchor in yards.
+ * A label never covers a pin in `pins` (in yards): one that would moves just below the pin, else just above,
+ * else gives way; the pin keeps its place.
  */
-export function placeLabels(candidates: LabelCandidate[], view: Box, widthPx: number, fontPx: number): LabelCandidate[] {
+export function placeLabels(candidates: LabelCandidate[], view: Box, widthPx: number, fontPx: number, pins: readonly { x: number; y: number }[] = []): LabelCandidate[] {
   const k = widthPx / view.width, heightPx = view.height * k, h = fontPx * 1.4, pad = 2;
+  const overlaps = (a: { l: number; r: number; t: number; b: number }, o: typeof a, gap = pad) => a.l < o.r + gap && o.l < a.r + gap && a.t < o.b + gap && o.t < a.b + gap;
+  // No gap around a pin: a pin's own name starts 14 px from its centre, just clear of its 13 px half.
+  const pinBoxes = pins.map((p) => {
+    const sx = (p.x - view.x) * k, sy = (p.y - view.y) * k;
+    return { l: sx - PIN_HALF_PX, r: sx + PIN_HALF_PX, t: sy - PIN_HALF_PX, b: sy + PIN_HALF_PX };
+  });
+  const shift = PIN_HALF_PX + h / 2 + pad;
   const taken: { l: number; r: number; t: number; b: number }[] = [];
   const placed: LabelCandidate[] = [];
   for (const c of [...candidates].sort((a, b) => b.priority - a.priority || a.text.length - b.text.length || a.id.localeCompare(b.id))) {
-    const sx = (c.x - view.x) * k, sy = (c.y - view.y) * k, w = c.text.length * fontPx * 0.58 + 6;
-    const l = c.align === "middle" ? sx - w / 2 : sx, r = l + w, t = sy - h / 2, b = sy + h / 2;
-    if (l < 0 || t < 0 || r > widthPx || b > heightPx) continue;
-    if (taken.some((o) => l < o.r + pad && o.l < r + pad && t < o.b + pad && o.t < b + pad)) continue;
-    taken.push({ l, r, t, b });
-    placed.push(c);
+    const sx = (c.x - view.x) * k, w = c.text.length * fontPx * 0.58 + 6;
+    const l = c.align === "middle" ? sx - w / 2 : sx, r = l + w;
+    const base = (c.y - view.y) * k;
+    const onPin = (t: number) => pinBoxes.some((p) => overlaps({ l, r, t, b: t + h }, p, 0));
+    // Where it stands, or, when that covers a pin, just below or above the pin it covers.
+    const tries = onPin(base - h / 2) ? [base + shift, base - shift] : [base];
+    let sy: number | null = null;
+    for (const y of tries) {
+      const box = { l, r, t: y - h / 2, b: y + h / 2 };
+      if (box.l < 0 || box.t < 0 || box.r > widthPx || box.b > heightPx) continue;
+      if (onPin(box.t) || taken.some((o) => overlaps(box, o))) continue;
+      sy = y;
+      taken.push(box);
+      break;
+    }
+    if (sy === null) continue;
+    placed.push(sy === base ? c : { ...c, y: view.y + sy / k });
   }
   return placed;
 }

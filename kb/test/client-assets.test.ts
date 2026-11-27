@@ -192,12 +192,14 @@ test("the site's other art: class, tree, profession, buff and item icons, item s
   expect(manifest.counts).toMatchObject({ itemsRecorded: 2, itemsWithIcon: 1 });
 
   // The zone map: its two tiles stitched and cut to the picture, with the rectangle it covers, and a small copy. The continent had no art.
+  // Each picture is named by its content, so a re-drawn picture never meets a year-old cached copy of the same name.
   expect(manifest.maps["1429"]).toMatchObject({
-    file: "maps/1429.webp", kind: "zone", name: "Elwynn Forest", heldBack: false, rect: { left: 1000, top: 500, right: 0, bottom: -500 }, width: 500, height: 256,
-    small: { file: "maps/1429-small.webp" },
+    file: expect.stringMatching(/^maps\/1429-[0-9a-f]{12}\.webp$/), kind: "zone", name: "Elwynn Forest", heldBack: false, rect: { left: 1000, top: 500, right: 0, bottom: -500 }, width: 500, height: 256,
+    small: { file: expect.stringMatching(/^maps\/1429-small-[0-9a-f]{12}\.webp$/) },
   });
   expect(jobs.find((j) => j.dst.endsWith("1429-small.webp"))).toMatchObject({ max: 320, quality: 82 });
-  expect(Object.keys(checksums.files).filter((f) => f.startsWith("maps/"))).toEqual(["maps/1429-small.webp", "maps/1429.webp"]);
+  expect(Object.keys(checksums.files).filter((f) => f.startsWith("maps/"))).toEqual([manifest.maps["1429"].file, manifest.maps["1429"].small!.file].sort());
+  for (const f of Object.keys(checksums.files)) expect(existsSync(join(dir, f))).toBe(true);
   expect(manifest.skippedMaps).toEqual(["Eastern Kingdoms (13): no art in this build"]);
   const mapJob = jobs.find((j) => j.dst.endsWith("1429.webp"))!;
   expect(mapJob).toMatchObject({ tile: [256, 256], crop: [0, 0, 500, 256], quality: 82 });
@@ -371,4 +373,32 @@ test("it refuses a snapshot that lacks the atlas tables", async () => {
   const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
   await expect(buildAssetsFromTables({ get: (n) => (n === "UiTextureAtlas" ? undefined : tables[n]), build, outDir, source: source([]), convert: fakeConvert }))
     .rejects.toThrow(/client-extract --refresh/);
+});
+
+test("a zone map is drawn with its explored-area overlays; an overlay with an encrypted tile is left out and noted", async () => {
+  const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
+  const jobs: Parameters<Converter>[0] = [];
+  const convert: Converter = async (batch) => { jobs.push(...batch); return fakeConvert(batch); };
+  const withOverlays: Record<string, Rows> = {
+    ...site,
+    WorldMapOverlay: t([
+      { ID: 84, UiMapArtID: 51, OffsetX: 382, OffsetY: 21, TextureWidth: 300, TextureHeight: 210 },
+      { ID: 85, UiMapArtID: 51, OffsetX: 0, OffsetY: 0, TextureWidth: 100, TextureHeight: 100 },
+    ]),
+    WorldMapOverlayTile: t([
+      { ID: 1, WorldMapOverlayID: 84, LayerIndex: 0, RowIndex: 0, ColIndex: 0, FileDataID: 7100 },
+      { ID: 2, WorldMapOverlayID: 84, LayerIndex: 0, RowIndex: 0, ColIndex: 1, FileDataID: 7101 },
+      { ID: 3, WorldMapOverlayID: 85, LayerIndex: 0, RowIndex: 0, ColIndex: 0, FileDataID: 7102 },
+    ]),
+  };
+  const files = { ...siteStatus, 7100: "present", 7101: "present", 7102: "encrypted" } as Record<number, FileStatus>;
+  const src: TableSource = { ...source([]), fileStatus: (id) => files[id] ?? "absent" };
+  const { manifest, notes } = await buildAssetsFromTables({ get: (n) => withOverlays[n], build, outDir, source: src, convert });
+  const mapJob = jobs.find((j) => j.dst.endsWith("1429.webp"))!;
+  expect(mapJob.overlays!.map((o) => ({ ...o, tiles: o.tiles.map((x) => [x.row, x.col, x.src.split(/[\\/]/).pop()]) }))).toEqual([
+    { x: 382, y: 21, width: 300, height: 210, tiles: [[0, 0, "tile-7100.blp"], [0, 1, "tile-7101.blp"]] },
+  ]);
+  expect(jobs.find((j) => j.dst.endsWith("1429-small.webp"))!.overlays).toEqual(mapJob.overlays);
+  expect(manifest.maps["1429"]).toBeDefined();
+  expect(notes).toContain("map overlay: Elwynn Forest (1429): overlay 85 left out, tile file 7102 is encrypted");
 });

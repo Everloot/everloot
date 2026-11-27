@@ -98,8 +98,9 @@ It writes two folders under `kb/data/assets/` (gitignored, like all of `kb/data/
                            64 px as the game stores it
   frames/<name>.webp       node frames (round, square, choice; grey, green, gold), connector arrows,
                            the row gate piece and one background per spec
-  maps/<uiMapID>.webp      one picture per continent and zone, at the game's base zoom,
-  maps/<uiMapID>-small.webp  and a copy at most 320 px for the zoomed-out view
+  maps/<uiMapID>-<hash>.webp      one picture per continent and zone, at the game's base zoom,
+  maps/<uiMapID>-small-<hash>.webp  and a copy at most 320 px for the zoomed-out view; <hash> is
+                           the start of the picture's sha256, so a redrawn picture gets a new name
   loading/<fileDataID>.webp  one loading screen picture, at most 1600 px, whichever maps show it,
   loading/<fileDataID>-small.webp  and a copy at most 640 px for phones and thumbnails
   emblems/<name>.webp      race icons (raceicon128-<race>-<female|male>) and faction emblems, by their atlas name
@@ -160,7 +161,12 @@ How it works, and what it will not do:
   `UiMapArtStyleLayer` the tile and picture size. The tiles of the base zoom layer are laid on their
   grid and cut to the picture, which covers exactly the rectangle `UiMapAssignment` gives the map, so
   it lines up with the zone outlines. Phased art is left out. A map with a missing, encrypted or
-  unreadable tile is skipped and listed in `skippedMaps`, never drawn with a hole. The map page draws
+  unreadable tile is skipped and listed in `skippedMaps`, never drawn with a hole. Over the base art go
+  all of the art's explored-area overlays (`WorldMapOverlay`, tiles in `WorldMapOverlayTile`): lakes,
+  towns and roads, which the game draws once a player has explored the area. Without them a zone is a
+  blank basin. An overlay with a missing or unreadable tile is left out (the base art shows there) and
+  named in the run's notes. Files are named by their content: the bucket caches each for a year, so a
+  redrawn picture reaches browsers only under a new name. The map page draws
   only the pictures in view, from their small copies until the reader zooms in.
 - **Map legend icons.** The pieces the game's own map and minimap draw (`Dungeon`, `Raid`,
   `TaxiNode_Neutral`, `Innkeeper`, `Profession`, `QuestNormal`, `VignetteLoot`), cut out of the interface

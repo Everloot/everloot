@@ -15,7 +15,7 @@
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -26,7 +26,7 @@ import {
 } from "./assets/banners.js";
 import { buildItemSet, shardRecords, ITEM_SHARD_SIZE } from "./assets/items.js";
 import { mayShowSpellName } from "./game-name-rule.js";
-import { planMapArt, stitchPlan } from "./assets/map-art.js";
+import { overlayProblem, planMapArt, stitchPlan } from "./assets/map-art.js";
 import { resolveTooltip, type EffectFacts, type SpellFacts } from "./assets/tooltip.js";
 import { buildTalentCatalog, type Rows, type TableReader } from "./talents/build-catalog.js";
 import { LABEL, type BuildStamp } from "./talents/catalog.js";
@@ -222,6 +222,8 @@ export interface ConvertJob {
   /** Map tiles to lay on a grid of `tile`-sized cells, by row and column. */
   tiles?: { src: string; row: number; col: number }[];
   tile?: [number, number];
+  /** Explored-area pictures drawn over the stitched tiles at x, y, each cut to width x height. */
+  overlays?: { x: number; y: number; width: number; height: number; tiles: { src: string; row: number; col: number }[] }[];
 }
 export interface ConvertResult { dst: string; ok: boolean; width: number; height: number; error: string | null }
 export type Converter = (jobs: ConvertJob[]) => Promise<ConvertResult[]>;
@@ -239,6 +241,7 @@ export const pillowConverter: Converter = async (jobs) => {
   const jobFile = resolve(dirname(first), "jobs.json");
   writeFileSync(jobFile, JSON.stringify(jobs.map((j) => ({
     ...j, src: j.src ? resolve(j.src) : null, dst: resolve(j.dst), tiles: j.tiles?.map((t) => ({ ...t, src: resolve(t.src) })),
+    overlays: j.overlays?.map((o) => ({ ...o, tiles: o.tiles.map((t) => ({ ...t, src: resolve(t.src) })) })),
   }))));
   const script = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "blp_convert.py");
   const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
@@ -567,6 +570,16 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   // Map pictures: each continent's and zone's tiles laid on their grid and cut to the picture.
   const maps: AssetManifest["maps"] = {};
   const skippedMaps: string[] = [];
+  const mapOverlaysLeftOut: string[] = [];
+  /**
+   * A map picture's file is named by its content (`maps/<uiMapID>-<hash>.webp`): the bucket caches each file for a
+   * year, so a picture drawn again (with its overlays, say) must get a new name to reach browsers in the same build folder.
+   */
+  const hashName = (dst: string, uiMapId: number, small: boolean) => {
+    const file = `maps/${uiMapId}${small ? "-small" : ""}-${sha(readFileSync(dst)).slice(0, 12)}.webp`;
+    renameSync(dst, join(dir, file));
+    return file;
+  };
   if (["UiMap", "UiMapAssignment", "UiMapXMapArt", "UiMapArt", "UiMapArtStyleLayer", "UiMapArtTile"].every((t) => get(t))) {
     const plan = planMapArt(get);
     skippedMaps.push(...plan.skipped);
@@ -591,7 +604,22 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
         tiles.push({ src, row: tile.row, col: tile.col });
       }
       if (problem) { skippedMaps.push(`${label}: ${problem}`); continue; }
-      const shared = { target, tiles, tile: [target.layer.tileWidth, target.layer.tileHeight] as [number, number], crop: grid.crop, quality: MAP_QUALITY };
+      // The explored-area overlays; one that cannot be drawn whole is left out (the base art shows there) and noted.
+      const overlays: NonNullable<ConvertJob["overlays"]> = [];
+      for (const overlay of target.overlays) {
+        let why = overlayProblem(target.layer, overlay);
+        const overlayTiles: NonNullable<ConvertJob["tiles"]> = [];
+        for (const tile of why ? [] : overlay.tiles) {
+          const f = await fetchFile(tile.fileId);
+          if (f.status !== "ok") { why = `tile file ${tile.fileId} is ${f.status}`; break; }
+          const src = join(work, `tile-${tile.fileId}.blp`);
+          writeFileSync(src, f.buffer!);
+          overlayTiles.push({ src, row: tile.row, col: tile.col });
+        }
+        if (why) { mapOverlaysLeftOut.push(`${label}: overlay ${overlay.overlayId} left out, ${why}`); continue; }
+        overlays.push({ x: overlay.x, y: overlay.y, width: overlay.width, height: overlay.height, tiles: overlayTiles });
+      }
+      const shared = { target, tiles, tile: [target.layer.tileWidth, target.layer.tileHeight] as [number, number], overlays, crop: grid.crop, quality: MAP_QUALITY };
       mapJobs.push({ ...shared, small: false, dst: join(dir, "maps", `${target.uiMapId}.webp`), max: MAP_MAX });
       mapJobs.push({ ...shared, small: true, dst: join(dir, "maps", `${target.uiMapId}-small.webp`), max: MAP_SMALL_MAX });
     }
@@ -600,7 +628,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     mapJobs.forEach((job, i) => {
       const r = results[i];
       if (!job.small || !r?.ok) return;
-      const file = `maps/${job.target.uiMapId}-small.webp`;
+      const file = hashName(job.dst, job.target.uiMapId, true);
       track(file);
       smallOf.set(job.target.uiMapId, { file, width: r.width, height: r.height });
     });
@@ -614,7 +642,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
         if (smallOf.has(t.uiMapId)) { rmSync(join(dir, smallOf.get(t.uiMapId)!.file), { force: true }); delete checksums[smallOf.get(t.uiMapId)!.file]; }
         return;
       }
-      const file = `maps/${t.uiMapId}.webp`;
+      const file = hashName(job.dst, t.uiMapId, false);
       track(file);
       maps[String(t.uiMapId)] = {
         file, width: r.width, height: r.height, small: smallOf.get(t.uiMapId) ?? null,
@@ -772,6 +800,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     `classes: ${Object.keys(classes).length}, professions: ${Object.keys(professions).length}, spell icons: ${Object.keys(spellIcons).length}, pet family icons: ${Object.keys(familyIcons).length}`,
     items ? `items: ${c.itemsRecorded} recorded in ${Object.keys(items.shards).length} shards (private folder), ${c.itemsWithIcon} with an icon` : "items: no item tables in the snapshot",
     `maps: ${c.mapsExtracted} pictures, ${c.mapsSkipped} skipped`,
+    ...mapOverlaysLeftOut.map((m) => `map overlay: ${m}`),
     `loading screens: ${c.loadingScreensExtracted} maps with a picture (${new Set(Object.values(loadingScreens).map((l) => l.file)).size} files), ${c.loadingScreensSkipped} skipped; buff tooltips: ${Object.keys(spellTips).length}`,
     `emblems: ${c.emblemsExtracted} (races: ${Object.keys(races).length}, factions: ${Object.keys(factions).length})`,
     `map legend icons: ${c.poiExtracted} of ${Object.keys(POI_ELEMENTS).length} categories (${Object.entries(poi).map(([k, p]) => `${k}: ${p.element}`).join(", ") || "none"})`,
