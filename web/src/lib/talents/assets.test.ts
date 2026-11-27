@@ -200,6 +200,9 @@ const SHOWS_ART = new Set([
   // The Auction House boards' stored view: the shown name of each item with a public auction value, under the same rule
   // as the Auction House pages (tools/auctions/art.ts), read from the tooltips in the cron instead of on each page.
   "web/src/lib/market-boards.ts",
+  // The stored-views job, which builds the two views above: it only checks that the asset URL and the private reader are
+  // set before it starts, as the site's build has the URL inlined and the job reads it at run time.
+  "web/scripts/stored-views.ts",
   // The landing page's newest facts: the icon and quality of items that just reached three installs, as /database/recent lists them.
   "web/src/lib/home-live.ts",
 ]);
