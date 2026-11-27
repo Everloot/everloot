@@ -25,8 +25,9 @@ export interface PageHeaderProps {
   quality?: Quality;
   /**
    * Section hubs only: a wide-screen picture with the title on it (see Banner). `image` is the
-   * decorative picture; the banner adds its one-line caption. The lede, meta and actions follow under
-   * the picture. The header must then sit directly in the layout's main, not in a Container.
+   * decorative picture. The lede, meta and actions follow under the picture. The banner's caption is left out here:
+   * between the title and the lede a screen reader reads it as the page's first line, so the page puts
+   * BANNER_CAPTION at its end. The header must then sit directly in the layout's main, not in a Container.
    */
   banner?: { image: ReactNode };
 }
@@ -48,7 +49,7 @@ export default function PageHeader({ title, lede, trail, meta, actions, icon, qu
     return (
       <header data-page-header className="mb-6">
         {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
-        <Banner image={banner.image}>
+        <Banner image={banner.image} caption={false}>
           <h1 className={`${TITLE} text-fg`}>{title}</h1>
         </Banner>
         {lede && <p className="mt-3 max-w-lede text-cell text-fg-2">{lede}</p>}

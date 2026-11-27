@@ -138,3 +138,36 @@ test("every node carries its tooltip text for a screen reader, without hover", a
   const id = node(11).getAttribute("aria-describedby")!;
   expect(document.getElementById(id)?.textContent).toBe("Talent 11. Text of Talent 11.");
 });
+
+test("the tooltip follows the rank: a talent's own rank, a Next rank line, and a note where the files hold no per-rank amount", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(manifest)));
+  await render();
+  const tip = () => tooltip()?.textContent ?? "";
+  const focus = (id: number) => act(async () => { node(id).blur(); node(id).focus(); });
+
+  // A five-rank talent whose amount per rank is not in the files: no Next rank before the first point or at full rank,
+  // a Next rank line between, and the note every time.
+  await focus(11);
+  expect(tip()).toContain("Rank 0/5");
+  expect(tip()).not.toContain("Next rank:");
+  expect(tip()).toContain("not in the game files we read");
+  await act(async () => { node(11).click(); });
+  await focus(11);
+  expect(tip()).toContain("Rank 1/5");
+  expect(tip()).toMatch(/Next rank:.*not in the game files we read/);
+  for (let i = 0; i < 4; i++) await act(async () => { node(11).click(); });
+  await focus(11);
+  expect(tip()).toContain("Rank 5/5");
+  expect(tip()).not.toContain("Next rank:");
+
+  // A tiered talent: the rank held names its own entry, and Next rank gives the next entry's text from the files.
+  await focus(53);
+  expect(tip()).toContain("Tier one");
+  expect(tip()).not.toContain("Next rank:");
+  await act(async () => { node(53).click(); });
+  await focus(53);
+  expect(tip()).toMatch(/^Tier one/);
+  expect(tip()).toContain("Text of Tier one.");
+  expect(tip()).toMatch(/Next rank:\s*Text of Tier two\./);
+});

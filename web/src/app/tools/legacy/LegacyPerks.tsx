@@ -25,19 +25,25 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
       {catalog.trees.map((tree) => {
         const id = `tree-${tree.id}`;
         const c = cap(tree.currencyId);
+        const name = treeName(tree);
+        const files = [`tree ${tree.id}`];
+        if (tree.cost.value !== null) files.push(`cost per rank from ${tree.cost.from}`);
+        if (c && c.value !== null) files.push(`most points from ${c.from}`);
         return (
           <section key={tree.id} aria-labelledby={id}>
             <SectionHeading
               id={id}
               note={<>
-                {`The game files give this tree no name. ${tree.nodes.length} perks. `}
-                {`Cost per rank: ${tree.cost.value === null ? "not known" : `${tree.cost.value}, an unconfirmed reading of ${tree.cost.from}`}. `}
-                {`Most points a character holds: ${!c || c.value === null ? "not known" : `${c.value}, an unconfirmed reading of ${c.from}`}.`}
+                {name ? "The game files give this tree no name; it is named here by its top perk. " : "The game files give this tree no name. "}
+                {`${tree.nodes.length} perks. `}
+                {`Cost per rank: ${tree.cost.value === null ? "not known" : `${tree.cost.value} (unconfirmed)`}. `}
+                {`Most points a character holds: ${!c || c.value === null ? "not known" : `${c.value} (unconfirmed)`}.`}
               </>}
             >
-              {`Legacy tree ${tree.id}`}
+              {name ? `${name} tree` : `Legacy tree ${tree.id}`}
             </SectionHeading>
-            <DataTable caption={`Perks of Legacy tree ${tree.id}`} columns={perkColumns(tree, column)} rows={sortNodes(tree.nodes, column)} rowKey={(n) => String(n.id)} />
+            <DataTable caption={`Perks of the ${name ? `${name} tree` : `Legacy tree ${tree.id}`}`} columns={perkColumns(tree, column)} rows={sortNodes(tree.nodes, column)} rowKey={(n) => String(n.id)} />
+            <p className="mt-2 text-xs text-muted">{`From the game files: ${files.join("; ")}.`}</p>
           </section>
         );
       })}
@@ -61,6 +67,16 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
 
 const sortNodes = (nodes: Node[], column: (n: Node) => number | null) =>
   [...nodes].sort((a, b) => (column(a) ?? Infinity) - (column(b) ?? Infinity) || (a.y ?? Infinity) - (b.y ?? Infinity) || a.id - b.id);
+
+/**
+ * A tree's name from what it holds: its top perk (the lowest row, then the leftmost) that the files name. Null when
+ * none is named. "Unknown" is a placeholder name in the files, not a perk's name.
+ */
+function treeName(tree: Tree): string | null {
+  const named = tree.nodes.filter((n) => n.y !== null && n.entries[0]?.name && n.entries[0].name !== "Unknown");
+  named.sort((a, b) => a.y! - b.y! || (a.x ?? Infinity) - (b.x ?? Infinity) || a.id - b.id);
+  return named[0]?.entries[0]?.name ?? null;
+}
 
 const nodeName = (n: Node) => n.entries[0]?.name ?? "No name in the files";
 

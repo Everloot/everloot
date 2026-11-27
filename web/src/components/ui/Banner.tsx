@@ -37,9 +37,10 @@ export const BANNER_CAPTION = "Art © Blizzard Entertainment";
  *
  * `hero` is the home page's taller version: at least 432 px on a phone and 544 px from `lg`. `aside` sits on
  * the art at the bottom-right on a wide screen, above the caption, and under `children` on a narrow one.
- * With no `image` the band is the plain panel and there is no caption.
+ * With no `image` the band is the plain panel and there is no caption. `caption={false}` leaves it out, for a page that
+ * puts the credit at its end instead (PageHeader's banner: the caption would sit between the title and the lede).
  */
-export default function Banner({ image, children, aside, hero = false }: { image: ReactNode; children?: ReactNode; aside?: ReactNode; hero?: boolean }) {
+export default function Banner({ image, children, aside, hero = false, caption = true }: { image: ReactNode; children?: ReactNode; aside?: ReactNode; hero?: boolean; caption?: boolean }) {
   return (
     <div data-banner className={`relative -mt-8 flex flex-col justify-end pb-4 pt-18 lg:pb-8 ${hero ? "min-h-[27rem] lg:min-h-[34rem]" : "min-h-64 lg:min-h-[21rem]"}`}>
       <div data-banner-art className="absolute inset-y-0 left-[calc(50%-50vw)] w-screen overflow-hidden bg-panel">
@@ -50,7 +51,7 @@ export default function Banner({ image, children, aside, hero = false }: { image
       </div>
       <div className="relative min-w-0 lg:max-w-[calc(100%-26rem)]">{children}</div>
       {aside && <div className="relative mt-4 lg:absolute lg:bottom-16 lg:right-0 lg:mt-0 lg:w-56">{aside}</div>}
-      {image && (
+      {image && caption && (
         <p data-banner-credit className="absolute bottom-1 right-0 text-[10px] leading-none text-muted lg:bottom-2">
           {BANNER_CAPTION}
         </p>

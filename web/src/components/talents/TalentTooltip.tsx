@@ -14,6 +14,8 @@ export interface TipContent {
   partial: boolean;
   /** A note under the text, such as an amount the text leaves out (the armory's trees); absent: none. */
   note?: string | null;
+  /** What the next point gives, for a talent between its first and last rank; absent: no line. */
+  next?: string | null;
   /** Why a point cannot be added now, from the point rules; null when it can. */
   lock: string | null;
   label: string;
@@ -57,6 +59,7 @@ export default function TalentTooltip({ anchorId, id, content, titleColor = "#ff
       ) : (
         <p className="mt-1 text-[#9a9a9a]">No description in the game files.</p>
       )}
+      {content.next && <p className="mt-1 whitespace-pre-line text-[#f0e6b4]"><span className="text-[#c8c8c8]">Next rank: </span>{content.next}</p>}
       {content.partial && <p className="mt-1 text-xs text-[#9a9a9a]">[?] marks a value the game files do not give us yet.</p>}
       {content.note && <p className="mt-1 text-xs text-[#9a9a9a]">{content.note}</p>}
       {content.lock && <p className="mt-1 text-[#ff6b5a]">{content.lock}</p>}

@@ -19,7 +19,7 @@ const page = async () => {
 test("lists every tree and perk in the data file, with node and entry ids and ranks", async () => {
   const html = await page();
   for (const tree of LEGACY_PERKS.trees) {
-    expect(html).toContain(`Legacy tree ${tree.id}`);
+    expect(html).toContain(`id="tree-${tree.id}"`);
     for (const node of tree.nodes) {
       expect(html).toContain(`>${node.id}<`);
       for (const e of node.entries) expect(html).toContain(String(e.id));
@@ -42,12 +42,25 @@ test("carries the game-files label, the build stamp and Blizzard's credit", asyn
 
 test("shows the cost and cap only as unconfirmed readings, and gates as partial", async () => {
   const html = await page();
-  expect(html).toContain("Cost per rank: 1, an unconfirmed reading of TraitTreeXTraitCost, TraitCost.Amount.");
-  expect(html).toContain("Most points a character holds: 16, an unconfirmed reading of TraitCurrency.SourcedMax.");
+  expect(html).toContain("Cost per rank: 1 (unconfirmed).");
+  expect(html).toContain("Most points a character holds: 16 (unconfirmed).");
   expect(html).toContain("5 points spent (where they count is unconfirmed)");
   expect(html).toContain("Spend gates are partial");
   // Nothing on the page spends points.
   expect(html).not.toMatch(/<button|<input/);
+});
+
+test("each tree is named by its top perk, and the file names sit in a small note from the game files", async () => {
+  const html = await page();
+  expect(html).toMatch(/<h2[^>]*id="tree-1187"[^>]*>(?:<[^>]*>)*Master Chef tree</);
+  expect(html).toMatch(/<h2[^>]*id="tree-1188"[^>]*>(?:<[^>]*>)*High Alert tree</);
+  expect(html).toMatch(/<h2[^>]*id="tree-1189"[^>]*>(?:<[^>]*>)*For Great Honor tree</);
+  expect(html).not.toContain("Legacy tree 1187");
+  expect(html).toContain("named here by its top perk");
+  // File and column names only in the note under each table.
+  const heading = html.slice(html.indexOf('id="tree-1187"'), html.indexOf("<table", html.indexOf('id="tree-1187"')));
+  expect(heading).not.toContain("TraitTreeXTraitCost");
+  expect(html).toMatch(/From the game files: tree 1187; cost per rank from TraitTreeXTraitCost, TraitCost.Amount; most points from TraitCurrency.SourcedMax\./);
 });
 
 test("an unknown cost, cap or gate scope shows no number", () => {

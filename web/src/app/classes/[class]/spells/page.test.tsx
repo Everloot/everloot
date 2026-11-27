@@ -62,3 +62,26 @@ test("names that cannot be read are said so, and the spells still list by number
   const id = first.spells[0]!;
   expect(html).toMatch(new RegExp(`href="/database/spells/${id}"[^>]*>Spell ${id}<`));
 });
+
+test("talents and runes have no trainer level: they sit in their own group, not under Level 1, and a name shows once there", async () => {
+  // Real mage spell ids (build 71139): Ignite is a talent, 401722 engraves Arcane Barrage, 400610 is Arcane Barrage,
+  // 400613 and 400614 are both Living Bomb (engraved by 415936), 29074 is the Master of Elements talent and 29077 its
+  // proc. Fireball (133) is a trainer spell at level 1.
+  store.names = new Map([
+    [133, "Fireball"], [11119, "Ignite"], [401722, "Engrave Cloak - Arcane Barrage"], [400610, "Arcane Barrage"],
+    [415936, "Engrave Gloves - Living Bomb"], [400613, "Living Bomb"], [400614, "Living Bomb"],
+    [29074, "Master of Elements"], [29077, "Master of Elements"],
+  ]);
+  const html = await render();
+  const group = html.slice(html.indexOf('id="talents-runes"'));
+  const level1 = html.slice(html.indexOf('id="level-1"'), html.indexOf('id="talents-runes"'));
+  expect(html).toContain("Talents and runes (no trainer level)");
+  expect(level1).toContain('href="/database/spells/133"');
+  for (const id of [11119, 401722, 400610, 400613, 29074]) {
+    expect(level1, String(id)).not.toContain(`href="/database/spells/${id}"`);
+    expect(group, String(id)).toContain(`href="/database/spells/${id}"`);
+  }
+  // Same name twice: shown once.
+  expect(html.match(/>Living Bomb</g)?.length).toBe(1);
+  expect(html.match(/>Master of Elements</g)?.length).toBe(1);
+});
