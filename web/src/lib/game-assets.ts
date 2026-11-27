@@ -5,6 +5,7 @@ import type { BuffTable } from "@/data/game-data/raid";
 import { withBagSlots } from "@/lib/bags";
 import { itemTipText, qualityColor } from "@/lib/item-names";
 import { timeRead } from "@/lib/server-timing";
+import { iconTable, type IconsById } from "@/lib/icon-table";
 import { ICON_CATEGORIES, type PoiIcons } from "@/lib/map-marks";
 import { assetPath, assetsBaseUrl, MANIFEST_SCHEMA } from "@/lib/talents/assets";
 import type { ItemRecord } from "@kb/assets/items";
@@ -46,11 +47,7 @@ const site = z.object({
     trees: z.array(z.object({ name: z.string().nullable(), icon: assetPath.nullable() })),
   })).default({}),
   professions: z.record(z.string(), z.object({ name: z.string(), icon: assetPath.nullable() })).default({}),
-  spellIcons: z.record(z.string(), assetPath).default({}),
-  familyIcons: z.record(z.string(), assetPath).default({}),
-  currencyIcons: z.record(z.string(), assetPath).default({}),
-  petIcons: z.record(z.string(), assetPath).default({}),
-  achievementIcons: z.record(z.string(), assetPath).default({}),
+  // The icon tables (spellIcons, familyIcons, currencyIcons, petIcons, achievementIcons) are read by `iconTable`, not here.
   maps: z.record(z.string(), z.object({
     file: assetPath, small: z.object({ file: assetPath }).nullable().default(null),
     kind: z.enum(["continent", "zone"]), name: z.string(), continentId: z.number().int(), heldBack: z.boolean(), rect: Rect,
@@ -85,16 +82,16 @@ export interface SiteAssets {
   classes: Map<string, { name: string; icon: string | null; trees: { name: string | null; icon: string | null }[] }>;
   /** By profession name in lower case; only professions that have an icon. */
   professions: Map<string, { name: string; icon: string }>;
-  /** Spell id -> icon URL: raid buff spells, and the spells items are created by or used in. */
-  spellIcons: Map<number, string>;
+  /** Spell id -> icon URL: every named spell with an icon. */
+  spellIcons: IconsById;
   /** Pet family id -> icon URL. */
-  familyIcons: Map<number, string>;
+  familyIcons: IconsById;
   /** Currency id -> icon URL. */
-  currencyIcons: Map<number, string>;
+  currencyIcons: IconsById;
   /** Companion pet species id -> icon URL. */
-  petIcons: Map<number, string>;
+  petIcons: IconsById;
   /** Achievement id -> icon URL; empty until an asset upload carries them. */
-  achievementIcons: Map<number, string>;
+  achievementIcons: IconsById;
   maps: MapArt[];
   /** Raid buff spell id -> name and tooltip text. */
   spellTips: Map<number, SpellText>;
@@ -146,13 +143,16 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
   const parsed = site.safeParse(json);
   if (!parsed.success) return null;
   const m = parsed.data;
+  const raw = json as Record<string, unknown>;
+  const isPath = (name: string) => assetPath.safeParse(name).success;
+  const icons = (key: "spellIcons" | "familyIcons" | "currencyIcons" | "petIcons" | "achievementIcons") =>
+    iconTable(raw[key], base, iconUrl, isPath);
+  const spellIcons = icons("spellIcons"), familyIcons = icons("familyIcons"), currencyIcons = icons("currencyIcons");
+  const petIcons = icons("petIcons"), achievementIcons = icons("achievementIcons");
+  if (!spellIcons || !familyIcons || !currencyIcons || !petIcons || !achievementIcons) return null;
   const icon = (name: string | null) => (name ? iconUrl(base, name) : null);
   const professions = new Map<string, { name: string; icon: string }>();
   for (const [key, p] of Object.entries(m.professions)) if (p.icon) professions.set(key.toLowerCase(), { name: p.name, icon: iconUrl(base, p.icon) });
-  const spellIcons = new Map<number, string>();
-  for (const [id, name] of Object.entries(m.spellIcons)) if (/^\d+$/.test(id)) spellIcons.set(Number(id), iconUrl(base, name));
-  const familyIcons = new Map<number, string>();
-  for (const [id, name] of Object.entries(m.familyIcons)) if (/^\d+$/.test(id)) familyIcons.set(Number(id), iconUrl(base, name));
   const byId = <T, U>(record: Record<string, T>, f: (v: T, id: number) => U) =>
     new Map(Object.entries(record).filter(([id]) => /^\d+$/.test(id)).map(([id, v]) => [Number(id), f(v, Number(id))] as const));
   const tip = (s: { name: string | null; description: z.infer<typeof Text> | null }): SpellText =>
@@ -161,9 +161,7 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
   return {
     base, version: m.build.version, label: m.label,
     classes: new Map(Object.entries(m.classes).map(([key, c]) => [key.toLowerCase(), { name: c.name, icon: icon(c.icon), trees: c.trees.map((t) => ({ name: t.name, icon: icon(t.icon) })) }])),
-    professions, spellIcons, familyIcons,
-    currencyIcons: byId(m.currencyIcons, (name) => iconUrl(base, name)), petIcons: byId(m.petIcons, (name) => iconUrl(base, name)),
-    achievementIcons: byId(m.achievementIcons, (name) => iconUrl(base, name)),
+    professions, spellIcons, familyIcons, currencyIcons, petIcons, achievementIcons,
     maps: Object.entries(m.maps).filter(([id]) => /^\d+$/.test(id)).map(([id, a]) => ({
       uiMapId: Number(id), kind: a.kind, name: a.name, continentId: a.continentId, heldBack: a.heldBack,
       url: assetUrl(base, a.file), smallUrl: a.small ? assetUrl(base, a.small.file) : null, rect: a.rect,
