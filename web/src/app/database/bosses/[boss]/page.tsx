@@ -6,7 +6,7 @@ import { npcLootTable } from "@kb/loot-tables";
 import { CLIENT_LABEL } from "@kb/edges";
 import EntityLink from "@/components/EntityLink";
 import { AgreementMeter, Badge, DataTable, Disclosure, Tabs, type Column, type Fact, type TabItem } from "@/components/ui";
-import { bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
+import { bossEntries, bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
 import { trailFor } from "@/lib/breadcrumbs";
 import { observedLine } from "@/lib/evidence";
 import { entityTitle } from "@/lib/entity-meta";
@@ -134,7 +134,8 @@ export default async function BossPage(props: Props) {
   ];
 
   type Other = BossEntry;
-  const others = instance.encounters.map((e) => bossEntry(e.id, new Map([[instance.instanceMapId, instance]]))).filter((b): b is Other => b !== undefined);
+  // The instance's boss table, in its order: the same rows and order its Bosses tab shows.
+  const others: Other[] = bossEntries(new Map([[instance.instanceMapId, instance]]));
   const otherColumns: Column<Other>[] = [
     { key: "order", header: "Order", numeric: true, cell: (b) => b.order ?? PLACEHOLDER },
     { key: "boss", header: "Boss", cell: (b) => (b.id === boss.id
@@ -179,7 +180,8 @@ export default async function BossPage(props: Props) {
   const tabs: TabItem[] = [
     ...(lootRows ? [lootTab] : []),
     ...(clears ? [{
-      id: "kills", label: "Kills",
+      // The addon's count is a fact above; this tab is the Desktop App's synced kills of linked characters, a separate count.
+      id: "kills", label: "Desktop App kills",
       panel: <>
         <p className="mb-2 text-meta text-muted">From the boss kills linked characters sync through the Everloot Desktop App, public on their armory pages; up to the 500 with the newest kills in {instanceName}. Counts only.</p>
         <p className="text-sm text-fg-2">

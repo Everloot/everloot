@@ -41,6 +41,17 @@ test("buildClientEncounters: per instance in order index, difficulty only when b
   });
 });
 
+test("OrderIndex is a signed 16-bit field: 59536 is -6000 and sorts before 0, as Blackfathom Deeps' rows need", () => {
+  const out = buildClientEncounters(snapshotWith([
+    table("DungeonEncounter", [
+      [2910, { ID: 2910, Name_lang: "Aku'mai", MapID: 48, DifficultyID: 1, OrderIndex: 0 }],
+      [2911, { ID: 2911, Name_lang: "Twilight Lord Kelris", MapID: 48, DifficultyID: 1, OrderIndex: 64536 }],
+      [2916, { ID: 2916, Name_lang: "Ghamoo-ra", MapID: 48, DifficultyID: 0, OrderIndex: 59536 }],
+    ]),
+  ]));
+  expect(out.instances["48"]!.map((e) => e.name)).toEqual(["Ghamoo-ra", "Twilight Lord Kelris", "Aku'mai"]);
+});
+
 test("a snapshot without the table still yields a file, empty and labelled", () => {
   const empty = buildClientEncounters(snapshotWith([]));
   expect(empty.instances).toEqual({});

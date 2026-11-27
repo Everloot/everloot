@@ -91,6 +91,8 @@ test("linked characters' kills of the boss are counts only, with no character na
     { region: "eu", slug: "tavi-reed", name: "Tavi", surname: "Reed", kills: [k(2732, 5), k(2733, 1)] },
   ]);
   const html = await page("2732-oggleflint");
+  // The tab names its source, apart from the addon's count in the facts.
+  expect(html).toMatch(/aria-controls="[^"]*-panel-kills"[^>]*>Desktop App kills</);
   const kills = text(panel(html, "kills"));
   expect(kills).toContain("2 linked characters have killed this boss, 7 kills in all.");
   expect(kills).toContain("First synced kill 2026-11-10");

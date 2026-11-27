@@ -102,6 +102,14 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     } },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
+  // The hub counts the instances the game files place ("N in game files"); the list adds the ones known only from
+  // players' reports. Say so, so the two numbers agree.
+  const placed = all.filter((r) => r.files.length > 0).length;
+  const extra = all.length - placed;
+  const unnamed = all.some((r) => r.files.length === 0 && r.name === null);
+  const countNote = extra > 0
+    ? `${placed} are placed by the game files; ${extra} more ${extra === 1 ? "is" : "are"} known only from what players reported${unnamed ? (extra === 1 ? ", listed by its id until a name is known" : ", the unnamed ones listed by id") : ""}.`
+    : null;
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "instance" : "instances"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Instance pages" />;
 
   return (
@@ -113,6 +121,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
         {!seen.unreachable && (
           <ListNote>
             {q.sort ? "" : "Sorted by level, lowest first. "}The level is read from the game files, which give one level for most instances rather than a range; a dash there means the files give none. Entrances are read from the game files and confirmed once 3 installs zone in from the same place. A boss is counted once 3 installs report it; until then the count is the game files' own list, marked unconfirmed. A dash in the other columns means nobody has yet, not that there is none. Guide links to the instance's prep page once it is published, and to the raid builder for a raid.
+            {countNote && <span data-instance-count-note>{` Of the ${all.length} instances, ${countNote}`}</span>}
           </ListNote>
         )}
         <FilterBar

@@ -55,7 +55,7 @@ test("a confirmed title page has the header meta, the facts, In short, Open data
   // In short: what it is, who reported it, what the files say, what is still missing and where the name came from.
   expect(out).toContain("In short");
   expect(out).toContain("A character title in WoW: Forever.");
-  expect(out).toContain("Players reported holding it, three installs agreeing.");
+  expect(out).toContain("Three installs agree it is in the game client title list, by this name. That list holds every title the client knows; it is not a report of anyone holding it.");
   expect(out).toContain("The game files list it.");
   expect(out).toContain("No achievement is linked to it yet.");
   expect(out).toContain("Players agree on the name.");
@@ -66,7 +66,7 @@ test("a confirmed title page has the header meta, the facts, In short, Open data
   expect(text.split("\n")).toEqual([
     "Bloodsail Admiral &lt;Name&gt; (title 144)",
     "A character title in WoW: Forever.",
-    "Players reported holding it, three installs agreeing.",
+    "Three installs agree it is in the game client title list, by this name. That list holds every title the client knows; it is not a report of anyone holding it.",
     "The game files list it.",
     "No achievement is linked to it yet.",
     "Players agree on the name.",
@@ -89,7 +89,7 @@ test("a title only the game files know keeps an empty meter for player reports a
   // Unreported, so it folds into the one Not yet reported row with its empty meter.
   expect(factOf(out, "Not yet reported")).toMatch(/data-agreement="0"[\s\S]*Player reports/);
   expect(out).not.toContain("3 of 3 installs agree");
-  expect(out).toContain("No player has reported holding it yet.");
+  expect(out).toContain("Fewer than three installs have found it in the game client title list yet.");
   expect(out).toContain("The game files list it.");
   expect(out).toContain("The name is shown from the game files; players have not reported it yet.");
   expect(out).not.toContain("It has no agreed name yet");
@@ -113,7 +113,7 @@ test("a title three installs reported that the files do not list says so", async
   game.titles = [];
   const out = await html("144-bloodsail-admiral");
   expect(out).toContain("No game file read so far lists it.");
-  expect(out).toContain("Players reported holding it, three installs agreeing.");
+  expect(out).toContain("Three installs agree it is in the game client title list, by this name. That list holds every title the client knows; it is not a report of anyone holding it.");
 });
 
 test("an id nothing lists is a 404 and a wrong slug redirects", async () => {

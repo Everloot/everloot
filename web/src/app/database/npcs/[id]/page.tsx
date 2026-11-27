@@ -247,7 +247,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
           },
           {
             // Reports short of 3 installs fill the meter: no count, so the tab and its meter stay.
-            id: "sells", label: "Sells", count: unreachable || (!goods.length && goodsReported) ? undefined : goods.length,
+            // One row per item (goodsRows): an item seen at two prices is one row.
+            id: "sells", label: "Sells", count: unreachable || (!goods.length && goodsReported) ? undefined : new Set(goods.map((o) => o.itemId)).size,
             panel: unreachable ? <Unreachable />
               : goods.length ? <>
                 <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>

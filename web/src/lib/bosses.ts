@@ -3,8 +3,8 @@ import { bossRows, instanceRows, type BossRow, type InstanceRow } from "./instan
 
 /**
  * The boss pages: one per encounter of a dungeon or raid the site lists (lib/instances.ts `instanceRows`), by the
- * encounter id the game files and ENCOUNTER_END share. The rows are the instance page's boss table (`bossRows`),
- * player-first, so a boss page and its instance's Bosses tab never disagree; an instance the site does not list (known
+ * encounter id the game files and ENCOUNTER_END share. The rows are the instance page's boss table (`bossRows`), in
+ * its order, so a boss page's place and neighbours and its instance's Bosses tab never disagree; an instance the site does not list (known
  * only from a held-back zone) gives no boss page, as it gives no instance page. Names are the files' unless 3 installs
  * agree on one; kills, creatures and dates come from player reports.
  */
@@ -24,7 +24,7 @@ export interface BossEntry {
   filesName: boolean;
   row: BossRow;
   instance: InstanceRow;
-  /** Its place in the files' encounter list (1 first), or null for an encounter only players report. */
+  /** Its place in the files' encounter list (1 first), as the boss table orders it; null for an encounter only players report. */
   order: number | null;
   /** How many encounters the files list for its instance. */
   total: number;

@@ -8,6 +8,7 @@ import { publicQuests, type QuestRow } from "./world-lists";
 import { dayLabel } from "./report-labels";
 import type { WorldMapData } from "@kb/world-map-data";
 import { slugify } from "@kb/lore-slug";
+import { playableEncounters } from "@kb/encounter-set";
 import { objectNames } from "./names";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadInstanceFacts, loadItemFacts } from "./rollup-compute";
@@ -42,14 +43,18 @@ export interface InstanceRow {
   bosses: InstanceBoss[];
   /** Encounters fewer than 3 installs report here: encounter id -> how many installs did. A count, never a boss. */
   reportedBosses: Map<number, number>;
-  /** The encounters the game files list for it (DungeonEncounter), in the files' order; empty when they list none. */
+  /**
+   * The encounters the game files list for it (DungeonEncounter), in the files' order: the ones of its first difficulty
+   * (`playableEncounters`), not every difficulty's copy; empty when they list none.
+   */
   encounters: ClientEncounter[];
 }
 
 /**
- * One line of an instance's boss table, player-first: every boss 3 installs report, in the reports' order, then the
- * encounters the files list that no report has confirmed. A reported boss the installs have not named borrows the
- * files' name (`filesName`); a files-only encounter has no `boss`.
+ * One line of an instance's boss table, in the files' encounter order: each encounter the files list, with the boss 3
+ * installs report for it when they do, then any boss 3 installs report that the files do not list, in the reports'
+ * order. The boss pages number and step through bosses in this same order. A reported boss the installs have not named
+ * borrows the files' name (`filesName`); an encounter no report has confirmed has no `boss`.
  */
 export interface BossRow {
   encounterId: number;
@@ -62,16 +67,15 @@ export interface BossRow {
 }
 
 export function bossRows(row: Pick<InstanceRow, "bosses" | "encounters"> & Partial<Pick<InstanceRow, "reportedBosses">>): BossRow[] {
-  const files = new Map(row.encounters.map((e) => [e.id, e.name]));
-  const out: BossRow[] = row.bosses.map((b) => ({
-    encounterId: b.encounterId,
-    name: b.name ?? files.get(b.encounterId) ?? null,
-    filesName: b.name === null && files.has(b.encounterId),
-    boss: b,
-    reported: 0,
-  }));
-  const reported = new Set(row.bosses.map((b) => b.encounterId));
-  for (const e of row.encounters) if (!reported.has(e.id)) out.push({ encounterId: e.id, name: e.name, filesName: true, boss: null, reported: row.reportedBosses?.get(e.id) ?? 0 });
+  const files = new Set(row.encounters.map((e) => e.id));
+  const reported = new Map(row.bosses.map((b) => [b.encounterId, b]));
+  const out: BossRow[] = row.encounters.map((e) => {
+    const b = reported.get(e.id);
+    return b
+      ? { encounterId: e.id, name: b.name ?? e.name, filesName: b.name === null, boss: b, reported: 0 }
+      : { encounterId: e.id, name: e.name, filesName: true, boss: null, reported: row.reportedBosses?.get(e.id) ?? 0 };
+  });
+  for (const b of row.bosses) if (!files.has(b.encounterId)) out.push({ encounterId: b.encounterId, name: b.name, filesName: false, boss: b, reported: 0 });
   return out;
 }
 
@@ -235,7 +239,7 @@ export function instanceRows(
   const row = (id: number): InstanceRow => {
     const lv = data.entrances.find((f) => f.mapId === id);
     const level = lv?.minLevel !== undefined && lv.maxLevel !== undefined ? { min: lv.minLevel, max: lv.maxLevel } : null;
-    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], reportedBosses: new Map(), encounters: encounters[String(id)] ?? [] };
+    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], reportedBosses: new Map(), encounters: playableEncounters(encounters[String(id)] ?? [], lv?.difficultyIds) };
     out.set(id, r);
     return r;
   };

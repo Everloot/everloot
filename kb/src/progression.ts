@@ -4,6 +4,7 @@ import names from "../../addon/data/instance-map-names.json";
 import agreed from "../../addon/data/agreed-instances.json";
 import type { InstanceFacts } from "./instances.js";
 import { isDevelopmentItemName } from "./dev-item-names.js";
+import { playableEncounters } from "./encounter-set.js";
 
 export const PROGRESSION_GROUPS = ["Dungeons", "Raids", "World bosses"] as const;
 export const PROGRESSION_BUILD = encounters.build.version;
@@ -67,7 +68,8 @@ export function progressionCatalogue(facts: InstanceFacts | null): ProgressionIn
       group: world ? "World bosses" : (place?.raid ?? entrance?.instanceType === "raid") ? "Raids" : "Dungeons",
       typeKnown: world || place !== undefined || entrance !== undefined,
       unconfirmed: world || (!entrance && !agreed.bosses.some((r) => r.instanceMapId === id)),
-      bosses: [...new Map(bosses.map((b) => [b.id, { id: b.id, name: b.name }])).values()],
+      // The bosses of the instance's own difficulty, as its instance page lists them: not every difficulty's copy.
+      bosses: [...new Map(playableEncounters(bosses as { id: number; name: string; difficultyId?: number }[], (place as { difficultyIds?: number[] } | undefined)?.difficultyIds).map((b) => [b.id, { id: b.id, name: b.name }])).values()],
       availability: facts === null ? "unknown" : open.has(id) ? "open" : "not seen open yet",
     };
   });

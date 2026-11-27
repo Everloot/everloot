@@ -69,8 +69,8 @@ test("a confirmed faction page has the header meta, the facts, In short, Open da
   const out = await html("21-booty-bay");
   expect(out).toMatch(/data-entity-meta[^>]*>.*Faction.*Steamwheedle Cartel.*ID 21/);
   expect(out.match(/ID 21/g)).toHaveLength(1);
-  // The facts: the files' header flag and parent, three installs' standing, and where to track it.
-  expect(factOf(out, "Header")).toBe("No");
+  // The facts: the files' parent, three installs' standing, and where to track it; no "Header: No" for a non-header.
+  expect(out).not.toMatch(/>Header<\/dt>/);
   expect(factOf(out, "Parent faction")).toContain('href="/database/factions/169-steamwheedle-cartel"');
   expect(factOf(out, "Player reports")).toBe("3 of 3 installs agree");
   expect(factOf(out, "Track this")).toContain('href="/tools/collections"');

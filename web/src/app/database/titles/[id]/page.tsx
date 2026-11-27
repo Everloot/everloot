@@ -60,7 +60,11 @@ export default async function TitlePage(props: Props) {
   const [what, observed, name] = entry
     ? entitySummary({
       identity: "A character title in WoW: Forever.",
-      observed: entry.confirmed ? "Players reported holding it, three installs agreeing." : "No player has reported holding it yet.",
+      // The addon reads the client's whole title list (GetTitleName for every id): a confirmed title is one the client
+      // lists, never one a player was seen holding.
+      observed: entry.confirmed
+        ? "Three installs agree it is in the game client title list, by this name. That list holds every title the client knows; it is not a report of anyone holding it."
+        : "Fewer than three installs have found it in the game client title list yet.",
       nameFrom: entry.confirmed ? "players" : "none",
     })
     : [];

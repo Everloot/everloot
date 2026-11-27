@@ -56,7 +56,9 @@ export function buildClientEncounters(snapshotPath: string): ClientEncounters {
       const mapId = Number(row.MapID);
       if (!name || !(mapId > 0)) continue;
       const list = byMap.get(mapId) ?? [];
-      list.push({ id: Number(row.ID), name, difficultyId: Number(row.DifficultyID ?? 0), order: Number(row.OrderIndex ?? 0) });
+      // OrderIndex is a signed 16-bit field the reader returns unsigned: 59536 is -6000, which comes before 0.
+      const order = Number(row.OrderIndex ?? 0);
+      list.push({ id: Number(row.ID), name, difficultyId: Number(row.DifficultyID ?? 0), order: order >= 32768 && order < 65536 ? order - 65536 : order });
       byMap.set(mapId, list);
     }
   }

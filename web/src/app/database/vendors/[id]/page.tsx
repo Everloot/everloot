@@ -124,7 +124,8 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         label={`${title}: relations`}
         tabs={[
           {
-            id: "goods", label: "Sells", count: facts.unreachable ? undefined : page.offers.length,
+            // One row per item (goodsRows): an item seen at two prices is one row.
+            id: "goods", label: "Sells", count: facts.unreachable ? undefined : itemsSold,
             panel: facts.unreachable ? <Unreachable />
               : page.offers.length ? (
                 <VendorGoods title={title} offers={page.offers} tips={tips} items={items} evidence={goodsEvidence} />

@@ -47,12 +47,12 @@ Everloot.InstanceData = {
       { id = 2778, name = "Charlga Razorflank" },
     } },
     { id = 48, name = "Blackfathom Deeps", group = "Dungeons", unconfirmed = false, bosses = {
-      { id = 2910, name = "Aku'mai" },
       { id = 2916, name = "Ghamoo-ra" },
       { id = 2915, name = "Lady Sarevess" },
       { id = 2914, name = "Geilhast" },
       { id = 2912, name = "Old Serra'kis" },
       { id = 2911, name = "Twilight Lord Kelris" },
+      { id = 2910, name = "Aku'mai" },
     } },
     { id = 129, name = "Razorfen Downs", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 2782, name = "Mordresh Fire Eye" },
