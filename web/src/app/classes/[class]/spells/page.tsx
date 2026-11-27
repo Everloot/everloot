@@ -24,7 +24,8 @@ const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 const ENGRAVE = /^Engrave \S+ - (.+)$/;
 
 /**
- * Talents and runes out of the level groups: the files give them level 1, which is no trainer level. A talent is a
+ * Talents and runes out of the level groups: the files give talents level 1, which is no trainer level (runes and their
+ * abilities have no level in build 71139, so none reach here today; a later build that gives one still goes apart). A talent is a
  * spell of the class's talent catalog; a rune is an "Engrave <slot> - <rune>" spell. A level-1 spell named like a
  * talent or a rune (its proc, or the rune's ability) goes with them. Within a group a name (with its rank) shows once.
  */
@@ -102,10 +103,10 @@ export default async function ClassSpellsPage({ params }: Params) {
       <PageHeader
         trail={[...trailFor("/classes")!, { name, path: `/classes/${slug}` }, { name: "Spells by level", path: `/classes/${slug}/spells` }]}
         title={<><span className={CLASS_TEXT[slug]}>{name}</span> spells by level</>}
-        lede={`${placed} ${name} spells have a level in the game files: ${count} listed by level, lowest first, ${apart.length} talents and runes apart${repeats > 0 ? `, and ${repeats} that repeat a name and rank at one level, shown once` : ""}.`}
+        lede={`${placed} ${name} spells have a level in the game files: ${count} listed by level, lowest first, ${apart.length} talents apart${repeats > 0 ? `, and ${repeats} that repeat a name and rank at one level, shown once` : ""}.`}
       />
       <ListNote files>
-        {`The spells on the ${name}'s own skill lines in build ${SPELLS_BUILD}: ranks, passives and helper spells as the files have them, unconfirmed. Talents and runes, which the files put at level 1, are listed apart at the end. Nothing in the files says which a trainer teaches or what it costs. `}
+        {`The spells on the ${name}'s own skill lines in build ${SPELLS_BUILD}: ranks, passives and helper spells as the files have them, unconfirmed. Talents, which the files put at level 1, are listed apart at the end; runes, pet abilities and procs have none. Nothing in the files says which a trainer teaches or what it costs. `}
         {!names && "The spell names could not be read, so each spell is listed by number. "}
         {unleveled > 0 && <>{`${unleveled} more ${name} spells have no level in the files: `}<Link href={`/database/spells?class=${slug}`} className={LINK}>{`every ${name} spell`}</Link>{" lists them. "}</>}
         <Link href={`/classes/${slug}`} className={LINK}>{`Back to the ${name}`}</Link>
@@ -119,7 +120,7 @@ export default async function ClassSpellsPage({ params }: Params) {
         ))}
         {apart.length > 0 && (
           <section aria-labelledby="talents-runes">
-            <h2 id="talents-runes" className="border-b border-line pb-1 text-sm font-semibold text-fg">Talents and runes (no trainer level)</h2>
+            <h2 id="talents-runes" className="border-b border-line pb-1 text-sm font-semibold text-fg">Talents (no trainer level)</h2>
             <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-cell sm:grid-cols-2 lg:grid-cols-3">{apart.map(item)}</ul>
           </section>
         )}

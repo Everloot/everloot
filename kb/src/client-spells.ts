@@ -133,6 +133,13 @@ export function buildClientSpells(snapshotPath: string): ClientSpells {
   const powerTypes = rows("PowerType");
   const modifier = new Map(powerTypes.map((r) => [int(r.PowerTypeEnum), num(r.DisplayModifier) || 1]));
 
+  // SpellLevel 1 with no BaseLevel is the files' default, not a level: the rune abilities, pet abilities and procs on
+  // the class skill lines read it (Fel Armor, 403619), while every trained spell gives a BaseLevel too.
+  const levelOf = (id: number) => {
+    const row = levels.get(id)?.[0];
+    const lv = int(row?.SpellLevel);
+    return lv === 1 && !int(row?.BaseLevel) ? 0 : lv;
+  };
   const spells: Record<string, ClientSpell> = {};
   for (const id of [...linked].sort((a, b) => a - b)) {
     const s: ClientSpell = {};
@@ -140,7 +147,7 @@ export function buildClientSpells(snapshotPath: string): ClientSpells {
     if (m) {
       if (int(m.SchoolMask)) s.school = int(m.SchoolMask);
       const attrs = arr(m.Attributes).map(int);
-      const lv = int(levels.get(id)?.[0]?.SpellLevel);
+      const lv = levelOf(id);
       if (lv) s.level = lv;
       const cast = int(castTimes.get(int(m.CastingTimeIndex))?.Base);
       if (cast > 0) s.castMs = cast;
@@ -162,7 +169,7 @@ export function buildClientSpells(snapshotPath: string): ClientSpells {
       if ((attrs[0] ?? 0) & PASSIVE) s.passive = 1;
       if ((attrs[1] ?? 0) & CHANNELED) s.channeled = 1;
     } else {
-      const lv = int(levels.get(id)?.[0]?.SpellLevel);
+      const lv = levelOf(id);
       if (lv) s.level = lv;
     }
     const c = categories.get(id)?.[0];

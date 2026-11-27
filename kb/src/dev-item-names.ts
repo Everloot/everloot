@@ -24,3 +24,12 @@ const WHOLE = /^(?:Monster Weapon|Template Item)$/;
 
 export const isDevelopmentItemName = (name: string | null | undefined): boolean =>
   Boolean(name) && (PREFIX.test(name!) || MARKER.test(name!) || TEST_WORD.test(name!) || WHOLE.test(name!));
+
+/**
+ * A spell name the files keep for development: the item rule, or Test as a word in any case ("Editor Test Spell",
+ * "Wyatt Test", "Tim's Test Fireball"). Spells only: quest and NPC names keep their capital Test. "Test of Faith" and
+ * "Test of Lore" are real quest spells and stay; "Testament" and "Testing" are other words.
+ */
+const SPELL_TEST = /\btest\b(?! of\b)/i;
+export const isDevelopmentSpellName = (name: string | null | undefined): boolean =>
+  isDevelopmentItemName(name) || (Boolean(name) && SPELL_TEST.test(name!));

@@ -197,14 +197,25 @@ test("the tooltip box lays out cost and range, then cast time, as the game does,
   const tip = box(page);
   expect(tip).toMatch(/data-tip-pair[^>]*>(?:<[^>]*>)*30 Mana(?:<[^>]*>)*, (?:<[^>]*>)*35 yd range/);
   expect(tip).toContain("1.5 sec cast");
-  // The files link no other rank to this Fireball (SkillLineAbility.SupercedesSpell is 0), so no rank is claimed.
-  expect(tip).not.toContain("Rank ");
+  // The files link no other rank to this Fireball (SkillLineAbility.SupercedesSpell is 0); its rank is the spell list's,
+  // the first of the mage's Fireballs by level (133 at 1, 143 at 6).
+  expect(tip).toMatch(/>Rank 1</);
   expect(tip).toMatch(/School:(?:<[^>]*>)*\s*Fire/);
   expect(tip).toMatch(/Duration:(?:<[^>]*>)*\s*4 sec/);
   // Quick facts: the school, the spell level and the class whose skill line lists it, linked.
   expect(page).toMatch(/School(?:<[^>]*>)*Fire/);
   expect(page).toMatch(/Spell level(?:<[^>]*>)*1</);
   expect(page).toContain('href="/classes/mage"');
+});
+
+test("a class spell the list ranks says its rank on its page too, from the same source", async () => {
+  // Frostbolt 116 (level 4) and 205 (level 8) on the mage's skill lines: no rank chain in the files, so the list ranks
+  // them by the levels of one name (classSpellRanks).
+  known([[116, "Frostbolt"], [205, "Frostbolt"]]);
+  const page = await render("116");
+  expect(box(page)).toMatch(/>Rank 1</);
+  expect(page).toMatch(/>Rank<(?:\/[^>]+>)*(?:<[^>]+>)*1</);
+  expect(box(await render("205"))).toMatch(/>Rank 2</);
 });
 
 test("rage costs read in rage, melee range says so, and a cooldown shows on the right", async () => {

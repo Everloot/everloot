@@ -45,7 +45,7 @@ const tables: Record<string, Rows> = {
   SpellCategories: [[1, { SpellID: 5143, DifficultyID: 0, DispelType: 1, Mechanic: 12 }]],
   SpellDispelType: [[0, { ID: 0, Name_lang: "None" }], [1, { ID: 1, Name_lang: "Magic" }]],
   SpellMechanic: [[12, { ID: 12, StateName_lang: "stunned" }]],
-  SpellLevels: [[1, { SpellID: 133, DifficultyID: 0, SpellLevel: 1, BaseLevel: 1, MaxLevel: 5 }], [2, { SpellID: 143, DifficultyID: 0, SpellLevel: 6 }]],
+  SpellLevels: [[1, { SpellID: 133, DifficultyID: 0, SpellLevel: 1, BaseLevel: 1, MaxLevel: 5 }], [2, { SpellID: 143, DifficultyID: 0, SpellLevel: 6 }], [3, { SpellID: 6057, DifficultyID: 0, SpellLevel: 1, BaseLevel: 0 }]],
   SpellEffect: [
     [1, { SpellID: 133, DifficultyID: 0, EffectIndex: 0, EffectBasePointsF: 13, EffectDieSides: 6, EffectAuraPeriod: 0, EffectChainTargets: 0, Variance: 0, EffectRadiusIndex: [0, 0] }],
     [2, { SpellID: 133, DifficultyID: 0, EffectIndex: 1, EffectBasePointsF: 0, EffectDieSides: 0, EffectAuraPeriod: 2000, EffectChainTargets: 0, Variance: 0, EffectRadiusIndex: [8, 0] }],
@@ -88,6 +88,14 @@ test("spells: rage costs in the game's units, a melee range, the longer cooldown
   expect(spells["78"]).toEqual({ school: 1, range: [0, 5, 1], cooldownMs: 6000, costs: [[1, 15, 0]] });
   expect(spells["143"]).toMatchObject({ level: 6, supersedes: 133 });
   expect(spells["133"]?.supersedes).toBeUndefined();
+});
+
+test("spells: a spell level of 1 with no base level is no level (runes, pet abilities, procs), one above 1 is kept", () => {
+  // Build 71139: Fel Armor (403619) and the rune abilities read SpellLevel 1, BaseLevel 0; trained spells read both.
+  const { spells } = buildClientSpells(snapshot(tables));
+  expect(spells["6057"]?.level).toBeUndefined();
+  expect(spells["133"]?.level).toBe(1);
+  expect(spells["143"]?.level).toBe(6);
 });
 
 test("spells: passive and channeled flags, a percent cost, and the dispel type and mechanic by id", () => {

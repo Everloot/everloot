@@ -7,12 +7,13 @@ import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
 import { CLIENT_SPELLS } from "@/data/game-data/client-spells";
 import Link from "@/components/Link";
-import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { isDevelopmentSpellName } from "@kb/dev-item-names";
 import { CLASSES } from "@/design/tokens";
 import { classLabel, hasClassContext, parseClassContext, switchClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { loadCatalog } from "@/lib/talents/catalogs";
+import { loadSpellTalents } from "@/lib/talents/spell-talents";
 import { classSpellRanks, spellRank } from "@/lib/spell-card";
 import { CLIENT_LABEL } from "@kb/edges";
 import {
@@ -64,7 +65,11 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   // role narrow nothing; a catalog that cannot be read leaves the skill lines to narrow by.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
-  const [names, talents, assets] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), context ? talentCatalogSpells(context.classSlug) : null, loadSiteAssets()]);
+  const [names, talents, assets, talentSpells] = await Promise.all([
+    loadSpellNames(CLIENT_LAYER.build.version), context ? talentCatalogSpells(context.classSlug) : null, loadSiteAssets(),
+    // A talent's level is its row in the tree (the spell page's rule); unread catalogs leave every level shown.
+    loadSpellTalents().catch(() => new Map<number, unknown>()),
+  ]);
   const all = names?.names ?? new Map<number, string>();
   const lines = context ? CLIENT_CLASS_SPELLS.classes[context.classSlug]?.spells ?? [] : [];
   const mine = context ? new Set([...lines, ...(talents ?? [])]) : null;
@@ -74,13 +79,20 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const matching = [...all.entries()]
     .filter(([spellId, name]) => (!mine || mine.has(spellId)) && (!text || (id !== null ? spellId === id : name.toLowerCase().includes(text))));
   // The files' test and retired spells ("Hot Foot (TEST)", "Word of Recall (OLD)") are left out unless asked for, by the
-  // rule the item lists use (kb/src/dev-item-names.ts); the line above the table counts them, with the toggle.
-  const leftovers = matching.filter(([, name]) => isDevelopmentItemName(name)).length;
+  // rule the item lists use plus Test as a word (kb/src/dev-item-names.ts); the line above the table counts them, with the toggle.
+  const leftovers = matching.filter(([, name]) => isDevelopmentSpellName(name)).length;
   // A class's spells of one name are its ranks: each row says which, and the level the files give it.
   const ranks = classSpellRanks((spellId) => all.get(spellId));
   const rows = matching
-    .filter(([, name]) => q.dev || !isDevelopmentItemName(name))
-    .map(([spellId, name]) => ({ spellId, name, rank: ranks.get(spellId) ?? spellRank(spellId), level: CLIENT_SPELLS.spells[String(spellId)]?.level || null }));
+    .filter(([, name]) => q.dev || !isDevelopmentSpellName(name))
+    .map(([spellId, name]) => ({
+      spellId, name, rank: ranks.get(spellId) ?? spellRank(spellId),
+      level: talentSpells.has(spellId) ? null : CLIENT_SPELLS.spells[String(spellId)]?.level || null,
+    }));
+  // A name on more than one row with no rank to tell them apart says its id beside it (Heavy Linen Bandage 3276, 3281).
+  const named = new Map<string, number>();
+  for (const x of rows) named.set(x.name, (named.get(x.name) ?? 0) + 1);
+  const twin = (x: (typeof rows)[number]) => !x.rank && (named.get(x.name) ?? 0) > 1;
   const sort = q.sort ?? DEFAULT_SORT;
   const sorted = sortRows(rows, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.spellId), sort.desc, (x) => x.spellId);
   const { shown, pages, per } = paged(sorted, q);
@@ -90,7 +102,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const clear = withClassContext("/database/spells", context);
 
   const columns: Column<(typeof rows)[number]>[] = [
-    { key: "name", header: "Spell", sortable: true, cell: (x) => <NameCell href={`/database/spells/${x.spellId}`} icon={assets?.spellIcons.get(x.spellId)}>{x.name}</NameCell> },
+    { key: "name", header: "Spell", sortable: true, cell: (x) => <NameCell href={`/database/spells/${x.spellId}`} icon={assets?.spellIcons.get(x.spellId)} after={twin(x) ? <span className="text-meta text-fg-2">{`ID ${x.spellId}`}</span> : null}>{x.name}</NameCell> },
     { key: "rank", header: "Rank", nowrap: true, cell: (x) => (x.rank ? `Rank ${x.rank}` : null) },
     { key: "level", header: "Level", numeric: true, cell: (x) => x.level ?? "–" },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.spellId },
