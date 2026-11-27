@@ -1,5 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { ITEM_FACTS } from "@everloot/protocol";
+import { asciiJsonText } from "./ascii-json";
 import type { ItemFactState } from "@kb/item-facts";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { agreedItemNames } from "@kb/item-page";
@@ -123,7 +124,8 @@ const stored = keep<ReadView | null, { cloud: R2Config; fetch: typeof fetch }>(a
   let read: ReadView | null = null;
   try {
     const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
-    const view = res.ok ? parseItemView(JSON.parse(await res.text())) : null;
+    // Read through asciiJsonText: one name players give with a character above U+00FF would make `res.text()` two bytes a character.
+    const view = res.ok ? parseItemView(JSON.parse(await asciiJsonText(res))) : null;
     if (view) {
       read = {
         view,

@@ -496,12 +496,33 @@ export async function loadItemLevels(assets: SiteAssets | null, ids: readonly nu
 
 /** The file keeps each wiki page as its title in the URL; the link adds this. */
 const WIKI_PAGE_PREFIX = "https://warcraft.wiki.gg/wiki/";
-const ItemNamesSchema = z.object({
-  schema: z.literal("everloot.item-names/1"),
-  build: z.object({ version: z.string() }),
-  wiki: z.object({ name: z.string(), url: z.string().regex(/^https:\/\//), licence: z.literal("CC-BY-SA-4.0") }),
-  names: z.record(z.string().regex(/^\d+$/), z.object({ n: z.string().min(1), q: z.number().int().optional(), w: z.string().regex(/^[^\s"<>]+$/).optional() })),
-});
+/** One entry of the item names file: its name, quality id and wiki page title (both optional). */
+interface ItemNameEntry { n: string; q?: number; w?: string }
+/** The item names file as written (kb/src/assets/item-names.ts); `isItemNamesFile` checks a file has this shape. */
+interface ItemNamesFile {
+  schema: "everloot.item-names/1";
+  build: { version: string };
+  wiki: { name: string; url: string; licence: "CC-BY-SA-4.0" };
+  names: Record<string, ItemNameEntry>;
+}
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const WIKI_TITLE = /^[^\s"<>]+$/;
+const isNameEntry = (v: unknown): v is ItemNameEntry => isRecord(v) && typeof v.n === "string" && v.n.length > 0
+  && (v.q === undefined || Number.isSafeInteger(v.q)) && (v.w === undefined || (typeof v.w === "string" && WIKI_TITLE.test(v.w)));
+
+/**
+ * Whether a parsed item names file has the shape the pages read: the same rules a zod schema gave, checked by hand.
+ * The file is the build's own output, read on most new server instances, and zod took about 60 ms over its 30k entries.
+ */
+export function isItemNamesFile(raw: unknown): raw is ItemNamesFile {
+  if (!isRecord(raw) || raw.schema !== "everloot.item-names/1") return false;
+  const { build, wiki, names } = raw;
+  if (!isRecord(build) || typeof build.version !== "string") return false;
+  if (!isRecord(wiki) || typeof wiki.name !== "string" || typeof wiki.url !== "string" || !wiki.url.startsWith("https://") || wiki.licence !== "CC-BY-SA-4.0") return false;
+  if (!isRecord(names)) return false;
+  for (const id in names) if (!/^\d+$/.test(id) || !isNameEntry(names[id])) return false;
+  return true;
+}
 
 /**
  * An item name the site shows before players confirm it: from the Warcraft Wiki where the wiki gives it (alone, or
@@ -542,16 +563,17 @@ export async function loadItemNames(version: string, base: string | null = asset
 
 /** The item names file as the pages use it; PRIVATE_MALFORMED for a file of another shape (the pages then show none). */
 function parseItemNames(raw: unknown): ItemNames | typeof PRIVATE_MALFORMED {
-  if (!raw || typeof raw !== "object") return PRIVATE_MALFORMED;
-  const f = ItemNamesSchema.safeParse(raw);
-  return f.success ? {
-    version: f.data.build.version,
-    wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
+  if (!isItemNamesFile(raw)) return PRIVATE_MALFORMED;
+  const names = new Map<number, MatchedName>();
+  for (const id in raw.names) {
+    const x = raw.names[id];
     // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
-    names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
+    if (!mayShowName(Number(id), x.n)) continue;
+    names.set(Number(id), {
       name: x.n, color: qualityColor(x.q ?? 1), ...(x.q === undefined ? {} : { quality: x.q }), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
-    } satisfies MatchedName])),
-  } : PRIVATE_MALFORMED;
+    });
+  }
+  return { version: raw.build.version, wiki: { name: raw.wiki.name, url: raw.wiki.url }, names };
 }
 
 /* ---------- Quest titles, item set names and spell names ---------- */

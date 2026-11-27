@@ -1,11 +1,12 @@
 import v8 from "node:v8";
 import vm from "node:vm";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { z } from "zod";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { CLIENT_BAGS } from "@/data/game-data/client-bags";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, forgetSiteAssets, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemLevels, loadItemSetNames, loadItemTips,loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
+  instanceThumbs, isItemNamesFile, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemLevels, loadItemSetNames, loadItemTips,loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, tooltipMoney, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
@@ -540,6 +541,37 @@ test("without the file, the bucket or the asset URL, or with a file for another 
   // A wiki source under another licence, or a link that is not a page title, makes the whole file unusable.
   expect(await loadItemNames("1.60.1.70450", BASE, store({ ...namesFile, wiki: { ...namesFile.wiki, licence: "CC-BY-NC" } }))).toBeNull();
   expect(await loadItemNames("1.60.1.70450", BASE, store({ ...namesFile, names: { 1: { n: "X", q: 1, w: "\"><script>" } } }))).toBeNull();
+});
+
+test("the names file's hand check refuses every file the zod schema it replaced refused, and the page treats it as unreadable", async () => {
+  // The schema the reader used before, kept here as the reference.
+  const zodSchema = z.object({
+    schema: z.literal("everloot.item-names/1"),
+    build: z.object({ version: z.string() }),
+    wiki: z.object({ name: z.string(), url: z.string().regex(/^https:\/\//), licence: z.literal("CC-BY-SA-4.0") }),
+    names: z.record(z.string().regex(/^\d+$/), z.object({ n: z.string().min(1), q: z.number().int().optional(), w: z.string().regex(/^[^\s"<>]+$/).optional() })),
+  });
+  const entry = (e: unknown) => ({ ...namesFile, names: { 2589: e } });
+  const bad: unknown[] = [
+    null, [], "names", 1, [namesFile],
+    { ...namesFile, schema: undefined }, { ...namesFile, schema: "everloot.item-names/2" },
+    { ...namesFile, build: undefined }, { ...namesFile, build: [] }, { ...namesFile, build: { version: 70450 } },
+    { ...namesFile, wiki: undefined }, { ...namesFile, wiki: { ...namesFile.wiki, name: null } }, { ...namesFile, wiki: { ...namesFile.wiki, url: "http://warcraft.wiki.gg" } },
+    { ...namesFile, wiki: { ...namesFile.wiki, licence: "CC-BY-NC" } },
+    { ...namesFile, names: undefined }, { ...namesFile, names: [] }, { ...namesFile, names: null }, { ...namesFile, names: { x1: { n: "X" } } }, { ...namesFile, names: { "-1": { n: "X" } } },
+    entry(null), entry([]), entry("Linen Cloth"), entry({}), entry({ n: "" }), entry({ n: 5 }), entry({ n: "X", q: 1.5 }), entry({ n: "X", q: "1" }), entry({ n: "X", q: null }),
+    entry({ n: "X", q: 2 ** 53 }), entry({ n: "X", w: "" }), entry({ n: "X", w: "a b" }), entry({ n: "X", w: "a<b" }), entry({ n: "X", w: null }), entry({ n: "X", w: 3 }),
+  ];
+  const good: unknown[] = [namesFile, { ...namesFile, names: {} }, entry({ n: "X" }), entry({ n: "X", q: 0, extra: true }), { ...namesFile, wiki: { ...namesFile.wiki, more: 1 } }];
+  for (const file of [...bad, ...good]) {
+    const raw = JSON.parse(JSON.stringify(file) ?? "null");
+    expect(isItemNamesFile(raw), JSON.stringify(file)).toBe(zodSchema.safeParse(raw).success);
+  }
+  for (const file of bad) {
+    const raw = JSON.parse(JSON.stringify(file) ?? "null");
+    if (raw !== null) expect(await loadItemNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/item-names.json`]: raw })), JSON.stringify(file)).toBeNull();
+  }
+  expect(good.every((file) => isItemNamesFile(file))).toBe(true);
 });
 
 const questFile = {
