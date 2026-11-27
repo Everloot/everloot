@@ -13,13 +13,13 @@ import {
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
-import { loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
-import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
+import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { zoneCoverageHref } from "@/lib/coverage-view";
 import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
-import { itemNames } from "@/lib/names";
 import { loadItemLooks } from "@/lib/item-look";
+import ItemTip from "@/components/game/ItemTip";
 import { loadProfessions } from "@/lib/profession-store";
 import { rateWithRange } from "../../loot-tables";
 import { METHOD_LINE } from "@kb/loot-tables";
@@ -132,8 +132,6 @@ export default async function ZonePage(props: Props) {
   if (!itemsDown && query.page > itemPages) notFound();
   const shownItems = items.slice((query.page - 1) * PER_PAGE, query.page * PER_PAGE);
   const itemsHref = (page: number) => `${canonical}${page > 1 ? `?page=${page}` : ""}#items`;
-  const itemFacts = shownItems.length ? await loadItemFacts() : null;
-  const itemName = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
   const terrain = zoneTerrain(zone.mapId);
   const gear = gearFor({ zone: zone.mapId });
@@ -143,7 +141,8 @@ export default async function ZonePage(props: Props) {
   const [spellNames, setNames] = gear.length
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
-  const tips = await loadItemTips(assets, shownItems.map((i) => i.itemId));
+  // The Items rows name, colour and draw each item as its own page, hover card and the drop tables do (lib/item-look.ts).
+  const itemLookOf = shownItems.length ? await loadItemLooks(assets, shownItems.map((i) => i.itemId)) : null;
   const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows, facts.kills);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
@@ -210,7 +209,11 @@ export default async function ZonePage(props: Props) {
   const manySources = (i: ZoneItem) => i.sources.length > 1;
   const rateRange = (i: ZoneItem) => i.sources.map((s) => rateWithRange(s.withItem, s.windows, s.installs)).join("; ");
   const itemColumns: Column<ZoneItem>[] = [
-    { key: "item", header: "Item", cell: (i) => <EntityLink kind="item" id={i.itemId} name={itemName.get(i.itemId) ?? tips.get(i.itemId)?.name} icon={tips.get(i.itemId)?.icon} /> },
+    { key: "item", header: "Item", cell: (i) => {
+      const x = itemLookOf!(i.itemId);
+      // The tooltip draws its own icon in front; an item the files give only an icon for draws it in the link.
+      return <ItemTip tip={x.tip}><EntityLink kind="item" id={i.itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} /></ItemTip>;
+    } },
     { key: "from", header: "From", cell: (i) => (!manySources(i) ? sourceLink(i.sources[0]) : (
       <details data-item-sources className="group">
         <summary className="flex min-h-6 cursor-pointer list-none items-center gap-2 text-fg [&::-webkit-details-marker]:hidden">

@@ -578,6 +578,16 @@ test("a confirmed title and its game-files row are one row: the files' kind, the
   expect(linked(await html(TitleList(search({ sort: "name" }))), "titles")).toEqual(["5-corporal", "1017-of-the-magram", "4-private", "1260-sergeant", "1273-sergeant"]);
 });
 
+test("a merged-away title row has no sitemap entry and its page redirects to the title it merged into", async () => {
+  // As above: "Corporal %s" (1259) is the files' row of the confirmed "Corporal" (5); the list links only 5.
+  game.titles = [{ id: 1017, name: "%s of the Magram" }, { id: 1258, name: "Private %s" }, { id: 1259, name: "Corporal %s" }, { id: 1260, name: "Sergeant %s" }, { id: 1273, name: "Sergeant %s" }];
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname).filter((p) => p.startsWith("/database/titles/"));
+  expect(paths.sort()).toEqual(["/database/titles/1017-of-the-magram", "/database/titles/1260-sergeant", "/database/titles/1273-sergeant", "/database/titles/4-private", "/database/titles/5-corporal"]);
+  await expect(TitlePage(page("1259-corporal"))).rejects.toThrow("REDIRECT /database/titles/5-corporal");
+  await expect(TitlePage(page("1258"))).rejects.toThrow("REDIRECT /database/titles/4-private");
+  expect(await html(TitlePage(page("1260-sergeant")))).toContain("Sergeant");
+});
+
 test("the achievement list leaves out Points when no row on the page has any, and a row with none is an empty cell, not a dash", async () => {
   game.achievements = { "50": { title: "Loremaster", points: 0, criteria: [{}] }, "60": { title: "Skilled", points: 0, criteria: [] } };
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });

@@ -17,6 +17,7 @@ import { npcRows, publicQuests, SIDE_LABEL, type NpcRow, type QuestRow } from "@
 import { guildSearchPrefix, guildsOn } from "@/lib/guilds";
 import { playerPagesOn, searchPrefix } from "@/lib/player-pages";
 import PeopleResults, { PeopleTabCount } from "./PeopleResults";
+import PendingResults from "./PendingResults";
 
 /** A `type=` value is one of the stored types; anything else means All. */
 function typeOf(raw: string | undefined): LoreType | undefined {
@@ -196,6 +197,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         <div className="mb-4 max-w-3xl">
           <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} surface="search-page" />
         </div>
+        <PendingResults q={q}>
         {tabs && <div className="mb-4"><LinkTabs label="Result types" tabs={tabs} /></div>}
 
         {groups === null ? <SearchStart /> : groups.length === 0 ? (
@@ -210,6 +212,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
             {groups.slice(split).map(table)}
           </>
         )}
+        </PendingResults>
       </article>
     </Container>
   );

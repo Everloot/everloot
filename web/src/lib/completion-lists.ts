@@ -177,20 +177,31 @@ export const titleWords = (name: string) => name.replace(NAME_SLOT, " ").replace
  * ("Sergeant %s", Alliance and Horde) pair only when as many reported titles carry them, in id order; else both stay.
  */
 export function titleRows(titles: readonly Listed<TitleEntry>[]): Listed<TitleEntry>[] {
+  const { named, folded } = foldTitles(titles);
+  return titles.filter((t) => !folded.has(t)).map((t) => (named.has(t) ? { ...t, name: named.get(t)! } : t));
+}
+
+/** The id of the title a game-files row merged into (titleRows), so its page can send readers to the one the list links. */
+export function titleMergedInto(titles: readonly Listed<TitleEntry>[], id: number): Listed<TitleEntry> | null {
+  for (const [files, into] of foldTitles(titles).folded) if (files.titleId === id) return { ...into, name: files.name };
+  return null;
+}
+
+function foldTitles(titles: readonly Listed<TitleEntry>[]) {
   const files = new Map<string, Listed<TitleEntry>[]>();
   for (const t of titles) if (!t.confirmed && t.name.includes("%s")) files.set(titleWords(t.name), [...(files.get(titleWords(t.name)) ?? []), t]);
   const reported = new Map<string, Listed<TitleEntry>[]>();
   for (const t of titles) if (t.confirmed && !t.name.includes("%s")) reported.set(titleWords(t.name), [...(reported.get(titleWords(t.name)) ?? []), t]);
   const named = new Map<Listed<TitleEntry>, string>();
-  const folded = new Set<Listed<TitleEntry>>();
+  const folded = new Map<Listed<TitleEntry>, Listed<TitleEntry>>();
   for (const [words, list] of reported) {
     const match = files.get(words);
     if (!match || match.length !== list.length) continue;
     const byId = (a: Listed<TitleEntry>, b: Listed<TitleEntry>) => a.titleId - b.titleId;
     const pieces = [...match].sort(byId);
-    [...list].sort(byId).forEach((t, i) => { named.set(t, pieces[i]!.name); folded.add(pieces[i]!); });
+    [...list].sort(byId).forEach((t, i) => { named.set(t, pieces[i]!.name); folded.set(pieces[i]!, t); });
   }
-  return titles.filter((t) => !folded.has(t)).map((t) => (named.has(t) ? { ...t, name: named.get(t)! } : t));
+  return { named, folded };
 }
 
 /** A title with a name in its slot, as the game shows it on a character. */
