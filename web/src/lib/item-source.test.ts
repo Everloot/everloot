@@ -64,7 +64,8 @@ test("src round-trips through the URL, in one order, beside the other filters", 
   expect(itemsHref("armor", "cloth", q)).toBe("/database/items/armor/cloth?q=robe&quality=epic&src=drop,quest&sort=-seen&page=2");
   expect(toggled(q, "src", "drop")).toMatchObject({ src: ["quest"], page: 1 });
   expect(toggled(toggled(q, "src", "drop"), "src", "quest").src).toBeUndefined();
-  expect(categoryQuery({ src: "loot" })).toBeNull();
+  // An unknown source is left out and named, not a 404 (category-page.test.tsx draws the note).
+  expect(categoryQuery({ src: "loot" })).toEqual({ page: 1, unknown: [{ filter: "source", value: "loot" }] });
 });
 
 test("a subclass is labelled without the client's OBSOLETE suffix or a bare number, and those buckets are marked retired", () => {

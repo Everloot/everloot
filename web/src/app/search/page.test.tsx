@@ -22,7 +22,10 @@ vi.mock("@/lib/shown-search-names", () => ({ loadSearchShown: () => (namesRead.p
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return { icons: icons.map, unknown: icons.map.size ? "https://assets.everloot.app/b/icons/134400.webp" : null }; } }));
 // The Characters and Guilds groups load in the browser; here a marker shows where they would sit, and the fallback.
-vi.mock("./PeopleResults", () => ({ default: ({ q, empty }: { q: string; empty?: ReactNode }) => <div data-people={q}>{empty}</div> }));
+vi.mock("./PeopleResults", () => ({
+  default: ({ q, empty }: { q: string; empty?: ReactNode }) => <div data-people={q}>{empty}</div>,
+  PeopleTabCount: ({ kind }: { kind: string }) => <span data-tab-count={kind} />,
+}));
 // The quest and NPC facts beside the overview's hits come from the lists' own row builders over the aggregate; here the
 // rows a test sets stand in for them, and with none set the aggregate is unreachable.
 const facts = vi.hoisted(() => ({ quests: null as unknown[] | null, npcs: null as unknown[] | null }));
@@ -177,6 +180,9 @@ test("the tab row lists All, every group with its count opening its list, and Ch
   const thrall = (await render({ q: "thrall" })).match(/<nav aria-label="Result types"[\s\S]*?<\/nav>/)?.[0] ?? "";
   expect(thrall).toContain('href="/players?q=thrall"');
   expect(thrall).toContain('href="/guilds?q=thrall"');
+  // Their counts come with the rows the browser asks for, in the tab itself (the Characters tab had none beside "(2)").
+  expect(thrall).toMatch(/href="\/players\?q=thrall"[^>]*>Characters<span data-tab-count="characters">/);
+  expect(thrall).toMatch(/href="\/guilds\?q=thrall"[^>]*>Guilds<span data-tab-count="guilds">/);
   // The tabs take their own row under the field, and the group footer opens the list too.
   expect(html.indexOf('name="q"')).toBeLessThan(html.indexOf('aria-label="Result types"'));
   expect(html).toContain(">See all 6 quests</a>");

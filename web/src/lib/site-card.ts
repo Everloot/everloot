@@ -81,7 +81,7 @@ export type SiteCardResult = { status: 200; body: SiteCard } | { status: 404 | 5
 
 const NOT_FOUND = "No card: no such page, or players have not reported it yet.";
 /** The line on a quest card that nothing names yet. */
-const NO_QUEST_NAME = "Name not yet reported by players";
+const NO_QUEST_NAME = "Name not reported yet";
 const UNREACHABLE = "Storage is unavailable. The card is unrecorded, not empty.";
 const UNAVAILABLE = { status: 503, error: UNREACHABLE } as const;
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ") || null;

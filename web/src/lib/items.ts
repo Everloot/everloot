@@ -173,6 +173,11 @@ export interface CategoryQuery {
   /** Rows on a page when not the default (?per=, lib/page-size.ts). */
   per?: number;
   page: number;
+  /**
+   * Filter values the list does not know (a hand-typed or old link: ?quality=4), left out of the list and of every link
+   * it writes; the page names them in a note rather than answering 404.
+   */
+  unknown?: { filter: string; value: string }[];
 }
 
 /** How many filters are on (the page and the sort are not filters). */
@@ -190,27 +195,41 @@ function levels(raw: string | undefined): { min: number; max: number } | undefin
 }
 const levelsParam = (r?: { min: number; max: number }) => (r ? (r.min === r.max ? String(r.min) : `${r.min}-${r.max}`) : undefined);
 
-/** A comma list where every value is known, in the known values' order; null when one is not. */
-function list(raw: string | undefined, known: readonly string[]): string[] | undefined | null {
-  if (raw === undefined) return undefined;
-  const values = raw.split(",").filter(Boolean);
-  if (!values.length || values.some((v) => !known.includes(v))) return null;
-  return known.filter((k) => values.includes(k));
-}
+/** The filter names a note about an unknown value uses ("No such quality: ..."). */
+const FILTER_NAMES: Record<string, string> = {
+  slot: "slot", quality: "quality", src: "source", skill: "profession", bind: "binding", ilvl: "item level", req: "required level",
+  crafted: "crafted setting", reagent: "reagent setting", set: "set piece setting", seen: "seen by players setting",
+};
 
-/** The list filters from the query string; an unknown value is null (the page answers 404 rather than guess). */
+/**
+ * The list filters from the query string. A filter value the list does not know is left out and kept in `unknown`
+ * (old or hand-typed links still show the list); a bad sort, page or page size, or a bad view flag, is null (404).
+ */
 export function categoryQuery(search: Record<string, string | string[] | undefined>): CategoryQuery | null {
   const one = (k: string) => (typeof search[k] === "string" ? (search[k] as string) : undefined);
-  const flag = (k: string): boolean | undefined | null => { const v = one(k); return v === undefined ? undefined : v === "1" ? true : null; };
-  const slot = list(one("slot"), SLOT_SLUGS);
-  const quality = list(one("quality"), [...QUALITY_SLUGS, UNRECORDED]);
-  const src = list(one("src"), SOURCE_SLUGS) as SourceSlug[] | undefined | null;
-  const crafted = flag("crafted"), reagent = flag("reagent"), set = flag("set"), seen = flag("seen"), dev = flag("dev"), unnamed = flag("unnamed");
-  const skill = one("skill"), sort = one("sort"), page = one("page"), per = parsePer(one("per"));
-  const ilvl = levels(one("ilvl")), req = levels(one("req")), bind = one("bind");
-  if (slot === null || quality === null || src === null || crafted === null || reagent === null || set === null || seen === null || dev === null || unnamed === null || ilvl === null || req === null) return null;
-  if (skill !== undefined && !itemFacets().professions.some((p) => p.slug === skill)) return null;
-  if (bind !== undefined && !BINDING_SLUGS.includes(bind)) return null;
+  const unknown: { filter: string; value: string }[] = [];
+  const miss = (k: string, value: string) => { unknown.push({ filter: FILTER_NAMES[k], value: value.slice(0, 40) }); return undefined; };
+  /** A comma list's known values, in the known values' order; the rest are unknown. */
+  const list = (k: string, known: readonly string[]): string[] | undefined => {
+    const values = one(k)?.split(",").filter(Boolean);
+    if (!values?.length) return undefined;
+    for (const v of values) if (!known.includes(v)) miss(k, v);
+    const kept = known.filter((v) => values.includes(v));
+    return kept.length ? kept : undefined;
+  };
+  const view = (k: string): boolean | undefined | null => { const v = one(k); return v === undefined ? undefined : v === "1" ? true : null; };
+  const flag = (k: string): boolean | undefined => { const v = one(k); return v === undefined ? undefined : v === "1" ? true : miss(k, v); };
+  const range = (k: string) => { const v = one(k), r = levels(v); return r === null ? miss(k, v!) : r; };
+  const slot = list("slot", SLOT_SLUGS);
+  const quality = list("quality", [...QUALITY_SLUGS, UNRECORDED]);
+  const src = list("src", SOURCE_SLUGS) as SourceSlug[] | undefined;
+  const crafted = flag("crafted"), reagent = flag("reagent"), set = flag("set"), seen = flag("seen"), dev = view("dev"), unnamed = view("unnamed");
+  const sort = one("sort"), page = one("page"), per = parsePer(one("per"));
+  const ilvl = range("ilvl"), req = range("req");
+  const rawSkill = one("skill"), rawBind = one("bind");
+  const skill = rawSkill === undefined || itemFacets().professions.some((p) => p.slug === rawSkill) ? rawSkill : miss("skill", rawSkill);
+  const bind = rawBind === undefined || BINDING_SLUGS.includes(rawBind) ? rawBind : miss("bind", rawBind);
+  if (dev === null || unnamed === null) return null;
   const sorted = sort === undefined ? undefined : /^(-?)([a-z]+)$/.exec(sort);
   if (sort !== undefined && (!sorted || !(ITEM_SORTS as readonly string[]).includes(sorted[2]))) return null;
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
@@ -225,6 +244,7 @@ export function categoryQuery(search: Record<string, string | string[] | undefin
     ...(sorted ? { sort: { key: sorted[2] as ItemSort, desc: sorted[1] === "-" } } : {}),
     ...(per ? { per } : {}),
     page: page === undefined ? 1 : Number(page),
+    ...(unknown.length ? { unknown } : {}),
   };
 }
 

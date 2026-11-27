@@ -1,5 +1,7 @@
 import { renderRssChannel } from "@kb/changes";
+import { KIND_LABEL } from "@/lib/database-activity";
 import { loadDatabaseActivity } from "@/lib/database-activity-store";
+import { withPageNames } from "@/lib/home-live";
 import { absoluteUrl, SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +10,10 @@ const xml = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g
 export async function GET(): Promise<Response> {
   const file = await loadDatabaseActivity();
   if (!file) return Response.json({ error: "Public facts are temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "CDN-Cache-Control": "no-store" } });
-  const items = file.entries.map((e) => [
+  // The names the page and the home panel show, not the activity file's "NPC #2376" fallback.
+  const items = (await withPageNames(file.entries)).map((e) => [
     "    <item>",
-    `      <title>${xml(`${e.kind}: ${e.name}`)}</title>`,
+    `      <title>${xml(`${KIND_LABEL[e.kind] ?? e.kind}: ${e.name}`)}</title>`,
     `      <link>${xml(absoluteUrl(e.path))}</link>`,
     `      <guid isPermaLink="false">database:${e.kind}:${e.id}</guid>`,
     `      <pubDate>${new Date(e.publicAt).toUTCString()}</pubDate>`,

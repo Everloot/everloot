@@ -443,8 +443,12 @@ test("item sets are found by the set names the set pages show, and any set the g
   const itemSets = new Map([[1, "Ironfeather Armor"], [41, "Dal'Rend's Arms"]]);
   const group = (await siteSearch("ironfeather", { itemSets })).find((g) => g.type === "item-set")!;
   expect(group.heading).toBe("Item sets");
-  expect(group.results).toEqual([{ label: "Ironfeather Armor", href: "/database/item-sets/1", note: "id 1", exact: false, id: 1 }]);
+  // The note gives the pieces and bonuses the set list shows, so two sets of one name tell apart.
+  expect(group.results).toEqual([{ label: "Ironfeather Armor", href: "/database/item-sets/1", note: "6 pieces · 4 bonuses", exact: false, id: 1 }]);
   expect((await siteSearch("1", { itemSets: new Map() })).find((g) => g.type === "item-set")!.results[0]).toMatchObject({ label: "Item set 1", href: "/database/item-sets/1", exact: true });
+  // The two Postmaster sets (81 and 1782) share a name and five pieces; their bonuses differ.
+  const twins = (await siteSearch("postmaster", { itemSets: new Map([[81, "The Postmaster"], [1782, "The Postmaster"]]) })).find((g) => g.type === "item-set")!;
+  expect(twins.results.map((r) => r.note)).toEqual(["5 pieces · 4 bonuses", "5 pieces · 6 bonuses"]);
 });
 
 test.each(["spell", "vendor", "item-set"] as const)("a search scoped to %s pages through its matches", async (only) => {

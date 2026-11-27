@@ -58,7 +58,7 @@ export const NAME_TITLE: Record<NameSource, string> = { ...NAME_FROM, files: UNC
  * The plain list, on any page, is its own canonical; a filter, a sort, a name search or a class context is noindex
  * and points its canonical at page 1 of the plain list.
  */
-const isPlain = (q: CategoryQuery, search: Search) => activeFilters(q) === 0 && !q.sort && !q.per && !q.dev && !q.unnamed && !hasClassContext(search);
+const isPlain = (q: CategoryQuery, search: Search) => activeFilters(q) === 0 && !q.sort && !q.per && !q.dev && !q.unnamed && !q.unknown && !hasClassContext(search);
 
 export const ALL_ITEMS = {
   title: "WoW Forever Items by Category",
@@ -389,6 +389,11 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             </span>
           )}
         </ClassContextChip>
+        {q.unknown && (
+          <p data-unknown-filter className="mt-2 text-cell-2 text-fg-2">
+            {q.unknown.map((u) => `No such ${u.filter}: “${u.value}”.`).join(" ")} The list shows without {q.unknown.length === 1 ? "it" : "them"}.
+          </p>
+        )}
         {(held > 0 || showUnnamed) && (
           <p data-hidden-items className="mt-2 flex flex-wrap items-center gap-2 text-cell-2 text-muted">
             <span>{hiddenLine}</span>
@@ -409,9 +414,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           <DataTable
             dense
             caption={`${title}: ${plural(rows.length)}`}
-            // A column nothing in the whole result has (Source, until a listed item has one) is left out; one page
-            // without a value keeps it, so it does not come and go from page to page or under a filter.
-            columns={filledColumns(columns, rows)}
+            // A column nothing in the category has (Source, until an item the list can show has one) is left out. It is
+            // read over the category, not the filtered result, so it shows wherever the Source menu does and does not
+            // come and go from page to page or under a filter.
+            columns={filledColumns(columns, pool)}
             rows={shown}
             rowKey={(row) => String(row[0])}
             // The default order (named items first) is no one column, so no header shows an arrow for it.
