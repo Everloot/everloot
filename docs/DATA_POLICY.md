@@ -706,8 +706,7 @@ in-game `/ask`) answers from the committed game-data files when a question names
 master, mount, achievement or talent the 2023 wiki and player data do not cover. The rules:
 
 - An answer may carry the names those files hold for instances, encounters (bosses), zones, flight masters,
-  mounts, achievements and talents, with ids and facts: an instance's kind, levels, zone, its entrance's spot on
-  that zone's map (the map layer's entrance point, as the instance page shows it; added 2026-11-27) and encounters in
+  mounts, achievements and talents, with ids and facts: an instance's kind, levels, zone and encounters in
   order, a mount's riding skill and spell, an achievement's points and criteria count, a talent's class, tree
   and ranks.
 - Game text stays on pages: achievement descriptions and criteria, spell and talent descriptions and tooltip

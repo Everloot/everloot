@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -182,10 +182,4 @@ test("filesEvidence preserves literal punctuation, whole-word boundaries and Uni
   expect(filesEvidence("Hoggers and AAAB", index, 8)).toEqual([]);
   expect(filesEvidence("Kelvin and ſtorm", index, 8).map((e) => e.claim)).toEqual(["Kelvin: boss.", "Storm: boss."]);
   expect(filesEvidence("éHogger2", index, 8)).toEqual([]);
-});
-
-test("an instance's fact gives its entrance's spot on the zone map, as the instance page does (the real map file)", () => {
-  const map = JSON.parse(readFileSync(new URL("../../web/src/data/game-data/map.json", import.meta.url), "utf8"));
-  const deadmines = buildFilesIndex({ map }).facts.find((f) => f.kind === "instance" && f.name === "Deadmines")!;
-  expect(deadmines.claim).toMatch(/^Deadmines: a dungeon, level 16, entered from Westfall at 38\.2, 77\.5[.;]/);
 });
