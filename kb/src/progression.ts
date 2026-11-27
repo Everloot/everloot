@@ -3,6 +3,7 @@ import map from "../../web/src/data/game-data/map.json";
 import names from "../../addon/data/instance-map-names.json";
 import agreed from "../../addon/data/agreed-instances.json";
 import type { InstanceFacts } from "./instances.js";
+import { isDevelopmentItemName } from "./dev-item-names.js";
 
 export const PROGRESSION_GROUPS = ["Dungeons", "Raids", "World bosses"] as const;
 export const PROGRESSION_BUILD = encounters.build.version;
@@ -70,7 +71,8 @@ export function progressionCatalogue(facts: InstanceFacts | null): ProgressionIn
       availability: facts === null ? "unknown" : open.has(id) ? "open" : "not seen open yet",
     };
   });
-  return rows.sort((a, b) => PROGRESSION_GROUPS.indexOf(a.group) - PROGRESSION_GROUPS.indexOf(b.group) || a.id - b.id);
+  // A development leftover ("Test Dungeon") is dropped by the same name rule as the item and achievement lists.
+  return rows.filter((r) => !isDevelopmentItemName(r.name)).sort((a, b) => PROGRESSION_GROUPS.indexOf(a.group) - PROGRESSION_GROUPS.indexOf(b.group) || a.id - b.id);
 }
 
 const tracked = trackedDungeons();

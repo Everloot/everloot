@@ -10,7 +10,7 @@ import {
   armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion, regionLabel, slugFromSegment, validArmorySlug,
 } from "@/lib/armory";
 import { loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
-import { loadEquippedTips } from "@/lib/equipped-item-tips";
+import { loadEquippedItems } from "@/lib/equipped-item-tips";
 import { publicArmoryLink } from "@/lib/armory-links";
 import { Equipment, readTimes } from "../../profile";
 import { characterPanel, characterTabs, DEFAULT_TAB } from "../../character-tabs";
@@ -88,12 +88,12 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   // The character's own region and slug are the address's (the store matches on both), so the early reads are its reads.
   const { name, sightingRead, ranksRead, linkRead, assetsRead, progressionRead } = early ?? addressReads(c.region, c.slug)!;
   const sighting = c.name.normalize("NFC").toLowerCase() === name ? sightingRead : addonSighting(c);
-  const [ranks, associated, addon, assets, tips, progression, seen, defaultParts, search] = await Promise.all([
+  const [ranks, associated, addon, assets, { tips, unknown }, progression, seen, defaultParts, search] = await Promise.all([
     ranksRead,
     linkRead,
     linkRead.then((a) => (a?.sharesData ? addonProfile(a.identity).catch(() => null) : null)),
     assetsRead,
-    assetsRead.then((a) => loadEquippedTips(a, c.equipment)),
+    assetsRead.then((a) => loadEquippedItems(a, c.equipment)),
     progressionRead,
     sighting,
     tabParts(c, DEFAULT_TAB),
@@ -157,9 +157,9 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
 
         <CharacterOverview character={c} />
 
-        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} center={<SheetSummary character={c} />} />
+        <Equipment character={c} tips={tips} unknownIcon={unknownIcon} unknown={unknown} center={<SheetSummary character={c} />} />
 
-        <DungeonRaidSlot data={progression.dungeons} href="#progress" />
+        <DungeonRaidSlot data={progression.dungeons} href="#progress" character={c} />
 
         {seen && <AddonSighting seen={seen} />}
 

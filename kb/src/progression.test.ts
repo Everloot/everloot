@@ -18,10 +18,13 @@ test("the tracked dungeon summary excludes partial catalogs, and distinguishes m
   expect(dungeonProgress([...kills, ...kills, kill(36, kills[0]!.encounterId)])).toEqual({ cleared: 1, total: tracked.length });
 });
 
-test("every client instance and unique boss survives, grouped then in file order", () => {
+test("every client instance but a development leftover, and every unique boss, survives, grouped then in file order", () => {
   const rows = catalogue();
-  expect(rows).toHaveLength(Object.keys(encounters.instances).length);
-  expect(new Set(rows.map((r) => r.id))).toEqual(new Set(Object.keys(encounters.instances).map(Number)));
+  // The files name one instance "Test Dungeon": a leftover, dropped by the rule the item and achievement lists use.
+  expect(rows.some((r) => r.name === "Test Dungeon")).toBe(false);
+  const leftovers = Object.keys(encounters.instances).map(Number).filter((id) => !rows.some((r) => r.id === id));
+  expect(leftovers).toHaveLength(1);
+  expect(new Set([...rows.map((r) => r.id), ...leftovers])).toEqual(new Set(Object.keys(encounters.instances).map(Number)));
   expect([...new Set(rows.map((r) => r.group))]).toEqual(["Dungeons", "Raids", "World bosses"]);
   for (const group of ["Dungeons", "Raids", "World bosses"]) {
     const ids = rows.filter((r) => r.group === group).map((r) => r.id);

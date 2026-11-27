@@ -6,6 +6,7 @@ import { entryAtRank, nodeMap, pointsByTree } from "@/lib/talents/rules";
 import type { Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameTree from "./GameTree";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
+import { withoutUnknownAmounts } from "./armory-text";
 import TalentTreeView, { arrowTarget, assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
 
 // A character's build drawn on the calculator's trees, read-only: the same tree pictures (the game's look when the
@@ -47,11 +48,15 @@ export default function ArmoryTalentTrees({ catalog, ranks }: { catalog: TalentC
   if (assets && tipNode) {
     const rank = ranks[tipNode.id]?.rank ?? 0;
     const entries = tipNode.kind === "choice" ? tipNode.entries : [entryAtRank(tipNode, rank)];
+    const raw = entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n");
+    const { text, dropped } = withoutUnknownAmounts(raw);
     content = {
       title: entries.map((e) => e.name).join(" or "),
       rank: `Rank ${rank}/${tipNode.maxRanks}`,
-      text: entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n") || null,
-      partial: entries.some((e) => assetOf(assets, e)?.partial),
+      text: text || null,
+      // With every [?] written out of the text, only the note about the left-out amount remains.
+      partial: text.includes("[?]"),
+      note: dropped ? "This rank's amount is not in the game files we read, so the text leaves it out." : null,
       lock: null,
       label: `${assets.label} · build ${assets.version}`,
     };
