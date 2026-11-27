@@ -27,8 +27,12 @@ import type { Market, R2Config } from "./upload-store";
  */
 
 export const BOARDS_KEY = "snapshots/market-boards.json";
-/** The file's shape. Change it when the shape changes, so the next cron rewrites the file and pages never read an old one. */
-export const BOARDS_REVISION = "boards-1";
+/**
+ * The file's shape. Change it when the shape changes, so the next cron rewrites the file and pages never read an old one.
+ * boards-2: files stored before #1612 named only the items players agree on (the job had no game assets address), and the
+ * write step skips a rollup and day it already stored, so the bump makes the next run store them with the game files' names.
+ */
+export const BOARDS_REVISION = "boards-2";
 /** How long one server instance keeps the file before asking again (with its ETag): the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 60_000;
 
