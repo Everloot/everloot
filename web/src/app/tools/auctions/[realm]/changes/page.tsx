@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "@/components/Link";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { notFound, permanentRedirect } from "next/navigation";
 import type { AuctionHouse } from "@everloot/protocol";
 import { MARKET_RULE, THIN_UNITS, formatCopper, reportersText } from "@kb/market";
@@ -197,6 +198,8 @@ export default async function MarketChangesPage(props: Props) {
 
   return (
     <Container width="data">
+      {/* Boards that could not be read: the edge keeps this render a minute, not its five. */}
+      <EdgeDegraded when={!stored} />
       <article>
         <DataTitle
           title={<>Market changes: <RealmName name={realmName} /></>}

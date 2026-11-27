@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { MARKET_RULE } from "@kb/market";
 import { uploadStore } from "@/lib/upload-store";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
@@ -62,6 +64,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 export default async function CrossRealmItemPage(props: Props) {
   const { itemId, now, market, rows, tip, names, label } = await load(props.params);
   const state = market.state;
+  // A rollup that could not be read is kept seconds, not five minutes.
+  const degraded = await keepBrieflyIf(state === null);
   const path = crossRealmHref(itemId);
   const low = extreme(rows, (a, b) => a < b);
   const high = extreme(rows, (a, b) => a > b);
@@ -69,6 +73,7 @@ export default async function CrossRealmItemPage(props: Props) {
 
   return (
     <Container>
+      <EdgeDegraded when={degraded} />
       {rows.length > 0 && (
         <JsonLd data={marketDatasetJsonLd({
           name: `${label} auction prices across realms`,

@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { CLASSES, LAUNCH, longDate, NEW_COMBOS, RACES } from "@/data/wow-forever";
 import { DATES, POSTS, RULESETS, RULESETS_POST, hasLaunched, windowAt, type BluePostRef } from "@/data/wow-forever-launch";
 import { latestBuildLine } from "@/lib/changes-facts";
-import { loadTimeline, postPath } from "@/lib/changes";
+import { loadTimeline, postPath, timelineDegraded } from "@/lib/changes";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor, type RaceTrait } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import StartHere from "@/components/start/StartHere";
@@ -12,7 +14,7 @@ import RulesetChooser from "@/components/start/RulesetChooser";
 import JsonLd from "@/components/JsonLd";
 import { videoGamePageJsonLd } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
-import { emblems, loadSiteAssets } from "@/lib/game-assets";
+import { emblems, loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 
@@ -133,12 +135,16 @@ export default async function WowForeverPage() {
   // The game's race and faction emblems beside the names, only when the asset URL is set and the upload has them.
   const assets = await loadSiteAssets();
   const icons = emblems(assets);
+  const timeline = await loadTimeline();
+  // The emblems or the latest build that could not be read (the build's render, or an outage): kept seconds, not the hour.
+  const degraded = await keepBrieflyIf(siteAssetsFailed(assets) || await timelineDegraded());
   const now = new Date();
   const launched = hasLaunched(now);
   const names = windowAt(now, DATES.namesOpen, DATES.namesClose);
   const step = "font-semibold text-fg";
   return (
     <Container width="wide">
+      <EdgeDegraded when={degraded} />
       <JsonLd data={videoGamePageJsonLd({ name: title, description, path: "/wow-forever", source: { title: LAUNCH.sourceTitle, url: LAUNCH.sourceUrl } })} />
       <PageHeader
         title="What is WoW: Forever?"
@@ -268,7 +274,7 @@ export default async function WowForeverPage() {
         <section aria-labelledby="latest" className="max-w-reading">
           <SectionHeading id="latest">What is the latest WoW: Forever build?</SectionHeading>
           <div className="space-y-4">
-            <p className="text-fg-2">{latestBuildLine(await loadTimeline())}</p>
+            <p className="text-fg-2">{latestBuildLine(timeline)}</p>
             <p className="text-sm text-muted">
               A build&apos;s date is when Everloot first saw it, not when Blizzard shipped it. Every build and Blizzard post is on{" "}
               <Link href="/changes" className={link}>Patch notes and Blizzard posts</Link>.

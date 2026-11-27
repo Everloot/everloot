@@ -28,14 +28,26 @@ const builds = (buildsFile as unknown as { builds: BuildLike[] }).builds;
 const TIMELINE_KEEP_MS = 60_000;
 
 /** One read per caller (`share: false`): a Worker cancels work one request awaits on another's behalf (release.ts). */
-const timeline = keep<ChangeEntry[]>(async () => ({ value: await readTimeline() }), { ttlMs: TIMELINE_KEEP_MS, share: false });
+const timeline = keep<Timeline>(async () => ({ value: await readTimeline() }), { ttlMs: TIMELINE_KEEP_MS, share: false });
+
+/** The timeline, and whether it is the bundled posts because the store was not configured or could not be read. */
+interface Timeline { entries: ChangeEntry[]; degraded: boolean }
 
 /**
  * One entry per announcement: a post Blizzard made on both forums is one entry, the other copies under `copies`.
  * Shared by every caller of the instance while it is kept: read it, never sort or change it in place.
  */
 export async function loadTimeline(): Promise<ChangeEntry[]> {
-  return timeline.get();
+  return (await timeline.get()).entries;
+}
+
+/**
+ * Whether the timeline is the bundled posts because the blue store could not be read (or, as on the deploy's build,
+ * is not configured): the newest posts may be missing, so a kept page drawn from it is kept only briefly
+ * (lib/degraded-render.ts).
+ */
+export async function timelineDegraded(): Promise<boolean> {
+  return (await timeline.get()).degraded;
 }
 
 /**
@@ -56,17 +68,19 @@ export function oneRowPerTitleDay(entries: readonly ChangeEntry[], n: number): {
 /** For tests: forget the kept timeline. */
 export const forgetTimeline = () => timeline.forget();
 
-async function readTimeline(): Promise<ChangeEntry[]> {
+async function readTimeline(): Promise<Timeline> {
   let posts = store.posts;
+  let degraded = true;
   try {
     const storage = blueStorage();
     if (storage) {
       const response = await fetch(await storage.sign(BLUE_POSTS_KEY), { next: { tags: ["blue"], revalidate: 600 } });
       if (!response.ok) throw new Error("Blue posts unavailable");
       posts = bluePosts(await response.json());
+      degraded = false;
     }
   } catch { /* The bundled posts remain available during a storage outage. */ }
-  return groupAnnouncements([...buildTimeline(posts, builds), ...manualEntries(manualFile)]);
+  return { entries: groupAnnouncements([...buildTimeline(posts, builds), ...manualEntries(manualFile)]), degraded };
 }
 
 /** Our reviewed write-ups of blue posts (kb/curated/blue-writeups), by post id; bundled like the posts. */

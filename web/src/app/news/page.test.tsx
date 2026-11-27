@@ -19,9 +19,11 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("404"); } }));
 // The post page resolves its tokens against the database; the fixture's item gets a fixed name.
+const vest = () => new Map([["item:2589", { name: "Rough Copper Vest", href: "/database/items/2589" }]]);
 vi.mock("@/lib/wiki-names", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/wiki-names")>()),
-  resolveTokens: async () => new Map([["item:2589", { name: "Rough Copper Vest", href: "/database/items/2589" }]]),
+  resolveTokens: async () => vest(),
+  readTokens: async () => ({ tokens: vest(), degraded: false }),
 }));
 
 const FIXTURES = fileURLToPath(new URL("../../test/news", import.meta.url));

@@ -53,6 +53,25 @@ test("an answer's pages are source cards that say what each page is; cited sourc
   expect(list).toMatch(/target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>Cited<span class="sr-only"> \(opens in a new tab\)<\/span>/);
 });
 
+test("an answer without a model draws the lookup's pieces as a list, not as Markdown bullets", () => {
+  const html = renderToStaticMarkup(
+    <AssistantMessage m={{
+      role: "assistant", at: "", model: null, steps: [], sources: [], pages: ["https://everloot.app/database/items/2589"],
+      text: [
+        "Everloot has no recorded answer to that yet.",
+        "- [game files, build 1.60.1] Linen Cloth is a trade good.",
+        "  Source: https://everloot.app/database/items/2589",
+        "- [observed] Humanoids drop it.",
+      ].join("\n"),
+    }} />,
+  );
+  expect(html).not.toMatch(/(?:^|>|\n)- \[/);
+  expect(html).toMatch(/<ul[^>]*><li>\[game files, build 1\.60\.1\] Linen Cloth is a trade good\.<\/li><li>\[observed\] Humanoids drop it\.<\/li><\/ul>/);
+  expect(html).toMatch(/<p><span>Everloot has no recorded answer to that yet\.<\/span><\/p><ul/);
+  // The Source and More lines still become the source cards below, not lines of the answer.
+  expect(html).not.toContain("Source: https://");
+});
+
 test("a page's kind comes from its path", () => {
   expect(pageKind("/database/items/2589")).toBe("Item");
   expect(pageKind("/database/quest/12")).toBe("Quest");

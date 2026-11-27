@@ -4,6 +4,8 @@ import Link from "@/components/Link";
 import { POLESTAR } from "@/data/polestar";
 import TrackedDownload from "@/components/TrackedDownload";
 import { polestarLive } from "@/lib/polestar-github";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, PageHeader, SectionHeading } from "@/components/ui";
 
@@ -25,8 +27,11 @@ export default async function PolestarPage() {
   // A failed refresh throws so the cache keeps serving the last good page; only the build, which has
   // no earlier page, renders the fallback.
   if (!live && process.env.NEXT_PHASE !== "phase-production-build") throw new Error("GitHub unavailable: keep the last good page");
+  // That fallback is kept seconds, not the hour, so the first visit after the deploy asks GitHub again.
+  const degraded = await keepBrieflyIf(!live);
   return (
     <Container width="reading">
+      <EdgeDegraded when={degraded} />
       <article>
         <PageHeader
           trail={trailFor("/addons/polestar")!}

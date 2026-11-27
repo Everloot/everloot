@@ -10,16 +10,17 @@ import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
-import { loadTimeline, oneRowPerTitleDay } from "@/lib/changes";
+import { loadTimeline, oneRowPerTitleDay, timelineDegraded } from "@/lib/changes";
 import { TYPE_LABEL, postPath } from "@kb/changes";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { longDate } from "@/data/wow-forever";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
 import { FEED } from "@/lib/seo";
-import { launchArt, loadSiteAssets } from "@/lib/game-assets";
+import { launchArt, loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { BannerArt } from "@/components/game/PageBanner";
 import LivePanels from "@/components/home/LivePanels";
-import { keepBriefly, loadHomeLadder, loadHomeNewest, loadHomeWeek } from "@/lib/home-live";
+import { loadHomeLadder, loadHomeNewest, loadHomeWeek } from "@/lib/home-live";
+import { keepBriefly } from "@/lib/degraded-render";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
@@ -48,8 +49,9 @@ export default async function Home() {
   // has its own read and says so on its own when that read fails.
   const [coverage, newestFacts, ladder, week] = await Promise.all([loadCoverageSummary(), loadHomeNewest(), loadHomeLadder(), loadHomeWeek()]);
   // A render missing any of them (the build's, or a cold instance's) is kept seconds, not five minutes. The ladder is
-  // undefined, not failed, while the guild pages are off.
-  const degraded = coverage === null || newestFacts === null || ladder === null || week === null;
+  // undefined, not failed, while the guild pages are off. So is one drawn from the bundled posts or without the art.
+  const degraded = coverage === null || newestFacts === null || ladder === null || week === null
+    || siteAssetsFailed(assets) || await timelineDegraded();
   if (degraded) await keepBriefly();
 
   return (

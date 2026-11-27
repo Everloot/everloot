@@ -207,6 +207,9 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
   return read;
 }
 
+/** Whether `loadSiteAssets` answered null because its read failed, not because no asset URL is set. */
+export const siteAssetsFailed = (assets: SiteAssets | null, base: string | null = assetsBaseUrl()): boolean => assets === null && base !== null;
+
 /* ---------- Items, from the private bucket ---------- */
 
 /**
