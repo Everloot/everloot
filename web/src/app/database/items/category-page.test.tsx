@@ -61,7 +61,7 @@ test("a word in the item slot is a class page; a subclass page filters by slot a
   if (chest > PER_PAGE) expect(cloth).toContain('href="/database/items/armor/cloth?slot=chest&amp;page=2"');
 });
 
-test("filters, sort and page live in the URL in one order; several values join with commas; unknown ones are a 404", async () => {
+test("filters, sort and page live in the URL in one order; several values join with commas; an unknown sort is a 404", async () => {
   const many = await html(SubclassPage(sub("armor", "cloth", { quality: "epic,rare", sort: "-id" })));
   // The quality menu offers turning each value off and others on, keeping the sort.
   expect(many).toContain('href="/database/items/armor/cloth?quality=rare&amp;sort=-id"');
@@ -70,8 +70,32 @@ test("filters, sort and page live in the URL in one order; several values join w
   // (Ascending by id is its own URL: the plain list opens on the named items first.)
   expect(many).toMatch(/aria-sort="descending"[^>]*>[\s\S]*?href="\/database\/items\/armor\/cloth\?quality=rare,epic&amp;sort=id"/);
   await expect(html(SubclassPage(sub("armor", "cloth", { sort: "price" })))).rejects.toThrow("NEXT_NOT_FOUND");
-  await expect(html(SubclassPage(sub("armor", "cloth", { crafted: "yes" })))).rejects.toThrow("NEXT_NOT_FOUND");
-  await expect(html(items({ skill: "basket-weaving" }))).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("an unknown filter value (a hand-typed or old link) shows the list without it and says so, never a 404", async () => {
+  const all = await html(items());
+  const total = `>${CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</span> items`;
+  for (const [search, note] of [
+    [{ quality: "4" }, 'No such quality: “4”.'],
+    [{ quality: "epic,shiny" }, 'No such quality: “shiny”.'],
+    [{ slot: "tail" }, 'No such slot: “tail”.'],
+    [{ src: "chest" }, 'No such source: “chest”.'],
+    [{ skill: "basket-weaving" }, 'No such profession: “basket-weaving”.'],
+    [{ bind: "glue" }, 'No such binding: “glue”.'],
+    [{ ilvl: "high" }, 'No such item level: “high”.'],
+    [{ crafted: "yes" }, 'No such crafted setting: “yes”.'],
+  ] as [Record<string, string>, string][]) {
+    const page = await html(items(search));
+    expect(page, JSON.stringify(search)).toContain("data-unknown-filter");
+    expect(page, JSON.stringify(search)).toContain(note);
+    expect(page).toMatch(/<tr /);
+  }
+  // The known value stays on; the unknown one only drops out.
+  expect(await html(items({ quality: "epic,shiny" }))).toContain('href="/database/items?quality=epic"');
+  expect(await html(items({ quality: "4" }))).toContain(total);
+  expect(all).not.toContain("data-unknown-filter");
+  // Such a URL is not the plain list: never indexed.
+  expect((await subclassMetadata(sub("armor", "cloth", { quality: "4" }))).robots).toMatchObject({ index: false });
 });
 
 test("game-file filters: crafted, reagent, set piece and profession narrow the rows; zero rows say so with removable chips", async () => {
@@ -117,10 +141,9 @@ test("the first, singular class URLs move to the plural ones for good, filters k
   await expect(html(ItemPage(props("armors")))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
-test("unknown categories and filters are a 404, not an empty page", async () => {
+test("unknown categories and pages are a 404, not an empty page", async () => {
   await expect(html(ItemPage(props("dragons")))).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html(SubclassPage(sub("armor", "lances")))).rejects.toThrow("NEXT_NOT_FOUND");
-  await expect(html(SubclassPage(sub("armor", "cloth", { quality: "shiny" })))).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html(SubclassPage(sub("armor", "cloth", { page: "9999" })))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
@@ -189,10 +212,18 @@ test("the Source column and filter: reported items show where they come from, th
     // Only the reported item has a source; the rest of the page shows a dash.
     expect(all.match(/>Drop<\/td>/g)).toHaveLength(1);
     expect(all).toContain(">Source</a></th>");
-    // A page of the result with no reported row keeps the column, so it does not come and go from page to page or
-    // vanish under a filter; a result with no reported row at all leaves it out.
+    // The column shows wherever the Source menu does: a page or a filtered result with no reported row keeps it, so it
+    // does not come and go from page to page or vanish under a filter (?quality=epic with a Source menu and no column).
     if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).toContain(">Source</a></th>");
-    expect(await html(SubclassPage(sub("armor", "cloth", { q: "#" + plain })))).not.toContain(">Source</a></th>");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "#" + plain })))).toContain(">Source</a></th>");
+    const epic = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === 1 && r[4] === 4);
+    if (epic && epic[0] !== dropped) {
+      const filtered = await html(SubclassPage(sub("armor", "cloth", { quality: "epic", unnamed: "1" })));
+      expect(filtered).toContain('data-filter="src"');
+      expect(filtered).toContain(">Source</a></th>");
+    }
+    // A category where no item has a source has neither the menu nor the column.
+    expect(await html(SubclassPage(sub("armor", "plate")))).not.toContain(">Source</a></th>");
     const only = await html(SubclassPage(sub("armor", "cloth", { src: "drop", quality: "epic" })));
     expect(only).toContain("No items match these filters.");
     expect(only).toContain('href="/database/items/armor/cloth?src=drop"');

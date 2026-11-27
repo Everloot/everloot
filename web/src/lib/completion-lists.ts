@@ -2,6 +2,7 @@ import { cache } from "react";
 import { agreedCatalog } from "@kb/completion-rollup";
 import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "@kb/completion";
 import { isDevelopmentAchievement as isDevelopmentFileAchievement } from "@kb/client-achievements";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { slugify } from "@kb/lore-slug";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
@@ -102,9 +103,11 @@ export const loadCatalog = cache(async (): Promise<CompletionCatalog | null> => 
   const agreed = read.state ? agreedCatalog(read.state) : null;
   return {
     achievements: merge(base.achievements, agreed?.achievements ?? new Map(), read.state?.catalog.a).filter((a) => !isDevelopmentAchievement(a.achievementId, a.name)),
-    factions: merge(base.factions, agreed?.factions ?? new Map(), read.state?.catalog.f),
-    titles: merge(base.titles, agreed?.titles ?? new Map(), read.state?.catalog.t),
-    chains: merge(base.chains, agreed?.chains ?? new Map(), read.state?.catalog.q),
+    // The game files' entries are filtered when each file is built, by the rule of that day; a confirmed entry ("[DNT]
+    // Test") or one a newer rule catches ("DNT Test Reputation") is filtered here, as the catalog index filters it.
+    factions: merge(base.factions, agreed?.factions ?? new Map(), read.state?.catalog.f).filter((f) => !isDevelopmentItemName(f.name)),
+    titles: merge(base.titles, agreed?.titles ?? new Map(), read.state?.catalog.t).filter((t) => !isDevelopmentItemName(t.name)),
+    chains: merge(base.chains, agreed?.chains ?? new Map(), read.state?.catalog.q).filter((c) => !isDevelopmentItemName(c.name)),
     dataAsOf: read.state ? read.dataAsOf : null,
     base: base.available,
     confirmations: read.state !== null,

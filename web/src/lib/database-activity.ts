@@ -18,6 +18,8 @@ export interface PublicFact {
   /** Historical corpus rows have capture times, not the time the server first published them. */
   estimated?: boolean;
 }
+/** A fact's kind as a page or a feed title names it: "NPC", "Item". */
+export const KIND_LABEL: Record<PublicFact["kind"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", boss: "Boss", entrance: "Entrance" };
 // Bump whenever publication gates widen or a new entity kind is added.
 export const DATABASE_ACTIVITY_CODE_VERSION = 1;
 export interface DatabaseActivity {

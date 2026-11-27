@@ -73,9 +73,10 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
   }
 
   const alert = error && <p role="alert" className="absolute right-0 top-full mt-2 w-56 rounded-card border border-line bg-canvas p-3 text-sm text-fg">{error}</p>;
-  const signIn = status === "anonymous" ? <a href="/sign-in" className={controlClass}>Sign in</a>
-    : status === "unavailable" ? <button type="button" aria-label="Retry account status" onClick={() => setRetry(retry + 1)} className={controlClass}>Retry</button>
-    : <button type="button" disabled aria-busy="true" className={controlClass}>Account</button>;
+  // Until the answer arrives the header says Sign in, as a signed-out visitor sees it: the served HTML of an error page
+  // (or a page whose script has not run) never shows a disabled "Account" in its place.
+  const signIn = status === "unavailable" ? <button type="button" aria-label="Retry account status" onClick={() => setRetry(retry + 1)} className={controlClass}>Retry</button>
+    : <a href="/sign-in" className={controlClass}>Sign in</a>;
 
   if (place === "menu") {
     return <div className="flex flex-wrap gap-2 border-t border-line pt-4 lg:hidden">{status !== "signed-in" && signIn}<a href="/addon" className={controlClass}>Get the addon</a></div>;

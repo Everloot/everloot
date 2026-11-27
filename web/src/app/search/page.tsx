@@ -8,7 +8,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_LABEL, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CLASS_TEXT, classNameOf } from "@/components/ui/class-colour";
 import { CC_BY_SA } from "@/lib/jsonld";
-import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
+import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, loreSnippet, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
 import { HEADINGS, isResultScope, SEARCH_EXAMPLES, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
 import { loadSearchShown } from "@/lib/shown-search-names";
 import { shownItemIcons } from "@/lib/item-icons";
@@ -16,7 +16,7 @@ import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { npcRows, publicQuests, SIDE_LABEL, type NpcRow, type QuestRow } from "@/lib/world-lists";
 import { guildSearchPrefix, guildsOn } from "@/lib/guilds";
 import { playerPagesOn, searchPrefix } from "@/lib/player-pages";
-import PeopleResults from "./PeopleResults";
+import PeopleResults, { PeopleTabCount } from "./PeopleResults";
 
 /** A `type=` value is one of the stored types; anything else means All. */
 function typeOf(raw: string | undefined): LoreType | undefined {
@@ -163,7 +163,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   const guilds = named && guildsOn() && Boolean(guildSearchPrefix(q));
   const people = characters || guilds;
   // One tab per type with results, each opening that type's list (or the lore list, or its section here), then a
-  // Characters or Guilds tab where the text could start such a name: their counts arrive in the browser, so the tabs carry none.
+  // Characters or Guilds tab where the text could start such a name: their counts arrive in the browser with the rows.
   const tabs = groups && groups.length > 0 ? [
     { label: "All", href: base, current: true },
     ...groups.map((g) => ({
@@ -172,8 +172,8 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
       href: listHrefFor(g.type, q) ?? (g.type === "lore" ? `${base}&in=lore` : `${base}#results-${g.type}`),
       current: false,
     })),
-    ...(characters ? [{ label: "Characters", href: `/players?q=${encodeURIComponent(q)}`, current: false }] : []),
-    ...(guilds ? [{ label: "Guilds", href: `/guilds?q=${encodeURIComponent(q)}`, current: false }] : []),
+    ...(characters ? [{ label: <>Characters<PeopleTabCount q={q} kind="characters" /></>, href: `/players?q=${encodeURIComponent(q)}`, current: false }] : []),
+    ...(guilds ? [{ label: <>Guilds<PeopleTabCount q={q} kind="guilds" /></>, href: `/guilds?q=${encodeURIComponent(q)}`, current: false }] : []),
   ] : null;
   const archive = (g: SearchGroup) => g.type === "lore" || g.type === "tool" || g.type === "doc";
   let split = groups?.length ?? 0;
@@ -406,7 +406,7 @@ async function LoreResults({ q, params }: { q: string; params: Params }) {
                       title={hit.name}
                       meta={<>{hit.gameVersion === "lore" ? "lore · 2023" : `${hit.gameVersion} · ${hit.sourceId}`} · {sourceHost(hit.sourceUrl)}</>}
                     >
-                      <p>{hit.snippet}</p>
+                      {loreSnippet(hit.snippet) && <p>{loreSnippet(hit.snippet)}</p>}
                     </Entry>
                   ))}
                 </EntryList>

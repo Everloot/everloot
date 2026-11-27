@@ -346,6 +346,14 @@ test("the title and quest chain lists apply the same three-reporter gate", async
   await expect(TitleList(search({ sort: "points" }))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
+test("a development title stays out of the list and has no page, even once three installs confirm it", async () => {
+  serve([...rows, ...from(3, { kind: "title_catalog", titleId: 36, name: "[DNT] Test" })]);
+  const titles = await html(TitleList(search()));
+  expect(titles).not.toContain("[DNT]");
+  expect(linked(titles, "titles")).toEqual(["4-private", "5-corporal"]);
+  await expect(TitlePage(page("36"))).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
 test("title and quest chain pages: facts, quest links, redirects and 404s", async () => {
   expect(await html(TitlePage(page("5-corporal")))).toContain("Corporal");
   await expect(TitlePage(page("6"))).rejects.toThrow("NEXT_NOT_FOUND");

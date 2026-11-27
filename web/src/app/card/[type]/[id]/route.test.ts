@@ -124,7 +124,8 @@ test("a quest with a page but no name has a small card: its id, that no name is 
   expect(res.status).toBe(200);
   const card = (await res.json()).card;
   expect(card.title).toBe("Quest 92742");
-  expect(card.lines).toContain("Name not yet reported by players");
+  expect(card.lines).toContain("Name not reported yet");
+  expect(card.lines).not.toContain("Name not yet reported by players");
   // 92742 is the first step of a quest line in the committed game files.
   expect(card.lines.some((l: string) => /^Chain: .+/.test(l))).toBe(true);
   expect(JSON.stringify(card)).not.toContain("Lone Report");

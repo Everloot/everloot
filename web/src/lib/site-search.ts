@@ -13,7 +13,7 @@ import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
 import { bossEntries, bossHref, type BossEntry } from "./bosses";
-import { laterExpansionPages, loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
+import { laterExpansionPages, loreSlug, loreSnippet, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { byPhrase, byTypo, byWords, rank, respelling, type Match } from "./name-match";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
@@ -205,6 +205,11 @@ const spellHref = (id: number) => entityHref("spell", id);
 /** A spell row's note: its rank where the files give it a rank chain (spell-card.ts), so same-named ranks tell apart. */
 const spellNote = (id: number, idText: string) => { const rank = spellRank(id); return rank ? `Rank ${rank} · ${idText}` : idText; };
 const UNNAMED_SET = { known: (id: number) => itemSet(id) !== undefined, label: (id: number) => `Item set ${id}` };
+/** A set's note: its pieces and bonuses, as the set list counts them, so two sets of one name ("The Postmaster") tell apart. */
+const setNote = (id: number) => {
+  const set = itemSet(id);
+  return set && `${set.items.length} ${set.items.length === 1 ? "piece" : "pieces"} · ${set.bonuses.length} ${set.bonuses.length === 1 ? "bonus" : "bonuses"}`;
+};
 
 type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
 const publicObjects = new WeakMap<object, WeakMap<object, Set<number>>>();
@@ -321,7 +326,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       if (want("family")) hits.set("family", fileHits(petFamilyEntries(), match, id, petFamilyHref));
       // Spells, item sets and vendors by the names their lists show, which only a page passes in (never the API).
       if (spells) hits.set("spell", namedHits(spells, match, id, spellHref).map((x) => ({ ...x, note: spellNote(x.id!, `id ${x.id}`) })));
-      if (itemSets) hits.set("item-set", namedHits(itemSets, match, id, itemSetHref, UNNAMED_SET));
+      if (itemSets) hits.set("item-set", namedHits(itemSets, match, id, itemSetHref, UNNAMED_SET).map((h) => ({ ...h, note: setNote(h.id!) ?? h.note })));
       if (vendors) hits.set("vendor", vendorHits(vendors, names.npcs, match, id));
     }
     return hits;
@@ -385,7 +390,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       const forever = [...GAME].some((t) => (found.get(t)?.total ?? 0) > 0);
       const later = forever ? await laterExpansionPages([...lore.hits, ...(lore.some ?? [])].map((h) => h.id)) : new Set<number>();
       const kept = (hits: SearchHit[]) => hits.filter((h) => !later.has(h.id));
-      const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
+      const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: loreSnippet(h.snippet) || undefined, exact: h.name.toLowerCase() === q });
       if (lore.hits.length || !lore.some) {
         const hits = kept(lore.hits).map(loreHit);
         found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });

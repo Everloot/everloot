@@ -174,6 +174,15 @@ export async function keepBriefly(): Promise<void> {
 }
 
 export const loadHomeNewest = () => orNull(cachedNewest);
+
+/**
+ * The activity file's facts as the database pages name them (pageNamed), for /database/recent and its RSS feed, which
+ * list the same facts as the home panel. The name files are read only when a fact has the "Item #id" fallback; without
+ * them a fact keeps that fallback.
+ */
+export async function withPageNames<T extends PublicFact>(entries: readonly T[]): Promise<T[]> {
+  return entries.some(isFallback) ? pageNamed(entries, await orNull(loadPageNames)) : [...entries];
+}
 /** Undefined while the guild pages are off: there is no ladder to show or link to. */
 export const loadHomeLadder = async (): Promise<HomeLadder | null | undefined> => (guildsOn() ? orNull(cachedLadder) : undefined);
 export const loadHomeWeek = () => orNull(cachedWeek);

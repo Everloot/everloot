@@ -354,3 +354,13 @@ describe("types, facets and browsing", () => {
     expect(await coverage()).toBe("unavailable");
   });
 });
+
+test("a lore snippet drops the wiki's list markers, headings and patch-note lines", async () => {
+  const { loreSnippet } = await import("./lore");
+  expect(loreSnippet("* Patch 9.0.1: Added.")).toBe("");
+  expect(loreSnippet("…the cinch of the bear.\n== Patch changes ==\n* Patch 5.2.0: Added.\n* Patch 10.0.2: Now sold by Grex.")).toBe("…the cinch of the bear.");
+  expect(loreSnippet("Notable residents:\n* Grex the trader\n# '''Old Murk-Eye'''")).toBe("Notable residents: Grex the trader Old Murk-Eye");
+  expect(loreSnippet("…* Patch 1.11.0 (2006-06-20): Moved.")).toBe("");
+  // Plain prose, a star or a patch named inside a sentence stay as they are.
+  expect(loreSnippet("A star-shaped hall built in patch 2.4 times.")).toBe("A star-shaped hall built in patch 2.4 times.");
+});

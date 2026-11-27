@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
   default: ({ children, onNavigate: _onNavigate, prefetch: _prefetch, ...props }: { children: React.ReactNode; onNavigate?: () => void; prefetch?: boolean; href: string }) => <a {...props}>{children}</a>,
 }));
 
-import PeopleResults, { PEOPLE_PAGE_TIMEOUT_MS } from "./PeopleResults";
+import PeopleResults, { PEOPLE_PAGE_TIMEOUT_MS, PeopleTabCount } from "./PeopleResults";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -78,18 +78,33 @@ test("no rows, or a failed request, leaves the fallback", async () => {
   expect(container.textContent).toBe("Nothing matches that.");
 });
 
-test("the slot stays empty until the answer settles, and a slow answer counts as none after the page timeout", async () => {
+test("while the answer is out the slot says it is searching, and a slow answer counts as none after the page timeout", async () => {
   vi.useFakeTimers();
   try {
     reply.never = true;
     await show("slow");
-    // Never "Nothing matches" first and then replaced.
-    expect(container.textContent).toBe("");
+    // Never "Nothing matches" first and then replaced, and never a blank page: a page with no database match says it
+    // is still looking (/search?q=zzqxv stayed blank for seconds).
+    expect(container.querySelector('[role="status"]')!.textContent).toBe("Searching characters and guilds…");
+    expect(container.textContent).not.toContain("Nothing matches");
     await act(async () => { await vi.advanceTimersByTimeAsync(PEOPLE_PAGE_TIMEOUT_MS - 1); });
-    expect(container.textContent).toBe("");
+    expect(container.textContent).toBe("Searching characters and guilds…");
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(container.textContent).toBe("Nothing matches that.");
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("below database results the slot stays empty while it waits: no line that comes and goes between groups", async () => {
+  reply.never = true;
+  await act(async () => root.render(<PeopleResults q="slow" />));
+  expect(container.textContent).toBe("");
+});
+
+test("the Characters and Guilds tabs take their counts from the same answer", async () => {
+  reply.body = { characters: { results: [character("Thrallina"), character("Thrallo")], total: 2 }, guilds: { results: [], total: 25, capped: true } };
+  await act(async () => root.render(<><span id="c"><PeopleTabCount q="thrall" kind="characters" /></span><span id="g"><PeopleTabCount q="thrall" kind="guilds" /></span><PeopleResults q="thrall" /></>));
+  expect(container.querySelector("#c")!.textContent).toBe(" (2)");
+  expect(container.querySelector("#g")!.textContent).toBe(" (25+)");
 });

@@ -52,6 +52,19 @@ describe("header account controls", () => {
     expect(signInLink()?.getAttribute("href")).toBe("/sign-in");
   });
 
+  it("says Sign in before the account answer arrives, as an error page's header did not (it said Account)", async () => {
+    // The HTML a 404 or error page is served with, before (or without) the browser asking who is signed in.
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const html = renderToStaticMarkup(<Header />);
+    expect(html).toMatch(/<a href="\/sign-in"[^>]*>Sign in<\/a>/);
+    expect(html).not.toContain(">Account<");
+    // An answer that never comes leaves the link, not a disabled placeholder.
+    vi.stubGlobal("fetch", () => new Promise(() => {}));
+    await act(async () => root.render(<Header />));
+    expect(signInLink()?.getAttribute("href")).toBe("/sign-in");
+    expect(container.textContent).not.toContain("Account");
+  });
+
   it("keeps the addon download reachable in the mobile menu", async () => {
     vi.stubGlobal("fetch", async () => Response.json({ user: null }));
     await act(async () => root.render(<Header />));

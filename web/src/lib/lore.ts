@@ -266,6 +266,23 @@ export async function loreHeadsNamed(type: LoreType, names: readonly string[], b
   return groups;
 }
 
+/** A patch-note line ("Patch 9.0.1: Added.", "Patch 1.11.0 (2006-06-20): Moved."), which says nothing about the page. */
+const PATCH_NOTE = /^Patch \d+(?:\.\d+)+(?: \([^)]*\))?:/;
+
+/**
+ * A search snippet as prose: the stored body keeps the wiki's list markers (`*`, `#`), `== headings ==`, bold quotes
+ * and its patch-change list, which read as raw fragments in a one-line result ("* Patch 9.0.1: Added."). Patch-note
+ * and heading lines go, the markers come off the rest, and the lines join with a space. Empty when nothing is left.
+ */
+export function loreSnippet(text: string): string {
+  return text.split("\n").flatMap((raw) => {
+    const lead = raw.startsWith("…") ? "…" : "";
+    const line = raw.slice(lead.length).replace(/^[\s*#:;]+/, "").replace(/'{2,}/g, "").trim();
+    if (!line || PATCH_NOTE.test(line) || /^=+.*=+$/.test(line)) return [];
+    return [lead + line];
+  }).join(" ").replace(/\s+/g, " ").trim();
+}
+
 export async function searchLore(q: string, page: number, type?: LoreType): Promise<{ hits: SearchHit[]; hasNext: boolean } | Unavailable> {
   const release = await getRelease();
   if (!release) return UNAVAILABLE;
