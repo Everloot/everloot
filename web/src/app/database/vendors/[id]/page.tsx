@@ -13,7 +13,7 @@ import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
 import { entitySummary, reportedLine } from "@/lib/evidence";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { VendorGoods } from "../goods";
+import { goodsRows, VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { Tabs, TooltipFrame } from "@/components/ui";
 import { hasCard } from "@/lib/tooltip";
@@ -70,7 +70,10 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   // Each offer with the installs and the date behind it, as the NPC page's Sells tab shows them.
   const { goodsEvidence } = npcRelations(page.vendorNpcId, facts, Date.now());
   const itemsSold = new Set(page.offers.map((o) => o.itemId)).size;
-  const limited = page.offers.filter((o) => o.limitedStock !== null).length;
+  // Counted on the Sells tab's rows (one per item): every row agreed "not limited" is None, not an unreported fact.
+  const rows = goodsRows(page.offers);
+  const limited = rows.filter((o) => o.limitedStock !== null).length;
+  const stockKnown = rows.length > 0 && rows.every((o) => o.limitedStock !== null || o.unlimited);
   // A vendor is an NPC: its lore page is its NPC's, under the same rule.
   const lore = vendorName ? await loreFor("npc", page.vendorNpcId, vendorName) : null;
   // The map slot draws where the vendor stands; the pin table below is its text.
@@ -115,7 +118,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
         { label: "Reaction", value: known(reaction && REACTION_LABELS[reaction]) },
         { label: "Zone", value: zoneLink ?? known(null) },
         { label: "Items sold", value: known(itemsSold || null), numeric: true },
-        { label: "Limited stock", value: known(limited || null), numeric: true },
+        { label: "Limited stock", value: known(limited || (stockKnown ? "None" : null)), numeric: limited > 0 },
         { label: "Map positions", value: known(places.length || null), numeric: true },
       ]}
       summary={summary}

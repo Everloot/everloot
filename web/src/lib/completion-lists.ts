@@ -167,6 +167,32 @@ export function titlePlacement(name: string): "prefix" | "suffix" | null {
   return name.slice(at + 2).trim() ? "suffix" : name.slice(0, at).trim() ? "prefix" : null;
 }
 
+/** A title's words without the name slot, for matching and sorting: "Corporal %s" and "Corporal" are both "Corporal". */
+export const titleWords = (name: string) => name.replace(NAME_SLOT, " ").replace(/^[\s,]+|[\s,]+$/g, "").replace(/\s+/g, " ");
+
+/**
+ * The title list's rows: players report a title under the game's own id with its words alone ("Corporal", 9) while the
+ * files list it under their row id with its slot ("Corporal %s", 1259). A confirmed title and the files' row of the same
+ * words are one row: the confirmed id and mark, the files' name (so its kind). Words the files list more than once
+ * ("Sergeant %s", Alliance and Horde) pair only when as many reported titles carry them, in id order; else both stay.
+ */
+export function titleRows(titles: readonly Listed<TitleEntry>[]): Listed<TitleEntry>[] {
+  const files = new Map<string, Listed<TitleEntry>[]>();
+  for (const t of titles) if (!t.confirmed && t.name.includes("%s")) files.set(titleWords(t.name), [...(files.get(titleWords(t.name)) ?? []), t]);
+  const reported = new Map<string, Listed<TitleEntry>[]>();
+  for (const t of titles) if (t.confirmed && !t.name.includes("%s")) reported.set(titleWords(t.name), [...(reported.get(titleWords(t.name)) ?? []), t]);
+  const named = new Map<Listed<TitleEntry>, string>();
+  const folded = new Set<Listed<TitleEntry>>();
+  for (const [words, list] of reported) {
+    const match = files.get(words);
+    if (!match || match.length !== list.length) continue;
+    const byId = (a: Listed<TitleEntry>, b: Listed<TitleEntry>) => a.titleId - b.titleId;
+    const pieces = [...match].sort(byId);
+    [...list].sort(byId).forEach((t, i) => { named.set(t, pieces[i]!.name); folded.add(pieces[i]!); });
+  }
+  return titles.filter((t) => !folded.has(t)).map((t) => (named.has(t) ? { ...t, name: named.get(t)! } : t));
+}
+
 /** A title with a name in its slot, as the game shows it on a character. */
 export const titleWithName = (name: string, character: string) => name.replace(NAME_SLOT, character).trim();
 

@@ -3,13 +3,15 @@ import EntityLink from "@/components/EntityLink";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { Badge, DataTable, type Column } from "@/components/ui";
 import { instanceHref } from "@/lib/instances";
+import type { ItemLook } from "@/lib/item-look";
 import { NO_AREA, speedLabel, TERRAIN_PATH, triggerLabel, type TerrainGear } from "@/lib/terrain";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 export interface GearNames {
-  item: (id: number) => { name?: string | null; icon?: string | null };
+  /** The item's name, quality and icon as its own page and hover card show them (lib/item-look.ts). */
+  item: (id: number) => ItemLook;
   /** A spell name from the game files, shown with the unconfirmed marker. */
   spell: (id: number) => string | undefined;
   /** An item set name from the game files, shown with the unconfirmed marker. */
@@ -39,16 +41,21 @@ function Where({ gear, names, zone }: { gear: TerrainGear; names: GearNames; zon
  * its game-file name, and the speed it gives), how it fires and where it works. Names follow the site's name rules;
  * a row with no name keeps "Item N" / "Spell N".
  */
+function Item({ id, names }: { id: number; names: GearNames }) {
+  const x = names.item(id);
+  return <EntityLink prefetch={false} kind="item" id={id} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />;
+}
+
 export default function TerrainGearTable({ gear, names, caption, zone, empty }: { gear: readonly TerrainGear[]; names: GearNames; caption: string; zone?: number; empty?: string }) {
   const columns: Column<TerrainGear>[] = [
     { key: "item", header: "Item", cell: (g) => {
-      if (!g.set) return <EntityLink prefetch={false} kind="item" id={g.itemId} {...names.item(g.itemId)} />;
+      if (!g.set) return <Item id={g.itemId} names={names} />;
       // A set bonus: the set's name, then each piece, as the item pages list a set.
       const name = names.set(g.set.setId);
       return (
         <span className="inline-flex flex-col gap-1">
           <span className="inline-flex items-center gap-x-2" title={name ? GAME_NAME_TITLE.files : undefined}>{name ?? `Item set ${g.set.setId}`}{name ? <Badge tone="files" /> : null}</span>
-          <span className="inline-flex flex-wrap gap-x-3 gap-y-1">{g.set.pieces.map((id) => <EntityLink key={id} prefetch={false} kind="item" id={id} {...names.item(id)} />)}</span>
+          <span className="inline-flex flex-wrap gap-x-3 gap-y-1">{g.set.pieces.map((id) => <Item key={id} id={id} names={names} />)}</span>
         </span>
       );
     } },

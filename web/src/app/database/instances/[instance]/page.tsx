@@ -137,12 +137,11 @@ export default async function InstancePage(props: Props) {
   const terrain = instanceTerrain(row.instanceMapId);
   const gear = gearFor({ instance: row.instanceMapId });
   const gearIds = gear.flatMap((g) => g.set?.pieces ?? [g.itemId]);
-  const gearFacts = gear.length ? await loadItemFacts() : null;
-  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : new Map<number, string>();
+  // Each gear row's name, quality and icon as the item's own page and hover card show them, as the drop rows.
+  const gearLook = gearIds.length ? await loadItemLooks(assets, gearIds) : null;
   const [spellNames, setNames] = gear.length
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
-  const tips = await loadItemTips(gearIds.length ? assets : null, gearIds);
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
   const tied = lootBosses.some((b) => b.npcIds.length);
@@ -362,7 +361,7 @@ export default async function InstancePage(props: Props) {
             gear={gear}
             caption={`Gear whose effect works in ${title}`}
             names={{
-              item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+              item: (id) => gearLook!(id),
               spell: (id) => spellNames?.names.get(id),
               set: (id) => setNames?.names.get(id),
               instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),

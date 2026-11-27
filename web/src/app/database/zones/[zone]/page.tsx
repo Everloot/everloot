@@ -19,6 +19,7 @@ import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@
 import { zoneCoverageHref } from "@/lib/coverage-view";
 import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
 import { itemNames } from "@/lib/names";
+import { loadItemLooks } from "@/lib/item-look";
 import { loadProfessions } from "@/lib/profession-store";
 import { rateWithRange } from "../../loot-tables";
 import { METHOD_LINE } from "@kb/loot-tables";
@@ -136,12 +137,13 @@ export default async function ZonePage(props: Props) {
   // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
   const terrain = zoneTerrain(zone.mapId);
   const gear = gearFor({ zone: zone.mapId });
-  const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
-  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : itemName;
+  const gearIds = gear.flatMap((g) => g.set?.pieces ?? [g.itemId]);
+  // Each gear row's name, quality and icon as the item's own page and hover card show them (lib/item-look.ts).
+  const gearLook = gearIds.length ? await loadItemLooks(assets, gearIds) : null;
   const [spellNames, setNames] = gear.length
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
-  const tips = await loadItemTips(assets, [...shownItems.map((i) => i.itemId), ...gear.flatMap((g) => g.set?.pieces ?? [g.itemId])]);
+  const tips = await loadItemTips(assets, shownItems.map((i) => i.itemId));
   const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows, facts.kills);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
@@ -426,7 +428,7 @@ export default async function ZonePage(props: Props) {
                   zone={zone.mapId}
                   caption={`Gear whose effect works in ${zone.name}`}
                   names={{
-                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                    item: (id) => gearLook!(id),
                     spell: (id) => spellNames?.names.get(id),
                     set: (id) => setNames?.names.get(id),
                     instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),

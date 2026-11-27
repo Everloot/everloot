@@ -84,6 +84,18 @@ test("an item agreed at two prices is one row at the higher price, with the othe
   expect(out).toMatch(/role="tab"[^>]*>Sells<span[^>]*> \(1\)<\/span>/);
 });
 
+test("Limited stock counts the merged rows: every row not limited reads None, not an unreported chip; an item at two prices counts once", async () => {
+  // SYNTHETIC, in the shape of Barkeep Hann: four items, one agreed at two prices, every row "not limited".
+  const sold = (itemId: number, priceCopper: number, ids = installs, extra: { limitedStock?: number } = {}) => ids.map((installId) => ({ installId, vendorNpcId: 1125, itemId, priceCopper, capturedAt: at, ...extra }));
+  facts.vendors = [...sold(117, 500), ...sold(117, 450, ["four", "five", "six"]), ...sold(159, 25), ...sold(1179, 125), ...sold(1205, 400)];
+  const out = await html();
+  expect(fact(out, "Limited stock")).toBe("None");
+  expect(out).not.toMatch(/Not yet reported(?:<[^>]*>|[^<])*Limited stock/);
+  // One limited item seen at two prices is one limited item.
+  facts.vendors = [...sold(117, 500, installs, { limitedStock: 5 }), ...sold(117, 450, ["four", "five", "six"], { limitedStock: 5 }), ...sold(159, 25)];
+  expect(fact(await html(), "Limited stock")).toBe("1");
+});
+
 test("storage down: no reaction, zone or counts stated", async () => {
   facts.unreachable = true;
   const out = await html();

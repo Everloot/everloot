@@ -35,6 +35,13 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 const renders = vi.hoisted(() => ({ npcs: new Map<number, { url: string; size: number }>() }));
 vi.mock("@/lib/game-renders", () => ({ loadRenders: async () => ({ npcs: renders.npcs, items: new Map() }) }));
 
+// The names the item lists and hover cards read: the real ones unless a test hands the page some.
+const listNames = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock("@/lib/item-view", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/item-view")>();
+  return { ...real, loadListNames: async () => (listNames.value as Awaited<ReturnType<typeof real.loadListNames>> | null) ?? real.loadListNames() };
+});
+
 import InstancesPage from "./page";
 import InstancePage, { generateMetadata as instanceMetadata } from "./[instance]/page";
 
@@ -500,5 +507,36 @@ test("the Loot tab is one table of every boss's drops, highest chance first, pag
   } finally {
     state.seen = { unreachable: true };
     state.loot = new Map();
+  }
+});
+
+test("the Terrain tab names each item as its own page and hover card do (the names file), with its unconfirmed mark", async () => {
+  // SYNTHETIC names-file rows for the Deadmines terrain gear (Staff of Westfall 2042 is bound to Westfall's ground).
+  listNames.value = {
+    agreed: new Map(), named: { has: () => true }, degraded: false, unreachable: false,
+    matched: { version: "1", wiki: { name: "w", url: "u" }, names: new Map([[2042, { name: "Staff of Westfall", color: "#1eff00", quality: 2, wikiPage: null, source: "files" }]]) },
+    showsTip: () => true,
+  };
+  try {
+    const terrain = panel(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "36-deadmines" }) })), "terrain");
+    expect(terrain).toMatch(/<a href="\/database\/items\/2042">Staff of Westfall<\/a>(?:<[^>]*>)*<span data-badge="files"/);
+    expect(terrain).not.toContain(">Item 2042<");
+  } finally {
+    listNames.value = null;
+  }
+});
+
+test("the list's boss count matches the page: reported of listed when players confirmed only some, the intro says what it counts", async () => {
+  // One of Ragefire Chasm's four encounters confirmed by 3 installs; its page lists all four.
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  try {
+    const page = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+    expect(page).toMatch(/role="tab"[^>]*>Bosses<span[^>]*> \(4\)<\/span>/);
+    const list = renderToStaticMarkup(await InstancesPage({}));
+    const row = list.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"')) ?? "";
+    expect(row).toMatch(/>1 of 4</);
+    expect(list).toContain("Bosses reads 7 of 8 when 3 installs confirm 7 of the 8 bosses the instance&#x27;s page lists");
+  } finally {
+    state.seen = { unreachable: true };
   }
 });
