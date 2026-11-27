@@ -7,10 +7,11 @@ import { categoryOf } from "@kb/item-taxonomy";
 import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemSetNames, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
 import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
+import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
 import { currencyEntries, mountEntries, petEntries } from "./collectibles";
-import { factionInFiles, isDevelopmentAchievement, loadCatalog, titleDisplayName } from "./completion-lists";
+import { factionInFiles, isDevelopmentAchievement, loadCatalog, pointsText, titleDisplayName } from "./completion-lists";
 import { instanceRows, levelLabel } from "./instances";
-import { itemSet, itemSetOf } from "./item-sets";
+import { itemSet, itemSetOf, setBonusText } from "./item-sets";
 import { bossEntry } from "./bosses";
 import { zonePlaces } from "./places";
 import { holidayEntries, lastsLabel, petFamilyEntries, startLabel } from "./world-events";
@@ -79,6 +80,8 @@ export interface SiteCard {
 export type SiteCardResult = { status: 200; body: SiteCard } | { status: 404 | 503; error: string };
 
 const NOT_FOUND = "No card: no such page, or players have not reported it yet.";
+/** The line on a quest card that nothing names yet. */
+const NO_QUEST_NAME = "Name not yet reported by players";
 const UNREACHABLE = "Storage is unavailable. The card is unrecorded, not empty.";
 const UNAVAILABLE = { status: 503, error: UNREACHABLE } as const;
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ") || null;
@@ -172,6 +175,16 @@ async function worldCard(type: TooltipType, id: number): Promise<SiteCardResult>
     if (names === PRIVATE_UNREACHABLE) return UNAVAILABLE;
     const wiki = names?.names.get(id)?.name;
     if (wiki) return plain(type, id, wiki, result.status === 200 ? result.body.lines.filter((l) => l !== NO_QUEST_TITLE) : [], NAME_FROM.wiki);
+    // A quest whose page shows (an install reported it) but which nothing names yet: a small card with the id, that the
+    // name is missing, and the quest line the game files put it in. Nothing an install reported shows before 3 agree.
+    if (result.status === 404) {
+      const facts = await loadWorldFacts();
+      if (facts.unreachable) return UNAVAILABLE;
+      if (facts.quests.some((r) => r.questId === id)) {
+        const chain = CLIENT_QUEST_LINES.questLines.find((c) => c.questIds.includes(id));
+        return plain(type, id, `Quest ${id}`, kept([NO_QUEST_NAME, chain && `Chain: ${chain.name}`]));
+      }
+    }
   }
   return result.status === 200 ? plain(type, id, result.body.title, result.body.lines) : result;
 }
@@ -259,7 +272,7 @@ async function itemCard(id: number): Promise<SiteCardResult> {
     set: set && {
       ...set,
       pieceName: (item) => shownItemName(item, shown.agreed, shown.matched?.names)?.name,
-      spellName: (spell) => spells?.names.get(spell),
+      spellName: (spell) => setBonusText(spells?.names.get(spell)),
     },
     taught: taught === null ? undefined : {
       id: taught, tip: taughtTip, name: shownItemName(taught, shown.agreed, shown.matched?.names, taughtTip),
@@ -312,7 +325,7 @@ async function entryCard(type: EntryCardType, id: number): Promise<SiteCardResul
           path.length ? path.join(" › ") : entry?.category,
           files?.faction && `${files.faction} only`,
           !entry && files?.description,
-          points !== null && plural(points, "point"),
+          points !== null && pointsText(points),
           criteria !== null && criteria > 0 && plural(criteria, "criterion", "criteria"),
         ]), filesFoot(Boolean(entry)), icon);
       }

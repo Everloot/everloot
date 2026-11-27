@@ -18,6 +18,16 @@ const byItem = new Map(ITEM_SETS.flatMap((s) => s.items.map((item) => [item, s] 
 /** The set an item is a piece of, as the game files list it. */
 export const itemSetOf = (itemId: number): ClientItemSet | undefined => byItem.get(itemId);
 
+/**
+ * A set bonus as the game's tooltip words it: the bonus spell's tooltip text when the files give all of it (no value
+ * left unresolved), else the spell's name without the files' zero-padding ("Run Speed +08%" is "Run Speed +8%").
+ * Nothing is added: a name the files lack stays undefined, for the caller's "Spell N".
+ */
+export function setBonusText(name: string | undefined, tip?: { text: string | null; partial: boolean } | null): string | undefined {
+  if (tip?.text && !tip.partial) return tip.text;
+  return name?.replace(/(^|[^\d.])0+(?=\d)/g, "$1");
+}
+
 const CLASS_BY_BIT = Object.entries(CLIENT_CLASS_GEAR.classes).map(([slug, c]) => ({ slug, bit: 1 << (c.id - 1), id: c.id })).sort((a, b) => a.id - b.id);
 
 /**

@@ -103,13 +103,15 @@ export default async function DatabasePage() {
   const live = rates.filter((r) => r.public).length + measuredZeros.filter((z) => z.public).length;
   const classes = T.classes.filter((c) => c.items > 0).sort((a, b) => b.items - a.items);
   // What players have made public so far, per place: a count once there is one, the empty meter until then.
-  const seen = (x: number) => (stats.unreachable ? "unrecorded" : x > 0 ? n(x) : <AgreementMeter count={0} />);
+  // `what` names what the number counts where the card's list shows more rows than it (the quest list adds the quests
+  // only the files or the wiki title), so the two numbers never read as a contradiction.
+  const seen = (x: number, what?: string) => (stats.unreachable ? "unrecorded" : x > 0 ? (what ? `${n(x)} ${what}` : n(x)) : <AgreementMeter count={0} />);
   const listed = (x?: number) => (x === undefined ? "unrecorded" : x > 0 ? n(x) : <AgreementMeter count={0} />);
   const readable = !world.unreachable;
   // The rows come from DATABASE_HUBS, which the sitemap reads too; a hub with no count here prints none.
   const counts: Record<string, ReactNode> = {
     "/database/npcs": seen(readable ? npcRows(world, rates).length : 0),
-    "/database/quests": seen(readable ? publicQuests(world).length : 0),
+    "/database/quests": seen(readable ? publicQuests(world).length : 0, "confirmed"),
     "/database/vendors": seen(readable ? publicVendors(world).length : 0),
     "/database/objects": seen(stats.unreachable ? 0 : objectList({ rates, measuredZeros, names: [] }).length),
     "/database/spells": listed(spellNames?.names.size),
@@ -128,7 +130,8 @@ export default async function DatabasePage() {
     "/database/drops": seen(live),
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
-    "/database/instances": n(instanceRows().size),
+    // The list adds the ones only players saw, so the card says what its number counts.
+    "/database/instances": `${n(instanceRows().size)} in game files`,
     // Their bosses, from the same files rows.
     "/database/bosses": n(bossEntries().length),
     // The terrain types the game files name, like the zone count: it reads the files, not the uploads.

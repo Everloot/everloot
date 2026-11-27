@@ -7,8 +7,15 @@ const files = vi.hoisted(() => ({ sets: true as boolean }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadItemSetNames: async () => (files.sets ? { version: "x", names: new Map([[1, "The Gladiator"], [342, "Champion's Raiment"]]) } : null),
-  loadSpellNames: async () => ({ version: "x", names: new Map([[9331, "Increased Defense"]]) }),
-  loadSiteAssets: async () => ({ spellIcons: new Map() }),
+  // Set 1's other bonuses carry the files' raw spell names; one has its whole tooltip text, one only a partial one.
+  loadSpellNames: async () => ({ version: "x", names: new Map([[9331, "Increased Defense"], [1301123, "Run Speed +08%"], [1314795, "Increased Hit Chance 01"]]) }),
+  loadSiteAssets: async () => ({
+    spellIcons: new Map(),
+    spellTips: new Map([
+      [1314795, { name: "Increased Hit Chance 01", text: "Improves your chance to hit by 1%.", partial: false }],
+      [1301123, { name: "Run Speed +08%", text: "Increases speed by [?]%.", partial: true }],
+    ]),
+  }),
   // Piece 11729 has a whole record; 11728 only an icon (no ItemSparse row), as tier pieces often do.
   readItemTips: async (_: unknown, ids: readonly number[]) => ({
     tips: new Map(ids.filter((id) => id === 11729).map((id) => [id, { icon: "https://assets.test/icon.webp" }])),
@@ -69,6 +76,13 @@ test("a set page: the name with the unconfirmed marker, its pieces with icons an
   expect(out).toContain('<a href="/database/spells/9331">Increased Defense</a>');
   expect(out).toContain('<a href="/database/spells/1301126">Spell 1301126</a>');
   expect(out).toContain("(3) Set: Increased Defense");
+  // A bonus reads as the game's tooltip says it when the files give its whole text; else its name without the
+  // files' zero-padding ("+08%" is "+8%"). A partial text never stands in.
+  expect(out).toContain("(5) Set: Improves your chance to hit by 1%.");
+  expect(out).toContain('<a href="/database/spells/1314795">Improves your chance to hit by 1%.</a>');
+  expect(out).toContain("(4) Set: Run Speed +8%");
+  expect(out).not.toContain("+08%");
+  expect(out).not.toContain("[?]%");
   // Found in game files, unconfirmed, with the build.
   expect(out).toContain("Found in game files, unconfirmed: read from build 1.60.1.71139");
   expect(out).toContain("Blizzard Entertainment");

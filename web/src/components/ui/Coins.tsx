@@ -1,4 +1,4 @@
-import { tipLine, type Metal } from "@/lib/tip-line";
+import { tipLine, tooltipMoney, type Metal } from "@/lib/tip-line";
 
 const METALS: Metal[] = ["gold", "silver", "copper"];
 
@@ -35,9 +35,14 @@ export function CoinText({ text }: { text: string }) {
 /** Thousands grouped, so a lifetime total like 1,234,567g reads at a glance; silver and copper never reach 1,000. */
 const grouped = (n: number) => n.toLocaleString("en-US");
 
-export default function Coins({ copper }: { copper: number | null }) {
+/**
+ * A price in coins. `game` leaves out a coin that is zero, as the game's tooltips and vendor window print a price
+ * ("1s", "1g 1c"; tooltipMoney in lib/tip-line.ts); without it every coin below the largest shows ("1s 0c").
+ */
+export default function Coins({ copper, game = false }: { copper: number | null; game?: boolean }) {
   if (copper === null) return "unrecorded";
   const value = Math.round(Math.abs(copper));
+  if (game && value > 0) return <CoinText text={`${copper < 0 ? "-" : ""}${tooltipMoney(value)}`} />;
   const g = Math.floor(value / 10000), s = Math.floor(value % 10000 / 100), c = value % 100;
   return <CoinText text={`${copper < 0 ? "-" : ""}${g ? `${g}g ` : ""}${g || s ? `${s}s ` : ""}${c}c`} />;
 }

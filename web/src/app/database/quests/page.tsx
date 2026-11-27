@@ -23,7 +23,9 @@ export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "level", "category", "side", "group", "giver", "turnin", "rewards", "id"] as const;
 type Sort = (typeof SORTS)[number];
-const DEFAULT_SORT = { key: "id" as Sort, desc: false };
+// Lowest level first: the quests players agree on a level for lead, the ones with none (test and unreleased ids among
+// them) follow in id order. The ID sort stays a header.
+const DEFAULT_SORT = { key: "level" as Sort, desc: false };
 
 const SIDES: Record<string, QuestSide> = { alliance: "alliance", horde: "horde", both: "both" };
 
@@ -121,6 +123,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questId },
   ];
 
+  const anyRewards = all.some((x) => x.rewards.length > 0);
   const categories = [...new Set(all.map((x) => x.category).filter((c): c is string => c !== null))].sort((a, b) => a.localeCompare(b));
   const controls: FilterControl[] = [
     {
@@ -141,7 +144,8 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
         label: SIDE_LABEL[s], href: here({ side: k }), on: q.side === k, count: all.filter((x) => x.side === s).length,
       }))],
     },
-    { type: "toggle", key: "rewards", label: "Has rewards", href: here({ rewards: q.rewards ? undefined : true }), on: Boolean(q.rewards) },
+    // Offered once some quest has agreed rewards (3 installs report the same item); until then it could only empty the list.
+    ...(anyRewards || q.rewards ? [{ type: "toggle" as const, key: "rewards", label: "Has rewards", href: here({ rewards: q.rewards ? undefined : true }), on: Boolean(q.rewards) }] : []),
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "quest" : "quests"} page={q.page} perPage={per} href={(page) => href({ ...q, page })} sizeHref={(n) => href({ ...q, per: n, page: 1 })} label="Quest pages" />;
@@ -155,6 +159,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const empty = facts.unreachable ? <Unreadable />
     : filters(q) > 0 ? <>
         <NoMatches noun="quests" chips={chips} clearHref="/database/quests" />
+        {q.rewards && !anyRewards && <p className="pb-4 text-cell text-fg-2">No quest has agreed rewards yet: a reward shows once 3 installs report the same item.</p>}
         {id !== null && <p className="pb-4 text-cell"><Link prefetch={false} href={`/database/quests/${id}`} className={LINK}>Open quest {id}</Link></p>}
       </>
     : <NoObservations>No quest has agreed facts yet; each shows here once 3 installs report it.</NoObservations>;

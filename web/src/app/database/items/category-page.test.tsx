@@ -188,9 +188,11 @@ test("the Source column and filter: reported items show where they come from, th
     expect(all).toContain(">Drop</td>");
     // Only the reported item has a source; the rest of the page shows a dash.
     expect(all.match(/>Drop<\/td>/g)).toHaveLength(1);
-    // A page with no reported row leaves the column out.
     expect(all).toContain(">Source</a></th>");
-    if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).not.toContain(">Source</a></th>");
+    // A page of the result with no reported row keeps the column, so it does not come and go from page to page or
+    // vanish under a filter; a result with no reported row at all leaves it out.
+    if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).toContain(">Source</a></th>");
+    expect(await html(SubclassPage(sub("armor", "cloth", { q: "#" + plain })))).not.toContain(">Source</a></th>");
     const only = await html(SubclassPage(sub("armor", "cloth", { src: "drop", quality: "epic" })));
     expect(only).toContain("No items match these filters.");
     expect(only).toContain('href="/database/items/armor/cloth?src=drop"');
@@ -206,6 +208,17 @@ test("the Source column and filter: reported items show where they come from, th
   } finally {
     facts.rates = [];
   }
+});
+
+test("a Sort menu offers every column's order, for a phone where only the name column shows", async () => {
+  const page = await html(items());
+  const menu = page.split('data-filter="sort"')[1]?.split("</details>")[0] ?? "";
+  for (const label of ["Name", "Type", "Slot", "Item level", "Req. level", "Source", "ID"]) expect(menu).toContain(`>${label}<`);
+  expect(menu).toContain('href="/database/items?sort=-ilvl"');
+  expect(menu).toContain('href="/database/items?sort=name"');
+  // The default order (named items first) is the menu's reset choice; a chosen order is named on the menu's button.
+  expect(menu).toMatch(/href="\/database\/items"[^>]*>(?:<[^>]*>)*Named first/);
+  expect(await html(items({ sort: "-ilvl" }))).toMatch(/data-filter="sort"(?:[^<]|<(?!\/summary>))*Sort: <span class="text-fg">Item level<\/span>/);
 });
 
 test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {

@@ -59,6 +59,16 @@ test("the Sells tab is the NPC page's table: item links, prices in coins, stock 
   expect(sells).not.toContain(">Installs<");
 });
 
+test("Sells prices leave out zero coins as the game does, and on a phone the price, stock and evidence fold under the name", async () => {
+  facts.vendors = installs.map((installId) => ({ installId, vendorNpcId: 1125, itemId: 117, priceCopper: 100, capturedAt: at }));
+  const sells = panel(await html(), "goods");
+  expect(sells).toContain('<span class="sr-only">1 silver</span>');
+  expect(sells).not.toContain("0 copper");
+  // The Reported column hides below 640 px; its words ride the item cell's second line there.
+  expect(sells).toMatch(/<div class="dt-meta">(?:<[^>]*>)*(?:[^<]*<[^>]*>)*[^<]*not limited[^<]*(?:<[^>]*>)*3 of 3 installs agree/);
+  expect(sells).toMatch(/<th scope="col"[^>]*hidden sm:table-cell[^>]*>(?:<[^>]*>)*Reported/);
+});
+
 test("storage down: no reaction, zone or counts stated", async () => {
   facts.unreachable = true;
   const out = await html();

@@ -59,7 +59,8 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const columns: Column<Listed<AchievementEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={achievementHref(x.achievementId, x.name)} icon={assets?.achievementIcons.get(x.achievementId)}>{x.name}</NameCell> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
-    { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
+    // Most of the files' achievements carry no points: a dash, as any list shows a blank, not a column of zeros.
+    { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points || <span className="text-muted">—</span> },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
@@ -107,7 +108,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
             rowKey={(x) => String(x.achievementId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => [x.category, plural(x.points, "point"), `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].join(" · ")}
+            meta={(x) => [x.category, x.points > 0 && plural(x.points, "point"), `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>
@@ -119,7 +120,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const Totals = ({ t }: { t: CategoryTotal }) => (
-  <span className="text-meta text-muted tabular-nums">{plural(t.achievements, "achievement")} · {plural(t.points, "point")}</span>
+  <span className="text-meta text-muted tabular-nums">{plural(t.achievements, "achievement")}{t.points > 0 && ` · ${plural(t.points, "point")}`}</span>
 );
 
 /** The listed achievements by category, as the game files nest them, each with how many achievements and points it holds. */

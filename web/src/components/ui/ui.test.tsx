@@ -290,6 +290,20 @@ describe("DataTable", () => {
     expect(html).toContain('href="?sort=-count"');
   });
 
+  test("every sortable header says it can sort: aria-sort none on the unsorted ones, both table styles", () => {
+    const columns2 = [...columns, { key: "plain", header: "Plain", cell: () => "x" }];
+    for (const dense of [false, true]) {
+      const html = render(
+        <DataTable dense={dense} caption="Items" columns={columns2} rows={rows} rowKey={(r) => String(r.id)} sort={{ key: "name", direction: "asc" }} sortHref={(key) => `?sort=${key}`} />,
+      );
+      expect(html.match(/aria-sort="ascending"/g)).toHaveLength(1);
+      expect(html.match(/aria-sort="none"/g)).toHaveLength(1);
+      // A column that cannot sort carries no aria-sort; nor does a table without sort links.
+      expect(html).toMatch(/<th scope="col" class="[^"]*">(?:<[^>]*>)*Plain/);
+      expect(render(<DataTable dense={dense} caption="Items" columns={columns2} rows={rows} rowKey={(r) => String(r.id)} />)).not.toContain("aria-sort");
+    }
+  });
+
   test("dense with a phone line: only the first column shows below 640 px, the rest folds into its second line", () => {
     const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} meta={(r) => `Seen ${r.count}`} />);
     expect(html.match(/<th [^>]*hidden sm:table-cell/g)).toHaveLength(1);

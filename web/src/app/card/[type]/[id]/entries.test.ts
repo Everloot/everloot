@@ -73,7 +73,7 @@ test.each(CASES)("a %s card is the page's name, art and a few facts, cached an h
 test("each card's lines say what its page's box and facts say", async () => {
   const lines = async (type: string, id: number) => (await (await call(type, id)).json()).card.lines;
   // The page's category path, then the files' text, points and criteria.
-  expect(await lines("achievement", 627)).toEqual(["Adventure › Eastern Kingdoms", "Explore Dun Morogh, revealing the covered areas of the world map.", "0 points", "18 criteria"]);
+  expect(await lines("achievement", 627)).toEqual(["Adventure › Eastern Kingdoms", "Explore Dun Morogh, revealing the covered areas of the world map.", "No points in this game", "18 criteria"]);
   expect(await lines("faction", 21)).toEqual(["Steamwheedle Cartel"]);
   expect(await lines("zone", zone.mapId)).toEqual(expect.arrayContaining([`Zone in ${zone.continentName}`]));
   expect((await lines("instance", instance.instanceMapId))[1]).toBe(`${instance.encounters.length} ${instance.encounters.length === 1 ? "boss" : "bosses"} in the game files`);
