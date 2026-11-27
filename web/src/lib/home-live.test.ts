@@ -4,7 +4,7 @@ vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => 
 
 import type { GuildProgress, InstanceDef } from "@kb/guilds";
 import type { PublicFact } from "./database-activity";
-import { censusWeek, ladderTop, loadHomeNewest, loadHomeWeek, newestFacts } from "./home-live";
+import { censusWeek, ladderTop, loadHomeNewest, loadHomeWeek, newestFacts, pageNamed } from "./home-live";
 
 const fact = (kind: PublicFact["kind"], id: number, publicAt: string): PublicFact => ({
   kind, id, name: `${kind} ${id}`, installs: 3, publicAt, path: `/database/${kind === "item" ? "items" : "npcs"}/${id}`,
@@ -23,6 +23,22 @@ test("the newest facts come newest first, five of them, and only items take an i
   expect(shown[3]).toMatchObject({ icon: null, quality: null });
   expect(shown[1]).not.toHaveProperty("icon");
   expect(shown[4]).not.toHaveProperty("quality");
+});
+
+test("a fact stored under its #id fallback takes the name its own page shows; a page without one keeps the fallback", () => {
+  const named = (kind: PublicFact["kind"], id: number, name: string): PublicFact => ({ ...fact(kind, id, "2026-11-25T00:00:00.000Z"), name });
+  const entries = [
+    named("item", 249881, "Item #249881"), named("npc", 2376, "NPC #2376"), named("item", 276916, "Item #276916"),
+    named("quest", 7, "Quest #7"), named("item", 9, "Agreed Name"), named("boss", 4, "Encounter #4"),
+  ];
+  const names = {
+    items: new Map([[249881, "Recipe: Root Tea"], [9, "Files Name"]]), npcs: new Map([[2376, "Torn Fin Oracle"]]),
+    objects: new Map<number, string>(), quests: new Map<number, string>(),
+  };
+  expect(pageNamed(entries, names).map((e) => e.name)).toEqual([
+    "Recipe: Root Tea", "Torn Fin Oracle", "Item #276916", "Quest #7", "Agreed Name", "Encounter #4",
+  ]);
+  expect(pageNamed(entries, null)).toEqual(entries);
 });
 
 const instance = (id: number, tier: number, type: InstanceDef["instanceType"]): InstanceDef => ({ instanceMapId: id, name: `Instance ${id}`, instanceType: type, tier, bosses: [] });
