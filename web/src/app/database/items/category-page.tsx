@@ -215,7 +215,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined}
             tone={colour}
             style={name?.color ? { color: name.color } : undefined}
-            after={name && name.source !== "files" && <span className="sr-only"> ({NAME_TITLE[name.source].toLowerCase()})</span>}
+            after={name?.source === "players" && <span className="sr-only"> ({NAME_TITLE.players.toLowerCase()})</span>}
             files={unconfirmed}
           >
             {name?.name ?? `Item ${row[0]}`}
@@ -415,6 +415,12 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           </p>
         )}
         {match.respelled && rows.length > 0 && <Respelled q={match.respelled} />}
+        {/* Where wiki names come from, once for the page rather than under every row it names. */}
+        {shown.some((row) => names.get(row[0])?.source === "wiki") && (
+          <p data-name-note className="mt-2 text-cell-2 text-muted">
+            {`Names players have not confirmed yet are from the Warcraft Wiki${shown.some((row) => names.get(row[0])?.source === "files") ? "; a name marked unconfirmed is from the game files alone" : ""}.`}
+          </p>
+        )}
         <div className="mt-2">
           <DataTable
             dense

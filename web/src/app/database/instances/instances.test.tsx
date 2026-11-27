@@ -97,7 +97,7 @@ test("with storage down, an instance's page lists the bosses the game files give
   for (const r of rows) expect(r).not.toContain("[?]");
   // The entrance the files give is labelled as such, beside the line saying none is confirmed.
   expect(text(panel(html, "entrance"))).toContain("in the game files, not confirmed by players");
-  expect(text(html)).toMatch(/\|Bosses reported\|\[\?\]\|unconfirmed\|in the files, 11\|/);
+  expect(text(html)).toMatch(/\|Bosses confirmed\|\[\?\]\|unconfirmed\|the game files list 11\|/);
   const list = renderToStaticMarkup(await InstancesPage({}));
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
   expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
@@ -123,7 +123,23 @@ test("on night one, each boss one install reported shows 1 of 3, and nothing it 
     expect(text(row)).toContain("|1 of 3|");
     expect(text(row)).toContain("1 of 3 installs reported");
     expect(text(bosses)).toContain("No boss here has 3 installs reporting it yet. Kills and last seen show once one does.");
-    expect(text(html)).toMatch(/\|Bosses reported\|0\|/);
+    expect(text(html)).toMatch(/\|Bosses confirmed\|0 of 4\|/);
+  } finally {
+    state.seen = { unreachable: true };
+  }
+});
+
+test("the facts say how many bosses are confirmed out of the files' list, and why an entrance 3 installs zoned in from is still unconfirmed", async () => {
+  // SYNTHETIC: three installs killed three of Ragefire Chasm's four encounters and zoned in, each from a different map.
+  const installs = ["install-a", "install-b", "install-c"];
+  const encounters = installs.flatMap((installId) => [2732, 2733, 2734].map((encounterId) => ({ installId, encounterId, name: "Reported name", instanceMapId: 389, success: true, npcIds: [1], capturedAt: "2026-11-04T20:00:00Z" })));
+  const entrances = installs.map((installId, i) => ({ installId, instanceMapId: 389, name: "Ragefire Chasm", instanceType: "party", mapId: [1454, 1411, 1413][i]!, x: 50, y: 50, capturedAt: "2026-11-04T20:00:00Z" }));
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances, encounters } };
+  try {
+    const facts = text(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) })));
+    expect(facts).toMatch(/\|Bosses confirmed\|3 of 4\|unconfirmed\|the game files list 4\|/);
+    expect(facts).not.toContain("Bosses reported");
+    expect(facts).toMatch(/\|Entrance\|[^]*?in the files; 3 installs zoned in, not yet 3 from the same place\|/);
   } finally {
     state.seen = { unreachable: true };
   }

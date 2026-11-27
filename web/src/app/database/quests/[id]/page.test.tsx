@@ -230,14 +230,20 @@ test("Started by sits beside an agreed giver, and an item held back by the item 
   expect(await html()).not.toContain(">Started by</dt>");
 });
 
-test("the quest's objective from its lore archive page is a fact near the top, labelled with its source; none without one", async () => {
+test("the Warcraft Wiki blurb is an About fact near the top, named for its source, and the Lore block does not repeat it", async () => {
   data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
-  expect(await html()).not.toContain(">Objective</dt>");
-  lore.match = { extId: "x", name: "A quest", intro: "Slaughter 6 Mottled Boars, then return to Grull Hawkwind.", sourceId: "wiki" };
+  const ABOUT = "About this quest (Warcraft Wiki, 2023)";
+  expect(await html()).not.toContain(`>${ABOUT}</dt>`);
+  const intro = "Slaughter 6 Mottled Boars, then return to Grull Hawkwind.";
+  lore.match = { extId: "x", name: "A quest", intro, sourceId: "wiki" };
   const out = await html();
-  const objective = fact(out, "Objective");
-  expect(objective).toContain("Slaughter 6 Mottled Boars, then return to Grull Hawkwind.");
-  expect(objective).toContain("Warcraft Wiki archive, 2023");
+  // Not the in-game objective: the wiki's blurb, so not labelled "Objective".
+  expect(out).not.toContain(">Objective</dt>");
+  expect(out).toContain(`>${ABOUT}</dt>`);
+  expect(out.split(`>${ABOUT}</dt>`)[1]).toMatch(new RegExp(`^<dd[^>]*>(?:<[^>]*>)*${intro}`));
   // First among the facts, before the reported title.
-  expect(out.indexOf(">Objective</dt>")).toBeLessThan(out.indexOf(">Reported title</dt>"));
+  expect(out.indexOf(`>${ABOUT}</dt>`)).toBeLessThan(out.indexOf(">Reported title</dt>"));
+  // Shown once: the Lore block keeps its source line and archive link, not the paragraph again.
+  expect(out.split(intro)).toHaveLength(2);
+  expect(out).toContain("Read A quest in the lore archive");
 });

@@ -172,10 +172,11 @@ export const MAP_LINK_HEADER = <span className="sr-only">Map link</span>;
 
 /**
  * A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same; the
- * place follows the visible words, so the link's name starts with what is on screen (WCAG 2.5.3).
+ * place follows the visible words, so the link's name starts with what is on screen (WCAG 2.5.3). The place lives in
+ * the name alone: a hidden span shows up as a stray ": Zone at x, y" line in copied and reader-mode text.
  */
 export function ShowOnMap({ href, mapId, x, y }: { href: string; mapId: number; x: number; y: number }) {
-  return <Link href={href} className={LINK}>Show on the map<span className="sr-only">: {zoneName(mapId)} at {x}, {y}</span></Link>;
+  return <Link href={href} aria-label={`Show on the map: ${zoneName(mapId)} at ${x}, ${y}`} className={LINK}>Show on the map</Link>;
 }
 
 /** A position 3 installs agree on: the UiMap and the point on it, with how many installs reported it. */

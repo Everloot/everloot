@@ -157,12 +157,9 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
       }}
       // No box: its level, type, side and category are the header's type line again.
       facts={!facts.unreachable && [
-        // A quest's lore archive page opens with its objective (the Lore block below shows the same paragraph): first
-        // among the facts, with its source, since the archive predates WoW: Forever.
-        ...(lore && lore !== UNAVAILABLE && lore.intro ? [{ label: "Objective", value: <>
-          {lore.intro}
-          <span className="ml-2 text-meta text-muted">Warcraft Wiki archive, 2023</span>
-        </> }] : []),
+        // The opening paragraph of the quest's lore archive page: the wiki's blurb, not the in-game objective, so the
+        // label names it and its source (the archive predates WoW: Forever). The Lore block below then omits it.
+        ...(lore && lore !== UNAVAILABLE && lore.intro ? [{ label: "About this quest (Warcraft Wiki, 2023)", value: lore.intro }] : []),
         { label: "Reported title", value: known(page.title) },
         { label: "Level", value: known(page.level), numeric: true },
         { label: "Side", value: known(sideChip || null) },
@@ -233,7 +230,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         ]}
       /></>}
       related={<>
-        <LoreSection match={lore} />
+        <LoreSection match={lore} intro={false} />
         {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
       </>}
       screenshots={<EntityScreenshots type="quest" id={page.questId} name={title} />}

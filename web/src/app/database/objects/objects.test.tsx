@@ -78,6 +78,17 @@ test("an object name 3 installs agree on replaces the id on its page, title and 
   expect(await html(ObjectsPage({}))).toContain("Object 1731</a>");
 });
 
+test("item pages name an object source as its own page does, in Get it from and Dropped by", async () => {
+  const named = (installId: string, objectName: string) => ({ ...loot(installId, 1731, [2770]), sourceObjectName: objectName });
+  // 3 installs agree (one spells it in lower case), so the object page names it; the item page must too.
+  store.loadCorpus.mockResolvedValue(corpus([named("install-a", "Copper Vein"), named("install-b", "Copper Vein"), named("install-c", "copper vein")]));
+  expect(await html(ObjectPage(props("1731")))).toContain("Copper Vein");
+  const item = await html(ItemPage({ params: Promise.resolve({ id: "2770" }) }));
+  const getFrom = item.match(/Get it from<\/dt>[\s\S]*?<\/dd>/)?.[0] ?? "";
+  expect(getFrom).toMatch(/href="\/database\/objects\/1731"[^>]*>(?:<[^>]*>)*Copper Vein/);
+  expect(item).not.toContain("Object 1731");
+});
+
 test("the object list filters agreed names case-insensitively and preserves the public gate and numeric lookup", async () => {
   const records = ["a", "b", "c"].flatMap((install) => [
     { ...loot(`install-${install}`, 1731, [2770]), sourceObjectName: "Copper Vein" },

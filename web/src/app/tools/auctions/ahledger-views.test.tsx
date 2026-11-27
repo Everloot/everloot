@@ -20,10 +20,11 @@ const history = { median7d: 123456, median30d: 234567, salesPerDay: 3.5, windowD
   { t: "2026-11-15T00:00:00Z", min: 11, median: 16, p25: 13, p75: 19 },
 ] };
 const credit = { text: "Prices from AHledger", url: "https://ahledger.com/test-credit" };
-const panels: { name: string; panel: () => ReactNode; field: string; empty: unknown; message: string }[] = [
-  { name: "history", panel: () => <AhledgerHistory itemId={42} />, field: "history", empty: { ...history, median7d: null, median30d: null, salesPerDay: null, series: [] }, message: "No price history" },
-  { name: "deals", panel: () => <AhledgerDeals />, field: "deals", empty: [], message: "No deals meet" },
-  { name: "economy", panel: () => <AhledgerEconomySummary />, field: "markets", empty: [], message: "No full scans" },
+const panels: { name: string; panel: () => ReactNode; field: string; empty: unknown; message: string; failed: string }[] = [
+  // History has its own failure line: AH Ledger's history endpoint can be down while its current prices answer.
+  { name: "history", panel: () => <AhledgerHistory itemId={42} />, field: "history", empty: { ...history, median7d: null, median30d: null, salesPerDay: null, series: [] }, message: "No price history", failed: "AH Ledger's price history is unavailable right now" },
+  { name: "deals", panel: () => <AhledgerDeals />, field: "deals", empty: [], message: "No deals meet", failed: "could not be read" },
+  { name: "economy", panel: () => <AhledgerEconomySummary />, field: "markets", empty: [], message: "No full scans", failed: "could not be read" },
 ];
 
 for (const p of panels) {
@@ -51,7 +52,7 @@ for (const p of panels) {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("busy", { status: 503 })));
     await act(async () => root.render(p.panel()));
     expect(container.querySelector("[data-ahledger]")?.getAttribute("data-ahledger")).toBe("failed");
-    expect(container.textContent).toContain("could not be read");
+    expect(container.textContent).toContain(p.failed);
     expect(container.textContent).not.toContain(p.message);
     expect(container.querySelector('a[href="https://ahledger.com"]')).not.toBeNull();
   });

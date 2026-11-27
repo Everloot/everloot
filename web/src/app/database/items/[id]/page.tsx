@@ -321,7 +321,7 @@ export default async function ItemPage(props: Props) {
     ...rel("sold_by").map(relationSource),
     ...(facts.unreachable ? [] : sources.rows.map((d) => (d.sourceNpcId !== undefined
       ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
-      : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} />))),
+      : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} name={dropNames.objects.get(d.sourceObjectId!)?.name} />))),
     ...rel("created_by").map(relationSource),
   ].slice(0, 3);
   // The page in four lines: what it is, what players saw, what nobody has reported, and where the name came from.
