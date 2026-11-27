@@ -147,6 +147,10 @@ How it works, and what it will not do:
   used in, for the `/database` item pages, and of every spell that teaches a mount (`Mount.SourceSpellID`), for
   the mount pages; `familyIcons` holds `CreatureFamily.IconFileID` by pet family id. Spells and families are not
   items, so these are not gated on reports.
+- **Every named spell's icon.** `spellIcons` also holds `SpellMisc.SpellIconFileDataID` of every spell the spell name
+  rule names (`SpellName.Name_lang`, `kb/src/game-name-rule.ts`, the same set `game-names` writes to
+  `spell-names.json`): each has a spell page, a row in the spell list and a hover card, so class spell lists, recipe
+  spells and item Use lines show their icons too. A spell with no name or no icon row gets none.
 - **Currency and companion pet icons.** `currencyIcons` holds `CurrencyTypes.InventoryIconFileID` by currency id
   and `petIcons` `BattlePetSpecies.IconFileDataID` by species id, for the currency and companion pet pages. A
   page shows one only when the manifest lists it, so a build uploaded before these keys shows none.
