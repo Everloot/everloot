@@ -4,7 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   missingTip: false, iconOnly: new Map<number, string>(),
-  assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
+  assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], levelCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
   progress: [] as { fact: "armor"; reporters: number; build: string }[],
   renders: null as unknown, renderCalls: 0,
@@ -19,6 +19,12 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
     state.tipCalls.push([...ids]);
     if (state.missingTip) return new Map();
     return new Map(ids.map((id) => [id, { name: `Game name ${id}`, color: "#fff", quality: "Common", icon: `https://assets.example.test/b/icons/i${id}.webp`, lines: state.tipLines, partial: false, why: [], label: "found in game files, unconfirmed · build 1.60.1.70450", level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
+  },
+  // The lists' level and binding filters and sorts: the same numbers as the tooltips above, without them.
+  loadItemLevels: async (_assets: unknown, ids: readonly number[]) => {
+    state.levelCalls.push([...ids]);
+    if (state.missingTip) return new Map();
+    return new Map(ids.map((id) => [id, { level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
   },
   // The item page's read for an item without a tooltip: its icon, and whether the build's item index was read.
   readItemTips: async (_assets: unknown, ids: readonly number[]) => ({
@@ -63,7 +69,7 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; state.renders = null; state.renderCalls = 0; state.indexed = true; state.tipLines = []; });
+beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.levelCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; state.renders = null; state.renderCalls = 0; state.indexed = true; state.tipLines = []; });
 
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
@@ -307,8 +313,9 @@ test("level and binding filters match only items whose facts show; unknown value
   const ilvl = await clothRows({ ilvl: "11-20" });
   // The item players have seen (its agreed name) leads the default order.
   expect(ilvl.rows).toEqual([ids[3], ids[0], ids[2]]);
-  // The filter reads the facts of every row that may show them, and only those.
-  expect(state.tipCalls).toEqual([ids.slice(0, 4)]);
+  // The filter reads the levels of every row that may show them, and only those; the tooltips only of the rows shown.
+  expect(state.levelCalls).toEqual([ids.slice(0, 4)]);
+  expect(state.tipCalls).toEqual([[ids[3], ids[0], ids[2]]]);
   // No required level is no value: it does not match a required level range.
   expect((await clothRows({ req: "1-10" })).rows).toEqual([ids[0]]);
   expect((await clothRows({ bind: "none" })).rows).toEqual([ids[2]]);

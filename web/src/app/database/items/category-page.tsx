@@ -5,13 +5,13 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,
-  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
-  listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
+  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, itemSkills, ITEM_LEVEL_BRACKETS, itemsHref,
+  listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
 } from "@/lib/items";
-import { loadListNames, loadListSeen } from "@/lib/item-view";
+import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
+import { loadItemLevels, loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
@@ -121,18 +121,21 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
   const fits = (row: ItemRow) => !usable || usable(row) !== "no";
   const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
-  const [{ agreed, matched, showsTip, degraded }, seen] = await Promise.all([loadListNames(), loadListSeen()]);
-  const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
+  // One after the other: the seen items then come from the view the names just read, not from a second read of it.
+  const listNames = await loadListNames();
+  const seen = await loadListSeen();
+  const { agreed, matched, showsTip, degraded } = listNames;
+  // The names, the default order, the leftovers and the unnamed items, worked out once per version of the files.
+  const index = itemListIndex(listNames, seen);
+  const nameOf = index.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
-  const tipsFor = async (ids: number[]) => {
-    const assets = ids.length ? await loadSiteAssets() : null;
-    return { assets, tips: await loadItemTips(assets, ids) };
-  };
-  // A level or binding filter or sort reads the facts of every row that may show them; otherwise only this page's.
+  // A level or binding filter or sort reads the levels of every row that may show them; the tooltips are this page's only.
   const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
-  const every = wide ? await tipsFor(base.map((row) => row[0]).filter(showsTip)) : null;
-  const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.tips.get(id) };
+  const wideIds = wide ? base.map((row) => row[0]).filter(showsTip) : [];
+  const wideAssets = wideIds.length ? await loadSiteAssets() : null;
+  const levels = wide ? await loadItemLevels(wideAssets, wideIds) : null;
+  const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => levels?.get(id), order: index.order };
   const match = matchItemNames(base, q, ctx);
   const listed = listItems(base, q, ctx, match);
   // The items no source names ("Item N") are one line above the table unless asked for, in the unrecorded quality
@@ -141,20 +144,30 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const isNamed = (id: number) => showsTip(id);
   const idLookup = Boolean(q.q && /^#?\d+$/.test(q.q));
   const folded = !q.unnamed && !q.quality?.includes(UNRECORDED) && !idLookup && listed.some((row) => isNamed(row[0]));
-  const unnamed = new Set(folded ? T.items.filter((row) => !isNamed(row[0])).map((row) => row[0]) : []);
+  const unnamed: ReadonlySet<number> = folded ? index.unnamed : new Set();
   const rows = listed.filter((row) => !unnamed.has(row[0]));
   const unnamedCount = folded ? listed.length - rows.length : rows.filter((row) => !isNamed(row[0])).length;
   // The development leftovers (test, placeholder and retired items) are out of the list unless asked for; the
   // menus count what the list can show, and the line above the table says how many are held back.
-  const leftovers = developmentLeftovers(T.items, nameOf);
+  const leftovers = index.leftovers;
   const gone = (id: number) => unnamed.has(id) || (!q.dev && leftovers.has(id));
   const pool = base.filter((row) => !gone(row[0]));
-  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx, match).filter((row) => !unnamed.has(row[0])).length - rows.length;
-  const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && (gone(row[0]) || !fits(row))), 0);
+  // Only counted, so the rows with the leftovers are not sorted.
+  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : matchingItems(base, { ...q, dev: true }, ctx, match).filter((row) => !unnamed.has(row[0])).length - rows.length;
+  // What a class or type menu's count leaves out, counted for every class and type in one pass.
+  const hiddenCounts = new Map<string, number>();
+  for (const row of T.items) {
+    if (!gone(row[0]) && fits(row)) continue;
+    for (const key of ["", `${row[1]}`, `${row[1]}/${row[2]}`]) hiddenCounts.set(key, (hiddenCounts.get(key) ?? 0) + 1);
+  }
+  const hiddenIn = (classId?: number, subclassId?: number) => hiddenCounts.get(classId === undefined ? "" : subclassId === undefined ? `${classId}` : `${classId}/${subclassId}`) ?? 0;
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
   const { shown, pages, per } = paged(rows, q);
-  const { assets, tips } = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
+  const shownIds = shown.map((row) => row[0]).filter(showsTip);
+  // With a wide read, the manifest as that read had it (so the icon column is drawn as before); else this page's own.
+  const assets = wide ? wideAssets : shownIds.length ? await loadSiteAssets() : null;
+  const tips = await loadItemTips(assets, shownIds);
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
   // The icon column, with the game's question mark where a row has no icon, only with the asset files.
   const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
@@ -217,7 +230,11 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     .filter((o) => o.count > 0 || o.on);
   const facets = itemFacets();
   const inBase = (set: Set<number>) => pool.reduce((n, row) => n + Number(set.has(row[0])), 0);
-  const skills = facets.professions.map((p) => ({ ...p, count: inBase(facets.bySkill.get(p.id)!) })).filter((p) => p.count > 0 && (q.dev || !isDevelopmentItemName(p.name)));
+  // Each profession's count in one pass over the list, through the professions of each item.
+  const bySkill = new Map<number, number>();
+  const skillsOf = itemSkills();
+  for (const row of pool) for (const skill of skillsOf.get(row[0]) ?? []) bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
+  const skills = facets.professions.map((p) => ({ ...p, count: bySkill.get(p.id) ?? 0 })).filter((p) => p.count > 0 && (q.dev || !isDevelopmentItemName(p.name)));
   const slotNames = new Map(pool.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
   const toggle = (key: "crafted" | "reagent" | "set" | "seen", label: string, count: number): FilterControl[] =>
     count > 0 || q[key] ? [{ type: "toggle", key, label, href: here({ [key]: q[key] ? undefined : true }), on: Boolean(q[key]) }] : [];

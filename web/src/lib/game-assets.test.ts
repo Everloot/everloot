@@ -5,7 +5,7 @@ import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { CLIENT_BAGS } from "@/data/game-data/client-bags";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, forgetSiteAssets, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
+  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemLevels, loadItemSetNames, loadItemTips,loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, tooltipMoney, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
@@ -162,6 +162,51 @@ test("whether the build's item index was read, so a page may say the files hold 
   expect((await readItemTips(a, [30], memoryStore({}))).indexed).toBe(false);
   expect((await readItemTips(a, [30], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).indexed).toBe(false);
   expect((await readItemTips(a, [30], null)).indexed).toBe(false);
+});
+
+/** A shard whose records count how often a reader looks at them (the item name is read by every check of a record). */
+function countingShard(shard: Record<string, Record<string, unknown>>) {
+  const looks = { keys: 0, records: 0 };
+  const records = Object.fromEntries(Object.entries(shard).map(([id, r]) => [id, new Proxy(r, { get: (t, k) => { if (k === "n") looks.records++; return Reflect.get(t, k); } })]));
+  return { looks, shard: new Proxy(records, { ownKeys: (t) => { looks.keys++; return Reflect.ownKeys(t); } }) };
+}
+
+test("the item lists' levels: the numbers each listed item's tooltip has, for its ids only, and none where there is no tooltip", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const levels = await loadItemLevels(a, [9, 25, 9, 4000, -1], memoryStore(privateFiles));
+  expect([...levels]).toEqual([[9, { level: 5, required: 0, binding: 0 }], [25, { level: 2, required: 5, binding: 2 }]]);
+  const tips = await loadItemTips(a, [9, 25], memoryStore(privateFiles));
+  for (const [id, x] of levels) expect(x).toEqual({ level: tips.get(id)!.level, required: tips.get(id)!.required, binding: tips.get(id)!.binding });
+  // As with the tooltips: a bad record, another build, no bucket, no manifest or no ids give none.
+  expect((await loadItemLevels(a, [9, 25], memoryStore({ ...privateFiles, [`${FOLDER}/items/0.json`]: { ...shard0, "9": { n: 1 } } }))).has(9)).toBe(false);
+  expect((await loadItemLevels(a, [9], memoryStore({ ...privateFiles, [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).size).toBe(0);
+  expect((await loadItemLevels(a, [9], null)).size).toBe(0);
+  expect((await loadItemLevels(null, [9], memoryStore(privateFiles))).size).toBe(0);
+  const idle = memoryStore(privateFiles);
+  expect((await loadItemLevels(a, [], idle)).size).toBe(0);
+  expect(idle.reads).toEqual([]);
+});
+
+test("a shard as read is checked once: later pages on the same read look nothing up again, a new read is checked anew", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const first = countingShard(shard0);
+  const store = memoryStore({ ...privateFiles, [`${FOLDER}/items/0.json`]: first.shard });
+  expect((await loadItemTips(a, [9], store)).has(9)).toBe(true);
+  const walked = first.looks.keys;
+  expect(walked).toBeGreaterThan(0);
+  // The next page's tooltips: the same object the store keeps, so the shard is not walked again.
+  expect((await loadItemTips(a, [25], store)).has(25)).toBe(true);
+  expect(first.looks.keys).toBe(walked);
+  // A list's levels check each record once; the next list page checks none.
+  expect((await loadItemLevels(a, [9, 25], store)).size).toBe(2);
+  const once = { ...first.looks };
+  expect((await loadItemLevels(a, [9, 25], store)).size).toBe(2);
+  expect(first.looks).toEqual(once);
+  // The store read the shard again (a new version): it is walked and its records are checked again.
+  const second = countingShard(shard0);
+  expect((await loadItemLevels(a, [9, 25], memoryStore({ ...privateFiles, [`${FOLDER}/items/0.json`]: second.shard }))).size).toBe(2);
+  expect(second.looks.keys).toBeGreaterThan(0);
+  expect(second.looks.records).toBeGreaterThan(0);
 });
 
 test("a stack size from a newer shard prints above the sell price; an older shard, or keys this reader does not know, still read", async () => {
