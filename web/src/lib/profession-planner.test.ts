@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planShopping, filterRecipes, cheapestPrices, type SearchRecipe } from "./profession-planner";
+import { planShopping, filterRecipes, cheapestPrices, packRecipes, unpackRecipes, shoppingCatalog, type PlannerRecipe, type SearchRecipe } from "./profession-planner";
 const recipes = [
   { profession: "Smithing", recipe: "Iron widget", skillMin: 1, skillMax: 10, points: 2, reagents: [{ item: "Iron Ore", count: 3 }], reporters: 3 },
   { profession: "Smithing", recipe: "Copper widget", skillMin: 1, skillMax: 10, points: 1, reagents: [{ item: "Copper Ore", count: 2 }], reporters: 3 },
@@ -52,5 +52,46 @@ describe("recipe filtering", () => {
     expect(filterRecipes(rows,"",20).map(r=>r.spellId)).toEqual([2]);
     expect(filterRecipes([{...rows[0],yellow:null}],"",20)).toHaveLength(1);
     expect(filterRecipes(rows,"",19)).toHaveLength(2);
+  });
+});
+
+describe("what the shopping list is sent", () => {
+  // Agreed steps carry no training cost; derived steps carry a number or null, and the list shows the difference.
+  const path: PlannerRecipe[] = [
+    ...recipes,
+    { profession: "Smithing", recipe: "Steel widget", skillMin: 8, skillMax: 30, points: 1, reagents: [{ item: "Iron Ore", count: 2 }, { item: "Coal", count: 1 }], reporters: 4, trainingCopper: 500 },
+    { profession: "smithing", recipe: "Bronze widget", skillMin: 20, skillMax: 40, points: 1, reagents: [{ item: "Copper Ore", count: 1 }], reporters: 3, trainingCopper: null },
+  ];
+  it("packs the path recipes so the planner gives the same plan for every range and skip", () => {
+    const back = unpackRecipes(packRecipes(path), "Smithing");
+    for (const [from, to] of [[1, 40], [3, 8], [9, 35], [25, 40]]) for (const skip of [[], ["Iron widget"], ["Steel widget", "Copper widget"]]) {
+      expect(planShopping(back, "Smithing", from, to, skip, prices)).toEqual(planShopping(path, "Smithing", from, to, skip, prices));
+    }
+    expect(back.map(r => r.trainingCopper)).toEqual([undefined, undefined, 500, null]);
+  });
+  it("sends each path recipe as its name, skills and reagent counts only", () => {
+    const one = JSON.stringify(packRecipes([path[2]]));
+    // The strings the planner reads (recipe and reagent names) plus 40 bytes of numbers and brackets.
+    expect(one.length).toBeLessThanOrEqual('"Steel widget""Iron Ore""Coal"'.length + 40);
+    expect(one).not.toContain("profession");
+  });
+  const catalog: SearchRecipe[] = Array.from({ length: 50 }, (_, i) => ({
+    profession: "Smithing", slug: "smithing", spellId: 1000 + i, name: i === 1 ? "Widget 0" : `Widget ${i}`, itemName: `Widget ${i}`, itemUnconfirmed: false, yellow: 10, grey: 20,
+    recipeItems: [{ itemId: 5000 + i, name: `Plans: Widget ${i}`, unconfirmed: true, sources: [] }],
+    reagents: [{ itemId: 2, name: "Iron Ore", count: 3 }, { itemId: 3, name: "Coal", count: 1 }, { itemId: 4000 + i, name: `Part ${i}`, count: 2 }],
+  }));
+  const named = catalog.map(r => ({ ...path[0], recipe: ` ${r.name.toUpperCase()} ` }));
+  it("keeps the catalog to reagent ids and the teaching items of names only one recipe has", () => {
+    const sent = shoppingCatalog(catalog, named);
+    expect(sent.reagents).toEqual([2, 3, ...catalog.map((_, i) => 4000 + i)]);
+    expect(sent.taught["widget 2"]).toEqual([5002]);
+    // Two recipes named "Widget 0": the list shows neither one's teaching item, as before.
+    expect(sent.taught["widget 0"]).toBeUndefined();
+    expect(shoppingCatalog(catalog, named.slice(2, 3))).toEqual({ reagents: [2, 3, 4002], taught: { "widget 2": [5002] } });
+  });
+  it("stays under 32 bytes per recipe, with the item names left to the page's item lookup", () => {
+    const json = JSON.stringify(shoppingCatalog(catalog, named));
+    expect(json.length / catalog.length).toBeLessThanOrEqual(32);
+    expect(json).not.toMatch(/Iron Ore|Plans:|Part \d/);
   });
 });

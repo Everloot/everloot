@@ -22,6 +22,41 @@ export function planShopping(recipes: PlannerRecipe[], profession: string, fromS
   const priceMap = new Map(Object.entries(prices));
   return professionPath([], [], { profession, fromSkill, toSkill }, recipes.filter(r => !skipped.includes(r.recipe)), priceMap);
 }
+/**
+ * A path recipe as the page sends it to the shopping list: [recipe, skillMin, skillMax, points, reporters, [reagent, count][],
+ * trainingCopper]. The training cost is left off when the step has none (agreed steps), and is a number or null otherwise.
+ */
+export type PackedRecipe = [string, number, number, number, number, [string, number][], (number | null)?];
+export function packRecipes(recipes: PlannerRecipe[]): PackedRecipe[] {
+  return recipes.map((r) => {
+    const row: PackedRecipe = [r.recipe, r.skillMin, r.skillMax, r.points, r.reporters, r.reagents.map((x): [string, number] => [x.item, x.count])];
+    if (r.trainingCopper !== undefined) row.push(r.trainingCopper);
+    return row;
+  });
+}
+/** Every packed recipe belongs to the one profession the list is for. */
+export function unpackRecipes(rows: PackedRecipe[], profession: string): PlannerRecipe[] {
+  return rows.map(([recipe, skillMin, skillMax, points, reporters, reagents, ...training]) => ({
+    profession, recipe, skillMin, skillMax, points, reporters, reagents: reagents.map(([item, count]) => ({ item, count })),
+    ...(training.length ? { trainingCopper: training[0] } : {}),
+  }));
+}
+/**
+ * What the shopping list reads from one profession's game-file catalog for the path's recipes: the reagent item ids (it
+ * matches the path's reagent names to them through the page's item lookup), and the teaching items by lowercased recipe
+ * name, for names only one recipe has. Names and badges come from the item lookup, so each item's name is sent once.
+ */
+export type ShoppingCatalog = { reagents: number[]; taught: Record<string, number[]> };
+export function shoppingCatalog(catalog: SearchRecipe[], recipes: PlannerRecipe[]): ShoppingCatalog {
+  const key = (name: string) => name.trim().toLowerCase();
+  const onPath = new Set(recipes.map((r) => key(r.recipe)));
+  const rows = catalog.filter((r) => onPath.has(key(r.name)));
+  const named = new Map<string, SearchRecipe[]>();
+  for (const r of rows) named.set(key(r.name), [...(named.get(key(r.name)) ?? []), r]);
+  const taught: Record<string, number[]> = {};
+  for (const [name, [only, ...more]] of named) if (!more.length && only.recipeItems.length) taught[name] = only.recipeItems.map((x) => x.itemId);
+  return { reagents: [...new Set(rows.flatMap((r) => r.reagents.map((x) => x.itemId)))], taught };
+}
 export function filterRecipes(rows: SearchRecipe[], query: string, skill: number | null): SearchRecipe[] {
   const q = query.trim().toLocaleLowerCase();
   return rows.filter(r => !(skill !== null && r.yellow !== null && r.grey !== null && skill >= r.grey)

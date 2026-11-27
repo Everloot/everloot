@@ -37,6 +37,7 @@ import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
 import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
 import ShoppingList from "../shopping-list";
+import { packRecipes, shoppingCatalog } from "@/lib/profession-planner";
 import RecipeTables, { type RecipeItem, type RecipeRow } from "../recipe-table";
 import RecipeShopping from "../recipe-shopping";
 import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
@@ -207,9 +208,8 @@ export default async function ProfessionPage(props: Props) {
   const listed = recipePage(filterRecipeViews(recipeGroups(p.recipes).flatMap((g) => g.recipes), catalog, listQuery), listQuery);
   const listHere = (change: Parameters<typeof recipeListHref>[3]) => recipeListHref(path, searchParams, listQuery, change);
   const teaching = new Map(catalog.map((r) => [r.spellId, r.recipeItems]));
-  // The shopping list only looks up the recipes on the agreed path and their reagents, so it gets those, not the catalog.
-  const pathNames = new Set(plannerRecipes.map((r) => r.recipe.trim().toLowerCase()));
-  const shoppingCatalog = catalog.filter((r) => pathNames.has(r.name.trim().toLowerCase()));
+  // The shopping list only looks up the recipes on the agreed path and their reagents, so it gets their item ids, not the catalog.
+  const shopping = shoppingCatalog(catalog, plannerRecipes);
   const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([k, v]) => [k, v.icon]));
 
   // The recipe rows as ids and numbers, each item they name once with its name, colour and icon (recipe-table.tsx).
@@ -245,6 +245,8 @@ export default async function ProfessionPage(props: Props) {
   const groups = recipeGroups(p.recipes);
   const shownGroups = recipeGroups(listed.rows);
   const tableGroups = shownGroups.map((g) => ({ key: g.key, label: g.label, rows: g.recipes.map(row) }));
+  // The shopping list names its items from the same lookup, so the page's RSC data carries each name once.
+  for (const id of [...shopping.reagents, ...Object.values(shopping.taught).flat()]) item(id);
   const listFilters = Number(Boolean(listQuery.q)) + Number(listQuery.min !== null || listQuery.max !== null);
   const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={listQuery.size} href={(page) => listHere({ page })} label={`${p.name} recipe pages`} />;
   const trail = trailFor(path)!;
@@ -381,7 +383,7 @@ export default async function ProfessionPage(props: Props) {
           </Card>
         </section>
         {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
-        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={shoppingCatalog}profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={shopping} items={items} profession={p.name} recipes={packRecipes(plannerRecipes)} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">
