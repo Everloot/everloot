@@ -3,7 +3,7 @@ import { Callout, C, H2, List, P, Step, Steps, docLink } from "@/components/docs
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 
 export const metadata: Metadata = pageMetadata({
   title: "Market prices in a script",

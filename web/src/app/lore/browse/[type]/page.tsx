@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import BrowseFilters from "./BrowseFilters";
 import { Card, Container, PageHeader, Pager } from "@/components/ui";

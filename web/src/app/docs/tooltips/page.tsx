@@ -1,7 +1,7 @@
 import { CLASSES, QUALITIES, tokens } from "@/design/tokens";
 import type { Metadata } from "next";
 import Script from "next/script";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SITE } from "@everloot/protocol";
 import { Callout, C, H2, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";

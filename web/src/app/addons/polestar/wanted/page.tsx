@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { PACK_IDEAS, POLESTAR, POLESTAR_HELP } from "@/data/polestar";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, Entry, EntryList, PageHeader, SectionHeading } from "@/components/ui";

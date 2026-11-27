@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { CREDIT_LINE, GAME_DATA_CREDIT, LICENCE, LICENCE_URL } from "@everloot/protocol";
 import { Callout, C, H2, H3, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";

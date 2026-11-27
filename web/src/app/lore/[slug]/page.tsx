@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { FEED, IMAGE, TWITTER_IMAGE } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";

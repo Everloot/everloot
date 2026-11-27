@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { KeysRefresh, RemoveAccess } from "@/components/ApiKeys";
 import { Callout } from "@/components/docs/blocks";

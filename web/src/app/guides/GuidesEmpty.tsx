@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { REPO_URL } from "@/lib/source";
 

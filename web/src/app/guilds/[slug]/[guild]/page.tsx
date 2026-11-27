@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { armoryGuildPath } from "@/lib/armory";
 import { armoryGuildOf } from "@/lib/guild-merge";

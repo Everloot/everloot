@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { SERVED, WITHOUT_SNAPSHOT, versionHref } from "@/lib/build-versions";
 import type { GameVersion } from "@/lib/game-version";

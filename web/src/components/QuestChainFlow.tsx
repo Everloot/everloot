@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import EntityLink from "./EntityLink";
 
 /** Up to this many quests show whole; a longer chain shows its first and last quest and this quest's neighbours. */

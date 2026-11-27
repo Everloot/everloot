@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Facts, SectionHeading } from "@/components/ui";
 import { Equipment, ProfileDetailsView, readTimes } from "@/app/armory/profile";
 import { ArmoryCredit, day, link, newest } from "@/app/armory/parts";

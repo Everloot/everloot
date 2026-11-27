@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { unstable_noStore as noStore } from "next/cache";
 import { dataAgeLabel } from "@/lib/data-age";
 import { BROWSE_HEADINGS, BROWSE_TYPES, coverage, FACET_KEYS, PRE_CLASSIFICATION_COPY, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type FacetKey } from "@/lib/lore";

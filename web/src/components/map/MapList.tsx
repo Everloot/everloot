@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Badge, EmptyState } from "@/components/ui";
 import { mapHref, zoneHref, type CategoryState, type MapItems, type MapZone } from "@/lib/map-view";
 import { confirmedLine } from "@/lib/report-labels";

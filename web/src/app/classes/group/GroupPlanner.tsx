@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Card, CopyButton, SectionHeading, Segmented } from "@/components/ui";

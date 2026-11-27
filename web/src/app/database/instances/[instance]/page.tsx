@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, DataTable, Disclosure, filledColumns, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";

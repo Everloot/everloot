@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, SectionHeading } from "@/components/ui";
 import { armoryOn } from "@/lib/armory";
 import { playerPagesOn } from "@/lib/player-pages";

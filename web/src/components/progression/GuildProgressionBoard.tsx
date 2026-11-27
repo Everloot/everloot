@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, DataTable } from "@/components/ui";
 import { armoryGuildPath } from "@/lib/armory";
 import type { GuildProgressionRank } from "@/lib/progression";

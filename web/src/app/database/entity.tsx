@@ -1,5 +1,5 @@
 import { isValidElement, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
 import { AgreementMeter, Container, DataTable, Facts, GET_THE_ADDON, InShort, OpenData, QUALITY_TEXT, type Column, type Fact, type Quality } from "@/components/ui";

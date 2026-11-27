@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Badge } from "@/components/ui";
 import { armoryGuildPath } from "@/lib/armory";
 import type { ArmoryGuild } from "@/lib/armory-store";

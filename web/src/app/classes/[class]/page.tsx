@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { ClassContextLink } from "@/components/classes/ClassContextChip";
 import UseClassButton from "@/components/classes/UseClassButton";

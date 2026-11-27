@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import AuthShell, { AUTH_BUTTON, AuthDivider } from "@/components/AuthShell";
