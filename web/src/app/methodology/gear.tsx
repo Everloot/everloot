@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SectionHeading } from "@/components/ui";
 import { GEAR_SCORE_DIVISOR, GEAR_SCORE_VERSION, GEAR_WEIGHTS_BUILD, GROUP_BUDGET } from "@kb/gear-score";
 

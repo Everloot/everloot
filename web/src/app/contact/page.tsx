@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 

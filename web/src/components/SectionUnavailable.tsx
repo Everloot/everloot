@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { Crumb } from "@/lib/jsonld";
 import { Card, Container, PageHeader } from "@/components/ui";
 

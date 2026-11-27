@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { filterTimeline, loadTimeline, type ChangeEntry } from "@/lib/changes";

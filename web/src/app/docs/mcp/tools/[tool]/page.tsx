@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import type { McpToolName } from "@everloot/protocol";

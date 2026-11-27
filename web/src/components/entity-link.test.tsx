@@ -15,7 +15,6 @@ test.each(["spell", "vendor"] as const)("a %s EntityLink targets the page recogn
   expect(html).not.toContain("data-no-hover-card");
 });
 
-test("an EntityLink is not prefetched as the page loads unless the caller asks for it", () => {
+test("an EntityLink is never prefetched, on view or on hover", () => {
   expect(renderToStaticMarkup(<EntityLink kind="item" id={10} name="Shown name" />)).toContain('data-prefetch="false"');
-  expect(renderToStaticMarkup(<EntityLink kind="item" id={10} name="Shown name" prefetch />)).toContain('data-prefetch="true"');
 });

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { agreedCollectionItems, collectionFactsFromRecords, handleCollectionGap } from "@kb/collection-gap";
 import {
   ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, completionProgress, droppedCharactersNote, overviewOf,

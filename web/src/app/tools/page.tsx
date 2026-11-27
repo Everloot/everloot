@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { TOOL_LINES, toolGroups } from "@/data/tools";

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadAddonLeaderboard } from "@/lib/rollup-compute";
 import { loadEcosystem } from "@/lib/ecosystem";

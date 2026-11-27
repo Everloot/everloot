@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Facts, type Fact } from "@/components/ui";
 import type { AccountOverview } from "@/lib/account-overview";

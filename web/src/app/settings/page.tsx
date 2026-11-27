@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { redirect } from "next/navigation";
 import ApiKeys from "@/components/ApiKeys";
 import { className } from "@/components/builds/describe";

@@ -1,6 +1,6 @@
 import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { DataTable, Facts, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
 import { EMPTY, EmptyTab, EntityPage, LINK } from "../../entity";

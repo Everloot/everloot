@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 
 // The page for any server failure, in practice a lore page whose release could not be opened.
 // Failed renders are not cached, so visitors see this until the release opens again.

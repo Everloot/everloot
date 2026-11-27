@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, GET_THE_ADDON, SectionHeading } from "@/components/ui";
 import type { CoverageSummary } from "@/lib/coverage-summary";
 import { dataAgeLabel } from "@/lib/data-age";

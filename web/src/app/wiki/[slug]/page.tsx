@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
 import { Card, Container, Disclosure, PageHeader, Prose, SectionHeading } from "@/components/ui";

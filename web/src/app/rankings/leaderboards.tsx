@@ -1,6 +1,6 @@
 import GuildProgressionBoard from "@/components/progression/GuildProgressionBoard";
 import type { GuildProgressionRank } from "@/lib/progression";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, DataTable, LinkTabs, SectionHeading, Tooltip, type Column } from "@/components/ui";
 import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryBoardHref, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
 import { guildDirectoryHref } from "@/lib/armory-guilds";

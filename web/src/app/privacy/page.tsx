@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
