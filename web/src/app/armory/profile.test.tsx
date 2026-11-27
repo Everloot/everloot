@@ -47,7 +47,9 @@ test("every equipped slot shows an icon in its quality border: its own art, or t
 
 test("an item the game files do not know keeps Blizzard's name, gets an armory-only tooltip and no link to a nameless page", () => {
   // Only the head has a game-file tooltip; the main hand (17069) is unknown to the files.
-  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip()]])} unknownIcon={UNKNOWN} />);
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip()]])} unknownIcon={UNKNOWN} unknown={new Set([17069])} />);
+  // Without a tooltip but not known to be missing from the files (a slow or absent bucket), the item keeps its link.
+  expect(renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map()} unknownIcon={UNKNOWN} />)).toContain('href="/database/items/17069"');
   const slot = html.slice(html.indexOf('data-equipment-slot="MAIN_HAND"'));
   const mainHand = slot.slice(0, slot.indexOf("</li>"));
   expect(mainHand).toContain("Striker&#x27;s Mark");

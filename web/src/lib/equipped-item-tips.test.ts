@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import { parseSiteManifest } from "./game-assets";
 import { itemIndex, memoryStore, shard0, siteManifest } from "./game-assets.fixture";
-import { loadEquippedTips } from "./equipped-item-tips";
+import { loadEquippedItems, loadEquippedTips } from "./equipped-item-tips";
 
 const BASE = "https://assets.example.test/wow_classic_beta-70450-84bea423";
 const FOLDER = "wow_classic_beta-70450-84bea423";
@@ -24,6 +24,15 @@ test("gear Blizzard reports equipped gets a card: the files' tooltip, else the a
   });
   // Neither a tooltip nor an icon: a plain link, as before.
   expect(tips.has(31)).toBe(false);
+});
+
+test("an item is unknown to the files only after a complete read of this build's index finds nothing for it", async () => {
+  const items = [{ itemId: 9, name: "Linen Cloth", quality: "COMMON" }, { itemId: 30, name: "Witchblade", quality: "EPIC" }, { itemId: 31, name: "Nothing In The Files", quality: "RARE" }];
+  const read = await loadEquippedItems(parseSiteManifest(siteManifest, BASE)!, items, store());
+  expect([...read.unknown]).toEqual([31]);
+  // No private bucket, or no asset files: nothing is known either way, so nothing is called unknown.
+  expect((await loadEquippedItems(parseSiteManifest(siteManifest, BASE)!, items, null)).unknown.size).toBe(0);
+  expect((await loadEquippedItems(null, items, store())).unknown.size).toBe(0);
 });
 
 test("an item with an icon only gets its type and slot from the client layer", async () => {

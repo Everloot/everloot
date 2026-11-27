@@ -29,19 +29,18 @@ const ICON = 40;
  * do); no icon at all without the asset files. The icon and the name both link the item page, so the shared hover card
  * (or the item's own tooltip) opens from either. `center` fills the model's place (the summary on the armory page); on
  * a phone it comes first and the slots follow as one list. The right column mirrors the left from a wide screen up.
- * `heading={false}` inside a tab, whose label names it already.
+ * `heading={false}` inside a tab, whose label names it already. An item in `unknown` (the game files carry nothing for
+ * it, lib/equipped-item-tips.ts) has a nameless database page and a hover card that would 404, so it gets no link and
+ * a tooltip from what Blizzard's armory read (name, quality, item level, slot) instead.
  */
-export function Equipment({ character: c, tips, unknownIcon = null, heading = true, center }: {
-  character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; heading?: boolean; center?: ReactNode;
+export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center }: {
+  character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; unknown?: ReadonlySet<number>; heading?: boolean; center?: ReactNode;
 }) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
   const slot = (key: string, mirror: boolean) => {
     const item = equipped.get(key);
     const known = item ? tips.get(item.itemId) : undefined;
-    // With the asset files read (`unknownIcon`), an item they have no record of is one the game files do not know yet:
-    // its database page would be nameless and its hover card a 404, so it gets no link and a tooltip from what
-    // Blizzard's armory read (name, quality, item level, slot) instead.
-    const unknown = item && !known && unknownIcon ? armoryOnlyTip(item, key, unknownIcon) : undefined;
+    const unknown = item && !known && unknownIds?.has(item.itemId) ? armoryOnlyTip(item, key, unknownIcon) : undefined;
     const tip = known ?? unknown;
     const src = tip?.icon ?? unknownIcon;
     const href = item && !unknown ? `/database/items/${item.itemId}` : "";
@@ -79,7 +78,7 @@ export function Equipment({ character: c, tips, unknownIcon = null, heading = tr
 }
 
 /** A tooltip for an equipped item the game files do not know, from the fields Blizzard's armory read; nothing invented. */
-function armoryOnlyTip(item: ArmoryCharacter["equipment"][number], slot: string, icon: string): Tip {
+function armoryOnlyTip(item: ArmoryCharacter["equipment"][number], slot: string, icon: string | null): Tip {
   const q = qualityName(item.quality);
   return {
     name: item.name, color: qualityColor(q ? QUALITIES.indexOf(q) : 1), quality: q ? q[0]!.toUpperCase() + q.slice(1) : "Common", icon,

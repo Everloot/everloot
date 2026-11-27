@@ -42,9 +42,26 @@ const historyKeys = new Set<string>(PLAY_HISTORY_METRICS.map((m) => ARMORY_BOARD
 const boardHref = (c: ArmoryCharacter, metric: Parameters<typeof armoryBoardHref>[0]) =>
   armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
 
+/** The character's own count on a board, from the profile row or Blizzard's play history; undefined when not read. */
+const PLAY_HISTORY_COUNT: Record<string, keyof NonNullable<NonNullable<ArmoryCharacter["details"]>["playHistory"]>["ranked"]> = {
+  quests_completed: "quests", creatures_killed: "creatures", fish_caught: "fish", flight_paths: "flights", dungeons_entered: "dungeons", total_deaths: "deaths",
+};
+function countOn(c: ArmoryCharacter, metric: ArmoryRank["metric"]): number | null | undefined {
+  if (metric === "item_level") return c.itemLevel;
+  if (metric === "gear_score") return c.gearScore;
+  if (metric === "honorable_kills") return c.honorableKills;
+  const key = PLAY_HISTORY_COUNT[metric];
+  return key ? c.details?.playHistory?.ranked[key] : undefined;
+}
+
+/** The ranks worth showing: a count of 0 (or none read) ranks the character only among others with nothing, so it gets none. */
+export function shownRanks(c: ArmoryCharacter, ranks: ArmoryRank[]): ArmoryRank[] {
+  return ranks.filter((r) => (countOn(c, r.metric) ?? 0) > 0);
+}
+
 /** The honorable-kills rank sits with the kills in the PvP tab; the gear ranks stay with the numbers above the tabs. */
 function pvpFacts(c: ArmoryCharacter, ranks: ArmoryRank[]): Fact[] {
-  return ranks.filter((r) => r.metric === "honorable_kills").flatMap((r) => {
+  return shownRanks(c, ranks).filter((r) => r.metric === "honorable_kills").flatMap((r) => {
     const metric = metricOfKey(r.metric);
     if (!metric) return [];
     return [{ label: `${ARMORY_BOARDS[metric].title} rank`, value: <Link href={boardHref(c, metric)} className={link}>{rankText(r)}</Link>, numeric: true }];
@@ -53,7 +70,7 @@ function pvpFacts(c: ArmoryCharacter, ranks: ArmoryRank[]): Fact[] {
 
 /** The play-history ranks sit beside their counts in the Play history tab. */
 function historyRanks(c: ArmoryCharacter, ranks: ArmoryRank[]): HistoryRank[] {
-  return ranks.flatMap((r) => {
+  return shownRanks(c, ranks).flatMap((r) => {
     const metric = metricOfKey(r.metric);
     return metric && historyKeys.has(r.metric)
       ? [{ metric, rank: r.rank, of: r.of, ...(r.tied === undefined ? {} : { tied: r.tied }), href: boardHref(c, metric) }]
@@ -66,7 +83,7 @@ function historyRanks(c: ArmoryCharacter, ranks: ArmoryRank[]): HistoryRank[] {
  * same words as every other rank (rankText: the tie count and top share once the database returns them).
  */
 export function rankBadges(c: ArmoryCharacter, ranks: ArmoryRank[]): RankBadge[] {
-  return ranks.flatMap((r) => {
+  return shownRanks(c, ranks).flatMap((r) => {
     const metric = metricOfKey(r.metric);
     if (!metric || historyKeys.has(r.metric)) return [];
     return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} ${rankText(r)}`, href: boardHref(c, metric) }];

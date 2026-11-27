@@ -5,6 +5,7 @@ import ProgressionMatrix from "@/components/progression/ProgressionMatrix";
 import { characterProgression } from "@kb/progression";
 import { characterPanel } from "./character-tabs";
 import { CharacterFacts, DungeonRaidSlot, SheetSummary } from "./[region]/[slug]/sheet";
+import { rankBadges, shownRanks } from "./[region]/[slug]/character-data";
 
 const at = "2026-11-23T14:40:00.000Z";
 const noKills = { synced: false, summary: null, instances: [] };
@@ -70,6 +71,16 @@ test("the Professions tab links the bars above instead of repeating them", () =>
   const html = renderToStaticMarkup(<>{characterPanel(c, "professions", {})}</>);
   expect(html).not.toContain("<progress");
   expect(html).toContain('href="#armory-overview-professions"');
+});
+
+test("a zero count gets no rank: no badge, no PvP rank and no play-history rank for 0", () => {
+  const c = armoryCharacter({ honorableKills: 0, details: { revision: 1, playHistory: { ...history, ranked: { quests: 988, deaths: 0 } } } });
+  const ranks = [
+    { metric: "item_level" as const, rank: 6, of: 20 }, { metric: "honorable_kills" as const, rank: 5705, of: 24403 },
+    { metric: "quests_completed" as const, rank: 90, of: 15620 }, { metric: "total_deaths" as const, rank: 4159, of: 15037 },
+  ];
+  expect(rankBadges(c, ranks).map((b) => b.label)).toEqual(["EU Normal · Item level #6 of 20"]);
+  expect(shownRanks(c, ranks).map((r) => r.metric)).toEqual(["item_level", "quests_completed"]);
 });
 
 test("reputations are ordered by standing, Exalted first, then by name", () => {
