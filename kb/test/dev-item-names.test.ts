@@ -1,5 +1,19 @@
 import { expect, test } from "vitest";
-import { isDevelopmentItemName } from "../src/dev-item-names.js";
+import { isDevelopmentItemName, isDevelopmentSpellName } from "../src/dev-item-names.js";
+
+test("a spell name with Test as a word is a leftover; the quest spells named Test of stay", () => {
+  // Real spell names from build 71139 the item rule lets through.
+  for (const name of [
+    "Editor Test Spell", "Wyatt Test", "Damage Immunity Test", "Stasis Test", "Script Test", "Sam's Test Spell #2", "Tim's Test Fireball",
+    "Love is in the Air Test", "Feed Pet (Quest Test)", "Get Gosssip, Test", "T1 Set Piece Test", "Test",
+  ]) expect(isDevelopmentSpellName(name), name).toBe(true);
+  // The item rule's leftovers stay leftovers.
+  expect(isDevelopmentSpellName("Hot Foot (TEST)")).toBe(true);
+  for (const name of [
+    "Test of Faith", "Test of Lore", "Testament of Hope", "Frostbolt", "Teleport Goldshire", "Goldshire Portal", "Contest Winner", "Attest",
+  ]) expect(isDevelopmentSpellName(name), name).toBe(false);
+  expect(isDevelopmentSpellName(undefined)).toBe(false);
+});
 
 test("names the game files keep for development items are leftovers", () => {
   for (const name of [

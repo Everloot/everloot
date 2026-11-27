@@ -63,7 +63,7 @@ test("names that cannot be read are said so, and the spells still list by number
   expect(html).toMatch(new RegExp(`href="/database/spells/${id}"[^>]*>Spell ${id}<`));
 });
 
-test("talents and runes have no trainer level: they sit in their own group, not under Level 1, and a name shows once there", async () => {
+test("talents have no trainer level: they sit in their own group, not under Level 1, and a name shows once there", async () => {
   // Real mage spell ids (build 71139): Ignite is a talent, 401722 engraves Arcane Barrage, 400610 is Arcane Barrage,
   // 400613 and 400614 are both Living Bomb (engraved by 415936), 29074 is the Master of Elements talent and 29077 its
   // proc. Fireball (133) is a trainer spell at level 1.
@@ -75,21 +75,23 @@ test("talents and runes have no trainer level: they sit in their own group, not 
   const html = await render();
   const group = html.slice(html.indexOf('id="talents-runes"'));
   const level1 = html.slice(html.indexOf('id="level-1"'), html.indexOf('id="talents-runes"'));
-  expect(html).toContain("Talents and runes (no trainer level)");
+  expect(html).toContain("Talents (no trainer level)");
   expect(level1).toContain('href="/database/spells/133"');
-  for (const id of [11119, 401722, 400610, 400613, 29074]) {
+  for (const id of [11119, 29074]) {
     expect(level1, String(id)).not.toContain(`href="/database/spells/${id}"`);
     expect(group, String(id)).toContain(`href="/database/spells/${id}"`);
   }
+  // Runes and their abilities read SpellLevel 1 with no BaseLevel: no level, so on no level and in no group here.
+  for (const id of [401722, 400610, 400613, 415936]) expect(html, String(id)).not.toContain(`href="/database/spells/${id}"`);
+  expect(html).toMatch(/runes, pet abilities and procs have none/);
   // Same name twice: shown once.
-  expect(html.match(/>Living Bomb</g)?.length).toBe(1);
   expect(html.match(/>Master of Elements</g)?.length).toBe(1);
 });
 
 test("the page counts the same spells as the class hub and says where each one is", async () => {
   const placed = levels.reduce((n, l) => n + l.spells.length, 0);
   const html = await render();
-  const m = new RegExp(`${placed} Mage spells have a level in the game files: (\\d+) listed by level, lowest first, (\\d+) talents and runes apart(?:, and (\\d+) that repeat a name and rank at one level, shown once)?\\.`).exec(html);
+  const m = new RegExp(`${placed} Mage spells have a level in the game files: (\\d+) listed by level, lowest first, (\\d+) talents apart(?:, and (\\d+) that repeat a name and rank at one level, shown once)?\\.`).exec(html);
   expect(m).not.toBeNull();
   expect(Number(m![1]) + Number(m![2]) + Number(m![3] ?? 0)).toBe(placed);
   // A name repeated at one level is counted, not dropped silently.

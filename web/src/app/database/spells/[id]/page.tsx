@@ -25,7 +25,7 @@ import { itemSetHref } from "@/lib/item-sets";
 import { shownItemName } from "@/lib/items";
 import { loadShownNames } from "@/lib/shown-item-names";
 import {
-  costText, dispelName, durationText, effectValue, ITEM_TRIGGER, mechanicName, schoolNames, spellNumbers, spellRanks, spellUses,
+  classSpellRanks, costText, dispelName, durationText, effectValue, ITEM_TRIGGER, mechanicName, schoolNames, spellNumbers, spellRanks, spellUses,
   SPELLS_BUILD, timeText, tooltipRows,
 } from "@/lib/spell-card";
 import { CLIENT_PROFESSIONS, professionHref, recipeBySpell, type RecipeView } from "@/lib/professions";
@@ -190,6 +190,8 @@ export default async function SpellPage(props: Props) {
   const itemTips = iconIds.length ? await loadItemTips(assets, iconIds) : new Map<number, { icon: string | null }>();
   const itemLook = (id: number): ItemLook => ({ name: itemName(id)?.name, icon: itemTips.get(id)?.icon });
   const spellName = (id: number) => spellNames?.names.get(id);
+  // The rank the spell list gives it: the files' rank chain, else its place among the class's spells of its name.
+  const shownRank = rank || classSpellRanks((id) => spellName(id) || undefined).get(spellId) || 0;
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
   const build = edges.client.find((e) => e.fromId === spellId || e.toId === spellId)?.build ?? CLIENT_LAYER.build.version;
 
@@ -304,7 +306,7 @@ export default async function SpellPage(props: Props) {
       }}
       box={
         <TooltipFrame
-          name={rank ? <span className="flex justify-between gap-4"><span>{tip?.name ?? title}</span><span className="font-normal text-fg-2">Rank {rank}</span></span> : tip?.name ?? title}
+          name={shownRank ? <span className="flex justify-between gap-4"><span>{tip?.name ?? title}</span><span className="font-normal text-fg-2">Rank {shownRank}</span></span> : tip?.name ?? title}
           label={`${tip?.name ?? title}, from the game files`}
         >
           {rows.map((r, i) => (
@@ -325,6 +327,7 @@ export default async function SpellPage(props: Props) {
       }
       facts={[
         ...(schools.length ? [{ label: "School", value: schools.join(", ") }] : []),
+        ...(shownRank ? [{ label: "Rank", value: <span className="tabular-nums">{shownRank}</span>, numeric: true }] : []),
         // A talent's level is its row in the tree, shown on the Talent tab; the files' spell level would read as a second gate.
         ...(numbers?.level && !talents.length ? [{ label: "Spell level", value: <span className="tabular-nums">{numbers.level}</span>, numeric: true }] : []),
         ...(uses.classes.length ? [{

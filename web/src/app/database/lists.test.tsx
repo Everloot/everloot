@@ -331,6 +331,34 @@ test("the spell list leaves the files' test and retired spells out unless asked,
   expect((await spellMetadata(search({ dev: "1" }))).robots).toMatchObject({ index: false });
 });
 
+test("a spell named with Test as a word is a leftover too, but the quest spells named Test of stay", async () => {
+  // Real ids and names (build 71139): 68 opened the list by id before.
+  files.spells = { version: "x", names: new Map([[68, "Editor Test Spell"], [133, "Fireball"], [6714, "Test of Faith"]]) };
+  expect(rows(await html(SpellList(search())), "spells")).toEqual([133, 6714]);
+  expect(rows(await html(SpellList(search({ dev: "1" }))), "spells")).toEqual([68, 133, 6714]);
+});
+
+test("rows whose name repeats with nothing else to tell them apart say their ID", async () => {
+  // Real ids (build 71139): two Heavy Linen Bandage spells, no rank or level in the files for either.
+  files.spells = { version: "x", names: new Map([[3276, "Heavy Linen Bandage"], [3281, "Heavy Linen Bandage"], [3275, "Linen Bandage"]]) };
+  const page = await html(SpellList(search({ q: "Linen Bandage" })));
+  const row = (id: number) => page.split("<tr").find((r) => r.includes(`href="/database/spells/${id}"`)) ?? "";
+  // Beside the name, not only in the small-screen line under it (a div).
+  expect(row(3276)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3276<\/span>/);
+  expect(row(3281)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3281<\/span>/);
+  // A name that does not repeat gets nothing added.
+  expect(row(3275)).toMatch(/>Linen Bandage<\/a><\/span>/);
+});
+
+test("a talent's level column is blank: its level is its row in the tree, as on the spell page", async () => {
+  // Real ids (build 71139): Improved Frostbolt is a mage talent the files give spell level 1; Frost Armor is trained at 1.
+  files.spells = { version: "x", names: new Map([[11070, "Improved Frostbolt"], [168, "Frost Armor"]]) };
+  const page = await html(SpellList(search()));
+  const row = (id: number) => page.split("<tr").find((r) => r.includes(`href="/database/spells/${id}"`)) ?? "";
+  expect(row(168)).toContain("Level 1 · ID 168");
+  expect(row(11070)).not.toContain("Level 1");
+});
+
 test("a class's spells of one name show their rank and the level the files give, so ranks are not identical rows", async () => {
   // Frostbolt's first ranks (116 at level 4, 205 at level 8) on the mage's skill lines; 900010 is no class's.
   files.spells = { version: "x", names: new Map([[116, "Frostbolt"], [205, "Frostbolt"], [900010, "Frostbolt"]]) };
