@@ -81,6 +81,35 @@ test("with storage unreachable the page says so instead of an empty list", async
   expect(page).not.toContain('href="/database/quests/301"');
 });
 
+test("Has rewards filters to the quests with agreed rewards, and is not offered while no quest has any", async () => {
+  store.quests = [quest({ questId: 301, title: "Quest Alpha", level: 10, rewards: [501] }), quest({ questId: 303, title: "Quest Gamma", level: 12 })];
+  const on = await html({ rewards: "1" });
+  expect(on).toContain('href="/database/quests/301"');
+  expect(on).not.toContain('href="/database/quests/303"');
+  expect(await html()).toContain(">Has rewards<");
+
+  store.quests = [quest({ questId: 303, title: "Quest Gamma", level: 12 })];
+  const plain = await html();
+  expect(plain).not.toContain(">Has rewards<");
+  // An old link with the filter on says why nothing matches instead of a bare "no match".
+  const old = await html({ rewards: "1" });
+  expect(old).toContain("No quest has agreed rewards yet: a reward shows once 3 installs report the same item.");
+});
+
+test("the list opens by level, lowest first, with quests no level is agreed for after; the ID sort stays a header link", async () => {
+  store.quests = [
+    quest({ questId: 1, title: "Quest Test One" }),
+    quest({ questId: 400, title: "Quest Late", level: 30 }),
+    quest({ questId: 401, title: "Quest Early", level: 5 }),
+  ];
+  const page = await html();
+  const order = [...page.matchAll(/href="\/database\/quests\/(\d+)"/g)].map((m) => Number(m[1]));
+  expect(order.slice(0, 2)).toEqual([401, 400]);
+  expect(order.indexOf(1)).toBeGreaterThan(1);
+  expect(page).toMatch(/aria-sort="ascending"[^>]*>(?:<[^>]*>)*Level/);
+  expect(page).toContain('href="/database/quests?sort=-id"');
+});
+
 test("a filter value the list does not know is a 404", async () => {
   await expect(html({ side: "x" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(html({ page: "9" })).rejects.toThrow("NEXT_NOT_FOUND");

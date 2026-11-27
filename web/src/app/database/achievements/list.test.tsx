@@ -28,6 +28,8 @@ function totals(name: string) {
   return { achievements: rows.length, points: rows.reduce((n, a) => n + a.points, 0) };
 }
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** A category's totals line: its points only when it has some (most of the files' achievements carry none). */
+const line = (t: { achievements: number; points: number }) => `${plural(t.achievements, "achievement")}${t.points ? ` · ${plural(t.points, "point")}` : ""}`;
 
 test("the list opens with the categories grouped as the files nest them, each with its achievements and points", async () => {
   const out = await html();
@@ -37,11 +39,11 @@ test("the list opens with the categories grouped as the files nest them, each wi
   const adventure = totals("Adventure");
   const eastern = totals("Eastern Kingdoms");
   expect(adventure.achievements).toBeGreaterThan(eastern.achievements);
-  expect(section).toMatch(new RegExp(`href="/database/achievements\\?category=Adventure">Adventure</a>(?:<[^>]*>)*\\s*${plural(adventure.achievements, "achievement")} · ${plural(adventure.points, "point")}`));
-  expect(section).toMatch(new RegExp(`href="/database/achievements\\?category=Eastern\\+Kingdoms">Eastern Kingdoms</a>(?:<[^>]*>)*\\s*${plural(eastern.achievements, "achievement")} · ${plural(eastern.points, "point")}`));
+  expect(section).toMatch(new RegExp(`href="/database/achievements\\?category=Adventure">Adventure</a>(?:<[^>]*>)*\\s*${line(adventure)}<`));
+  expect(section).toMatch(new RegExp(`href="/database/achievements\\?category=Eastern\\+Kingdoms">Eastern Kingdoms</a>(?:<[^>]*>)*\\s*${line(eastern)}<`));
   // Raids carry the files' only points.
   expect(totals("Raids").points).toBeGreaterThan(0);
-  expect(section).toMatch(new RegExp(`>Raids</a>(?:<[^>]*>)*\\s*${plural(totals("Raids").achievements, "achievement")} · ${plural(totals("Raids").points, "point")}`));
+  expect(section).toMatch(new RegExp(`>Raids</a>(?:<[^>]*>)*\\s*${line(totals("Raids"))}<`));
 });
 
 test("a parent category filters to everything under it; a filtered list drops the overview", async () => {
@@ -68,4 +70,11 @@ test("on a phone the overview folds behind a disclosure; rows say 1 point, not 1
   const section = out.split('aria-labelledby="by-category"')[1]?.split("</section>")[0] ?? "";
   expect(section).toMatch(/<details class="[^"]*sm:hidden[^"]*"><summary[^>]*>By category/);
   expect(out).not.toMatch(/(?<!\d)1 points\b/);
+});
+
+test("an achievement with no points shows a dash in the Points column and no \"0 points\" anywhere", async () => {
+  const out = await html({ category: "Eastern Kingdoms" });
+  expect(out).toContain("Explore Dun Morogh");
+  expect(out).not.toMatch(/(?<!\d)0 points?\b/);
+  expect(out).toMatch(/<td class="dt-td dt-num dt-fold"><span class="text-muted">—<\/span><\/td>/);
 });

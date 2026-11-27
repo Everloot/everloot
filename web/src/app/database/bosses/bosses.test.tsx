@@ -74,7 +74,8 @@ test("a boss 3 installs report: kills, installs, the creature linked, its loot t
   }]]);
   renders.npcs = new Map([[11517, { url: "https://a.test/renders/x.webp", size: 512 }]]);
   const html = await page("2732-oggleflint");
-  expect(text(html)).toMatch(/\|Kills reported\|3\|/);
+  // The addon's count, so it does not read as the linked characters' kills the Kills tab lists.
+  expect(text(html)).toMatch(/\|Kills reported by the addon\|3\|/);
   expect(html).toContain('href="/database/npcs/11517"');
   const loot = panel(html, "loot");
   expect(loot).toContain('href="/database/items/14149"');

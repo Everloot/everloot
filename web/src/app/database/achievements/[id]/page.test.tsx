@@ -164,7 +164,7 @@ test("an achievement from the files: its icon, the category path linking the lis
   expect(out).toContain('href="/database/achievements?category=Adventure"');
   expect(out).toContain('href="/database/achievements?category=Eastern+Kingdoms"');
   expect(factOf(out, "Faction")).toBe("Alliance only");
-  expect(out).toContain("An achievement in Eastern Kingdoms, 0 points, 0 criteria.");
+  expect(out).toContain("An achievement in Eastern Kingdoms, no points in this game, 0 criteria.");
   expect(out).toContain("The name, category, points and criteria are from the game files of build 1.15.8.70862, unconfirmed.");
 });
 

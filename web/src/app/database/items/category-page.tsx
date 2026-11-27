@@ -6,7 +6,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, itemSkills, ITEM_LEVEL_BRACKETS, itemsHref,
-  listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
+  listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
 } from "@/lib/items";
 import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
@@ -95,6 +95,11 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
     robots: { index: named !== null && categoryNamedEnough(r.cls.id, r.sub?.id, named, page, hidden), follow: true },
   };
 }
+
+/** The Sort menu's orders, as the columns name them, and whether each starts high to low (the numbers but the id). */
+const ITEM_SORT_MENU: [ItemSort, string, boolean][] = [
+  ["name", "Name", false], ["type", "Type", false], ["slot", "Slot", false], ["ilvl", "Item level", true], ["req", "Req. level", true], ["seen", "Source", false], ["id", "ID", false],
+];
 
 /** Why a row has no name, and when that changes: names come from the addon once players see the items. */
 const namesArrive = () => (Date.now() < Date.parse(LAUNCH_AT) ? `Their names arrive from the addon after launch on ${longDate(LAUNCH.date)}.` : "Their names arrive from the addon as players see them.");
@@ -300,6 +305,15 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     ...toggle("reagent", "Reagent", inBase(facets.reagent)),
     ...toggle("set", "Set piece", inBase(facets.set)),
     ...toggle("seen", "Seen by players", seen.seen.size),
+    {
+      // The headers sort too; on a phone, where only the name column shows, this is the way. Each order starts as its
+      // header's first click does (levels high to low); the default, named items first, is the reset choice.
+      type: "menu", key: "sort", label: "Sort",
+      options: [
+        { label: "Named first", href: here({ sort: undefined }), on: !q.sort, reset: true },
+        ...ITEM_SORT_MENU.filter(([key]) => key !== "type" || !sub).map(([key, label, desc]) => ({ label, href: here({ sort: { key, desc } }), on: q.sort?.key === key })),
+      ],
+    },
   ];
   // The name box keeps every other filter (not the page) as hidden fields.
   const keep = Object.fromEntries(new URLSearchParams(link(undefined, undefined, { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
@@ -391,8 +405,9 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           <DataTable
             dense
             caption={`${title}: ${plural(rows.length)}`}
-            // A column with nothing on this page (Source, until a row here has one) is left out.
-            columns={filledColumns(columns, shown)}
+            // A column nothing in the whole result has (Source, until a listed item has one) is left out; one page
+            // without a value keeps it, so it does not come and go from page to page or under a filter.
+            columns={filledColumns(columns, rows)}
             rows={shown}
             rowKey={(row) => String(row[0])}
             // The default order (named items first) is no one column, so no header shows an arrow for it.

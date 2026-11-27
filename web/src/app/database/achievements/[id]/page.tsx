@@ -8,7 +8,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Badge, DataTable, TooltipFrame } from "@/components/ui";
 import { qualityNamed } from "@/components/ui/quality";
 import { trailFor } from "@/lib/breadcrumbs";
-import { achievementHref, isDevelopmentAchievement, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
+import { achievementHref, isDevelopmentAchievement, loadCatalog, NO_POINTS, parseSegment, pointsText, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { asOfLine } from "@/lib/evidence";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
@@ -100,7 +100,7 @@ export default async function AchievementPage(props: Props) {
   const facts: { label: string; value: ReactNode; numeric?: boolean }[] = [
     { label: "Category", value: categoryLinks || null },
     ...(faction ? [{ label: "Faction", value: faction }] : []),
-    { label: "Points", value: points, numeric: true },
+    { label: "Points", value: points === 0 ? NO_POINTS : points, numeric: points !== 0 },
     { label: "Criteria", value: criteria, numeric: true },
     { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
     { label: "ID", value: id, numeric: true },
@@ -111,7 +111,7 @@ export default async function AchievementPage(props: Props) {
   const state = confirmedCell(listed ?? { confirmed: false }, catalog?.confirmations ?? false);
   const asOf = asOfLine(catalog?.dataAsOf ?? null, Date.now());
   const summary = entry || files ? [
-    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet" : `${points} ${points === 1 ? "point" : "points"}`}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
+    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet" : pointsText(points).toLowerCase()}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
     entry
       ? `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
         : fileCriteria.length ? `; the criteria list is the game files' (build ${fileVersion}), unconfirmed`
@@ -131,12 +131,12 @@ export default async function AchievementPage(props: Props) {
       box={entry ? (
         <TooltipFrame name={title} label={`${title}, as players reported it`}>
           <p>{entry.category}</p>
-          <p>{entry.points} {entry.points === 1 ? "point" : "points"}</p>
+          <p>{pointsText(entry.points)}</p>
         </TooltipFrame>
       ) : files && (
         <TooltipFrame name={title} label={`${title}, from the game files`}>
           <p aria-hidden={!files.description} className={files.description ? "" : "text-muted"}>{files.description ?? "The game files give no text for it"}</p>
-          <p>{files.points} {files.points === 1 ? "point" : "points"}</p>
+          <p>{pointsText(files.points)}</p>
         </TooltipFrame>
       )}
       facts={(entry || files) && facts}

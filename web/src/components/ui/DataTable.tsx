@@ -56,7 +56,9 @@ export function filledColumns<Row>(columns: SparseColumn<Row>[], rows: readonly 
   return rows.length ? columns.filter((col) => !col.blank || !rows.every(col.blank)) : columns;
 }
 
-const ariaSort = (direction: SortDirection) => (direction === "asc" ? "ascending" : "descending");
+/** The sorted column says its direction; another column a link can sort by says "none", so a screen reader knows it sorts. */
+const ariaSort = (direction: SortDirection | undefined, sortable: unknown) =>
+  direction ? (direction === "asc" ? "ascending" : "descending") : sortable ? "none" : undefined;
 
 /**
  * The one table: dense rows in a card frame. A wide table scrolls inside its frame, never the page.
@@ -82,7 +84,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
                   <th
                     key={col.key}
                     scope="col"
-                    aria-sort={sorted ? ariaSort(sorted) : undefined}
+                    aria-sort={ariaSort(sorted, col.sortable && sortHref)}
                     className={`h-th whitespace-nowrap border-b border-line bg-canvas px-4 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"}`}
                   >
                     {col.sortable && sortHref ? (
@@ -151,7 +153,7 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
                   <th
                     key={col.key}
                     scope="col"
-                    aria-sort={sorted ? ariaSort(sorted) : undefined}
+                    aria-sort={ariaSort(sorted, col.sortable && sortHref)}
                     // Sticky under the site header from 1024 px up only: below that the table scrolls sideways inside
                     // its own box, which is then the sticky parent, so the offset pushed the header down onto the rows.
                     className={`z-10 h-th lg:sticky lg:top-header whitespace-nowrap border-b border-line bg-canvas px-3 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"} ${phoneHidden(i)}`}

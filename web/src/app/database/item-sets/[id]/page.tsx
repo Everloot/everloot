@@ -11,7 +11,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { loadItemSetNames, loadSiteAssets, loadSpellNames, readItemTips } from "@/lib/game-assets";
 import { loadItemSeen } from "@/lib/item-seen";
-import { itemSet, itemSetClasses, itemSetHref, ITEM_SETS_BUILD } from "@/lib/item-sets";
+import { itemSet, itemSetClasses, itemSetHref, ITEM_SETS_BUILD, setBonusText } from "@/lib/item-sets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, shownItemName, SOURCES, type SourceSlug } from "@/lib/items";
 import { professionHrefById } from "@/lib/professions";
@@ -69,7 +69,8 @@ export default async function ItemSetPage(props: Props) {
   const leftovers = set.items.length - pieces.length;
   // A piece's icon: its tooltip's, or the icon of a piece the files give nothing else for (no ItemSparse row), as on its item page.
   const { icons } = await readItemTips(assets, pieces.filter(showsTip));
-  const spellName = (spell: number) => spellNames?.names.get(spell);
+  // A bonus in the tooltip's words where the files give them whole, else its spell name cleaned of zero-padding.
+  const spellName = (spell: number) => setBonusText(spellNames?.names.get(spell), assets?.spellTips?.get(spell));
   const bonusLine = ([count, spell]: [number, number]) => `(${count}) Set: ${spellName(spell) ?? `Spell ${spell}`}`;
   // Where players got each piece: the item lists' Source column (3 installs), each label opening the item page's tab.
   const TAB: Record<SourceSlug, string> = { drop: "dropped-by", object: "dropped-by", vendor: "sold-by", crafted: "created-by", quest: "reward-from" };

@@ -167,7 +167,16 @@ describe("instance rows", () => {
   test("the files' list of difficulties names each one once, in file order", () => {
     expect(difficultyList([1, 12, 1], difficultyLabelIn(data))).toBe("Synthetic Normal, Synthetic Twist");
     // The Deadmines' ids in the build: 1 and 201 are both "Normal".
-    expect(difficultyList([1, 201, 213])).toBe("Normal, Infinite");
+    // 213 is "Infinite", a name the game never shows a player: it stays out of the list.
+    expect(difficultyList([1, 201, 213])).toBe("Normal");
+  });
+
+  test("difficulty names the game keeps for itself are left out; a list of only those keeps them, so it is never empty", () => {
+    // From the build's Difficulty rows: 202-204 "Difficulty A/B/C", 213 "Infinite", 214 "DNT - Internal only".
+    expect(difficultyList([1, 201, 214])).toBe("Normal");
+    expect(difficultyList([1, 202, 203, 204])).toBe("Normal");
+    expect(difficultyList([148, 185, 197, 226])).toBe("20 Player, 10 Player");
+    expect(difficultyList([213])).toBe("Infinite");
   });
 
   test("the files' difficulty ids for an instance's map reach its row", () => {

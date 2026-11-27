@@ -26,6 +26,12 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   loadSiteAssets: async () => live.assets,
 }));
 
+const quests = vi.hoisted(() => ({ count: 0 }));
+vi.mock("@/lib/world-lists", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/world-lists")>();
+  return { ...real, publicQuests: (facts: Parameters<typeof real.publicQuests>[0]) => (quests.count ? Array.from({ length: quests.count }, () => ({})) : real.publicQuests(facts)) };
+});
+
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { DATABASE_GROUPS } from "@/lib/database-home";
 import { instanceRows } from "@/lib/instances";
@@ -37,6 +43,7 @@ beforeEach(() => {
   store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
   live.newest = [];
   live.assets = null;
+  quests.count = 0;
 });
 
 const render = async () => renderToStaticMarkup(await DatabasePage());
@@ -86,14 +93,23 @@ test("the entity types sit in three groups, World, Items and gear, Character, ea
 
 test("each card keeps its count from the same source: instances from the game files, the players' lists with the empty meter", async () => {
   const page = await render();
-  expect(row(page, "/database/instances")).toMatch(new RegExp(`>${instanceRows().size}<`));
+  expect(row(page, "/database/instances")).toMatch(new RegExp(`>${instanceRows().size} in game files<`));
   expect(row(page, "/database/npcs")).toContain('data-agreement="0"');
+});
+
+test("a card whose list counts more than the card says what its number counts: quests confirmed, instances in the files", async () => {
+  quests.count = 543;
+  const page = await render();
+  // The quest list also lists the quests only the game files or the wiki title; the card counts the confirmed ones.
+  expect(row(page, "/database/quests")).toMatch(/>543 confirmed</);
+  // The instance list adds the ones only players saw; the card counts the files' entrances.
+  expect(row(page, "/database/instances")).toMatch(new RegExp(`>${instanceRows().size} in game files<`));
 });
 
 test("with storage down the instance card is still counted from the game files, never as zero", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const page = await render();
-  expect(row(page, "/database/instances")).toContain(`>${instanceRows().size}<`);
+  expect(row(page, "/database/instances")).toContain(`>${instanceRows().size} in game files<`);
 });
 
 test("every hub in the list is linked: a hub no card names sits under More lists with its label", async () => {

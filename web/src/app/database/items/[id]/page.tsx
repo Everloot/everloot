@@ -27,7 +27,7 @@ import { CLIENT_QUEST_STARTS, questStartedBy } from "@/data/game-data/client-que
 import { itemTooltip } from "@/lib/item-tooltip";
 import { recipeBySpell } from "@/lib/professions";
 import { taughtItemId } from "@/lib/recipe-catalog";
-import { itemSetOf } from "@/lib/item-sets";
+import { itemSetOf, setBonusText } from "@/lib/item-sets";
 import { GameCard } from "@/components/game/GameCard";
 import type { Crumb } from "@/lib/jsonld";
 import { loadNames, nameOf } from "@/lib/names";
@@ -294,7 +294,7 @@ export default async function ItemPage(props: Props) {
   const box = itemTooltip({
     // The name as the hover card has it: the game file name where the tooltip shows and no other source names the item.
     id: itemId, tip, name: shownItemName(itemId, agreed, matched?.names, tip), category, namesQuality: matched?.names.get(itemId)?.quality,
-    set: set && { ...set, pieceName: itemName, spellName: (spell) => bonusNames?.names.get(spell) },
+    set: set && { ...set, pieceName: itemName, spellName: (spell) => setBonusText(bonusNames?.names.get(spell), assets?.spellTips?.get(spell)) },
     spellHref: (spell) => (bonusNames?.names.has(spell) ? `/database/spells/${spell}` : undefined),
     filesLack,
     taught: taught === null ? undefined : {

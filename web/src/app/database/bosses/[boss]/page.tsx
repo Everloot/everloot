@@ -114,7 +114,8 @@ export default async function BossPage(props: Props) {
     { label: "Order", value: order ?? PLACEHOLDER, numeric: order !== null },
     { label: "Difficulty", value: difficulty },
     ...(level !== null ? [{ label: "Level", value: level, numeric: true }] : []),
-    { label: "Kills reported", value: unreachable ? PLACEHOLDER : known(reported ? reported.kills.toLocaleString("en-US") : null, boss.row.reported), numeric: Boolean(reported) },
+    // The addon's count from every install, apart from the linked characters' kills the Kills tab lists.
+    { label: "Kills reported by the addon", value: unreachable ? PLACEHOLDER : known(reported ? reported.kills.toLocaleString("en-US") : null, boss.row.reported), numeric: Boolean(reported) },
     ...(reported ? [
       { label: "Installs", value: <AgreementMeter count={reported.reporters} /> },
       { label: "Last seen", value: dayLabel(reported.lastSeen), numeric: true },

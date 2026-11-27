@@ -7,7 +7,7 @@ import type { ItemRecord } from "@kb/assets/items";
 import { checkedDamageRange, CHECKED_WEAPONS, type CheckedDamageRange, type CheckedWeapon } from "@kb/assets/weapon-damage";
 import type { ItemFactName, ItemFactState } from "@kb/item-facts";
 import { PLACEHOLDER } from "./placeholder";
-import { ARMOR, PAIR, SLOT, WEAPON } from "./tip-line";
+import { ARMOR, PAIR, SLOT, tooltipMoney, WEAPON } from "./tip-line";
 
 export { PLACEHOLDER };
 
@@ -81,14 +81,8 @@ export function damageSource(range: CheckedDamageRange, line: string): string {
     + `the way ${weapons} from that table read off the game's own tooltip on ${days.join(", ")} agree, build ${builds.join(", ")}.`;
 }
 
-/**
- * A price as the game's tooltip prints it: a coin that is zero is left out (GameTooltipMoneyFormat's zero display
- * mode is Collapse, so 10001 copper is "1g 1c" and 1000 is "10s"). Elsewhere the site keeps formatCopper's full form.
- */
-export function tooltipMoney(copper: number): string {
-  const parts = [[Math.floor(copper / 10000), "g"], [Math.floor((copper % 10000) / 100), "s"], [copper % 100, "c"]] as const;
-  return parts.filter(([n]) => n > 0).map(([n, unit]) => `${n}${unit}`).join(" ");
-}
+// The game's price form lives with the tooltip line parser, so the coin component can use it without this module.
+export { tooltipMoney };
 
 /** The tooltip's lines and then the reasons for its placeholders, as every item card shows them. */
 export const tipLines = (t: Pick<ItemTipText, "lines" | "why">): string[] => [...t.lines, ...t.why];

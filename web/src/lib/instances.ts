@@ -93,9 +93,20 @@ export const difficultyLabelIn =
     data.difficulties?.[id]?.name ?? DIFFICULTY_NAMES[id] ?? `Difficulty ${id}`;
 /** The site's name for a difficulty id, from the build's own files when map.json carries them. */
 export const difficultyLabel = (id: number): string => difficultyLabelIn(WORLD_MAP)(id);
-/** "Normal, Infinite" for ids [1, 201, 213]: the files carry several ids under one name, and each name prints once. */
-export const difficultyList = (ids: readonly number[], label: (id: number) => string = difficultyLabel): string =>
-  [...new Set(ids.map(label))].join(", ");
+/**
+ * Difficulty names the build's Difficulty rows carry that the game never shows a player: "Infinite", the lettered
+ * "Difficulty A" to "C", the "DNT - Internal only" rows.
+ */
+const INTERNAL_DIFFICULTY = /^(?:Infinite|Difficulty [A-Z]|DNT - .*)$/;
+/**
+ * "Normal" for ids [1, 201, 213]: the files carry several ids under one name, and each name prints once; a name the game
+ * keeps for itself is left out, unless it is all there is.
+ */
+export const difficultyList = (ids: readonly number[], label: (id: number) => string = difficultyLabel): string => {
+  const names = [...new Set(ids.map(label))];
+  const shown = names.filter((n) => !INTERNAL_DIFFICULTY.test(n));
+  return (shown.length ? shown : names).join(", ");
+};
 /** "5", or "20 or 40": the group sizes the files' Difficulty rows give these ids, smallest first; null when they give none. */
 export const groupSizeLabel = (ids: readonly number[], data: Pick<WorldMapData, "difficulties"> = WORLD_MAP): string | null => {
   const sizes = [...new Set(ids.map((id) => data.difficulties?.[id]?.maxPlayers).filter((n): n is number => n !== undefined && n > 0))].sort((a, b) => a - b);

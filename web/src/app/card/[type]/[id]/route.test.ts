@@ -114,6 +114,22 @@ test("a quest shows the title players agree on, else the Warcraft Wiki's with it
   expect((await call("quest", "177")).status).toBe(404);
 });
 
+test("a quest with a page but no name has a small card: its id, that no name is reported, and its chain in the files", async () => {
+  // One install reported quest 92742 (the quest page lists it); no title is agreed and no wiki names it.
+  mocks.world.mockResolvedValue({
+    unreachable: false, vendors: [], npcs: [],
+    quests: [{ installId: "a", questId: 92742, title: "Lone Report", level: 30, rewardItemIds: [] }],
+  });
+  const res = await call("quest", "92742");
+  expect(res.status).toBe(200);
+  const card = (await res.json()).card;
+  expect(card.title).toBe("Quest 92742");
+  expect(card.lines).toContain("Name not yet reported by players");
+  // 92742 is the first step of a quest line in the committed game files.
+  expect(card.lines.some((l: string) => /^Chain: .+/.test(l))).toBe(true);
+  expect(JSON.stringify(card)).not.toContain("Lone Report");
+});
+
 test("NPCs say what the embeddable card says", async () => {
   expect((await (await call("npc", "6")).json()).card).toMatchObject({ title: "Thrall", lines: ["Seen on 1 map, agreed by 3 or more installs."], quality: null });
 });

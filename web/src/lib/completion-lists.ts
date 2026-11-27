@@ -118,6 +118,10 @@ export function idSegment(id: number, name: string): string {
 }
 const segment = idSegment;
 export const achievementHref = (id: number, name: string) => `/database/achievements/${segment(id, name)}`;
+
+/** An achievement's points in words. WoW: Forever's files give nearly every one 0, so 0 reads as none, never "0 points". */
+export const NO_POINTS = "No points in this game";
+export const pointsText = (points: number) => (points === 0 ? NO_POINTS : `${points} ${points === 1 ? "point" : "points"}`);
 export const factionHref = (id: number, name: string) => `/database/factions/${segment(id, name)}`;
 /** The `%s` in a game-file title name: where the game puts the character's name. */
 const NAME_SLOT = /%s/g;

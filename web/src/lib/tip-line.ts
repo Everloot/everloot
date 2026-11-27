@@ -88,3 +88,12 @@ export function tipLine(line: string): TipLine {
   if (STAT.test(line)) return { kind: "stat", text: line };
   return { kind: "plain", text: line };
 }
+
+/**
+ * A price as the game's tooltip prints it: a coin that is zero is left out (GameTooltipMoneyFormat's zero display
+ * mode is Collapse, so 10001 copper is "1g 1c" and 1000 is "10s"). Elsewhere the site keeps formatCopper's full form.
+ */
+export function tooltipMoney(copper: number): string {
+  const parts = [[Math.floor(copper / 10000), "g"], [Math.floor((copper % 10000) / 100), "s"], [copper % 100, "c"]] as const;
+  return parts.filter(([n]) => n > 0).map(([n, unit]) => `${n}${unit}`).join(" ");
+}
