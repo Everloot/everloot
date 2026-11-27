@@ -24,7 +24,7 @@ export function goodsRows(offers: readonly VendorOffer[]): GoodsRow[] {
 const otherPrices = (o: GoodsRow): ReactNode => o.otherPrices.length > 0 && (
   <span data-other-prices className="block text-meta text-muted">
     {"players also saw "}
-    {o.otherPrices.map((c, i) => <span key={c}>{i > 0 && ", "}<Coins copper={c} game /></span>)}
+    {o.otherPrices.map((c, i) => <span key={c}>{i > 0 && ", "}<Coins copper={c} /></span>)}
     {" (likely a reputation discount)"}
   </span>
 );
@@ -44,7 +44,7 @@ export function VendorGoods({ title, offers, tips, items, evidence }: {
       columns={[
         { key: "item", header: "Item", cell: (o: GoodsRow) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} quality={qualityNamed(tips.get(o.itemId)?.quality)} /></ItemTip> },
         // As the vendor window prints a price: a zero coin is left out ("1s", not "1s 0c").
-        { key: "price", header: "Price", numeric: true, cell: (o: GoodsRow) => <><Coins copper={o.priceCopper} game />{otherPrices(o)}</> },
+        { key: "price", header: "Price", numeric: true, cell: (o: GoodsRow) => <><Coins copper={o.priceCopper} />{otherPrices(o)}</> },
         // Words in the text face; only a stock count is a figure.
         { key: "stock", header: "Stock", nowrap: true, cell: (o: GoodsRow) => stock(o) },
         ...(evidence ? [{ key: "reported", header: "Reported", cell: evidence }] : [
@@ -53,7 +53,7 @@ export function VendorGoods({ title, offers, tips, items, evidence }: {
       ]}
       // On a phone the item carries the row: price, stock and the evidence fold into its second line, so the evidence
       // column never squeezes to one word a line.
-      meta={(o) => <>{<Coins copper={o.priceCopper} game />} · {stock(o)} · {evidence ? evidence(o) : `${o.reporters} installs`}{otherPrices(o)}</>}
+      meta={(o) => <>{<Coins copper={o.priceCopper} />} · {stock(o)} · {evidence ? evidence(o) : `${o.reporters} installs`}{otherPrices(o)}</>}
       rows={rows}
       rowKey={(o) => `${o.itemId}-${o.priceCopper}`}
     />

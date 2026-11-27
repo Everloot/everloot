@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket, formatCopper } from "@kb/market";
+import { emptyMarket, foldMarket } from "@kb/market";
+import { tooltipMoney } from "@/lib/tip-line";
 import { BAGS_BUILD, PLAIN_BAGS } from "@/lib/bags";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
@@ -56,11 +57,11 @@ beforeEach(() => {
 test("one house's cheapest bag per size; a size priced only on another house says so, never 0", async () => {
   const html = text(await page({ realm: "forever", house: "horde", b1: String(small), b2: String(small), b3: String(small), b4: String(small) }));
   expect(html).toContain("Cheapest bag of each size");
-  expect(html).toContain(formatCopper(60_000));
-  expect(html).not.toContain(formatCopper(90_000));
+  expect(html).toContain(tooltipMoney(60_000));
+  expect(html).not.toContain(tooltipMoney(90_000));
   // The Alliance price is another market: the Horde page lists the size, with no price.
   expect(html).toContain("No public price on this house yet");
-  expect(html).not.toContain(formatCopper(777));
+  expect(html).not.toContain(tooltipMoney(777));
 });
 
 test("upgrades over the smallest bag, cost per added slot, from the chosen house only", async () => {
@@ -68,8 +69,8 @@ test("upgrades over the smallest bag, cost per added slot, from the chosen house
   const upgradesTable = text(html.slice(html.indexOf('id="bags-upgrades"')));
   expect(upgradesTable).toContain(`Swapping your smallest bag (${small} slots)`);
   expect(upgradesTable).toContain(`+${big - small!}`);
-  expect(upgradesTable).toContain(formatCopper(Math.round(60_000 / (big - small!))));
-  expect(upgradesTable).not.toContain(formatCopper(777));
+  expect(upgradesTable).toContain(tooltipMoney(Math.round(60_000 / (big - small!))));
+  expect(upgradesTable).not.toContain(tooltipMoney(777));
 });
 
 test("the page says where the numbers come from and carries the market rule", async () => {

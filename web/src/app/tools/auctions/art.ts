@@ -1,4 +1,4 @@
-import { loadItemTips, loadSiteAssets, type ItemTip, type SiteAssets } from "@/lib/game-assets";
+import { loadSiteAssets, readItemTips, type ItemTip, type SiteAssets } from "@/lib/game-assets";
 import { shownItemName } from "@/lib/items";
 import { loadShownNames } from "@/lib/shown-item-names";
 
@@ -7,12 +7,13 @@ export type { ItemTip };
 /**
  * Icons, quality and tooltips for the items an Auction House page shows. Callers pass only items with a
  * public value (3 reporters scanned them), so nothing found only in the game files is drawn. Nothing is
- * read when there are no items.
+ * read when there are no items. `icons` also holds the icon of an item the files give nothing else for.
  */
-export async function itemArt(ids: readonly number[]): Promise<{ assets: SiteAssets | null; tips: Map<number, ItemTip> }> {
-  if (!ids.length) return { assets: null, tips: new Map() };
+export async function itemArt(ids: readonly number[]): Promise<{ assets: SiteAssets | null; tips: Map<number, ItemTip>; icons: Map<number, string> }> {
+  if (!ids.length) return { assets: null, tips: new Map(), icons: new Map() };
   const assets = await loadSiteAssets();
-  return { assets, tips: await loadItemTips(assets, ids) };
+  const { tips, icons } = await readItemTips(assets, ids);
+  return { assets, tips, icons };
 }
 
 /**

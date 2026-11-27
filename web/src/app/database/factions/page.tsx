@@ -23,7 +23,7 @@ const sideTone = (header?: string) => (header && /\bAlliance\b/.test(header) ? "
  * The files keep a profession's specialisations as factions ("Blacksmithing - Armorsmithing", "Engineering - Gnome",
  * "Leatherworking - Tribal"); they are no reputation to earn, so the list groups them apart under their own heading.
  */
-const SPECIALISATION = /^(?:Alchemy|Blacksmithing|Enchanting|Engineering|Leatherworking|Tailoring) - /;
+const SPECIALISATION = /^(Alchemy|Blacksmithing|Enchanting|Engineering|Leatherworking|Tailoring) - /;
 
 interface FactionQuery extends ListQuery<Sort> { header?: string }
 
@@ -60,7 +60,12 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
   const sorted = byRank(sortRows(matched, key, sort.desc, (x) => x.factionId), ranked, Boolean(q.sort));
   const rows = sorted.filter((x) => !SPECIALISATION.test(x.name));
-  const specialisations = sorted.filter((x) => SPECIALISATION.test(x.name));
+  // Grouped by the profession their name starts with; sorting by the whole name puts groups and names in name order.
+  const professions = new Map<string, Listed<FactionEntry>[]>();
+  for (const x of sorted.filter((x) => SPECIALISATION.test(x.name)).sort((a, b) => a.name.localeCompare(b.name))) {
+    const profession = SPECIALISATION.exec(x.name)![1]!;
+    professions.set(profession, [...(professions.get(profession) ?? []), x]);
+  }
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<FactionQuery>) => href({ ...q, page: 1, ...over });
 
@@ -127,13 +132,20 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
           />
         </div>
         {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}
-        {specialisations.length > 0 && (
+        {professions.size > 0 && (
           <section data-specialisations aria-labelledby="specialisations" className="mt-8">
             <h2 id="specialisations" className="text-h2-sm text-fg">Profession specialisations</h2>
             <p className="mt-1 text-meta text-fg-2">The game files keep these as factions; they are a profession&apos;s specialisation, not a reputation to earn.</p>
-            <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-cell sm:grid-cols-2 lg:grid-cols-3">
-              {specialisations.map((x) => <li key={x.factionId} className="min-w-0"><NameCell href={factionHref(x.factionId, x.name)}>{x.name}</NameCell></li>)}
-            </ul>
+            <div className="mt-2 space-y-3">
+              {[...professions].map(([profession, list]) => (
+                <div key={profession}>
+                  <h3 className="text-meta font-semibold text-fg">{profession}</h3>
+                  <ul className="mt-1 grid gap-x-6 gap-y-1.5 text-cell sm:grid-cols-2 lg:grid-cols-3">
+                    {list.map((x) => <li key={x.factionId} className="min-w-0"><NameCell href={factionHref(x.factionId, x.name)}>{x.name}</NameCell></li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </section>
         )}
       </article>

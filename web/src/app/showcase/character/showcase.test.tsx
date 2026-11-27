@@ -281,7 +281,7 @@ describe("the other sections", () => {
     test("money in coins, counts as numbers, a reported zero as zero and a missing statistic as Not reported", () => {
       const html = gold(false);
       expect(html).toContain("115 gold 9 silver 5 copper");
-      expect(html).toContain("250 gold 0 silver 0 copper");
+      expect(html).toMatch(/250 gold(?! \d)/);
       expect(html).toContain(">50 copper<");
       expect(html).toContain("1,077");
       // 326 was reported as 0: drawn as 0 copper, not as missing.

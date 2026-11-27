@@ -160,7 +160,7 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
   const html = await realmHtml("forever");
   expect(html).toContain('href="/tools/auctions/forever/2589"');
   expect(text(html)).toContain("1s 98c"); // weighted market: (205*15 + 190*12) / 27 = 198
-  expect(text(html)).toContain("2s 0c");
+  expect(text(html)).toMatch(/(?<!\d)2s(?! \d+c)/);
   // Only historical days: the market value is unrecorded, never zero.
   expect(text(html)).toMatch(/Item 4306[\s\S]*unrecorded/);
   // Sortable headers are links; a number column sorts high to low first, and a sort keeps the other filters.
@@ -236,7 +236,7 @@ test("with no realm public yet, the hub lists each realm with scans and how many
   expect(words).toContain("A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.");
   expect(html).toContain('href="/tools/auctions/camwow-us1-realm-9-rp"');
   expect(html).toContain('data-agreement="2"');
-  expect(words).not.toMatch(/9s 99c|9s 0c/);
+  expect(words).not.toMatch(/9s 99c|(?<!\d)9s(?! \d+c)/);
 });
 
 test("an item page shows its value, a 60-day chart, each house, the other realms, its age and a Dataset", async () => {
@@ -244,7 +244,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   const words = text(html);
   expect(words).toContain("Market value1s 98c");
   expect(words).toContain(`Newest scan ${todayText}`);
-  expect(words).toMatch(new RegExp(`Newest scan[\\s\\S]*Horde1s 98c2s 0c[\\d,]+${todayText}`));
+  expect(words).toMatch(new RegExp(`Newest scan[\\s\\S]*Horde1s 98c2s[\\d,]+${todayText}`));
   expect(html).toContain("<svg");
   expect(html).toContain('href="/tools/auctions/malganis/2589"');
   expect(html).toContain('href="/tools/auctions/item/2589"');
@@ -252,7 +252,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(words).toContain("Horde auction house price on Forever");
   expect(words).not.toContain("blended");
   expect(words).toMatch(/Houses \(1\)/);
-  expect(words).toMatch(/Horde1s 98c2s 0c/);
+  expect(words).toMatch(/Horde1s 98c2s/);
   expect(html).toContain("/api/market/prices?realm=Forever&house=horde");
   // The day list: three days ago the value was 1s 90c.
   expect(text(html)).toContain("1s 90c");
@@ -296,7 +296,7 @@ test("the cross-realm page compares every realm with a price", async () => {
   const html = text(renderToStaticMarkup(await CrossRealmItemPage(props)));
   expect(html).toContain("Linen Cloth");
   expect(html).toContain("Lowest market value1s 98cForever, Horde");
-  expect(html).toContain("Highest market value3s 0cMal'Ganis, Horde");
+  expect(html).toContain("Highest market value3sMal'Ganis, Horde");
   expect(html).toContain("Mal'Ganis");
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
@@ -373,15 +373,15 @@ test("every price names its house: All houses lists each house's price apart, an
   const words = text(page);
   expect(words).toContain("Forever, each auction house apart: 2 prices");
   expect(page).toMatch(/>House</);
-  expect(words).toMatch(/Alliance[\s\S]*1s 0c/);
-  expect(words).toMatch(/Horde[\s\S]*9s 0c/);
+  expect(words).toMatch(/Alliance[\s\S]*(?<!\d)1s(?! \d+c)/);
+  expect(words).toMatch(/Horde[\s\S]*(?<!\d)9s(?! \d+c)/);
   // The average of the two houses, and the house-unknown scans, are nowhere.
-  expect(words).not.toMatch(/5s 0c|50s 0c|Item 765/);
-  expect(text(await realmHtml("forever", { house: "alliance" }))).not.toContain("9s 0c");
+  expect(words).not.toMatch(/(?<!\d)50?s(?! \d+c)|Item 765/);
+  expect(text(await realmHtml("forever", { house: "alliance" }))).not.toMatch(/(?<!\d)9s(?! \d+c)/);
   const item = text(renderToStaticMarkup(await RealmItemPage({ params: Promise.resolve({ realm: "forever", itemId: "2589" }) })));
   expect(item).toMatch(/Houses \(2\)/);
-  expect(item).toMatch(/Alliance1s 0c1s 0c[\s\S]*Horde9s 0c9s 0c/);
-  expect(item).not.toMatch(/5s 0c|50s 0c/);
+  expect(item).toMatch(/Alliance1s1s[\s\S]*Horde9s9s/);
+  expect(item).not.toMatch(/(?<!\d)50?s(?! \d+c)/);
   const box = await loadMarketBox(2589, today);
   expect(box.map((r) => [r.house, r.value.market])).toEqual([["Alliance", 100], ["Horde", 900]]);
 });

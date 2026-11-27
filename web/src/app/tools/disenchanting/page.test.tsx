@@ -2,7 +2,8 @@ import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket, formatCopper } from "@kb/market";
+import { emptyMarket, foldMarket } from "@kb/market";
+import { tooltipMoney } from "@/lib/tip-line";
 import { DISENCHANT_BUILD } from "@/lib/disenchant";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
@@ -65,9 +66,9 @@ test("each rated band lists its materials with chance and units, and its value o
   expect(bands).toContain("25% · 1 each");
   expect(bands).toContain("4 disenchants · 3 installs");
   // 1 dust x 1,000 + 0.25 essence x 5,000 = 2,250; after the 5% cut, 2,138.
-  expect(bands).toContain(formatCopper(2_250));
-  expect(bands).toContain(formatCopper(2_138));
-  expect(bands).not.toContain(formatCopper(900_000));
+  expect(bands).toContain(tooltipMoney(2_250));
+  expect(bands).toContain(tooltipMoney(2_138));
+  expect(bands).not.toContain(tooltipMoney(900_000));
 });
 
 test("buy to disenchant lists the items under their band's value after the cut, widest margin first", async () => {
@@ -75,10 +76,10 @@ test("buy to disenchant lists the items under their band's value after the cut, 
   const deals = section(html, "disenchant-deals");
   expect(deals).toContain(`/tools/auctions/forever/${CHEAP}`);
   expect(deals).not.toContain(`/tools/auctions/forever/${DEAR}`);
-  expect(text(deals)).toContain(formatCopper(2_138 - 300));
+  expect(text(deals)).toContain(tooltipMoney(2_138 - 300));
   // Materials are priced on the house and list the bands that give them.
   const materials = text(section(html, "disenchant-materials"));
-  expect(materials).toContain(formatCopper(1_000));
+  expect(materials).toContain(tooltipMoney(1_000));
   expect(materials).toContain("Uncommon armor, item level 5 to 15: 75%");
 });
 

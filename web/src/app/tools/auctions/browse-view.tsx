@@ -14,7 +14,7 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, newestScanDay, onRuleset, percent,
+  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, newestScanDay, noWeekMoveReason, onRuleset, percent,
   realmHref, rulesetSummaries, scanDayText, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
@@ -99,10 +99,11 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const withMoves = (ids: number[]) => [...new Set([...ids, ...moveIds])];
 
   let tips = new Map<number, ItemTip>();
+  let icons = new Map<number, string>();
   let names = new Map<number, string>();
   if (wide) {
     const ids = withMoves(allIds);
-    tips = (await itemArt(ids)).tips;
+    ({ tips, icons } = await itemArt(ids));
     names = await auctionNames(ids, tips, stored?.names);
   }
   const results = browseRows(rows, q, { now, name: (id) => names.get(id), levels: (id) => tips.get(id) });
@@ -111,7 +112,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const shown = results.slice((q.page - 1) * AH_PER_PAGE, q.page * AH_PER_PAGE);
   if (!wide) {
     const ids = withMoves(shown.map((b) => b.row.value.itemId));
-    tips = (await itemArt(ids)).tips;
+    ({ tips, icons } = await itemArt(ids));
     names = await auctionNames(ids, tips, stored?.names);
   }
 
@@ -190,7 +191,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const columns: Column<BrowseRow>[] = [
     {
       key: "name", header: "Item", sortable: true,
-      cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
+      cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} icon={icons.get(row.value.itemId)} names={names} />,
     },
     ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link prefetch={false} href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
     ...(showRealm ? [{ key: "region", header: "Region", nowrap: true, cell: ({ row }: BrowseRow) => REGION_LABEL[realmRegion(row.realm.name) ?? "unknown"] }] : []),
@@ -203,7 +204,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
     { key: "min", header: "Min buyout", numeric: true, sortable: true, cell: ({ row }) => <ClientCoins copper={row.value.min} /> },
     { key: "units", header: "Units", numeric: true, sortable: true, cell: ({ row }) => `${row.value.quantity.toLocaleString("en-US")}${row.value.thin ? " (thin)" : ""}` },
     ...(listings ? [{ key: "listings", header: "Listings", numeric: true, sortable: true, cell: ({ row }: BrowseRow) => row.listings?.toLocaleString("en-US") ?? <span className="text-muted">—</span> }] : []),
-    { key: "change", header: "7 days", numeric: true, sortable: true, cell: ({ move }) => (move ? <span className={move.change > 0 ? "text-accent" : "text-fg"}>{percent(move.change)}</span> : <span className="text-muted">—</span>) },
+    { key: "change", header: "7 days", numeric: true, sortable: true, cell: ({ row, move }) => (move ? <span className={move.change > 0 ? "text-accent" : "text-fg"}>{percent(move.change)}</span> : <span className="text-muted" title={noWeekMoveReason(row, now) ?? undefined}>—</span>) },
     { key: "trend", header: <span className="sr-only">Trend</span>, cell: ({ row }) => <Sparkline points={row.points} now={now} /> },
   ];
   // What the URL means with no sort: the week's movers lead by change, everything else by units.
@@ -270,7 +271,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
         rowKey={({ row }) => `${row.realm.key}:${row.house}:${row.value.itemId}`}
         sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
         sortHref={(key, dir) => here({ sort: key === fallback.key && (dir === "desc") === fallback.desc ? undefined : { key: key as AhSort, desc: dir === "desc" } })}
-        meta={({ row, move }) => [showRealm ? row.realm.name : null, row.house, <ClientCoins key="price" copper={row.value.market} />, `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).map((part, i) => <span key={i}>{i > 0 && " · "}{part}</span>)}
+        meta={({ row, move }) => [showRealm ? <RealmName key="realm" name={row.realm.name} /> : null, row.house, <ClientCoins key="price" copper={row.value.market} />, `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).map((part, i) => <span key={i}>{i > 0 && " · "}{part}</span>)}
         empty={empty}
       />
     );
