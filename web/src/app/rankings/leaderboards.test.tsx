@@ -79,7 +79,8 @@ test("with the armory on, the hub leads with the character boards and the guild 
   for (const title of ["Item level", "Gear Score", "Honorable kills", "Fish caught"]) expect(characters, title).toContain(title);
   expect(characters).toContain(`href="/armory/${me.region}/${me.slug}"`);
   expect(characters).toContain('href="/armory/rankings/item-level?region=eu"');
-  expect(characters).toContain('href="/armory/rankings/item-level?region=us"');
+  // QA round 8: the US board is empty here, so it has no full list to link.
+  expect(characters).not.toContain('href="/armory/rankings/item-level?region=us"');
   // One board at a time: the hub reads the shown board, one region each, never all nine.
   const spy = vi.spyOn(holder.store!, "boardFiltered");
   await hub({ metric: "honorable-kills" });
@@ -136,7 +137,8 @@ test("a region tab narrows the boards and rides on their full-list links", async
   const characters = section(html, "characters");
   expect(characters).not.toContain(`href="/armory/eu/${armoryCharacter().slug}"`);
   expect(characters).toContain("No characters with item level read on US realms yet.");
-  expect(characters).toContain('href="/armory/rankings/item-level?region=us"');
+  // QA round 8: an empty board offers no full-list link; the guild board below still carries the region.
+  expect(characters).not.toContain('href="/armory/rankings/item-level?region=us"');
   expect(section(html, "guilds")).toContain('href="/guilds?region=us&amp;sort=item-level"');
   // An unknown region reads as every region; any casing is read.
   expect(section(await hub({ region: "kr" }), "characters")).toContain(`href="/armory/eu/${armoryCharacter().slug}"`);

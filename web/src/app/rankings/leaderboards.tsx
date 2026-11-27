@@ -149,7 +149,7 @@ export function BestOfClass({ rows }: { rows: ArmoryBoardRow[] | null }) {
         { key: "region", header: "Region", cell: (r) => <RegionRuleset region={r.region} ruleset={r.ruleset} /> },
         { key: "value", header: <BoardMetric metric="gear-score" />, numeric: true, cell: (r) => <BoardValue row={r} metric="gear-score" top={Math.max(0, ...rows.map((r) => r.value))} /> },
       ]} rows={rows} rowKey={(r) => r.class}
-      meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><span>{regionLabel(r.region)}</span><BoardValue row={r} metric="gear-score" top={Math.max(0, ...rows.map((r) => r.value))} /></span>}
+      meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><span>{regionLabel(r.region)}</span><span className="ml-auto"><BoardValue row={r} metric="gear-score" top={Math.max(0, ...rows.map((r) => r.value))} /></span></span>}
       empty={<p className="p-4 text-fg-2">No Gear Score read yet.</p>} /></Card>}
   </section>;
 }

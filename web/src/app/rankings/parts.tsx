@@ -2,6 +2,7 @@ import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
+import { axisStep } from "@/lib/chart-axis";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
@@ -510,8 +511,8 @@ const TPAD = { left: 48, right: 16, top: 22, bottom: 28 };
  * a collecting week has no bar and says so. The table under it holds the same numbers.
  */
 export function WeeklyTotals({ points }: { points: { week: RankingWeek; count: CensusCount }[] }) {
-  const max = Math.max(1, ...points.map((p) => p.count ?? 0));
-  const top = Math.ceil(max / 50) * 50 || 50;
+  const step = axisStep(Math.max(...points.map((p) => p.count ?? 0)));
+  const top = step * 2;
   const plotW = TW - TPAD.left - TPAD.right;
   const plotH = TH - TPAD.top - TPAD.bottom;
   const slot = plotW / points.length;
@@ -523,7 +524,7 @@ export function WeeklyTotals({ points }: { points: { week: RankingWeek; count: C
     <figure data-weekly-totals className="min-w-0">
       <svg viewBox={`0 0 ${TW} ${TH}`} role="img" aria-label={`${title}, ${points.length} weeks`} className="h-auto w-full">
         <title>{title}</title>
-        {[0, top / 2, top].map((v) => (
+        {[0, step, top].map((v) => (
           <g key={v}>
             <line x1={TPAD.left} x2={TW - TPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
             <text x={TPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{number(v)}</text>

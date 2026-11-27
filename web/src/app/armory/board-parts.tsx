@@ -87,7 +87,8 @@ export function RegionBoard({ metric, region, rows, footer, query }: { metric: A
   const title = ARMORY_BOARDS[metric].title;
   const heading = <h3 id={`board-${region}`} className="flex items-center gap-2 px-4 pt-3 text-h2-sm text-fg"><RegionChip region={region} />{title}</h3>;
   return (
-    <Card as="section" aria-labelledby={`board-${region}`} padding="none">
+    // A board with no rows keeps its own height beside a full one, and has no full list to link.
+    <Card as="section" aria-labelledby={`board-${region}`} padding="none" className={rows?.length ? "" : "self-start"}>
       {rows === null ? <>{heading}<p className="px-4 py-4 text-cell text-fg-2" role="status">{STORAGE_UNREACHABLE}</p></> : (
         <DataTable
           dense
@@ -98,7 +99,7 @@ export function RegionBoard({ metric, region, rows, footer, query }: { metric: A
           meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>}
           empty={<p className="px-4 py-3 text-cell text-fg-2">{emptyBoardText(metric, region, query)}</p>}
           toolbar={heading}
-          footer={footer}
+          footer={rows.length ? footer : undefined}
         />
       )}
     </Card>
