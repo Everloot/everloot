@@ -436,11 +436,15 @@ function AddonSection({ addon }: { addon: GuildPageData }) {
 /** The guild at a glance, under its header: roster size, members read, level 60s, average item level, roster read, and the class mix as one bar. */
 function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary; activity: ReactNode }) {
   const read = members.filter((m) => m.stored).length;
+  // The all-levels average mixes in low characters; at 60 it says what a raid-ready member wears.
+  const at60 = members.filter((m) => m.level === 60 && m.itemLevel !== null).map((m) => m.itemLevel!);
+  const average60 = at60.length ? Math.round((at60.reduce((a, b) => a + b, 0) / at60.length) * 10) / 10 : null;
   return (
     <section data-guild-summary aria-label="Guild summary" className="space-y-3">
       <Facts items={[
         { label: "On the roster", value: members.length.toLocaleString("en-US"), numeric: true },
-        { label: "Members read", value: read.toLocaleString("en-US"), numeric: true },
+        // Members of this roster whose character has been read; /guilds counts characters read whose guild this is.
+        { label: "Roster members read", value: read.toLocaleString("en-US"), numeric: true },
         // Blizzard's roster, as of its read below; /guilds counts the characters read at 60 instead.
         { label: "Level 60 on the roster", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
         {
@@ -448,6 +452,7 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
           value: s.averageItemLevel === null ? "Not read" : `${metricValue("item-level", s.averageItemLevel)} (${s.itemLevelsRead} read)`,
           numeric: s.averageItemLevel !== null,
         },
+        ...(average60 === null ? [] : [{ label: "Average item level at 60", value: `${metricValue("item-level", average60)} (${at60.length} read)`, numeric: true }]),
         { label: "Roster read", value: day(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
       {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}

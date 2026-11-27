@@ -165,10 +165,10 @@ describe("the guild page summary", () => {
   test("population tiles and labelled bars count only shown members", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     expect(out).toContain("On the roster");
-    expect(out).toContain("Members read");
+    expect(out).toContain("Roster members read");
     expect(out).toContain("Level 60");
     expect(out).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
-    expect(out).toMatch(/Members read<\/dt><dd[^>]*>2<\/dd>/);
+    expect(out).toMatch(/Roster members read<\/dt><dd[^>]*>2<\/dd>/);
     expect(out).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
     expect(out).toContain('data-population="classes"');
     expect(out).toContain("2 (66.7%)");
@@ -186,7 +186,7 @@ describe("the guild page summary", () => {
     expect(hidden).not.toContain("Torvin");
     expect(hidden).toContain("2 (100%)");
     expect(hidden).toMatch(/On the roster<\/dt><dd[^>]*>2<\/dd>/);
-    expect(hidden).toMatch(/Members read<\/dt><dd[^>]*>1<\/dd>/);
+    expect(hidden).toMatch(/Roster members read<\/dt><dd[^>]*>1<\/dd>/);
   });
 
   test("sort parameters order roster rows and keep unread item levels last", async () => {
@@ -515,3 +515,31 @@ describe("QA round 1: rosters and the directory", () => {
     expect(spy).toHaveBeenCalledWith(expect.not.objectContaining({ minRead: expect.anything() }));
   });
 });
+
+describe("QA round 2: guild counts and the item level order", () => {
+  test("without the database's minimum the item level order drops guilds under 10 members read from the page and counts the rest", async () => {
+    const real = mem.guildDirectory.bind(mem);
+    vi.spyOn(mem, "guildDirectory").mockImplementation(async (f) => {
+      const page = await real({ ...f, minRead: undefined });
+      return page && { rows: page.rows, total: page.total };
+    });
+    const out = await html(pages.directory({ sort: "item-level" }));
+    expect(out).not.toContain("until the database update is applied");
+    // The fixture's guilds have 1 and 0 members read: neither ranks.
+    expect(out).not.toContain(">Ember Wardens<");
+    expect(out).toContain("Showing 0 ranked guilds on this page");
+    expect(out).toContain("the minimum turns on with the next database update");
+  });
+
+  test("the guild page labels its read count as roster members read and shows the level 60 average", async () => {
+    mem.putCharacter(armoryCharacter({ slug: "brannoc-tide", name: "Brannoc", surname: "Tide", level: 41, itemLevel: 30, fetchedAt: "2026-11-09T11:30:00.000Z" }));
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toMatch(/Roster members read<\/dt>/);
+    expect(out).not.toMatch(/>Members read<\/dt>/);
+    // Velkara (60, 57.41) is the one member at 60 with an item level read.
+    expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 \(1 read\)<\/dd>/);
+    const dir = await html(pages.directory());
+    expect(dir).toMatch(/differ from the guild page&#x27;s roster members read/);
+  });
+});
+

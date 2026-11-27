@@ -1,7 +1,8 @@
 import type { GuildProgress } from "@kb/guild-progression";
 import Link from "@/components/Link";
 import { PROGRESSION_BUILD, PROGRESSION_GROUPS, trackedDungeons, type CharacterProgress } from "@kb/progression";
-import { Badge } from "@/components/ui";
+import type { ReactNode } from "react";
+import { Badge, Disclosure } from "@/components/ui";
 import { SPACE } from "@/design/tokens";
 
 /** "1 boss", "8 bosses". */
@@ -12,24 +13,25 @@ export interface ProgressionMatrixProps {
   guild?: boolean;
   /** Only pages the site's instance route actually serves. */
   links?: Readonly<Record<number, string>>;
-  /** The notes on how kills are counted; off for a second list on the same page. */
-  notes?: boolean;
+  /** The notes on how kills are counted; off for a second list on the same page; "folded": the first line, the rest behind a disclosure. */
+  notes?: boolean | "folded";
 }
 
 const tracked = new Set(trackedDungeons().map((dungeon) => dungeon.id));
 
 export default function ProgressionMatrix({ instances, links = {}, guild = false, notes = true }: ProgressionMatrixProps) {
   return <div className="space-y-6">
-    {notes && <div className="space-y-2 text-sm text-fg-2">
-      {guild ? <p>Counts synced kills from every linked character in the armory roster; members without synced history count as not having the kill.</p> : <>
-      <p>Kills come from linked characters through the Everloot Desktop App. Synced boss history is public; hidden characters are excluded. Blizzard&apos;s API gives no encounter data for this game.</p>
+    {notes && <Fold folded={notes === "folded"} first={guild
+      ? <p>Counts synced kills from every linked character in the armory roster; members without synced history count as not having the kill.</p>
+      : <p>Kills come from linked characters through the Everloot Desktop App. Synced boss history is public; hidden characters are excluded. Blizzard&apos;s API gives no encounter data for this game.</p>}>
+      {!guild && <>
       <p>Lifetime progress counts each boss once across difficulties. No data from this character means no synced history is available, rather than no kills.</p>
         <p>A tracked dungeon counts as cleared when every boss on its supported checklist is recorded.</p>
       </>}
       <p>Not seen open yet means no upload has seen an entrance or a boss kill here; it is not a Blizzard release announcement. The files can include test and unused content.</p>
       <p>Found in game files, build {PROGRESSION_BUILD}; game data copyright Blizzard Entertainment, Inc. Unconfirmed means players have not agreed on the entry.</p>
       <p>Separately, Blizzard&apos;s <a href="https://news.blizzard.com/en-us/article/24303009/world-of-warcraft-forever-raid-overviewlocations-raid-sizes-and-attunement" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">raid overview</a> announces Barrow Deeps, Hyjal Summit and Onyxia&apos;s Lair for December 9. This is not a complete release schedule or evidence of an observed opening.</p>
-    </div>}
+    </Fold>}
     {PROGRESSION_GROUPS.filter((group) => instances.some((r) => r.group === group)).map((group) => <section key={group} aria-label={group} className="space-y-3">
       <h3 className="text-lg font-semibold text-fg">{group}</h3>
       <ul className="divide-y divide-line border-y border-line">
@@ -68,5 +70,13 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
         </li>)}
       </ul>
     </section>)}
+  </div>;
+}
+
+/** The notes: every line shown, or the first with the rest behind "How this is counted". */
+function Fold({ folded, first, children }: { folded: boolean; first: ReactNode; children: ReactNode }) {
+  return <div className="space-y-2 text-sm text-fg-2">
+    {first}
+    {folded ? <Disclosure summary="How this is counted"><div className="space-y-2 text-sm text-fg-2">{children}</div></Disclosure> : children}
   </div>;
 }

@@ -3,7 +3,7 @@
 import { cloneElement, isValidElement, useEffect, useId, useState, type ReactElement, type ReactNode } from "react";
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import { CardPopup, GameCard } from "./GameCard";
-import { splitWhy } from "@/lib/placeholder";
+import { splitWhy, spokenUnknowns } from "@/lib/placeholder";
 import { QUALITIES } from "@/design/tokens";
 import GameIcon from "./GameIcon";
 
@@ -45,7 +45,7 @@ function Tipped({ tip, size, icon, children }: { tip: Tip; size: number; icon?: 
     >
       {icon !== undefined ? icon : tip.icon && <GameIcon src={tip.icon} size={size} quality={QUALITIES.find((q) => q === tip.quality.toLowerCase())} />}
       {link}
-      <span id={descId} hidden>{[`${tip.name}, ${tip.quality}`, ...tip.lines, tip.label].join(". ")}</span>
+      <span id={descId} hidden>{[`${tip.name}, ${tip.quality}`, ...tip.lines.map(spokenUnknowns), tip.label].join(". ")}</span>
       {open && (
         <CardPopup anchor={open.anchor} x={open.x} id={`${anchorId}-tip`}>
           <GameCard card={{ title: tip.name, color: tip.color, icon: tip.icon, lines, notes: reasons, foot: tip.label }} />

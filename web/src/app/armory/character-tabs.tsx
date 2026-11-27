@@ -5,17 +5,17 @@ import type { ArmoryCharacter } from "@/lib/armory-store";
 import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
 import { characterProgression, progressionCatalogue } from "@kb/progression";
 import { Achievements, blizzardBossKillsLine, NO_ACHIEVEMENTS, PlayHistoryView, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
-import { link } from "./parts";
 
 /**
  * The character sheet's tabs: one per part of a Blizzard profile the armory stores, below the gear sheet (which is the
  * page's own, not a tab). Every tab is drawn, so the strip is
  * the same on every sheet; a part the last read did not bring says so in one sentence rather than leaving a gap.
+ * Professions is no tab: its bars sit in the overview above the gear (sheet.tsx CharacterOverview).
  * Gold, Completionist and Alts wait on #1275. Progress lists the files and synced boss kills publicly for everyone. Legacy perks waits on a stored field.
  */
 export const CHARACTER_TABS = [
   ["talents", "Talents"], ["stats", "Stats"], ["pvp", "PvP"],
-  ["achievements", "Achievements"], ["professions", "Professions"], ["reputations", "Reputations"], ["quests", "Quests"],
+  ["achievements", "Achievements"], ["reputations", "Reputations"], ["quests", "Quests"],
   ["history", "Play history"], ["progress", "Progress"],
 ] as const;
 export type CharacterTabId = typeof CHARACTER_TABS[number][0];
@@ -28,7 +28,6 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   stats: notRead("stats"),
   pvp: notRead("honorable kills or a PvP rank"),
   achievements: notRead("achievements"),
-  professions: notRead("professions"),
   reputations: notRead("reputations"),
   quests: notRead("completed quests"),
   history: notRead("play history"),
@@ -71,10 +70,6 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
     case "achievements": return !d?.achievements ? <Empty id={id} /> : d.achievements.rows.length
       ? <Achievements rows={d.achievements.rows} categories={parts.categories ?? new Map()} />
       : <p className="py-3 text-sm text-fg-2">{NO_ACHIEVEMENTS}</p>;
-    // The bars sit in the overview above the gear (sheet.tsx CharacterOverview); the tab points there, not repeats them.
-    case "professions": return d?.professions?.rows.length
-      ? <p className="py-3 text-sm text-fg-2">The profession bars are with the specialization above the gear. <a href="#armory-overview-professions" className={link}>Go to professions</a></p>
-      : <Empty id={id} />;
     case "reputations": return d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : <Empty id={id} />;
     case "quests": return d?.quests ? <QuestCount completed={d.quests.completed} /> : <Empty id={id} />;
     case "history": return d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} source /> : <Empty id={id} />;
@@ -82,7 +77,7 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
       {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">
         {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
       </p>}
-      <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} />
+      <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} notes="folded" />
     </>;
   }
 }

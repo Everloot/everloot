@@ -171,6 +171,10 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
     !data || data.unreachable ? null : loadGuildRealms(),
     armory ? hiddenGuilds().then((hidden) => loadGuildDirectory(d, hidden, d.sort === "item-level" ? GUILD_ITEM_LEVEL_MIN_READ : undefined)) : null,
   ]);
+  // Until the database applies the item level order's minimum, this page drops the guilds under it from the rows it
+  // got: the order stays right, a page just holds fewer rows, and the note says how many ranked.
+  const pageMinimum = dir?.state === "ready" && d.sort === "item-level" && dir.minRead === undefined;
+  const dirRows = !dir || dir.state === "unreachable" ? [] : pageMinimum ? dir.rows.filter((g) => g.membersRead >= GUILD_ITEM_LEVEL_MIN_READ) : dir.rows;
   // The one box feeds both searches; it says the rule only when neither could take the text.
   const refused = Boolean(q) && !prefix && (!armory || d.prefix === null);
   const ruleset = ARMORY_RULESETS.find((r) => r.id === d.ruleset);
@@ -231,7 +235,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
           {dir && (dir.state === "unreachable" ? <Unreachable /> : (
             <section aria-labelledby="directory" className="space-y-3">
-              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. Level 60 read counts the characters read at level 60, each as of its own read, so it can differ from the guild page's roster count. A character who asked to be hidden is not counted.">
+              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. Level 60 read counts the characters read at level 60, each as of its own read, so it can differ from the guild page's roster members read and its level 60 roster count. A character who asked to be hidden is not counted.">
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <FilterBar
@@ -249,9 +253,10 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                   {d.prefix ? " Until then a search finds guilds by name." : " Until then, search a guild by name."}
                 </p>
               )}
-              {dir.rows.length === 0
+              {dirRows.length === 0
                 ? <EmptyState message={
-                    dir.state === "ready" && d.page > 1 && dir.total > 0 ? "No guilds on this page."
+                    pageMinimum && dir.rows.length > 0 ? `No guild on this page has ${GUILD_ITEM_LEVEL_MIN_READ} members read or more.`
+                    : dir.state === "ready" && d.page > 1 && dir.total > 0 ? "No guilds on this page."
                     : d.prefix ? `No guild read yet starts with “${d.prefix}”.`
                     : dir.state === "ready" ? "No guild matches these filters yet." : "No guild to list yet."
                   } action={{ href: "/armory/guilds/submit", label: "Add a guild" }} />
@@ -259,7 +264,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     dense
                     caption={d.prefix ? `Guilds whose name starts with ${d.prefix}` : "Guilds read from Blizzard's API"}
                     columns={directoryColumns(dir.state === "ready")}
-                    rows={dir.rows}
+                    rows={dirRows}
                     rowKey={(g) => `${g.region}/${g.slug}`}
                     meta={(g) => directoryMeta(g, dir.state === "ready")}
                     sort={dir.state === "ready" ? { key: Object.keys(SORT_OF_COLUMN).find((k) => SORT_OF_COLUMN[k] === d.sort)!, direction: "desc" } : undefined}
@@ -267,8 +272,8 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                   />}
               {dir.state === "ready" && d.sort === "item-level" && (
                 <p className="text-meta text-muted" data-min-read-note>
-                  {dir.minRead === undefined
-                    ? "Ranked by average item level. Guilds with few members read can lead this order until the database update is applied."
+                  {pageMinimum
+                    ? `Showing ${dirRows.length} ranked ${dirRows.length === 1 ? "guild" : "guilds"} on this page: guilds with at least ${GUILD_ITEM_LEVEL_MIN_READ} members read. The guild count above still includes smaller guilds; the minimum turns on with the next database update.`
                     : `Ranked by average item level: guilds with at least ${dir.minRead} members read.`}
                 </p>
               )}

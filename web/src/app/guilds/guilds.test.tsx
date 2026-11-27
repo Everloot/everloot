@@ -16,7 +16,7 @@ const AS_OF = "2026-10-24T10:00:00.000Z";
 const directory = vi.hoisted(() => ({ recruiting: false, armory: new Map<string, unknown>() }));
 vi.mock("@/lib/armory-store", async (original) => ({
   ...await original<typeof import("@/lib/armory-store")>(),
-  armoryStore: () => ({ guildDirectory: async () => directory.recruiting ? { total: 1, rows: [{ region: "us", slug: "star-watch", name: "Star Watch", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 12, membersRead: 1, averageItemLevel: 30, level60: 0, fetchedAt: "2026-11-19T00:00:00Z" }] } : null, searchGuilds: async () => [],
+  armoryStore: () => ({ guildDirectory: async (f: { minRead?: number }) => directory.recruiting ? { ...(f.minRead === undefined ? {} : { minRead: f.minRead }), total: 1, rows: [{ region: "us", slug: "star-watch", name: "Star Watch", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 12, membersRead: 1, averageItemLevel: 30, level60: 0, fetchedAt: "2026-11-19T00:00:00Z" }] } : null, searchGuilds: async () => [],
     guild: async (region: string, slug: string) => directory.armory.get(`${region}/${slug}`) ?? null }),
 }));
 vi.mock("@/lib/guild-profile-store", () => ({ guildProfileStore: () => ({ recruiting: async () => new Set(directory.recruiting ? ["us/star-watch"] : []) }) }));

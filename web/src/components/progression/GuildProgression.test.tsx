@@ -59,3 +59,16 @@ test("a guild with no kills says so in one line above the folded list", async ()
   expect(html).toContain("1 instance with no kills yet");
   expect(html.indexOf("No roster member has a synced kill yet.")).toBeLessThan(html.indexOf("<details"));
 });
+
+test("a score of 0 before ladders open says when they start, not 0; a score still shows once open", async () => {
+  vi.useFakeTimers({ now: new Date("2026-11-27T12:00:00Z"), toFake: ["Date"] });
+  try {
+    loader.mockResolvedValue({ score: 0, links: {}, instances: [] });
+    const before = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
+    expect(before).toContain("Ladders start December 9");
+    expect(before).not.toContain("Guild progression score");
+    vi.setSystemTime(new Date("2026-12-10T12:00:00Z"));
+    const after = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
+    expect(after).toContain("Guild progression score");
+  } finally { vi.useRealTimers(); }
+});

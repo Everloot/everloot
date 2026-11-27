@@ -1,6 +1,8 @@
 import { canAdd, entryAtRank, entryRankAt, rankOf, refusalText } from "@/lib/talents/rules";
 import type { GameAssets } from "@/lib/talents/assets";
 import type { Ranks, TalentCatalog, TalentEntry, TalentNode, TalentTree } from "@/lib/talents/types";
+import { spokenUnknowns } from "@/lib/placeholder";
+import { SPOKEN_AMOUNT_NOTE, withoutUnknownAmounts } from "./armory-text";
 
 // One tree: a grid of talents with the prerequisite lines behind it. Plain buttons, no pictures.
 // Colour only names the class; state is also written out (rank, "locked", "full") for anyone who
@@ -73,9 +75,19 @@ export function heldTexts(assets: GameAssets | null, node: TalentNode, rank: num
   return [{ entry: held.entry, tip: textAt(assets, held.entry, held.rank) }];
 }
 
-/** A node's name and tooltip text, for aria-describedby: a screen reader gets it without hover. */
-export function describeNode(assets: GameAssets | null, node: TalentNode, rank: number): string {
-  return heldTexts(assets, node, rank).map(({ entry, tip }) => `${entry.name}. ${tip?.text ?? ""}`.trim()).join(" ");
+/**
+ * A node's name and tooltip text, for aria-describedby: a screen reader gets it without hover, and never the `[?]`
+ * mark. `readOnly` (the armory) words a missing amount out as its tooltip does and ends with the tooltip's note.
+ */
+export function describeNode(assets: GameAssets | null, node: TalentNode, rank: number, readOnly = false): string {
+  let dropped = false;
+  const text = heldTexts(assets, node, rank).map(({ entry, tip }) => {
+    const raw = tip?.text ?? "";
+    const words = readOnly ? withoutUnknownAmounts(raw) : { text: raw, dropped: false };
+    dropped ||= words.dropped;
+    return `${entry.name}. ${spokenUnknowns(words.text)}`.trim();
+  }).join(" ");
+  return dropped ? `${text} ${SPOKEN_AMOUNT_NOTE}` : text;
 }
 
 // A name never splits inside a word: a long single word gets a smaller size so it fits the tile.
@@ -222,7 +234,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
               <span className={`font-mono tabular-nums ${rank > 0 ? CLASS_TEXT[slug] : ""}`}>
                 {rank}/{node.maxRanks}{full ? " full" : ""}
               </span>
-              {assets && <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>}
+              {assets && <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank, readOnly)}</span>}
               {marked && <span aria-hidden="true" className={MARK} />}
             </button>
           );

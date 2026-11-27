@@ -39,15 +39,13 @@ test("a character with every part stored draws every tab, none of them empty", (
   expect(html).toContain("Intellect");
   expect(html).toContain("1,234");
   expect(html).toContain('href="/database/achievements/6"');
-  // The profession bars live in the overview above the tabs; the tab links to them.
-  expect(html).toContain('href="#armory-overview-professions"');
   expect(html).toContain('href="/database/factions/530"');
   expect(html).toMatch(/>3<\/span> completed quests/);
 });
 
 test("the strip holds Talents to Progress (the gear is the sheet above it) and nothing that waits on the privacy decision", () => {
   const labels = CHARACTER_TABS.map(([, label]) => label);
-  expect(labels).toEqual(["Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Play history", "Progress"]);
+  expect(labels).toEqual(["Talents", "Stats", "PvP", "Achievements", "Reputations", "Quests", "Play history", "Progress"]);
   for (const out of ["Gold", "Completionist", "Alts", "Legacy perks"]) expect(labels).not.toContain(out);
 });
 
@@ -81,7 +79,7 @@ test("a character with partial data keeps every tab, and each empty one says why
 
 test("PvP from the profile row shows without any detail read, and the gear is not a tab", () => {
   const html = render(armoryCharacter());
-  expect(emptyIds(html)).toEqual(["talents", "stats", "achievements", "professions", "reputations", "quests", "history"]);
+  expect(emptyIds(html)).toEqual(["talents", "stats", "achievements", "reputations", "quests", "history"]);
   expect(html).not.toContain("data-equipment-slot");
   expect(html).toContain("1,234");
 });
@@ -108,4 +106,14 @@ test("a character read before play history, or with none to read, has the tab sa
   expect(emptyIds(render(partial))).toContain("history");
   const none = armoryCharacter({ details: { revision: 1, playHistory: { asOf: at, groups: [], ranked: {} } } });
   expect(emptyIds(render(none))).toContain("history");
+});
+
+test("QA round 2: Progress opens with one line, the rest of how kills are counted folded under a disclosure", () => {
+  const progress = characterTabs(full, {}).find((t) => t.id === "progress")!;
+  const html = renderToStaticMarkup(<>{progress.panel}</>);
+  const fold = html.indexOf("How this is counted");
+  expect(fold).toBeGreaterThan(-1);
+  expect(html.indexOf("Kills come from linked characters")).toBeLessThan(fold);
+  for (const later of ["Lifetime progress counts each boss once", "Not seen open yet means", "raid overview"]) expect(html.indexOf(later)).toBeGreaterThan(fold);
+  expect(html.indexOf("How this is counted")).toBeLessThan(html.indexOf("data-progression-instance="));
 });

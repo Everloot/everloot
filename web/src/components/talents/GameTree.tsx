@@ -105,7 +105,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                       />
                     );
                   })}
-                  <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>
+                  <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank, readOnly)}</span>
                   {marked && <span aria-hidden="true" className={`${MARK} rounded-md`} />}
                 </div>
               );
@@ -143,7 +143,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                     {rank}/{node.maxRanks}
                   </span>
                 )}
-                <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank)}</span>
+                <span id={`talent-desc-${node.id}`} className="sr-only">{describeNode(assets, node, rank, readOnly)}</span>
                 {marked && <span aria-hidden="true" className={`${MARK} ${square ? "rounded-lg" : "rounded-full"}`} />}
               </button>
             );
