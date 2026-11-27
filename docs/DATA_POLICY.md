@@ -412,6 +412,11 @@ interface files, is a different thing and is covered by the second extension. Th
   so the item page's box links the line to the spell's page where the spell names file names the spell; the
   hover card stays unlinked. Durability and resistances are not read: this build's `ItemSparse` has no such
   columns, so resistances still come only from players' reports and durability is not shown.
+  *Added 2026-11-27, in the pull request that adds them (the maintainer review):* under the same rules, how
+  many of the item fit in one stack (`ItemSparse.Stackable`, recorded only above one), shown as the site's own
+  line "Stacks to N" above the sell price; and on a recipe item, the tooltip of the item its recipe creates
+  (from the committed recipe files), only where that item's own page shows its tooltip, so a held-back item
+  adds nothing. Sockets are not read: build 1.60.1.71139 has no socket values (`SocketType` is 0 on every row).
 - **Map pictures**: the game's own continent and zone map art from the map art tables, laid under
   our zone outlines. A held-back zone's picture shows only with spoilers on. A continent's own
   picture always shows (decided 2026-10-19): it is the original world's parchment map, with no names
