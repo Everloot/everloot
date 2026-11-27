@@ -144,6 +144,8 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
     why.add(WHY.older);
   }
   if (r.t) lines.push(`"${r.t}"`);
+  // The site's own line for ItemSparse.Stackable: the game's tooltip does not print it. An older shard has none.
+  if (r.ss && r.ss > 1) lines.push(`Stacks to ${r.ss}`);
   if (r.sp > 0) lines.push(`Sell Price: ${tooltipMoney(r.sp)}`);
   if (range) why.add(damageSource(range, damage));
   // Only where every printed line has its spell: a record from before the ids were kept has none.
@@ -186,7 +188,7 @@ const FACT_LINE = ITEM_FACTS.map((fact) => ({
 const rank = (fact: ItemFactName) => ITEM_FACTS.indexOf(fact);
 const factOf = (line: string) => FACT_LINE.find((f) => f.re.test(line.replace(/ \(unconfirmed, seen by \d+ players?\)$/, "")))?.fact ?? null;
 /** The first line the game prints below the armour, stats and resistances. */
-const BELOW_STATS = /^(Classes: |Races: |Requires |Item Level |Use: |Equip: |Chance on hit: |Set: |Restrictions: |Equip and Use: |"|Sell Price: )/;
+const BELOW_STATS = /^(Classes: |Races: |Requires |Item Level |Use: |Equip: |Chance on hit: |Set: |Restrictions: |Equip and Use: |"|Stacks to |Sell Price: )/;
 
 /** Where a line the files did not print goes: after the facts that come before it in the game, else before the rest. */
 function slotFor(lines: readonly string[], fact: ItemFactName): number {

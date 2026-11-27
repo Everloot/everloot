@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { buildRecipeCatalog, teachingItemIds } from "./recipe-catalog";
+import { buildRecipeCatalog, taughtItemId, teachingItemIds } from "./recipe-catalog";
 import { CLIENT_PROFESSIONS } from "./professions";
 import { filterRecipes } from "./profession-planner";
 
@@ -20,4 +20,13 @@ test("committed teaching data contains no names and no public name catalogs rema
  const data = JSON.parse(readFileSync("src/data/game-data/client-recipe-items.json", "utf8"));
  expect(data).not.toHaveProperty("names");
  for (const file of ["src/data/profession-search-names.json", "src/data/profession-recipe-sources.json", "src/app/tools/professions/recipe-catalog.json/route.ts", "src/app/tools/professions/[profession]/recipe-catalog.json/route.ts"]) expect(existsSync(file)).toBe(false);
+});
+
+test("a recipe item's taught item is the item its one recipe creates, from the committed files only", () => {
+ // Pattern: Blue Linen Vest teaches spell 7630, which creates item 6240 (client-recipe-items.json, client-recipes.json).
+ expect(taughtItemId(6270)).toBe(6240);
+ // An item that teaches nothing, and a recipe item whose recipe creates no item (an enchant), have none.
+ expect(taughtItemId(6240)).toBeNull();
+ const p = CLIENT_PROFESSIONS.flatMap(x => x.recipes).find(r => r.itemId === null && teachingItemIds([r.spellId]).length);
+ if (p) expect(taughtItemId(teachingItemIds([p.spellId])[0])).toBeNull();
 });

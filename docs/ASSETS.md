@@ -125,8 +125,10 @@ How it works, and what it will not do:
   required level, binding, slot, armour or weapon kind, weapon speed, stat kinds, flavour text and
   sell price from `ItemSparse` and `Item`, the quest the item begins (`StartQuestID`, as `qs`) and the
   spell behind each Use, Equip and Chance on hit line (`ItemEffect.SpellID`, as `fs`, in the order of
-  the lines in `fx`). Build 1.60.1's `ItemSparse` has no `MaxDurability` or `Resistances` columns, so
-  neither is recorded. Older shards without `qs` and `fs` still parse. Stat amounts, armour and damage are worked out by the
+  the lines in `fx`), and the stack size (`Stackable`, as `ss`, only above one). Build 1.60.1's `ItemSparse`
+  has no `MaxDurability` or `Resistances` columns, so neither is recorded, and its socket columns are all 0
+  in 71139. Older shards without `qs`, `fs` and `ss` still parse, and the reader drops keys it does not know,
+  so a newer shard also reads on older site code. Stat amounts, armour and damage are worked out by the
   client from tables we do not read, so the tooltip shows `[?]` for them and says so: `+[?] Stamina`,
   `[?] Armor` on cloth to plate and shields, and `[?] - [?] Damage` with `([?] damage per second)` on
   weapons. Build 1.60.1's `ItemSparse` has no `MinDamage`/`MaxDamage` columns (WoWDBDefs layout

@@ -340,3 +340,31 @@ test("a set piece's card lays its set out under the set's name: the pieces by th
     expect(down.headers.get("CDN-Cache-Control")).toBe("no-store");
   }
 });
+
+// Pattern 6270 teaches spell 7630, which creates item 6240 (the committed client-recipe-items.json and client-recipes.json).
+test("a recipe's card carries the tooltip of the item it teaches, only where that item's own card would show it", async () => {
+  const matched = new Map([[6270, { name: "Synthetic Pattern", color: "#ffffff", wikiPage: null, source: "wiki" }], [6240, { name: "Synthetic Vest", color: "#1eff00", wikiPage: null, source: "wiki" }]]);
+  const shownWith = (ids: number[]) => ({ facts: { unreachable: false }, agreed: new Map(), matched: { names: matched }, showsTip: (id: number) => ids.includes(id) });
+  mocks.names.mockResolvedValue({ names: matched });
+  mocks.tips.mockImplementation(async (_a: unknown, ids: number[]) => new Map([
+    [6270, { ...TIP, name: "Synthetic Pattern", lines: ["Requires Tailoring (35)", "Sell Price: 50c"], why: [] }],
+    [6240, { ...TIP, name: "Synthetic Vest", lines: ["Chest · Cloth", "[?] Armor"], why: ["[?] armor: reason."] }],
+  ].filter(([id]) => ids.includes(id as number)) as [number, typeof TIP][]));
+  mocks.shown.mockResolvedValue(shownWith([6270, 6240]));
+  const { card } = await (await call("item", "6270")).json();
+  expect(card.lines).toEqual(["Requires Tailoring (35)", "Sell Price: 50c"]);
+  expect(card.taught).toMatchObject({ id: 6240, title: "Synthetic Vest", lines: ["Chest · Cloth", "[?] Armor"], at: 1 });
+  expect(card.notes).toEqual(["[?] armor: reason."]);
+  // Its reported numbers fill its lines as on its own card.
+  expect(mocks.reported).toHaveBeenCalledWith(6240);
+
+  // A taught item no page shows (held back, unreleased) is never read, and the recipe's card draws none of it.
+  mocks.tips.mockClear();
+  mocks.reported.mockClear();
+  mocks.shown.mockResolvedValue(shownWith([6270]));
+  const hidden = (await (await call("item", "6270")).json()).card;
+  expect(hidden.taught).toBeUndefined();
+  expect(mocks.tips).toHaveBeenCalledWith(expect.anything(), [6270]);
+  expect(mocks.reported).not.toHaveBeenCalledWith(6240);
+  expect(JSON.stringify(hidden)).not.toContain("Synthetic Vest");
+});

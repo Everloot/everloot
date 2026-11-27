@@ -26,6 +26,7 @@ import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
 import { CLIENT_QUEST_STARTS, questStartedBy } from "@/data/game-data/client-quest-starts";
 import { itemTooltip } from "@/lib/item-tooltip";
 import { recipeBySpell } from "@/lib/professions";
+import { taughtItemId } from "@/lib/recipe-catalog";
 import { itemSetOf } from "@/lib/item-sets";
 import { GameCard } from "@/components/game/GameCard";
 import type { Crumb } from "@/lib/jsonld";
@@ -118,6 +119,11 @@ export default async function ItemPage(props: Props) {
   // The numbers 3 installs' tooltips agree on fill the files' placeholders, each with its installs, build and date.
   const reported = await loadReportedItemFacts(itemId);
   const tip = filesTip && withReported(filesTip, reported);
+  // A recipe's taught item, under its own page's gate: one that page would not show is never read.
+  const taughtId = tip ? taughtItemId(itemId) : null;
+  const taught = taughtId !== null && showsTip(taughtId) ? taughtId : null;
+  const [taughtFiles, taughtReported] = taught === null ? [] : await Promise.all([loadItemTips(assets, [taught]).then((t) => t.get(taught)), loadReportedItemFacts(taught)]);
+  const taughtTip = taughtFiles && taughtReported ? withReported(taughtFiles, taughtReported) : undefined;
   const spellIcon = (spellId: number) => assets?.spellIcons.get(spellId);
   const category = categoryOf(CLIENT_TAXONOMY, itemId);
   const names = await loadNames();
@@ -291,6 +297,10 @@ export default async function ItemPage(props: Props) {
     set: set && { ...set, pieceName: itemName, spellName: (spell) => bonusNames?.names.get(spell) },
     spellHref: (spell) => (bonusNames?.names.has(spell) ? `/database/spells/${spell}` : undefined),
     filesLack,
+    taught: taught === null ? undefined : {
+      id: taught, tip: taughtTip, name: shownItemName(taught, agreed, matched?.names, taughtTip),
+      category: categoryOf(CLIENT_TAXONOMY, taught), namesQuality: matched?.names.get(taught)?.quality,
+    },
   });
   const tooltipLines = tip ? [...box.card.lines, ...(box.card.evidence?.lines ?? []), ...(box.card.notes ?? [])] : [...box.card.lines, ...(box.card.missing ? [box.card.missing] : [])];
   // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain. The

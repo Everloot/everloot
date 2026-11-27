@@ -322,6 +322,8 @@ const ItemRecordSchema = z.object({
   is: z.object({ id: z.number().int().positive(), n: z.string().nullable() }).optional(), lc: z.string().optional(),
   cr: z.array(z.string()).optional(), rq: z.array(z.string()).optional(), fx: z.array(z.string()).optional(),
   fs: z.array(z.number().int().positive()).optional(), qs: z.number().int().positive().optional(),
+  // Written since 2026-11-27 (kb/src/assets/items.ts); an older shard has none. Keys this reader does not know are dropped, not refused.
+  ss: z.number().int().positive().optional(),
 });
 
 /**

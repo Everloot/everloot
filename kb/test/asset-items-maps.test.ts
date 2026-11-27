@@ -140,6 +140,23 @@ test("each printed effect line keeps its spell id, and an item that begins a que
   expect(buildItemSet((n) => tables[n]).records.get(1)!.fs).toBeUndefined();
 });
 
+test("an item that stacks keeps its stack size (ItemSparse.Stackable); one that does not stack records none", () => {
+  // Made-up rows; the ids are invented, the column name is the build's.
+  const tables: Record<string, Rows> = {
+    ItemSparse: t([
+      { ID: 1, Display_lang: "Synthetic Cloth", Stackable: 20 },
+      { ID: 2, Display_lang: "Synthetic Sword", Stackable: 1 },
+      { ID: 3, Display_lang: "Synthetic Relic" },
+    ]),
+    Item: t([{ ID: 1, ClassID: 7, SubclassID: 5 }, { ID: 2, ClassID: 2, SubclassID: 7 }, { ID: 3, ClassID: 15, SubclassID: 0 }]),
+  };
+  const { records } = buildItemSet((n) => tables[n]);
+  expect(records.get(1)!.ss).toBe(20);
+  // A stack of one and a row without the column print nothing, so the shard carries nothing for them.
+  expect(records.get(2)!.ss).toBeUndefined();
+  expect(records.get(3)!.ss).toBeUndefined();
+});
+
 test("an allowlist limits the items, and a snapshot without item tables is refused", () => {
   expect([...buildItemSet((n) => itemTables[n], new Set([600])).records.keys()]).toEqual([600]);
   expect(() => buildItemSet(() => undefined)).toThrow(/client-extract --refresh/);

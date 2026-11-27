@@ -16,9 +16,11 @@
  *   SkillLine, RequiredAbility with SpellName, MinFactionID and MinReputation with Faction).
  * - ItemXItemEffect and ItemEffect: the item's Use, Equip and Chance on hit spells, whose descriptions the caller
  *   resolves (assets/tooltip.ts), so a value the spell tables do not give stays `[?]`; each line keeps its spell id.
- * - ItemSparse.StartQuestID: the quest the item begins.
+ * - ItemSparse.StartQuestID: the quest the item begins. ItemSparse.Stackable: how many fit in one stack.
  * - Not recorded, because this build's ItemSparse has no such columns: durability (MaxDurability) and resistances
  *   (Resistances). Players' tooltips report the resistances (item facts); durability is in no file we read.
+ * - Not recorded, because 1.60.1.71139 has no values for them: sockets. SocketType is [0, 0, 0] and
+ *   Socket_match_enchantment_ID and Gem_properties are 0 on every ItemSparse row, and the build has no GemProperties rows.
  * - ItemDamage*: a weapon's damage per second by item level and quality. In 1.60.1 ItemSparse has no
  *   MinDamage/MaxDamage; the client works a weapon's damage out from this value, the weapon speed and
  *   ItemSparse.DmgVariance. Those inputs are recorded as the tables give them (`w`), not the damage:
@@ -89,6 +91,11 @@ export interface ItemRecord {
   fs?: number[];
   /** The quest the item begins ("This Item Begins a Quest", ItemSparse.StartQuestID); omitted when it begins none. */
   qs?: number;
+  /**
+   * How many fit in one stack (ItemSparse.Stackable), only where it is more than one. Written since 2026-11-27; absent
+   * in an older shard, which a reader takes as not known rather than as a stack of one.
+   */
+  ss?: number;
 }
 
 /** ITEM_FLAG2_CASTER_WEAPON, in the second Flags word. */
@@ -272,6 +279,8 @@ export function buildItemSet(get: TableReader, only?: ReadonlySet<number>, descr
     }
     const quest = num(row.StartQuestID);
     if (quest > 0) record.qs = quest;
+    const stack = num(row.Stackable);
+    if (stack > 1) record.ss = stack;
     records.set(id, record);
     const icon = base ? num(base.IconFileDataID) : 0;
     if (icon > 0) iconOf.set(id, icon);

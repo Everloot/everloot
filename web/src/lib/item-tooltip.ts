@@ -29,7 +29,20 @@ export interface ItemTooltip {
   evidence?: { summary: string; lines: string[] };
   /** One muted line where the files were read and hold no record for a shown item, so a thin box is not taken for a broken one. */
   missing?: string;
+  /** A recipe's taught item, drawn inside the box before `lines[at]` (the recipe's sell price), as the game draws it. */
+  taught?: TaughtItem;
   foot: string | null;
+}
+
+/** The item a recipe teaches: its name in its quality colour and its game file lines. */
+export interface TaughtItem {
+  id: number;
+  title: string;
+  quality: number | null;
+  color: string | null;
+  lines: string[];
+  /** Where in the recipe's lines the block goes: before its sell price, else after the last line. */
+  at: number;
 }
 
 /** The item's set as the game files list it (data/game-data/client-item-sets.json), with the names the pages may show. */
@@ -62,9 +75,15 @@ export interface ItemTooltipInput {
    * undefined where the files were not read or the tooltip is gated, so the box claims nothing about them.
    */
   filesLack?: string;
+  /**
+   * For a recipe item, the item it teaches (recipe-catalog.ts, `taughtItemId`), with its `tip` only where that item's
+   * own page shows its game file tooltip: the caller keeps its gates, so a held-back item passes none and draws nothing.
+   */
+  taught?: Pick<ItemTooltipInput, "id" | "tip" | "name" | "category" | "namesQuality">;
 }
 
 const SET_LINE = /^Set: (.+)$/;
+const SELL_PRICE = /^Sell Price: /;
 
 /**
  * The set lines as the game draws them in place of the files' one "Set: Name" line: the name with the pieces it has
@@ -122,7 +141,7 @@ export function reportSummary(reported: readonly ReportedLine[]): string {
  * The card, and the lines that open a page (the set's name, its pieces) by the line's text: the page box links them,
  * the hover card takes no pointer and leaves them out.
  */
-export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, spellHref, filesLack }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
+export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, spellHref, filesLack, taught }: ItemTooltipInput): { card: ItemTooltip; links: Record<string, string> } {
   const { reasons, evidence } = splitWhy(tip?.why ?? []);
   let links: Record<string, string> = {};
   const lines: string[] = [];
@@ -152,8 +171,14 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, 
   // The quality colour only where a name is shown; "Item N" stays plain.
   const q = category?.quality?.id ?? namesQuality;
   const quality = name && q !== undefined && q <= 5 ? q : null;
+  // A recipe's taught item, as the game adds it under the recipe: only beside the recipe's own game file lines, and only
+  // where the caller passed the taught item's (its gates), never a development leftover.
+  const inner = tip && taught?.tip && !isDevelopmentItemName(taught.name?.name) ? itemTooltip(taught).card : null;
+  if (inner) links = { ...links, [inner.title]: `/database/items/${taught!.id}` };
+  const sell = lines.findIndex((l) => SELL_PRICE.test(l));
   // The card draws them only while a line holds a `[?]` (GameCard).
-  const notes = reasons.length ? reasons : undefined;
+  const allReasons = [...new Set([...reasons, ...(inner?.notes ?? [])])];
+  const notes = allReasons.length ? allReasons : undefined;
   const foot = [name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label].filter(Boolean).join(" · ") || null;
   return {
     card: {
@@ -165,6 +190,12 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, 
       ...(notes ? { notes } : {}),
       ...(reported.length ? { evidence: { summary: reportSummary(reported), lines: reported.map((r) => r.detail) } } : {}),
       ...(!tip && filesLack ? { missing: `The game files read so far carry no stats for this item (build ${filesLack})` } : {}),
+      ...(inner ? {
+        taught: {
+          id: taught!.id, title: inner.title, quality: inner.quality, color: inner.color, lines: inner.lines,
+          at: sell >= 0 ? sell : lines.length,
+        },
+      } : {}),
       foot,
     },
     links,
