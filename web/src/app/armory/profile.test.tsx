@@ -62,6 +62,16 @@ test("an item the game files do not know keeps Blizzard's name, gets an armory-o
   expect(html).toContain('href="/database/items/16846"');
 });
 
+test("an item the files do not know keeps no link when Blizzard's lines give it a card, and the card is Blizzard's", () => {
+  const blizzard = tip({ name: "Striker's Mark", icon: null, lines: ["Item Level 69", "286 Armor"], label: "From Blizzard's API" });
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[17069, blizzard]])} unknownIcon={UNKNOWN} unknown={new Set([17069])} />);
+  const slot = html.slice(html.indexOf('data-equipment-slot="MAIN_HAND"'));
+  const mainHand = slot.slice(0, slot.indexOf("</li>"));
+  expect(mainHand).not.toContain('href="/database/items/17069"');
+  expect(mainHand).toContain("286 Armor");
+  expect(mainHand).not.toContain("Not in the game files yet");
+});
+
 test("supported details show their numbers and useful tools; missing categories stay absent", () => {
   const details = { revision: 1 as const, statistics: { asOf: "2026-11-12T12:00:00.000Z", rows: [{ label: "Intellect", value: 69, percent: false }] }, talents: { asOf: "2026-11-12T12:00:00.000Z", trees: [{ name: "Demonology", points: 14, talents: [{ name: "Unholy Power", rank: 5 }] }] }, professions: { asOf: "2026-11-12T12:00:00.000Z", rows: [{ name: "Alchemy", rank: 66, max: 150 }] } };
   const character = armoryCharacter({ class: "Warlock", classId: 9, details });

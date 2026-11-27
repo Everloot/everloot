@@ -3,7 +3,7 @@ import { GuildCrest as CrestSchema } from "@kb/armory/crest";
 import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery, StorageError } from "./supabase/server";
 import { ArmoryDetails, type PlayHistoryRankedKey, type ProfileDetails } from "@kb/armory/details";
-import type { CharacterRow } from "@kb/armory/parse";
+import type { CharacterRow, ItemTipLines } from "@kb/armory/parse";
 
 /**
  * Where the armory rows live: Supabase in production (the functions of 20261109120000_armory.sql, called with the
@@ -13,7 +13,8 @@ import type { CharacterRow } from "@kb/armory/parse";
  * contract gives; one that does not match is an error, as storage out of reach is, never a page of "undefined".
  */
 
-export interface ArmoryItem { slot: string; itemId: number; name: string; level: number | null; quality: string | null; inventoryType: string | null }
+/** `tip`: the tooltip lines Blizzard sent with the item (kb/src/armory/parse.ts), on rows read after they were kept. */
+export interface ArmoryItem { slot: string; itemId: number; name: string; level: number | null; quality: string | null; inventoryType: string | null; tip?: ItemTipLines }
 
 export interface ArmoryCharacter {
   region: string; slug: string; characterId: number; name: string; surname: string; level: number;
@@ -129,10 +130,25 @@ const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(N
 const numOrNull = num.nullable();
 const textOrNull = z.string().nullable();
 
+// An item's tooltip lines; one that does not match is dropped, never failing the character's row.
+const strings = z.array(z.string()).optional();
+const TipLines = z.object({
+  binding: z.string().optional(), slot: z.string().optional(), kind: z.string().optional(), armor: z.number().optional(),
+  damage: z.string().optional(), speed: z.string().optional(), dps: z.string().optional(),
+  stats: strings, bonus_stats: strings, effects: strings,
+  set: z.object({
+    name: z.string(),
+    pieces: z.array(z.object({ name: z.string(), equipped: z.boolean() })),
+    bonuses: z.array(z.object({ text: z.string(), count: z.number(), active: z.boolean() })),
+  }).optional(),
+}).optional().catch(undefined);
+
 const ItemRow = z.object({
   slot: z.string(), item_id: num, name: textOrNull.optional(), level: numOrNull.optional(), quality: textOrNull.optional(), inventory_type: textOrNull.optional(),
+  tip: TipLines,
 }).transform((e): ArmoryItem => ({
   slot: e.slot, itemId: e.item_id, name: e.name ?? `Item ${e.item_id}`, level: e.level ?? null, quality: e.quality ?? null, inventoryType: e.inventory_type ?? null,
+  ...(e.tip ? { tip: e.tip } : {}),
 }));
 
 const CharacterRow = z.object({
@@ -511,7 +527,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
         faction: row.faction, gender: row.gender, guildSlug: row.guild_slug, guildName: row.guild_name, lastLogin: row.last_login,
         equippedItemLevel: row.equipped_item_level, averageItemLevel: row.average_item_level, itemLevel: row.item_level, gearScore: row.gear_score,
         honorableKills: row.honorable_kills, pvpRank: row.pvp_rank,
-        equipment: row.equipment.map((e) => ({ slot: e.slot, itemId: e.item_id, name: e.name, level: e.level, quality: e.quality, inventoryType: e.inventory_type })),
+        equipment: row.equipment.map((e) => ({ slot: e.slot, itemId: e.item_id, name: e.name, level: e.level, quality: e.quality, inventoryType: e.inventory_type, ...(e.tip ? { tip: e.tip } : {}) })),
         fetchedAt: at, checkedAt: at,
       });
       // armory_upsert_characters puts the character's guild in the crawler's queue; so does this.

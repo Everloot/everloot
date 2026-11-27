@@ -1296,6 +1296,12 @@ These pages are separate from the addon sightings and the linked-character gear 
   a 404 or a hide). An API or MCP answer carries it in its own field with its own notice. It never enters the
   CC BY-SA dataset, the public corpus, open-data snapshots or bulk exports. Pages that show it carry no ads.
 - **Play history.** Each armory character's lifetime statistics (Blizzard's `achievements/statistics`: quests, kills, deaths, fish, flight paths, dungeons and the like) are read and stored with the rest of its row, under every rule in this section. Six of them rank characters on the armory boards. A linked character's page shows them only while its owner turns on Play history (`show_history`, off by default); the owner's lifetime totals page is visible to that account alone.
+- **Gear tooltips.** Amended 27 November 2026 by the maintainer: Blizzard's equipment answer, read already, also
+  carries each equipped item's tooltip lines (binding, slot and kind, armor, weapon damage and speed, stats, Equip
+  lines, and the item set with its pieces, the pieces worn and its bonuses). These are kept with the item in the
+  character's row, in Blizzard's words, under every rule in this section. Armory pages draw them as the gear's hover
+  card, labelled "From Blizzard's API"; database pages never read them, and no download, export or API answer
+  carries them. A read that brings no tooltip lines keeps the game files' card.
 - **Search.** Amended 23 November 2026 (#1271): the site search and its type-ahead list armory characters and
   guilds by name, with what their own pages already show (level, class, faction, region, ruleset, roster size), and
   link to those credited pages. No new field is read or published; hidden characters and guilds are left out. The

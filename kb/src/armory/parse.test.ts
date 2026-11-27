@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
+import tooltipEquipment from "./fixtures/equipment-tooltip.json";
 import pvp from "./fixtures/pvp.json";
 import guild from "./fixtures/guild.json";
 import roster from "./fixtures/roster.json";
@@ -296,4 +297,34 @@ it("uses the slot for scoring, with the sole two-handed main-hand exception", ()
     item_level: 7,
     gear_score: 5,
   });
+});
+it("keeps the tooltip lines Blizzard gives for each equipped item: type, binding, armor, weapon, stats, Equip lines and set", () => {
+  // Three items as Blizzard's Forever API sent them on 2026-11-27 (links trimmed): no item level on any.
+  const row = parseCharacter(profile, tooltipEquipment, pvp, "date", "ember-vale");
+  const mantle = row.equipment.find((e) => e.name === "Beastmaster's Mantle")!;
+  expect(mantle.level).toBeNull();
+  expect(mantle.tip).toEqual({
+    binding: "Binds when picked up", slot: "Shoulder", kind: "Mail", armor: 286,
+    stats: ["+12 Intellect", "+13 Agility", "+18 Stamina"],
+    set: {
+      name: "Beastmaster Armor",
+      pieces: expect.arrayContaining([{ name: "Beastmaster's Treads", equipped: true }, { name: "Beastmaster's Chest", equipped: false }]),
+      bonuses: expect.arrayContaining([{ text: "Set: +8 All Resistances.", count: 2, active: true }]),
+    },
+  });
+  expect(mantle.tip!.set!.pieces).toHaveLength(8);
+  const blade = row.equipment.find((e) => e.slot === "MAIN_HAND")!;
+  expect(blade.tip).toMatchObject({ damage: expect.stringMatching(/^\d+ - \d+ Damage$/), speed: expect.stringMatching(/^Speed \d+\.\d\d$/), dps: expect.stringMatching(/damage per second/) });
+  expect(blade.tip!.bonus_stats!.length).toBeGreaterThan(0);
+  // A hidden subclass (a ring's "Miscellaneous") is not printed, as the game does not.
+  const hidden = parseCharacter(profile, { equipped_items: [{ ...tooltipEquipment.equipped_items[0], is_subclass_hidden: true }] }, pvp, "date", "ember-vale");
+  expect(hidden.equipment[0].tip).not.toHaveProperty("kind");
+  const treads = row.equipment.find((e) => e.name === "Beastmaster's Treads")!;
+  expect(treads.tip!.effects).toEqual(["Equip: Increases damage dealt by your pet by 3%."]);
+});
+it("an item from the old fixture keeps its six fields and no tip; a malformed tooltip field never fails the character", () => {
+  expect(parseCharacter(profile, equipment, pvp, "date", "ember-vale").equipment.every((e) => !("tip" in e))).toBe(true);
+  const odd = tooltipEquipment.equipped_items.map((i) => ({ ...i, stats: "broken", set: { items: 3 } }));
+  const row = parseCharacter(profile, { equipped_items: odd }, pvp, "date", "ember-vale");
+  expect(row.equipment.find((e) => e.name === "Beastmaster's Mantle")!.tip).toEqual({ binding: "Binds when picked up", slot: "Shoulder", kind: "Mail", armor: 286 });
 });

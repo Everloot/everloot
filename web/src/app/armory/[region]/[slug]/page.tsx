@@ -93,7 +93,8 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     linkRead,
     linkRead.then((a) => (a?.sharesData ? addonProfile(a.identity).catch(() => null) : null)),
     assetsRead,
-    assetsRead.then((a) => loadEquippedItems(a, c.equipment)),
+    // Armory page: gear cards from the tooltip lines Blizzard sent, where the read brought them.
+    assetsRead.then((a) => loadEquippedItems(a, c.equipment, undefined, true)),
     progressionRead,
     sighting,
     tabParts(c, DEFAULT_TAB),

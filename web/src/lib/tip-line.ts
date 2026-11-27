@@ -49,7 +49,8 @@ const DAMAGE = /^(.+ Damage) · (Speed \d+\.\d\d)$/;
 const SPELL_RIGHT = /^(?:\d+(?:-\d+)? yd range|Melee Range|\d+(?:\.\d+)? (?:sec|min|hours?) cooldown)$/;
 const EFFECT = /^(?:Equip|Use|Chance on hit): /;
 // "Set: [?]" stands for a set name or set lines nobody has read; it stays neutral, like the other placeholders.
-const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|(?!\[\?\] ).+ \(0\/\d+\)|".+")$/;
+// A set heading counts the pieces worn: 0 on an item page, the character's own on an armory gear card.
+const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|(?!\[\?\] ).+ \(\d+\/\d+\)|".+")$/;
 // A number players reported may still wait for a third install: the line says so after the value.
 const UNCONFIRMED = String.raw`(?: \(unconfirmed, seen by \d+ players?\))?`;
 const STAT = new RegExp(String.raw`^(?:[+-]\d+ [A-Z][A-Za-z ]*[a-z]|\d+ (?:Armor|Block)|\(\d+(?:\.\d)? damage per second\))${UNCONFIRMED}$`);

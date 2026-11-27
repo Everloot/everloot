@@ -40,10 +40,11 @@ export function Equipment({ character: c, tips, unknownIcon = null, unknown: unk
   const slot = (key: string, mirror: boolean) => {
     const item = equipped.get(key);
     const known = item ? tips.get(item.itemId) : undefined;
-    const unknown = item && !known && unknownIds?.has(item.itemId) ? armoryOnlyTip(item, key, unknownIcon) : undefined;
-    const tip = known ?? unknown;
+    // Unknown to the files: no database page to link, even when Blizzard's lines give it a card.
+    const filesUnknown = Boolean(item && unknownIds?.has(item.itemId));
+    const tip = known ?? (item && filesUnknown ? armoryOnlyTip(item, key, unknownIcon) : undefined);
     const src = tip?.icon ?? unknownIcon;
-    const href = item && !unknown ? `/database/items/${item.itemId}` : "";
+    const href = item && !filesUnknown ? `/database/items/${item.itemId}` : "";
     const art = item && src ? <GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /> : null;
     const icon = art
       ? (href ? <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0">{art}</Link> : <span aria-hidden="true" className="shrink-0">{art}</span>)
