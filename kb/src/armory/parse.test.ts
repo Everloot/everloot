@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
+import noLevel from "./fixtures/equipment-no-level.json";
 import pvp from "./fixtures/pvp.json";
 import guild from "./fixtures/guild.json";
 import roster from "./fixtures/roster.json";
@@ -296,4 +297,50 @@ it("uses the slot for scoring, with the sole two-handed main-hand exception", ()
     item_level: 7,
     gear_score: 5,
   });
+});
+
+// Blizzard's Forever equipment answer of 2026-11-27 (mognu-vrot, EU, links trimmed): no item has `level`, and the
+// profile summary has no equipped or average item level either.
+const liveProfile = { ...profile, equipped_item_level: undefined, average_item_level: undefined };
+// The row the armory stored before: every slot's level from an earlier read.
+const storedLevels: Record<string, number> = {
+  HEAD: 63, NECK: 63, SHOULDER: 65, SHIRT: 1, CHEST: 62, WAIST: 65, LEGS: 66, FEET: 60, WRIST: 61, HANDS: 55,
+  FINGER_1: 65, FINGER_2: 63, TRINKET_1: 63, TRINKET_2: 60, BACK: 65, MAIN_HAND: 66, RANGED: 66, AMMO: 60,
+};
+const stored = {
+  item_level: 61, gear_score: 61.4, equipped_item_level: 62, average_item_level: 62,
+  equipment: noLevel.equipped_items.map((i) => ({ slot: i.slot.type, item_id: i.item.id, level: storedLevels[i.slot.type] })),
+};
+
+it("before: a re-read of the live answer, with nothing kept, has no item level at all", () => {
+  const row = parseCharacter(liveProfile, noLevel, pvp, "date", "ember-vale");
+  expect(row.equipment.every((e) => e.level === null)).toBe(true);
+  expect(row.item_level).toBeNull();
+});
+it("a re-read keeps each item's stored level when the same item is in the same slot, and the numbers from them", () => {
+  const row = parseCharacter(liveProfile, noLevel, pvp, "date", "ember-vale", { stored });
+  expect(row.equipment.find((e) => e.slot === "SHOULDER")?.level).toBe(65);
+  expect(row.equipment.every((e) => e.level !== null)).toBe(true);
+  const withLevels = noLevel.equipped_items.map((i) => ({ ...i, level: { value: storedLevels[i.slot.type] } }));
+  expect({ item_level: row.item_level, gear_score: row.gear_score }).toEqual(gearNumbers(withLevels));
+  expect(row.item_level).toBeGreaterThan(0);
+  // Blizzard's own numbers, absent from the summary now, keep their stored values rather than going blank.
+  expect(row.equipped_item_level).toBe(62);
+  expect(row.average_item_level).toBe(62);
+});
+it("a swapped item takes the game files' level for its id, else none; a level Blizzard sends always wins", () => {
+  const swapped = { ...noLevel, equipped_items: noLevel.equipped_items.map((i) => (i.slot.type === "HEAD" ? { ...i, item: { id: 999001 } } : i)) };
+  const files = (id: number) => (id === 999001 ? 58 : null);
+  expect(parseCharacter(liveProfile, swapped, pvp, "date", "ember-vale", { stored, fileLevel: files }).equipment.find((e) => e.slot === "HEAD")?.level).toBe(58);
+  expect(parseCharacter(liveProfile, swapped, pvp, "date", "ember-vale", { stored }).equipment.find((e) => e.slot === "HEAD")?.level).toBeNull();
+  const sent = { ...noLevel, equipped_items: noLevel.equipped_items.map((i) => (i.slot.type === "SHOULDER" ? { ...i, level: { value: 70 } } : i)) };
+  expect(parseCharacter(liveProfile, sent, pvp, "date", "ember-vale", { stored }).equipment.find((e) => e.slot === "SHOULDER")?.level).toBe(70);
+});
+it("when no level can be found for any item, the stored item level and Gear Score are kept, never written as nothing", () => {
+  const all = { ...noLevel, equipped_items: noLevel.equipped_items.map((i) => ({ ...i, item: { id: i.item.id + 5_000_000 } })) };
+  const row = parseCharacter(liveProfile, all, pvp, "date", "ember-vale", { stored });
+  expect(row.equipment.every((e) => e.level === null)).toBe(true);
+  expect({ item_level: row.item_level, gear_score: row.gear_score }).toEqual({ item_level: 61, gear_score: 61.4 });
+  // A stored row of another shape is ignored, not fatal.
+  expect(parseCharacter(liveProfile, noLevel, pvp, "date", "ember-vale", { stored: { equipment: "broken" } }).item_level).toBeNull();
 });

@@ -214,6 +214,9 @@ const SHOWS_ART = new Set([
   "web/src/lib/market-boards.ts",
   // The landing page's newest facts: the icon and quality of items that just reached three installs, as /database/recent lists them.
   "web/src/lib/home-live.ts",
+  // An on-demand armory read: an equipped item's level from the files when Blizzard's equipment answer leaves it out
+  // (since 2026-11-27). Only the number is read; no name, icon or tooltip.
+  "web/src/lib/armory-lookup.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

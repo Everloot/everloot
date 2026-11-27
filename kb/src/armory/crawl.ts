@@ -329,6 +329,8 @@ export async function runCrawl(cfg: {
           pvp.body,
           result.lastModified,
           q.slug,
+          // Blizzard's equipment answer has no item levels since 2026-11-27: the stored row keeps them (parse.ts).
+          { stored: stored[0] },
         );
         if (parsed.slug !== q.slug) {
           await skip(kind, q.slug, "slug_mismatch");

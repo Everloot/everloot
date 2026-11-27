@@ -13,7 +13,7 @@ const profile = (region: Region) => ({
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 /** Blizzard in memory: the slugs each region knows, every call it was asked, and an optional hang. */
-function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolean; slowDetailsMs?: number } = {}) {
+function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolean; slowDetailsMs?: number; equipment?: unknown } = {}) {
   const calls: string[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -24,7 +24,7 @@ function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolea
     if (!known[region]) return new Response(null, { status: 404 });
     const details = url.pathname.endsWith("/equipment") || url.pathname.endsWith("/pvp-summary");
     if (details && opts.slowDetailsMs) await new Promise((resolve) => setTimeout(resolve, opts.slowDetailsMs));
-    if (url.pathname.endsWith("/equipment")) return json({ equipped_items: [] });
+    if (url.pathname.endsWith("/equipment")) return json(opts.equipment ?? { equipped_items: [] });
     if (url.pathname.endsWith("/pvp-summary")) return json({ honorable_kills: 12, pvp_rank: 0 });
     return json(profile(region));
   });
@@ -207,4 +207,18 @@ test("only a browser's own fetch may look up; crawlers, scripts and page loads m
   expect(browserLookup(req({ ...own, "sec-fetch-site": "cross-site" }))).toBe(false);
   expect(browserLookup(req({ ...own, "sec-fetch-dest": "document" }))).toBe(false);
   expect(browserLookup(req({ "user-agent": browser }))).toBe(false);
+});
+
+test("an equipped item Blizzard sends without a level takes the game files' level for it on a first read", async () => {
+  // Since 2026-11-27 Blizzard's equipment answer has no item level; this invented item has none either.
+  const equipment = { equipped_items: [{ slot: { type: "HEAD" }, item: { id: 900123 }, name: "Invented Helm", quality: { type: "RARE" }, inventory_type: { type: "HEAD" } }] };
+  const b = blizzard({ us: true }, { equipment });
+  const asked: number[][] = [];
+  await lookupCharacter("Volvik Morningstar", deps(b, { fileLevels: async (ids) => { asked.push([...ids]); return new Map([[900123, 58]]); } }));
+  expect(asked).toEqual([[900123]]);
+  expect((await store.character("us", "volvik-morningstar"))?.equipment[0]?.level).toBe(58);
+  // Without the files (or when they fail), the item keeps no level, and the lookup still stores the character.
+  store = createMemoryArmoryStore();
+  await lookupCharacter("Volvik Morningstar", deps(blizzard({ us: true }, { equipment }), { fileLevels: async () => { throw new Error("bucket down"); } }));
+  expect((await store.character("us", "volvik-morningstar"))?.equipment[0]?.level).toBeNull();
 });
