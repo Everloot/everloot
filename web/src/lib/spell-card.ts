@@ -130,7 +130,33 @@ export function spellRank(id: number, table: ClientSpells = CLIENT_SPELLS): numb
   return chain.length > 1 ? chain.indexOf(id) + 1 : undefined;
 }
 
-export const ITEM_TRIGGER = { 0: "Use", 1: "Equip", 2: "Chance on hit" } as Record<number, string>;
+/**
+ * The rank of each class spell among the class's spells of the same name: the files' rank chain (spellRank) where it
+ * has one, else the same-name spells on one class's skill lines in the order of the level the files give (the lower id
+ * first at a shared level). A name whose spells all share one level (a talent and its effect) gets no rank.
+ */
+export function classSpellRanks(nameOf: (id: number) => string | undefined, classSpells = CLIENT_CLASS_SPELLS, table: ClientSpells = CLIENT_SPELLS): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const c of Object.values(classSpells.classes)) {
+    const byName = new Map<string, number[]>();
+    for (const id of c.spells) {
+      const name = nameOf(id), level = table.spells[String(id)]?.level;
+      if (name && level) byName.set(name, [...(byName.get(name) ?? []), id]);
+    }
+    for (const ids of byName.values()) {
+      const level = (id: number) => table.spells[String(id)]!.level!;
+      if (new Set(ids.map(level)).size < 2) continue;
+      ids.sort((a, b) => level(a) - level(b) || a - b).forEach((id, i) => out.set(id, i + 1));
+    }
+  }
+  for (const id of out.keys()) {
+    const chained = spellRank(id, table);
+    if (chained !== undefined) out.set(id, chained);
+  }
+  return out;
+}
+
+export const ITEM_TRIGGER ={ 0: "Use", 1: "Equip", 2: "Chance on hit" } as Record<number, string>;
 
 export interface SpellUses {
   items: { item: number; trigger: number }[];

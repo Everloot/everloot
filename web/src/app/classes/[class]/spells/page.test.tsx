@@ -85,3 +85,22 @@ test("talents and runes have no trainer level: they sit in their own group, not 
   expect(html.match(/>Living Bomb</g)?.length).toBe(1);
   expect(html.match(/>Master of Elements</g)?.length).toBe(1);
 });
+
+test("the page counts the same spells as the class hub and says where each one is", async () => {
+  const placed = levels.reduce((n, l) => n + l.spells.length, 0);
+  const html = await render();
+  const m = new RegExp(`${placed} Mage spells have a level in the game files: (\\d+) listed by level, lowest first, (\\d+) talents and runes apart(?:, and (\\d+) that repeat a name and rank at one level, shown once)?\\.`).exec(html);
+  expect(m).not.toBeNull();
+  expect(Number(m![1]) + Number(m![2]) + Number(m![3] ?? 0)).toBe(placed);
+  // A name repeated at one level is counted, not dropped silently.
+  store.names = new Map(first.spells.slice(0, 2).map((id) => [id, "Twin"]));
+  expect(await render()).toMatch(/, and 1 that repeat a name and rank at one level, shown once\./);
+});
+
+test("ranks of one spell say which rank each is, so a name never repeats without one", async () => {
+  // Real warlock ids (build 71139): Shadow Bolt rank 1 (686, level 1) and rank 2 (695, level 6).
+  store.names = new Map([[686, "Shadow Bolt"], [695, "Shadow Bolt"]]);
+  const html = await renderToStaticMarkup(await ClassSpellsPage(params("warlock")));
+  expect(html).toMatch(/href="\/database\/spells\/686"[^>]*>Shadow Bolt<(?:\/[^>]+>)*(?:<[^>]+>)*\s*Rank 1</);
+  expect(html).toMatch(/href="\/database\/spells\/695"[^>]*>Shadow Bolt<(?:\/[^>]+>)*(?:<[^>]+>)*\s*Rank 2</);
+});

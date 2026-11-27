@@ -17,6 +17,9 @@ const KINDS: Record<MarkKind, { label: string; shape: string; fill: string; edge
   place: { label: "Place", shape: "rounded-full", fill: "bg-fg-2", edge: "border-fg-2" },
 };
 const ORDER = Object.keys(KINDS) as MarkKind[];
+/** Drawing order: the many places and plain NPCs first, the rarer kinds after, so a vendor beside NPCs stays visible. */
+const UNDER: MarkKind[] = ["place", "npc"];
+const layer = (k: MarkKind) => (UNDER.includes(k) ? UNDER.indexOf(k) : UNDER.length);
 
 function Mark({ kind, agreed, className = "" }: { kind: MarkKind; agreed: boolean; className?: string }) {
   const k = KINDS[kind];
@@ -47,7 +50,7 @@ export default function EntityMap({ name, zones }: { name: string; zones: MapZon
           {/* The zone's picture from the asset bucket as it is; next/image would only proxy it. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img key={zone.mapId} src={zone.art} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
-          {zone.marks.map((m, i) => (
+          {[...zone.marks].sort((a, b) => layer(a.kind) - layer(b.kind)).map((m, i) => (
             <span key={`${m.kind}-${m.x}-${m.y}-${i}`} title={`${m.label} · ${m.x}, ${m.y}`} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${m.x}%`, top: `${m.y}%` }}>
               <Mark kind={m.kind} agreed={m.agreed} className="ring-2 ring-black/60" />
             </span>

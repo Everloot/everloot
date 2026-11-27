@@ -303,7 +303,8 @@ describe("class hubs", () => {
     expect(html).toContain('href="/classes/mage/spells"');
     const { levels, unleveled } = classSpellLevels("mage");
     const placed = levels.reduce((n, l) => n + l.spells.length, 0);
-    expect(visible(html)).toContain(`${placed} Mage spells with the level the game files give, from level ${levels[0]!.level} to ${levels.at(-1)!.level}`);
+    // The same count, in the same words, as the list by level opens with (classes/[class]/spells).
+    expect(visible(html)).toContain(`${placed} Mage spells have a level in the game files, from level ${levels[0]!.level} to ${levels.at(-1)!.level}`);
     expect(visible(html)).toContain(`${unleveled} more have no level in the files`);
     expect(html).toContain('href="/database/spells?class=mage"');
   });

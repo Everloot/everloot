@@ -85,9 +85,9 @@ export default async function AchievementPage(props: Props) {
   const fileCriteria = entry?.criteria ?? files?.criteria.map((c) => ({ text: c.text, required: c.amount ?? 1 })) ?? [];
   const fromReports = Boolean(entry?.criteria);
   const points = entry?.points ?? files?.points ?? null;
-  // The count and the list have separate sources: a confirmed entry's count is agreed by three installs whether or not
-  // they agreed on the list's text; without an entry both are the game files'.
-  const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;
+  // The count beside a list counts that list: a confirmed entry's count (agreed by three installs) only stands alone when
+  // no list shows. A raid kill installs report with 0 criteria and the files list Onyxia counts 1, not 0.
+  const criteria = fileCriteria.length ? fileCriteria.length : entry ? entry.criteriaCount : files?.criteria.length ?? null;
   // The files' category path, top first; a category players reported wins, and the path shows only while it ends there.
   const filesPath = categoryPath(files?.category);
   const path = !entry || filesPath.at(-1)?.name === entry.category ? filesPath : [];
@@ -116,8 +116,8 @@ export default async function AchievementPage(props: Props) {
   const summary = entry || files ? [
     `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet" : pointsText(points).toLowerCase()}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
     entry
-      ? `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
-        : fileCriteria.length ? `; the criteria list is the game files' (build ${fileVersion}), unconfirmed`
+      ? fileCriteria.length && !fromReports ? `The category and points are as three installs reported them; the criteria and their count are the game files' (build ${fileVersion}), unconfirmed.`
+      : `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
         : entry.criteriaCount > 0 ? "; the criteria list shows once three installs report the same full list" : ""}.`
       : `The name${category ? ", category" : ""}, points and criteria are from the game files of build ${fileVersion}, unconfirmed.`,
     state === "Confirmed" ? `Three installs confirmed it${asOf ? ` (${asOf})` : ""}.`

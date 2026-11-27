@@ -5,11 +5,15 @@ import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, t
 import Badge from "@/components/ui/Badge";
 import { CLASS_TEXT } from "@/components/ui/class-colour";
 import { CLIENT_CLASS_SPELLS } from "@/data/game-data/client-class-spells";
+import { CLIENT_SPELLS } from "@/data/game-data/client-spells";
+import Link from "@/components/Link";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { CLASSES } from "@/design/tokens";
 import { classLabel, hasClassContext, parseClassContext, switchClassContext, withClassContext, withoutClassContext, type ClassContext, type ClassSlug } from "@/lib/class-context";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { loadCatalog } from "@/lib/talents/catalogs";
+import { classSpellRanks, spellRank } from "@/lib/spell-card";
 import { CLIENT_LABEL } from "@kb/edges";
 import {
   ListNote, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, paged, pageParams, sortRows, Unreadable,
@@ -27,9 +31,12 @@ const SORTS = ["name", "id"] as const;
 type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
-const href = (q: Partial<ListQuery<Sort>>, context: ClassContext | null = null) => withClassContext(listHref("/database/spells", [
-  ["q", q.q], ...pageParams(q),
+type SpellQuery = ListQuery<Sort> & { dev?: boolean };
+const href = (q: Partial<SpellQuery>, context: ClassContext | null = null) => withClassContext(listHref("/database/spells", [
+  ["q", q.q], ["dev", q.dev ? "1" : undefined], ...pageParams(q),
 ]), context);
+/** The development leftovers view (?dev=1): the files' test and retired spells, which the plain list leaves out. */
+const devView = (search: Search) => search.dev === "1";
 
 /** The spells a class's talent catalog names, which may be none; null only when the catalog cannot be read. */
 async function talentCatalogSpells(slug: ClassSlug): Promise<Set<number> | null> {
@@ -43,13 +50,14 @@ async function talentCatalogSpells(slug: ClassSlug): Promise<Set<number> | null>
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const search = (await props.searchParams) ?? {};
   const q = listQuery(search, SORTS);
-  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per && !hasClassContext(search), q?.page);
+  return listMetadata(META, Boolean(q) && !q!.q && !q!.sort && !q!.per && !devView(search) && !hasClassContext(search), q?.page);
 }
 
 export default async function SpellListPage(props: { searchParams?: Promise<Search> }) {
   const search = (await props.searchParams) ?? {};
-  const q = listQuery(search, SORTS);
-  if (!q) notFound();
+  const listed = listQuery(search, SORTS);
+  if (!listed) notFound();
+  const q: SpellQuery = { ...listed, ...(devView(search) ? { dev: true } : {}) };
   // A class from a class hub narrows the list to the class's spells by the game files: the spells on its own skill lines
   // (data/game-data/client-class-spells.json) and the ones its talent catalog names. A spell no class line or catalog
   // names (an item's, a profession's, a creature's, a mount) is no class's, so a class leaves it out. The level and
@@ -63,22 +71,39 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const kept = mine ? [...all.keys()].filter((spellId) => mine.has(spellId)).length : 0;
-  const rows = [...all.entries()]
-    .filter(([spellId, name]) => (!mine || mine.has(spellId)) && (!text || (id !== null ? spellId === id : name.toLowerCase().includes(text))))
-    .map(([spellId, name]) => ({ spellId, name }));
+  const matching = [...all.entries()]
+    .filter(([spellId, name]) => (!mine || mine.has(spellId)) && (!text || (id !== null ? spellId === id : name.toLowerCase().includes(text))));
+  // The files' test and retired spells ("Hot Foot (TEST)", "Word of Recall (OLD)") are left out unless asked for, by the
+  // rule the item lists use (kb/src/dev-item-names.ts); the line above the table counts them, with the toggle.
+  const leftovers = matching.filter(([, name]) => isDevelopmentItemName(name)).length;
+  // A class's spells of one name are its ranks: each row says which, and the level the files give it.
+  const ranks = classSpellRanks((spellId) => all.get(spellId));
+  const rows = matching
+    .filter(([, name]) => q.dev || !isDevelopmentItemName(name))
+    .map(([spellId, name]) => ({ spellId, name, rank: ranks.get(spellId) ?? spellRank(spellId), level: CLIENT_SPELLS.spells[String(spellId)]?.level || null }));
   const sort = q.sort ?? DEFAULT_SORT;
   const sorted = sortRows(rows, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.spellId), sort.desc, (x) => x.spellId);
   const { shown, pages, per } = paged(sorted, q);
-  const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over }, context);
+  const here = (over: Partial<SpellQuery>) => href({ ...q, page: 1, ...over }, context);
   const className = context ? classLabel(context.classSlug) : "";
   const subset = mine ? `${className} spells in the game files` : null;
   const clear = withClassContext("/database/spells", context);
 
   const columns: Column<(typeof rows)[number]>[] = [
     { key: "name", header: "Spell", sortable: true, cell: (x) => <NameCell href={`/database/spells/${x.spellId}`} icon={assets?.spellIcons.get(x.spellId)}>{x.name}</NameCell> },
+    { key: "rank", header: "Rank", nowrap: true, cell: (x) => (x.rank ? `Rank ${x.rank}` : null) },
+    { key: "level", header: "Level", numeric: true, cell: (x) => x.level ?? "–" },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.spellId },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }, context).split("?")[1] ?? ""));
+  const toggle = leftovers > 0 && (
+    <p className="mt-2 text-meta text-fg-2">
+      {`Test, placeholder and retired spells the game files still list are ${q.dev ? "shown" : "left out"}. `}
+      <Link href={here({ dev: q.dev ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
+        {`${q.dev ? "Hide" : "Show"} ${leftovers.toLocaleString("en-US")} development ${leftovers === 1 ? "leftover" : "leftovers"}`}
+      </Link>
+    </p>
+  );
   const strip = <ResultStrip total={sorted.length} noun={sorted.length === 1 ? "spell" : "spells"} page={q.page} perPage={per} href={(page) => href({ ...q, page }, context)} sizeHref={(n) => href({ ...q, per: n, page: 1 }, context)} label="Spell pages" />;
   // The class menu puts a class context on the list, or takes it off; a class picks its own colour (the class picker rule).
   const plain = withoutClassContext("/database/spells", search);
@@ -122,6 +147,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
             </span>
           )}
         </ClassContextChip>
+        {toggle}
         <div className="mt-2">
           <DataTable
             dense
@@ -131,7 +157,7 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
             rowKey={(x) => String(x.spellId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => `ID ${x.spellId}`}
+            meta={(x) => [x.rank ? `Rank ${x.rank}` : null, x.level ? `Level ${x.level}` : null, `ID ${x.spellId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

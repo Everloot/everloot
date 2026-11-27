@@ -9,7 +9,7 @@ import { classSpellLevels } from "@/lib/class-hub";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { pageMetadata } from "@/lib/seo";
-import { SPELLS_BUILD } from "@/lib/spell-card";
+import { classSpellRanks, SPELLS_BUILD } from "@/lib/spell-card";
 import { isTalentClass, loadCatalog } from "@/lib/talents/catalogs";
 import { ListNote, NameCell } from "../../../database/list-parts";
 
@@ -26,9 +26,9 @@ const ENGRAVE = /^Engrave \S+ - (.+)$/;
 /**
  * Talents and runes out of the level groups: the files give them level 1, which is no trainer level. A talent is a
  * spell of the class's talent catalog; a rune is an "Engrave <slot> - <rune>" spell. A level-1 spell named like a
- * talent or a rune (its proc, or the rune's ability) goes with them. Within a group a name shows once.
+ * talent or a rune (its proc, or the rune's ability) goes with them. Within a group a name (with its rank) shows once.
  */
-function splitTalentsAndRunes(levels: { level: number; spells: number[] }[], talentIds: Set<number>, nameOf: (id: number) => string | undefined) {
+function splitTalentsAndRunes(levels: { level: number; spells: number[] }[], talentIds: Set<number>, nameOf: (id: number) => string | undefined, ranks: ReadonlyMap<number, number> = new Map()) {
   const all = levels.flatMap((l) => l.spells);
   const runes = new Set(all.flatMap((id) => ENGRAVE.exec(nameOf(id) ?? "")?.[1] ?? []));
   const talents = new Set([...talentIds].flatMap((id) => nameOf(id) ?? []));
@@ -41,8 +41,9 @@ function splitTalentsAndRunes(levels: { level: number; spells: number[] }[], tal
     return ids.filter((id) => {
       const name = nameOf(id);
       if (name === undefined) return true;
-      if (seen.has(name)) return false;
-      seen.add(name);
+      const key = `${name}#${ranks.get(id) ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
   };
@@ -81,11 +82,18 @@ export default async function ClassSpellsPage({ params }: Params) {
   const unleveled = byLevel.unleveled;
   const [names, assets, catalog] = await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), loadSiteAssets(), loadCatalog(slug)]);
   const talentIds = new Set(catalog.nodes.flatMap((n) => n.entries.flatMap((e) => e.spellId ?? [])));
-  const { levels, apart } = splitTalentsAndRunes(byLevel.levels, talentIds, (id) => names?.names.get(id) || undefined);
+  const nameOf = (id: number) => names?.names.get(id) || undefined;
+  // Ranks of one spell are told apart by their rank, from the files' rank chain or the same name's levels.
+  const ranks = classSpellRanks(nameOf);
+  const { levels, apart } = splitTalentsAndRunes(byLevel.levels, talentIds, nameOf, ranks);
   const count = levels.reduce((n, l) => n + l.spells.length, 0);
+  // The class hub counts every spell with a level; this page says where each of those went.
+  const placed = byLevel.levels.reduce((n, l) => n + l.spells.length, 0);
+  const repeats = placed - count - apart.length;
   const item = (id: number) => (
     <li key={id} className="min-w-0">
       <NameCell href={`/database/spells/${id}`} icon={assets?.spellIcons.get(id)}>{names?.names.get(id) || `Spell ${id}`}</NameCell>
+      {ranks.has(id) && <span className="ml-2 text-meta text-fg-2">{`Rank ${ranks.get(id)}`}</span>}
     </li>
   );
 
@@ -94,7 +102,7 @@ export default async function ClassSpellsPage({ params }: Params) {
       <PageHeader
         trail={[...trailFor("/classes")!, { name, path: `/classes/${slug}` }, { name: "Spells by level", path: `/classes/${slug}/spells` }]}
         title={<><span className={CLASS_TEXT[slug]}>{name}</span> spells by level</>}
-        lede={`${count} ${name} spells with the level the game files give, lowest first${apart.length > 0 ? `, then ${apart.length} talents and runes` : ""}.`}
+        lede={`${placed} ${name} spells have a level in the game files: ${count} listed by level, lowest first, ${apart.length} talents and runes apart${repeats > 0 ? `, and ${repeats} that repeat a name and rank at one level, shown once` : ""}.`}
       />
       <ListNote files>
         {`The spells on the ${name}'s own skill lines in build ${SPELLS_BUILD}: ranks, passives and helper spells as the files have them, unconfirmed. Talents and runes, which the files put at level 1, are listed apart at the end. Nothing in the files says which a trainer teaches or what it costs. `}

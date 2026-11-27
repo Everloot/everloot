@@ -42,7 +42,7 @@ type Props = { params: Promise<{ id: string }> };
 const relLabel: Record<string, string> = {
   created_by: "Creates",
   reagent_for: "Costs",
-  in_skill_line: "Taught by",
+  in_skill_line: "Skill",
   reward_from: "Reward from",
 };
 
@@ -202,7 +202,10 @@ export default async function SpellPage(props: Props) {
       : rank ? `The files list ${ranks.length} ranks; this is rank ${rank}.`
       // Only the items the Items tab lists: a development leftover it leaves out is not claimed here.
       : shownItems.length ? `The files list ${shownItems.length} ${shownItems.length === 1 ? "item that casts" : "items that cast"} it.`
-      : "The files say nothing about what it creates.",
+      // Only a profession's recipe is expected to make something; an attack or an aura is not.
+      : recipe || rel("in_skill_line").some((e) => CLIENT_PROFESSIONS.some((p) => p.id === otherEnd(e).id && otherEnd(e).kind === "skill")) ? "The files say nothing about what it creates."
+      : numbers ? "Its tooltip numbers are from the game files."
+      : "The files give nothing more about it.",
     // Spell names come from the game files' names (or their tooltips); a wiki name only when the files have none.
     nameFrom: fromWiki ? "wiki" : name ? "files" : "none",
   });

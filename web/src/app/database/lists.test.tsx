@@ -28,7 +28,7 @@ import NpcList, { generateMetadata as npcMetadata } from "./npcs/page";
 import ObjectList from "./objects/page";
 import DropsList from "./drops/page";
 import QuestList, { generateMetadata as questMetadata } from "./quests/page";
-import SpellList from "./spells/page";
+import SpellList, { generateMetadata as spellMetadata } from "./spells/page";
 import VendorList from "./vendors/page";
 import ZoneList, { generateMetadata as zoneMetadata } from "./zones/page";
 
@@ -314,6 +314,36 @@ test("the spell list with no names read says the build's names could not be read
   }
   files.spells = { version: "x", names: new Map([[133, "Fireball"]]) };
   expect(await html(SpellList(search({ q: "frost" })))).toContain("No spells match these filters.");
+});
+
+test("the spell list leaves the files' test and retired spells out unless asked, with a toggle that counts them", async () => {
+  files.spells = { version: "x", names: new Map([
+    [133, "Fireball"], [900001, "Hot Foot (TEST)"], [900002, "Word of Recall (OLD)"], [900003, "SWORDSPECIAL (DND)"],
+  ]) };
+  const plain = await html(SpellList(search()));
+  expect(rows(plain, "spells")).toEqual([133]);
+  expect(plain).toContain('href="/database/spells?dev=1"');
+  expect(plain).toContain("Show 3 development leftovers");
+  const dev = await html(SpellList(search({ dev: "1" })));
+  expect(rows(dev, "spells")).toEqual([133, 900001, 900002, 900003]);
+  expect(dev).toContain("Hide 3 development leftovers");
+  // The list with them is not the plain list.
+  expect((await spellMetadata(search({ dev: "1" }))).robots).toMatchObject({ index: false });
+});
+
+test("a class's spells of one name show their rank and the level the files give, so ranks are not identical rows", async () => {
+  // Frostbolt's first ranks (116 at level 4, 205 at level 8) on the mage's skill lines; 900010 is no class's.
+  files.spells = { version: "x", names: new Map([[116, "Frostbolt"], [205, "Frostbolt"], [900010, "Frostbolt"]]) };
+  const mage = await html(SpellList(search({ class: "mage", q: "frostbolt" })));
+  const row = (id: number) => mage.split("<tr").find((r) => r.includes(`href="/database/spells/${id}"`)) ?? "";
+  expect(heads(mage)).toEqual(["Spell", "Rank", "Level", "ID"]);
+  expect(row(116)).toMatch(/>Rank 1</);
+  expect(row(116)).toMatch(/>4</);
+  expect(row(205)).toMatch(/>Rank 2</);
+  expect(row(205)).toMatch(/>8</);
+  expect(row(205)).toContain("Rank 2 · Level 8 · ID 205");
+  const all = await html(SpellList(search({ q: "frostbolt" })));
+  expect(all.split("<tr").find((r) => r.includes('href="/database/spells/900010"'))).not.toContain("Rank");
 });
 
 /** The column headers, in order. */

@@ -193,7 +193,7 @@ export default async function ClassHubPage({ params }: Params) {
           {placed > 0 ? (
             <p className="text-sm text-fg-2">
               <Link href={`/classes/${slug}/spells`} className={LINK}>{`Every ${name} spell by the level it is learned`}</Link>
-              {` ${placed} ${name} spells with the level the game files give, from level ${spells.levels[0]!.level} to ${spells.levels.at(-1)!.level}: ranks, talents and passives as the files mix them. `}
+              {` ${placed} ${name} spells have a level in the game files, from level ${spells.levels[0]!.level} to ${spells.levels.at(-1)!.level}, counting every rank, talent, rune and passive as the files list them. `}
               {spells.unleveled > 0 && <>{`${spells.unleveled} more have no level in the files; `}<Link href={`/database/spells?class=${slug}`} className={LINK}>{`every ${name} spell`}</Link>{" lists them too. "}</>}
               <Badge tone="files" />
             </p>

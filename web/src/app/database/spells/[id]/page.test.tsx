@@ -362,6 +362,24 @@ test("in short, a spell that creates nothing says what the files do give, not th
   expect(potion).toContain("The files list 3 items that cast it.");
 });
 
+test("in short, only a profession's recipe says the files say nothing about what it creates; an attack never makes items", async () => {
+  // Frostbolt rank 6 and Holy Strength (the Crusader enchant's effect) create nothing and are no recipe.
+  known([[8406, "Frostbolt"], [20007, "Holy Strength"]]);
+  // Frostbolt has tooltip numbers in the committed file; Holy Strength has none there.
+  for (const [id, line] of [["8406", "Its tooltip numbers are from the game files."], ["20007", "The files give nothing more about it."]] as const) {
+    const page = await render(id);
+    expect(page, id).not.toContain("The files say nothing about what it creates.");
+    expect(page, id).toContain(line);
+  }
+});
+
+test("the tab naming the profession or skill line a spell belongs to is called Skill", async () => {
+  known([[3276, "Heavy Linen Bandage"]]);
+  const page = await render("3276");
+  expect(page).toMatch(/aria-controls="[^"]*taught-by[^"]*"[^>]*>Skill</);
+  expect(page).not.toMatch(/>Taught by</);
+});
+
 test("a spell the numbers file does not hold gets no invented tooltip lines", async () => {
   known([[1234, "Name Only"]]);
   const tip = box(await render("1234"));
