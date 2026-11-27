@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: item tooltips show how many fit in a stack, and a recipe's tooltip shows the item it teaches underneath, as in the game (#1597).
 - Site: zone maps place their flight masters and each one links to its spot on the world map; spell pages name the items a recipe makes and uses, with reagent counts, and link the profession that teaches it with its skill ranks (#1591).
 - Site: item set pages show every piece's icon and where players got it (drop, vendor, quest, crafted), and mount and companion pet pages name the spell that teaches or summons them, with its icon and, for a few mounts, the item that casts it (#1593).
 - Site: item pages name and link the quest an item begins, and quest pages list the items that start them, from the game files (#1586).
@@ -328,6 +329,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: item tooltips leave zero coins out of the sell price, show the slot and kind on one line for items without game file stats, and space a set's name and bonuses as the game does (#1596).
+- Site: on a phone the menu keeps focus and the page still, closes on Escape from anywhere and marks the page you are on; tab rows keep the open tab in view and show an arrow when there are more tabs; filter choices are 44 px tap targets (#1598).
 - Site: spell pages, the spell list, class spell lists and item Use lines show each spell's icon (Heroic Strike and Healing Potion had none) (#1592).
 - Site: each server instance now keeps the asset manifest's ~32,000 spell icons in about a sixth of the memory and parses them about three times faster, with the same icons on every page (#1594).
 - Site: quest and NPC pages no longer say nobody reported them while showing agreed facts, an NPC with no agreed spot takes its zone from where players looted its kills, and the guild and player sort menus name the chosen order once (#1585).
