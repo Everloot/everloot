@@ -122,3 +122,23 @@ test("each money value is drawn once: no phone line repeats the columns", () => 
   expect(html.match(/class="whitespace-nowrap tabular-nums"/g)).toHaveLength(9);
   expect(html).not.toContain("Sales/day:");
 });
+
+test("the margins table gets each row's figures, not its cells' markup, and draws the same row", async () => {
+  const { default: CraftingTable } = await import("./AhledgerCraftingTable");
+  const element = AhledgerCrafting({ profession: "Enchanting", market: "forever.normal.alliance.us", read: ready(), path, search: {}, spellIcon: (id) => `https://icons.test/spell-${id}.jpg` });
+  const found: { props: Parameters<typeof CraftingTable>[0] }[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === CraftingTable) found.push(el as never);
+    walk(el.props.children);
+  };
+  walk(element);
+  expect(found).toHaveLength(1);
+  const { rows, sortHrefs } = found[0].props;
+  expect(rows[0]).toEqual({ ...recipes[1], icon: "https://icons.test/spell-2.jpg" });
+  expect(sortHrefs.margin.desc).toBe(`${path}?sort=-margin#ahledger-margins`);
+  // The row: the recipe's icon and link, then its numbers and coins, as before.
+  expect(draw()).toMatch(/<img src="https:\/\/icons.test\/spell-2.jpg"[^>]*class="pf-ic pf-24"\/><a href="\/database\/spells\/2">Test beta<\/a>/);
+});

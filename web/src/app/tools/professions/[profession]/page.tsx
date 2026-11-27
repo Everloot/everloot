@@ -1,4 +1,3 @@
-import { CoinText } from "@/components/ui/Coins";
 import AhledgerCrafting, { type CraftingRead } from "../../auctions/AhledgerCrafting";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../../auctions/RealmHousePicker";
 import type { AuctionHouse } from "@everloot/protocol";
@@ -13,7 +12,7 @@ import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
-import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, ResultStrip, SectionHeading, qualityOf, type Column } from "@/components/ui";
+import { Badge, Card, Container, Contribute, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, ResultStrip, SectionHeading, qualityOf } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -33,12 +32,12 @@ import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { npcRows } from "@/lib/world-lists";
 import { publicZones } from "@/lib/zones";
-import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
 import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
 import ShoppingList from "../shopping-list";
+import RecipeTables, { type RecipeItem, type RecipeRow } from "../recipe-table";
 import RecipeShopping from "../recipe-shopping";
 import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
 
@@ -69,7 +68,6 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   };
 }
 
-const dash = <span className="text-muted">—</span>;
 const plural = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min === null ? `≤${r.max}` : r.max === null ? `${r.min}+` : r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`);
 
@@ -204,7 +202,7 @@ export default async function ProfessionPage(props: Props) {
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
   // The recipe table, filtered and paged here: the page carries only the rows it shows (`?page=&size=&q=&min=&max=`).
   const listQuery = recipeListQuery(searchParams);
-  const planHref = (id: number) => recipeListHref(path, { ...searchParams, recipe: String(id), crafts: undefined },
+  const planHref = (id: string) => recipeListHref(path, { ...searchParams, recipe: id, crafts: undefined },
     listQuery, { page: listQuery.page }).replace(/#prof-recipes$/, "#recipe-shopping");
   const listed = recipePage(filterRecipeViews(recipeGroups(p.recipes).flatMap((g) => g.recipes), catalog, listQuery), listQuery);
   const listHere = (change: Parameters<typeof recipeListHref>[3]) => recipeListHref(path, searchParams, listQuery, change);
@@ -214,73 +212,39 @@ export default async function ProfessionPage(props: Props) {
   const shoppingCatalog = catalog.filter((r) => pathNames.has(r.name.trim().toLowerCase()));
   const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([k, v]) => [k, v.icon]));
 
-  const ItemLink = ({ id, size = 24, count }: { id: number; size?: number; count?: number }) => {
+  // The recipe rows as ids and numbers, each item they name once with its name, colour and icon (recipe-table.tsx).
+  const iconBase = assets?.base ? `${assets.base}/icons/` : "";
+  const iconFile = (src: string | null | undefined) => (src && iconBase && src.startsWith(iconBase) ? src.slice(iconBase.length) : src);
+  const items: Record<number, RecipeItem> = {};
+  const item = (id: number) => {
+    if (items[id]) return;
     const name = names.get(id) ?? null;
-    const tip = tips.get(id);
     const quality = fileQuality.get(id);
     // A shown name carries its own quality colour; otherwise the game files' quality colours it, as on the item lists.
-    const colour = name?.color ? "" : quality !== undefined && quality !== null && quality <= 5 ? QUALITY_TEXT[qualityOf(quality)] : "text-fg";
-    return (
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        {tip?.icon
-          ? <GameIcon src={tip.icon} size={size} />
-          : <span aria-hidden="true" className="shrink-0 rounded-sm border border-line" style={{ width: size, height: size }} />}
-        {count !== undefined && <span className="font-mono tabular-nums text-fg-2">{count}×</span>}
-        <Link prefetch={false} href={`/database/items/${id}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
-          {name?.name ?? `Item ${id}`}
-        </Link>
-        {name?.source === "files" && <Badge tone="files" />}
-      </span>
-    );
+    const tone = name?.color ? undefined : quality !== undefined && quality !== null && quality <= 5 ? QUALITY_TEXT[qualityOf(quality)] : "text-fg";
+    const icon = iconFile(tips.get(id)?.icon);
+    items[id] = { name: name?.name ?? `Item ${id}`, ...(name?.color ? { color: name.color } : {}), ...(tone ? { tone } : {}), ...(icon ? { icon } : {}), ...(name?.source === "files" ? { files: true as const } : {}) };
   };
-
+  const row = (r: RecipeView): RecipeRow => {
+    const name = spellName(r.spellId);
+    const icon = iconFile(assets?.spellIcons.get(r.spellId));
+    const taught = (teaching.get(r.spellId) ?? []).map((x) => x.itemId);
+    const t = players(r);
+    for (const id of [...(r.itemId ? [r.itemId] : []), ...r.reagents.map((x) => x.itemId), ...taught]) item(id);
+    return {
+      id: r.spellId, ...(name ? { name } : {}), ...(icon ? { icon } : {}), ...(r.itemId ? { makes: r.itemId } : {}),
+      reagents: r.reagents.map((x): [number, number] => [x.itemId, x.count]),
+      ...(r.learn !== null ? { learn: r.learn } : {}), ...(r.yellow !== null ? { yellow: r.yellow } : {}), ...(r.grey !== null ? { grey: r.grey } : {}),
+      ...(taught.length ? { taught } : {}),
+      ...(t ? { players: { installs: t.installs, text: `yellow ${rangeText(t.yellow)}, green ${rangeText(t.green)}, grey ${rangeText(t.grey)}`, ...(t.costCopper !== null ? { cost: formatCopper(t.costCopper) } : {}) } } : {}),
+    };
+  };
   const anyLearn = p.recipes.some((r) => r.learn !== null);
   const anyPlayers = p.recipes.some((r) => players(r));
-  const columns: Column<RecipeView>[] = [
-    {
-      key: "recipe", header: "Recipe", cell: (r) => {
-        const icon = assets?.spellIcons.get(r.spellId);
-        const taught = teaching.get(r.spellId) ?? [];
-        return (
-          <span className="flex min-w-0 flex-col gap-1">
-            <span className="inline-flex min-w-0 items-center gap-2">
-              {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
-              <Link prefetch={false} href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
-              <Badge tone="files" />
-            </span>
-            {r.reagents.length > 0 && <Link prefetch={false} href={planHref(r.spellId)} className={LINK}>Plan this recipe</Link>}
-            {/* The recipe item the files link to this spell (client-recipe-items.json): unconfirmed, like the rest of the row. */}
-            {taught.length > 0 && <span className="inline-flex flex-wrap items-center gap-x-2 text-cell-2 text-fg-2">Recipe item: {taught.map((x) => <ItemLink key={x.itemId} id={x.itemId} size={16} />)}</span>}
-          </span>
-        );
-      },
-    },
-    { key: "makes", header: "Makes", cell: (r) => (r.itemId ? <ItemLink id={r.itemId} /> : dash) },
-    {
-      key: "reagents", header: "Reagents", cell: (r) => r.reagents.length
-        ? <ul className="flex flex-col gap-1">{r.reagents.map((x) => <li key={x.itemId}><ItemLink id={x.itemId} size={20} count={x.count} /></li>)}</ul>
-        : dash,
-    },
-    ...(anyLearn ? [{ key: "learn", header: "Needs", numeric: true, cell: (r: RecipeView) => r.learn ?? dash }] : []),
-    { key: "yellow", header: "Yellow", numeric: true, cell: (r) => r.yellow ?? dash },
-    { key: "grey", header: "Grey", numeric: true, cell: (r) => r.grey ?? dash },
-    ...(anyPlayers ? [{
-      key: "players", header: "Players saw", cell: (r: RecipeView) => {
-        const t = players(r);
-        if (!t) return dash;
-        return (
-          <span className="text-cell-2 text-fg-2">
-            <Badge tone="confirmed">{t.installs} installs</Badge>{" "}
-            yellow {rangeText(t.yellow)}, green {rangeText(t.green)}, grey {rangeText(t.grey)}
-            {t.costCopper !== null && <>; <CoinText text={formatCopper(t.costCopper)} /> a craft</>}
-          </span>
-        );
-      },
-    }] : []),
-  ];
 
   const groups = recipeGroups(p.recipes);
   const shownGroups = recipeGroups(listed.rows);
+  const tableGroups = shownGroups.map((g) => ({ key: g.key, label: g.label, rows: g.recipes.map(row) }));
   const listFilters = Number(Boolean(listQuery.q)) + Number(listQuery.min !== null || listQuery.max !== null);
   const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={listQuery.size} href={(page) => listHere({ page })} label={`${p.name} recipe pages`} />;
   const trail = trailFor(path)!;
@@ -387,18 +351,17 @@ export default async function ProfessionPage(props: Props) {
           )}
           {groups.length === 0 && <EmptyState message={`The game files list no ${p.name} recipes that make an item or cost a reagent.`} />}
           {groups.length > 0 && listed.total === 0 && <p data-empty-state className="py-3 text-cell text-fg-2">No {p.name} recipes match these filters.</p>}
-          {shownGroups.map((g) => (
-            <section key={g.key} aria-labelledby={`skill-${g.key}`} data-skill-group={g.key} className="space-y-2">
-              <SectionHeading id={`skill-${g.key}`} as="h3">{g.label}</SectionHeading>
-              <DataTable
-                dense
-                caption={`${p.name} recipes, ${g.label}: ${g.recipes.length}`}
-                columns={columns}
-                rows={g.recipes}
-                rowKey={(r) => String(r.spellId)}
-              />
-            </section>
-          ))}
+          {tableGroups.length > 0 && (
+            <RecipeTables
+              profession={p.name}
+              groups={tableGroups}
+              items={items}
+              iconBase={iconBase}
+              planHref={planHref("RECIPEID")}
+              learn={anyLearn}
+              players={anyPlayers}
+            />
+          )}
           {listed.pages > 1 && strip}
         </section>
 
