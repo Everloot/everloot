@@ -195,6 +195,15 @@ How it works, and what it will not do:
   variables, other spells' text, an effect value of 0 that the tables hold for a number that lives in
   a triggered spell) becomes the placeholder `[?]`, and the manifest lists the tokens. Nothing is
   guessed. The tooltip says so when it holds a placeholder.
+- **Talent amounts per rank.** A multi-rank talent's spell stores one amount. The amount at each rank is in
+  `TraitDefinitionEffectPoints`, which names a `Curve` for an effect of the definition's spell; the curve's
+  `CurvePoint` rows give the effect's base points by rank (x the rank, y the amount). The game's talent window
+  asks the client for the entry's text at a rank (`AppendInfo("GetTraitEntry", entryID, rank)` in
+  `Blizzard_SharedTalentUI`), so each talent gets its description resolved with each rank's amounts, as
+  `ranks` beside `description` in its manifest entry. Only a curve point at exactly the rank is used, and only
+  the "set" operation (0); a talent where any rank misses one gets no `ranks`, and the calculator keeps its
+  note that the amount per rank is not in the files. Build 71139: all 357 multi-rank talents have them
+  (Wand Specialization: 13% and 25%). A snapshot extracted before `Curve` and `CurvePoint` were read gives none.
 - **Frame art.** The client's own talent window pieces are named in its interface atlas tables
   (`UiTextureAtlasElement`, for example `talents-node-circle-green`); the extractor cuts each piece
   out of its atlas file. The per-spec backgrounds are named for the modern specs. Our Classic trees
@@ -466,7 +475,8 @@ At 1440 and 390 px wide:
   means full, green means a point can be added, grey means locked, multi-rank talents show
   `rank/max` at the corner, the connector arrows are gold once the talent above is full, the tooltip
   opens on hover, keyboard focus and a long press (Escape closes it), and the credit line is under the
-  trees. Each talent's accessible name still says its rank and whether it is locked, and its tooltip
+  trees. A multi-rank talent's tooltip shows the amount of the rank held and, between its first and last
+  rank, a Next rank line with the next amount. Each talent's accessible name still says its rank and whether it is locked, and its tooltip
   text is read by a screen reader without hovering.
 - **Items.** On the drops, vendor and auction pages each item link has its icon in front; hovering
   or tabbing to the link opens the tooltip with the name in its quality colour; Escape closes it.

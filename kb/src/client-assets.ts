@@ -27,6 +27,7 @@ import {
 import { buildItemSet, shardRecords, ITEM_SHARD_SIZE } from "./assets/items.js";
 import { mayShowSpellName } from "./game-name-rule.js";
 import { overlayProblem, planMapArt, stitchPlan } from "./assets/map-art.js";
+import { rankBasePoints, rankFacts, type CurvePointRow, type EffectPointsRow } from "./assets/talent-ranks.js";
 import { resolveTooltip, type EffectFacts, type SpellFacts } from "./assets/tooltip.js";
 import { buildTalentCatalog, type Rows, type TableReader } from "./talents/build-catalog.js";
 import { LABEL, type BuildStamp } from "./talents/catalog.js";
@@ -116,6 +117,12 @@ export const AssetManifest = z.object({
     /** Passive spells get the square border, active ones the round one (SpellMisc attribute bit, not our guess). */
     passive: z.boolean().nullable(),
     description: Text.nullable(),
+    /**
+     * The text at each rank (index 0 is rank 1), with that rank's amounts from the definition's curves
+     * (TraitDefinitionEffectPoints -> Curve -> CurvePoint). Absent when the talent has no curves or one has no
+     * point at a rank; `description` then holds the spell's stored amounts.
+     */
+    ranks: z.array(Text).optional(),
   })),
   frames: z.record(z.string(), File),
   /** "class:Tree name" -> frame element. `nearest`: the client has no background for that Classic tree, this is the closest. */
@@ -179,6 +186,8 @@ export const AssetManifest = z.object({
     loadingScreensExtracted: z.number().int().default(0), loadingScreensSkipped: z.number().int().default(0),
     emblemsExtracted: z.number().int().default(0), logoExtracted: z.number().int().default(0),
     poiExtracted: z.number().int().default(0),
+    /** Talents with text at every rank, and talents with curves whose amounts could not all be read. */
+    talentRanks: z.number().int().default(0), talentRanksUnknown: z.number().int().default(0),
   }),
   /** Frame elements the build does not have or that could not be read; the site falls back for these. */
   missingFrames: z.array(z.string()),
@@ -377,10 +386,30 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     return result;
   }
 
+  // Each talent's amounts by rank: its definition's effect points name a curve per effect. A snapshot read before
+  // Curve and CurvePoint were extracted has none, so its talents get no ranks.
+  const effectPoints = new Map<number, EffectPointsRow[]>();
+  for (const r of list(get("TraitDefinitionEffectPoints"))) {
+    const id = num(r.TraitDefinitionID);
+    effectPoints.set(id, [...(effectPoints.get(id) ?? []), { EffectIndex: num(r.EffectIndex), OperationType: num(r.OperationType), CurveID: num(r.CurveID) }]);
+  }
+  const curvePoints = new Map<number, CurvePointRow[]>();
+  for (const r of get("Curve") ? list(get("CurvePoint")) : []) {
+    const pos = Array.isArray(r.Pos) ? r.Pos : [];
+    if (pos.length !== 2 || typeof pos[0] !== "number" || typeof pos[1] !== "number") continue;
+    const id = num(r.CurveID);
+    curvePoints.set(id, [...(curvePoints.get(id) ?? []), { CurveID: id, OrderIndex: num(r.OrderIndex), Pos: [pos[0], pos[1]] }]);
+  }
+  // The most ranks any node gives a definition.
+  const maxRanksOf = new Map<number, number>();
+  for (const c of catalogs) for (const tree of c.trees) for (const node of tree.nodes) for (const entry of node.entries) {
+    maxRanksOf.set(entry.definitionId, Math.max(maxRanksOf.get(entry.definitionId) ?? 0, entry.maxRanks));
+  }
+
   // Icons and tooltips, one per talent entry.
   const spells: AssetManifest["spells"] = {};
   const iconIdOf = new Map<string, number>();
-  let resolved = 0, unresolvedCount = 0, empty = 0;
+  let resolved = 0, unresolvedCount = 0, empty = 0, talentRanks = 0, talentRanksUnknown = 0;
   for (const c of catalogs) {
     for (const tree of c.trees) {
       for (const node of tree.nodes) {
@@ -399,6 +428,20 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
           const attrs = misc.get(shown)?.Attributes;
           const word = Array.isArray(attrs) ? num(attrs[0]) : null;
           spells[key] = { spellId: entry.spellId, name: entry.name, icon: null, passive: word === null ? null : (word & ATTR_PASSIVE) !== 0, description };
+          // The text at each rank, where every rank's amounts are on the curves. The curves set the effects of the
+          // definition's spell; a shown spell that is another one keeps its stored text.
+          const points = effectPoints.get(entry.definitionId);
+          if (points?.length && raw) {
+            const spellId = num(def?.SpellID);
+            const perRank = Array.from({ length: maxRanksOf.get(entry.definitionId) ?? 0 }, (_, i) => rankBasePoints(points, curvePoints, i + 1));
+            if (shown === spellId && perRank.length && perRank.every((p) => p !== null)) {
+              spells[key].ranks = perRank.map((p) => {
+                const at = rankFacts(self, p!);
+                return resolveTooltip(raw, at, (id) => (id === spellId ? at : factsFor(id)));
+              });
+              talentRanks += 1;
+            } else talentRanksUnknown += 1;
+          }
           if (entry.iconFileId) iconIdOf.set(key, entry.iconFileId);
         }
       }
@@ -782,7 +825,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
       itemsRecorded: items?.count ?? 0, itemsWithIcon, mapsExtracted: Object.keys(maps).length, mapsSkipped: skippedMaps.length,
       loadingScreensExtracted: Object.keys(loadingScreens).length,
       loadingScreensSkipped: loadingSkipped,
-      emblemsExtracted, logoExtracted: logo ? 1 : 0, poiExtracted: Object.keys(poi).length,
+      emblemsExtracted, logoExtracted: logo ? 1 : 0, poiExtracted: Object.keys(poi).length, talentRanks, talentRanksUnknown,
     },
     missingFrames: missingFrames.sort(),
     skippedMaps,
@@ -797,6 +840,7 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
     `icons: ${c.iconsExtracted} extracted, ${c.iconsEncrypted} encrypted skipped, ${c.iconsAbsent} not in build, ${c.iconsFailed} failed`,
     `frame pieces: ${c.framesExtracted} extracted, ${c.framesEncrypted} encrypted skipped, ${c.framesAbsent} not in build, ${c.framesFailed} failed`,
     `tooltips: ${c.tooltipsResolved} fully resolved, ${c.tooltipsUnresolved} with placeholders, ${c.tooltipsEmpty} without text`,
+    `talent ranks: ${c.talentRanks} talents with text at every rank, ${c.talentRanksUnknown} with curves not all read`,
     `classes: ${Object.keys(classes).length}, professions: ${Object.keys(professions).length}, spell icons: ${Object.keys(spellIcons).length}, pet family icons: ${Object.keys(familyIcons).length}`,
     items ? `items: ${c.itemsRecorded} recorded in ${Object.keys(items.shards).length} shards (private folder), ${c.itemsWithIcon} with an icon` : "items: no item tables in the snapshot",
     `maps: ${c.mapsExtracted} pictures, ${c.mapsSkipped} skipped`,

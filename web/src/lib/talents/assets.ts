@@ -16,6 +16,7 @@ const path = z.string().regex(/^[A-Za-z0-9_-][A-Za-z0-9._/-]*$/).refine((p) => !
 /** The same rule for the site-wide reader (lib/game-assets.ts). */
 export const assetPath = path;
 const file = z.object({ file: path, width: z.number().int().positive(), height: z.number().int().positive() });
+const text = z.object({ text: z.string(), unresolved: z.array(z.string()) });
 
 const manifest = z.object({
   schema: z.literal(MANIFEST_SCHEMA),
@@ -25,7 +26,10 @@ const manifest = z.object({
     name: z.string().nullable(),
     icon: path.nullable(),
     passive: z.boolean().nullable(),
-    description: z.object({ text: z.string(), unresolved: z.array(z.string()) }).nullable(),
+    description: text.nullable(),
+    // The text at each rank (index 0 is rank 1), from the talent's curves. Manifests extracted before build 71139's
+    // curves were read have none.
+    ranks: z.array(text).optional(),
   })),
   // Newer manifests leave the icon list out (each talent names its icon); older ones still carry it.
   icons: z.record(z.string(), file).optional(),
@@ -33,12 +37,18 @@ const manifest = z.object({
   backgrounds: z.record(z.string(), z.object({ element: z.string(), nearest: z.boolean() })),
 });
 
+/** A talent's tooltip text; `partial` when it holds a placeholder for a value the files do not give. */
+export interface TalentText { text: string; partial: boolean }
+
 export interface GameAssets {
   /** The game build the files came from. */
   version: string;
   label: string;
-  /** By trait definition id (TalentEntry.definitionId). */
-  spells: Map<number, { icon: string | null; passive: boolean | null; text: string | null; partial: boolean }>;
+  /**
+   * By trait definition id (TalentEntry.definitionId). `text` holds the spell's stored amounts; `ranks`, where the
+   * files give them, the text at each rank (index 0 is rank 1).
+   */
+  spells: Map<number, { icon: string | null; passive: boolean | null; text: string | null; partial: boolean; ranks?: TalentText[] }>;
   /** Frame pieces by the client's name for them, as ready URLs. */
   frames: Map<string, { url: string; width: number; height: number }>;
   /** `class:Tree name` -> frame piece name. */
@@ -64,11 +74,14 @@ export function parseManifest(json: unknown, base: string): GameAssets | null {
   if (!parsed.success) return null;
   const m = parsed.data;
   const url = (p: string) => `${base}/${p}`;
-  const spells = new Map<number, { icon: string | null; passive: boolean | null; text: string | null; partial: boolean }>();
+  const spells: GameAssets["spells"] = new Map();
   for (const [id, s] of Object.entries(m.spells)) {
     const n = Number(id);
     if (!Number.isInteger(n)) continue;
-    spells.set(n, { icon: s.icon ? url(`icons/${s.icon}`) : null, passive: s.passive, text: s.description?.text ?? null, partial: (s.description?.unresolved.length ?? 0) > 0 });
+    spells.set(n, {
+      icon: s.icon ? url(`icons/${s.icon}`) : null, passive: s.passive, text: s.description?.text ?? null, partial: (s.description?.unresolved.length ?? 0) > 0,
+      ranks: s.ranks?.map((r) => ({ text: r.text, partial: r.unresolved.length > 0 })),
+    });
   }
   if (spells.size === 0) return null;
   const frames = new Map(Object.entries(m.frames).map(([name, f]) => [name, { url: url(f.file), width: f.width, height: f.height }]));

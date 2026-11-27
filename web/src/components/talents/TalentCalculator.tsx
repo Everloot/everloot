@@ -6,7 +6,7 @@ import {
   addPoint, canMovePoint, emptySet, movedLater, movePoint, orderRefusalText, prefixRanks, removePoint, resetTree, type MovedPoint,
 } from "@/lib/talents/order";
 import {
-  canAdd, canRemove, commit, entryAtRank, isLegal, nodeMap, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
+  canAdd, canRemove, commit, entryRankAt, isLegal, nodeMap, pointsAtLevel, pointsByTree, pointsSpent, redo, refusalText,
   startHistory, undo, levelFor, type History,
 } from "@/lib/talents/rules";
 import { hasNodeFrames, loadGameAssets, type GameAssets } from "@/lib/talents/assets";
@@ -24,7 +24,7 @@ import GameTree from "./GameTree";
 import LevelingOrder, { forSet, pointName } from "./LevelingOrder";
 import SaveBuild, { restorePendingSave } from "./SaveBuild";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
-import TalentTreeView, { arrowTarget, assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
+import TalentTreeView, { arrowTarget, CLASS_TEXT, heldTexts, textAt, type TipMode } from "./TalentTreeView";
 
 // Client side of the calculator: the point rules live in lib/talents/rules.ts and the spend order's in
 // lib/talents/order.ts; this file only holds state and wires clicks, long presses and keys to them.
@@ -459,22 +459,23 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
     const rank = shownRanks[tipNode.id]?.rank ?? 0;
     const choice = tipNode.kind === "choice";
     // The rank held (the first one before any point), and the one the next point buys.
-    const entries = choice ? tipNode.entries : [entryAtRank(tipNode, Math.max(0, rank - 1))];
-    const next = !choice && rank > 0 && rank < tipNode.maxRanks ? entryAtRank(tipNode, rank) : null;
-    // Every multi-rank talent keeps its per-rank amounts on a curve (TraitDefinitionEffectPoints -> Curve) we do not
-    // extract, so its text holds the spell's stored amounts and cannot change with rank. A tiered node's next entry is
+    const held = heldTexts(assets, tipNode, rank);
+    const next = !choice && rank > 0 && rank < tipNode.maxRanks ? entryRankAt(tipNode, rank + 1) : null;
+    const nextTip = next && textAt(assets, next.entry, next.rank);
+    // A talent's text at each rank comes from its curves (TraitDefinitionEffectPoints -> Curve). Where the manifest
+    // has none, the text holds the spell's stored amounts and cannot change with rank. A tiered node's next entry is
     // its own spell, with its own text.
-    const sameEntry = next !== null && next === entries[0];
-    const ranksInEntry = choice ? 1 : entries[0].maxRanks ?? tipNode.maxRanks;
+    const sameEntry = next !== null && next.entry === held[0].entry;
+    const ranksInEntry = choice ? 1 : held[0].entry.maxRanks ?? tipNode.maxRanks;
     const verdict = canAdd(catalog, shownRanks, tipNode.id, shownAvailable);
     tipAnchor = choice ? `talent-${tipNode.id}-0` : `talent-${tipNode.id}`;
     tipContent = {
-      title: entries.map((e) => e.name).join(" or "),
+      title: held.map((h) => h.entry.name).join(" or "),
       rank: `Rank ${rank}/${tipNode.maxRanks}`,
-      text: entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n") || null,
-      partial: entries.some((e) => assetOf(assets, e)?.partial),
-      next: next === null ? null : sameEntry ? "its amount is not in the game files we read." : assetOf(assets, next)?.text ?? `${next.name}.`,
-      note: ranksInEntry > 1 ? "The amount for each rank is not in the game files we read, so the numbers above stay the same at every rank." : null,
+      text: held.map((h) => h.tip?.text).filter(Boolean).join("\n\n") || null,
+      partial: held.some((h) => h.tip?.partial),
+      next: next === null ? null : sameEntry && !nextTip?.perRank ? "its amount is not in the game files we read." : nextTip?.text ?? `${next.entry.name}.`,
+      note: ranksInEntry > 1 && !held[0].tip?.perRank ? "The amount for each rank is not in the game files we read, so the numbers above stay the same at every rank." : null,
       lock: verdict.ok || verdict.reason === "max-rank" ? null : refusalText(verdict.reason!, tipNode, catalog, shownRanks),
       label: `${assets.label} · build ${assets.version}`,
     };

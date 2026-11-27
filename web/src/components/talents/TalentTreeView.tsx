@@ -1,4 +1,4 @@
-import { canAdd, entryAtRank, rankOf, refusalText } from "@/lib/talents/rules";
+import { canAdd, entryAtRank, entryRankAt, rankOf, refusalText } from "@/lib/talents/rules";
 import type { GameAssets } from "@/lib/talents/assets";
 import type { Ranks, TalentCatalog, TalentEntry, TalentNode, TalentTree } from "@/lib/talents/types";
 
@@ -55,10 +55,27 @@ export interface Props extends TreeHandlers {
 /** What a node's entry says in the asset manifest. */
 export const assetOf = (assets: GameAssets | null, entry: TalentEntry) => (entry.definitionId === null ? undefined : assets?.spells.get(entry.definitionId));
 
+/**
+ * An entry's tooltip at a rank (from 1): the text the files give for that rank, else the spell's stored text, which
+ * stays the same at every rank (`perRank` false).
+ */
+export function textAt(assets: GameAssets | null, entry: TalentEntry, rank: number): { text: string | null; partial: boolean; perRank: boolean } | undefined {
+  const a = assetOf(assets, entry);
+  if (!a) return undefined;
+  const at = a.ranks?.[rank - 1];
+  return at ? { ...at, perRank: true } : { text: a.text, partial: a.partial, perRank: false };
+}
+
+/** The entries a node's tooltip shows for the rank held, each with its text: before the first point, the first rank. */
+export function heldTexts(assets: GameAssets | null, node: TalentNode, rank: number) {
+  if (node.kind === "choice") return node.entries.map((entry) => ({ entry, tip: textAt(assets, entry, 1) }));
+  const held = entryRankAt(node, Math.max(1, rank));
+  return [{ entry: held.entry, tip: textAt(assets, held.entry, held.rank) }];
+}
+
 /** A node's name and tooltip text, for aria-describedby: a screen reader gets it without hover. */
 export function describeNode(assets: GameAssets | null, node: TalentNode, rank: number): string {
-  const entries = node.kind === "choice" ? node.entries : [entryAtRank(node, rank)];
-  return entries.map((e) => `${e.name}. ${assetOf(assets, e)?.text ?? ""}`.trim()).join(" ");
+  return heldTexts(assets, node, rank).map(({ entry, tip }) => `${entry.name}. ${tip?.text ?? ""}`.trim()).join(" ");
 }
 
 // A name never splits inside a word: a long single word gets a smaller size so it fits the tile.

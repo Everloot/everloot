@@ -212,6 +212,9 @@ export const CLIENT_TABLES = {
   // Model pictures (client-renders): the texture file of an item's own model
   // (ItemDisplayInfo.ModelMaterialResourcesID -> MaterialResourcesID -> FileDataID).
   TextureFileData: 982459,
+  // Talent amounts per rank: TraitDefinitionEffectPoints (W3) names a curve per effect, and its points give the
+  // effect's base points by rank (client-assets writes each talent's text at every rank).
+  Curve: 892585, CurvePoint: 892586,
 } as const;
 export type ClientTableName = keyof typeof CLIENT_TABLES;
 

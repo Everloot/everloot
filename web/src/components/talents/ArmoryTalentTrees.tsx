@@ -2,12 +2,12 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { hasNodeFrames, loadGameAssets, type GameAssets } from "@/lib/talents/assets";
-import { entryAtRank, nodeMap, pointsByTree } from "@/lib/talents/rules";
+import { nodeMap, pointsByTree } from "@/lib/talents/rules";
 import type { Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameTree from "./GameTree";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
 import { withoutUnknownAmounts } from "./armory-text";
-import TalentTreeView, { arrowTarget, assetOf, CLASS_TEXT, type TipMode } from "./TalentTreeView";
+import TalentTreeView, { arrowTarget, CLASS_TEXT, heldTexts, type TipMode } from "./TalentTreeView";
 
 // A character's build drawn on the calculator's trees, read-only: the same tree pictures (the game's look when the
 // asset files are there, the text tiles otherwise), every rank filled in, no points to spend. Hover, focus or the
@@ -47,11 +47,12 @@ export default function ArmoryTalentTrees({ catalog, ranks }: { catalog: TalentC
   const tipNode = tip ? nodes.get(tip.id) ?? null : null;
   if (assets && tipNode) {
     const rank = ranks[tipNode.id]?.rank ?? 0;
-    const entries = tipNode.kind === "choice" ? tipNode.entries : [entryAtRank(tipNode, rank)];
-    const raw = entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n");
+    // The rank the character holds, with its own amounts where the files give them.
+    const held = heldTexts(assets, tipNode, rank);
+    const raw = held.map((h) => h.tip?.text).filter(Boolean).join("\n\n");
     const { text, dropped } = withoutUnknownAmounts(raw);
     content = {
-      title: entries.map((e) => e.name).join(" or "),
+      title: held.map((h) => h.entry.name).join(" or "),
       rank: `Rank ${rank}/${tipNode.maxRanks}`,
       text: text || null,
       // With every [?] written out of the text, only the note about the left-out amount remains.
