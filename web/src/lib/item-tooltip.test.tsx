@@ -95,9 +95,10 @@ describe("item tooltip, as the card and the page box draw it", () => {
     });
 
     const card = drawn(t);
-    expect(row(card, "Synthetic Battlegear (0/3)").className).toBe("text-tip-yellow");
+    // The game's blank line above the set's name and above its first bonus (the tooltip audit, 2026-11-26).
+    expect(row(card, "Synthetic Battlegear (0/3)").className).toBe("mt-2 text-tip-yellow");
     expect(row(card, "Synthetic Breastplate").className).toBe("pl-2.5 text-muted");
-    expect(row(card, "(2) Set: Synthetic Fortitude").className).toBe("text-muted");
+    expect(row(card, "(2) Set: Synthetic Fortitude").className).toBe("mt-2 text-muted");
     expect(card.querySelectorAll("a")).toHaveLength(0);
 
     const page = drawn(t, true);
@@ -186,7 +187,8 @@ describe("item tooltip, as the card and the page box draw it", () => {
       tip: undefined, set: SET,
       category: { class: { id: 4, name: "Armor", label: "Armor", slug: "armor" }, subclass: { id: 3, name: "Mail", slug: "mail" }, slot: { inventoryType: 1, name: "Head", slug: "head" }, quality: null },
     }));
-    expect(hidden.card.lines).toEqual(["Mail", "Head"]);
+    // The game's slot line: the slot left, the kind right (the tooltip audit, 2026-11-26).
+    expect(hidden.card.lines).toEqual(["Head · Mail"]);
     expect(hidden.card.notes).toBeUndefined();
     expect(hidden.links).toEqual({});
   });
@@ -206,7 +208,7 @@ describe("what the files lack", () => {
 
   test("a shown item the files hold no record for says so in one muted line inside the box, with the build read", () => {
     const t = itemTooltip({ id: 12587, tip: undefined, name: { name: "Eye of Rend", source: "wiki", color: "#ffffff", wikiPage: null }, category: LEATHER_HEAD, filesLack: "71139" });
-    expect(t.card.lines).toEqual(["Leather", "Head"]);
+    expect(t.card.lines).toEqual(["Head · Leather"]);
     expect(t.card.missing).toBe("The game files read so far carry no stats for this item (build 71139)");
     const line = drawn(t, true).querySelector("[data-tooltip-frame] [data-card-missing]");
     expect(line?.textContent).toBe(t.card.missing);

@@ -3,7 +3,6 @@
 // A number this file does not know is printed as unknown, never guessed; a stat kind it does not know is left out.
 import { ITEM_FACTS } from "@everloot/protocol";
 import { tokens } from "@/design/tokens";
-import { formatCopper } from "@kb/market";
 import type { ItemRecord } from "@kb/assets/items";
 import { checkedDamageRange, CHECKED_WEAPONS, type CheckedDamageRange, type CheckedWeapon } from "@kb/assets/weapon-damage";
 import type { ItemFactName, ItemFactState } from "@kb/item-facts";
@@ -82,6 +81,15 @@ export function damageSource(range: CheckedDamageRange, line: string): string {
     + `the way ${weapons} from that table read off the game's own tooltip on ${days.join(", ")} agree, build ${builds.join(", ")}.`;
 }
 
+/**
+ * A price as the game's tooltip prints it: a coin that is zero is left out (GameTooltipMoneyFormat's zero display
+ * mode is Collapse, so 10001 copper is "1g 1c" and 1000 is "10s"). Elsewhere the site keeps formatCopper's full form.
+ */
+export function tooltipMoney(copper: number): string {
+  const parts = [[Math.floor(copper / 10000), "g"], [Math.floor((copper % 10000) / 100), "s"], [copper % 100, "c"]] as const;
+  return parts.filter(([n]) => n > 0).map(([n, unit]) => `${n}${unit}`).join(" ");
+}
+
 /** The tooltip's lines and then the reasons for its placeholders, as every item card shows them. */
 export const tipLines = (t: Pick<ItemTipText, "lines" | "why">): string[] => [...t.lines, ...t.why];
 
@@ -136,7 +144,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
     why.add(WHY.older);
   }
   if (r.t) lines.push(`"${r.t}"`);
-  if (r.sp > 0) lines.push(`Sell Price: ${formatCopper(r.sp)}`);
+  if (r.sp > 0) lines.push(`Sell Price: ${tooltipMoney(r.sp)}`);
   if (range) why.add(damageSource(range, damage));
   // Only where every printed line has its spell: a record from before the ids were kept has none.
   const spells = r.fx && r.fs?.length === r.fx.length ? Object.fromEntries(r.fx.map((line, i) => [line, r.fs![i]])) : undefined;
