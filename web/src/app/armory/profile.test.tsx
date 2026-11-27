@@ -137,3 +137,10 @@ test("a play-history count of 0 shows without a rank; a count above 0 keeps its 
   expect(html).not.toContain("/armory/rankings/deaths");
   expect(html).toContain("#90 of 15,620");
 });
+
+test("an equipped item's screen-reader description says an amount is missing instead of reading [?]", () => {
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip({ lines: ["Head", "[?] Armor", "+[?] Strength"], partial: true })]])} />);
+  const desc = html.match(/<span id="[^"]+-desc" hidden="">([^<]*)<\/span>/)?.[1] ?? "";
+  expect(desc).toContain("Armor (amount not in the game files). Strength (amount not in the game files)");
+  expect(desc).not.toContain("[?]");
+});

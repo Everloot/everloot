@@ -1,3 +1,7 @@
+/** The tooltip's note when an amount was left out, and the screen-reader text's shorter one. */
+export const AMOUNT_NOTE = "This rank's amount is not in the game files we read, so the text leaves it out.";
+export const SPOKEN_AMOUNT_NOTE = "This rank's amount is not in the game files we read.";
+
 const UNKNOWN_AMOUNT = /\b([Aa])n? \[\?\]%? (\w)/g;
 
 /**

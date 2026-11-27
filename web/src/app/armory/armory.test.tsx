@@ -378,7 +378,7 @@ describe("the character page", () => {
       const panel = (id: string) => out.slice(out.indexOf(`data-tab-panel="${id}"`)).split('role="tabpanel"')[0];
       expect(panel("talents")).toContain("Trueshot Aura");
       expect(panel("talents")).not.toContain("data-tab-loading");
-      for (const id of ["stats", "pvp", "achievements", "professions", "reputations", "quests", "history", "progress"]) {
+      for (const id of ["stats", "pvp", "achievements", "reputations", "quests", "history", "progress"]) {
         expect(panel(id)).toContain(`data-tab-loading="${id}"`);
       }
       expect(out).not.toContain("Darkspear Trolls");

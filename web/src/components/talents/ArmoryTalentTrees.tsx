@@ -6,7 +6,7 @@ import { nodeMap, pointsByTree } from "@/lib/talents/rules";
 import type { Ranks, TalentCatalog } from "@/lib/talents/types";
 import GameTree from "./GameTree";
 import TalentTooltip, { type TipContent } from "./TalentTooltip";
-import { withoutUnknownAmounts } from "./armory-text";
+import { AMOUNT_NOTE, withoutUnknownAmounts } from "./armory-text";
 import TalentTreeView, { arrowTarget, CLASS_TEXT, heldTexts, type TipMode } from "./TalentTreeView";
 
 // A character's build drawn on the calculator's trees, read-only: the same tree pictures (the game's look when the
@@ -57,7 +57,7 @@ export default function ArmoryTalentTrees({ catalog, ranks }: { catalog: TalentC
       text: text || null,
       // With every [?] written out of the text, only the note about the left-out amount remains.
       partial: text.includes("[?]"),
-      note: dropped ? "This rank's amount is not in the game files we read, so the text leaves it out." : null,
+      note: dropped ? AMOUNT_NOTE : null,
       lock: null,
       label: `${assets.label} · build ${assets.version}`,
     };

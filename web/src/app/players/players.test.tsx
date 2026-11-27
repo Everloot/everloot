@@ -137,12 +137,28 @@ describe("player directory", () => {
     expect(table).toContain('class="dt-meta"');
   });
 
-  test("a full page of 50 profiles stays light: under 780 bytes of markup a row (1,059 before; the phone line now names the guild)", async () => {
+  test("a full page of 50 profiles stays light: under 820 bytes of markup a row (1,059 before; 780 before the Class column)", async () => {
     for (let i = 0; i < 50; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, name: "Quill", surname: `Venn${i}`, gearScore: i }));
     const html = await page({ sort: "level" });
     const body = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
     expect(body.match(/<tr /g)).toHaveLength(50);
-    expect(body.length / 50).toBeLessThan(780);
+    expect(body.length / 50).toBeLessThan(820);
+  });
+
+  test("QA round 2: Region and Class columns, a dash for an empty item level and gear score, and a note on Gear Score", async () => {
+    armory.putCharacter(armoryCharacter());
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", level: 1, itemLevel: 0, gearScore: 0, class: "Mage", race: "Gnome" }));
+    const html = await page();
+    const table = html.slice(html.indexOf('id="player-results"'));
+    expect(table).toMatch(/<th[^>]*><span[^>]*>Region<\/span><\/th>/);
+    expect(table).not.toMatch(/>Realm<\/span><\/th>/);
+    expect(table).toMatch(/<th[^>]*><span[^>]*>Class<\/span><\/th>/);
+    expect(table).toMatch(/<td class="dt-td dt-nowrap dt-fold">Mage<\/td>/);
+    const arla = table.slice(table.indexOf("arla-quill"), table.indexOf("</tr>", table.indexOf("arla-quill")));
+    expect(arla.match(/<td class="dt-td dt-num dt-fold">—<\/td>/g)).toHaveLength(2);
+    expect(arla).not.toContain("GS 0");
+    expect(arla).not.toContain("ilvl 0");
+    expect(html).toContain("Gear Score weighs each item level by its slot");
   });
 
   test("the sort menu names the chosen order once", async () => {

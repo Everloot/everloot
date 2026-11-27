@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { armoryCharacter } from "@/lib/armory.fixture";
 import ProgressionMatrix from "@/components/progression/ProgressionMatrix";
 import { characterProgression } from "@kb/progression";
-import { characterPanel } from "./character-tabs";
+import { CHARACTER_TABS, characterPanel, isCharacterTab } from "./character-tabs";
 import { CharacterFacts, DungeonRaidSlot, SheetSummary } from "./[region]/[slug]/sheet";
 import { rankBadges, shownRanks } from "./[region]/[slug]/character-data";
 
@@ -66,11 +66,9 @@ test("below level 10 the Talents tab says there are no talent points yet", () =>
   expect(html).not.toContain("did not include talents");
 });
 
-test("the Professions tab links the bars above instead of repeating them", () => {
-  const c = armoryCharacter({ details: { revision: 1, professions: { asOf: at, rows: [{ name: "Skinning", rank: 300, max: 300 }] } } });
-  const html = renderToStaticMarkup(<>{characterPanel(c, "professions", {})}</>);
-  expect(html).not.toContain("<progress");
-  expect(html).toContain('href="#armory-overview-professions"');
+test("there is no Professions tab: its bars live in the overview above the gear, and an old tab address opens the default", () => {
+  expect(CHARACTER_TABS.map(([id]) => id)).not.toContain("professions");
+  expect(isCharacterTab("professions")).toBe(false);
 });
 
 test("a zero count gets no rank: no badge, no PvP rank and no play-history rank for 0", () => {
@@ -92,4 +90,13 @@ test("reputations are ordered by standing, Exalted first, then by name", () => {
   const html = renderToStaticMarkup(<>{characterPanel(c, "reputations", {})}</>);
   const order = ["Orgrimmar", "Darkspear Trolls", "Zandalar Tribe"].map((n) => html.indexOf(n));
   expect(order).toEqual([...order].sort((a, b) => a - b));
+});
+
+test("QA round 2: an empty item level and a Gear Score of 0 both read as a dash, never 0", () => {
+  const worn = renderToStaticMarkup(<CharacterFacts character={armoryCharacter({ level: 1, itemLevel: 0, gearScore: 0 })} lastRead={null} now={0} />);
+  expect(worn).toMatch(/Gear Score<\/dt><dd[^>]*>(?:<span[^>]*>)?—</);
+  expect(worn).not.toMatch(/Gear Score<\/dt><dd[^>]*>0</);
+  const bare = renderToStaticMarkup(<CharacterFacts character={armoryCharacter({ level: 1, itemLevel: 0, gearScore: 0, equipment: [] })} lastRead={null} now={0} />);
+  expect(bare).toMatch(/Ranked item level<\/dt><dd[^>]*>(?:<span[^>]*>)?—</);
+  expect(bare).toMatch(/Gear Score<\/dt><dd[^>]*>(?:<span[^>]*>)?—</);
 });

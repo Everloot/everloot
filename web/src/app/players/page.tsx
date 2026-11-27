@@ -49,6 +49,8 @@ const muted = (text: string) => <span className="text-muted">{text}</span>;
 const day = (iso: string | undefined | null) => iso?.slice(0, 10) ?? "";
 /** A read character whose gear the crawler has not read yet. */
 const GEAR_NOT_READ = "Gear not read yet";
+/** An item level or Gear Score of 0 (nothing counted yet, as at level 1) is a dash, as on the character page. */
+const gearValue = (metric: "item-level" | "gear-score", value: number) => (value === 0 ? "—" : metricValue(metric, value));
 /** The guild as words: Blizzard names a disbanded guild "DELETED". */
 const guildWords = (guild: string | null) => guild === null ? "No guild" : isDisbandedGuild(guild) ? "Guild disbanded" : guild;
 
@@ -82,15 +84,16 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
   const all: (Column<DirectoryRow> & { armory?: true })[] = [
     { key: "name", header: "Name", sortable: true, cell: (r) => <NameCell row={r} icons={icons} /> },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => r.level },
-    // The class is the name's colour and icon (and words on the phone line), so this column is the race alone.
     { key: "race", header: "Race", nowrap: true, cell: (r) => raceName(r.race) },
+    // Plain words: the name already carries the class colour and icon, and the phone line names it.
+    { key: "class", header: "Class", nowrap: true, cell: (r) => className(r.classToken) },
     {
       key: "guild", header: "Guild",
       cell: (r) => r.guild === null || isDisbandedGuild(r.guild) ? muted(guildWords(r.guild)) : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
     },
-    { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted(GEAR_NOT_READ) : metricValue("item-level", r.itemLevel) },
-    { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted(GEAR_NOT_READ) : metricValue("gear-score", r.gearScore) },
-    { key: "realm", header: "Realm", nowrap: true, cell: (r) => (r.region ? <><RegionChip region={r.region} /> {r.ruleset}</> : r.where) },
+    { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted(GEAR_NOT_READ) : gearValue("item-level", r.itemLevel) },
+    { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted(GEAR_NOT_READ) : gearValue("gear-score", r.gearScore) },
+    { key: "realm", header: "Region", nowrap: true, cell: (r) => (r.region ? <><RegionChip region={r.region} /> {r.ruleset}</> : r.where) },
     { key: "seen", header: guildHref ? "Last read" : "Last seen", numeric: true, sortable: true, cell: (r) => day(r.fetchedAt ?? r.lastSeen) },
   ];
   return guildHref ? all : all.filter((c) => !c.armory).map((c) => ({ ...c, sortable: false }));
@@ -98,7 +101,7 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
 
 /** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${!r.gearScore ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${!r.itemLevel ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -337,6 +340,7 @@ export default async function PlayersPage(props: { searchParams: Promise<PlayerS
                 action={active ? { href: "/players", label: "Clear filters" } : q ? { href: "/players", label: "Clear the search" } : { href: ARMORY_SUBMIT_PATH, label: "Add a character" }}
               />
             )}
+            {rows.length > 0 && armory && <p className="text-meta text-muted">Gear Score weighs each item level by its slot&apos;s stat budget, so it can rank characters differently from item level.</p>}
             {directory && directory.rows.length > 0 && <ArmoryCredit at={newest(directory.rows.map((r) => r.fetchedAt))} />}
             {sightings.length > 0 && <>
               <h3 className="text-h2-sm text-fg">Seen by the addon</h3>

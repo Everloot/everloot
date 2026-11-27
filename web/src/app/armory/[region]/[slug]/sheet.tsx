@@ -22,11 +22,12 @@ const Pair = ({ label, children }: { label: string; children: ReactNode }) => (
 const RANKED_ITEM_LEVEL = "Ranked item level";
 
 /**
- * An item level of 0 while something is worn (a level 1 character: most slots empty and counting 0) reads as a dash
- * that says why on hover, not a 0 that looks like a missing read.
+ * An item level or Gear Score of 0 reads as a dash, as /players shows it, not a 0 that looks like a missing read. While
+ * something is worn (a level 1 character: most slots empty and counting 0) the dash says why on hover.
  */
 function itemLevelValue(c: ArmoryCharacter, value: number, shown: ReactNode): ReactNode {
-  return value === 0 && c.equipment.length > 0 ? <span title="Under 1: most slots are empty and count 0">—</span> : shown;
+  if (value !== 0) return shown;
+  return c.equipment.length > 0 ? <span title="Under 1: most slots are empty and count 0">—</span> : "—";
 }
 
 /**
@@ -38,7 +39,7 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
   const items: [string, ReactNode][] = [
     // The number the item-level board ranks (its formula on the dt); the sheet's Blizzard average is a second number.
     ...(c.itemLevel !== null ? [[RANKED_ITEM_LEVEL, itemLevelValue(c, c.itemLevel, metricValue("item-level", c.itemLevel))] as [string, ReactNode]] : []),
-    ...(c.gearScore !== null ? [["Gear Score", metricValue("gear-score", c.gearScore)] as [string, ReactNode]] : []),
+    ...(c.gearScore !== null ? [["Gear Score", itemLevelValue(c, c.gearScore, metricValue("gear-score", c.gearScore))] as [string, ReactNode]] : []),
     ...(c.honorableKills !== null ? [["Honorable kills", metricValue("honorable-kills", c.honorableKills)] as [string, ReactNode]] : []),
     ...(d?.achievements ? [["Achievements", d.achievements.rows.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
     ...(d?.quests ? [["Quests completed", d.quests.completed.length.toLocaleString("en-US")] as [string, ReactNode]] : []),
