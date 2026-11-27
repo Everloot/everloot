@@ -8,10 +8,19 @@ import { bossKillSyncOn, instanceClearsOn } from "./boss-kill-sync";
 import { dungeonsAndRaids, instanceClears } from "./dungeon-clears";
 import { instanceHref, instanceRows } from "./instances";
 import { loadInstanceFacts } from "./rollup-compute";
+import { loadStoredInstanceFacts } from "./instance-facts-store";
+import type { InstanceFacts } from "@kb/instances";
+
+/** The instance facts from their small stored file (instance-facts-store.ts); without it, from the whole aggregate set. */
+async function instanceFacts(): Promise<InstanceFacts | null> {
+  const stored = await loadStoredInstanceFacts();
+  if (stored) return stored.instances;
+  const facts = await loadInstanceFacts().catch(() => null);
+  return facts && !facts.unreachable ? facts : null;
+}
 
 async function catalogueData() {
-  const facts = await loadInstanceFacts().catch(() => null);
-  const available = facts && !facts.unreachable ? facts : null;
+  const available = await instanceFacts();
   const catalogue = progressionCatalogue(available);
   const pages = instanceRows(available ? { instances: available } : {});
   const links = Object.fromEntries([...pages].map(([id, r]) => [id, instanceHref(id, r.name)]));

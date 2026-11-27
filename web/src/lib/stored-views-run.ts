@@ -8,6 +8,7 @@ import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
 import type { AggregateSet } from "@/lib/aggregate-set";
 import { writeSearchNames } from "@/lib/search-names-store";
 import { writeFarmAreas } from "@/lib/farm-areas-store";
+import { writeInstanceFacts } from "@/lib/instance-facts-store";
 import { writeNpcFacts } from "@/lib/npc-facts-store";
 import { writeRankingWeeks } from "@/lib/ranking-weeks-store";
 import { rankingWeeks } from "@/lib/rankings";
@@ -98,6 +99,7 @@ export interface StoredViewsResult {
   aggregates: (Written & { bytes?: number }) | null;
   searchNames: (Written & { bytes?: number }) | null;
   farmAreas: (Written & { bytes?: number }) | null;
+  instanceFacts: (Written & { bytes?: number }) | null;
   rankingWeeks: (Written & { weeks?: number; bytes?: number }) | null;
   auctionHistory: (Written & { items?: number }) | null;
   professions: (Written & { bytes?: number }) | null;
@@ -180,6 +182,9 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   // and leather profession pages never parse the aggregates on the site Worker. Written whenever its stamp is not the
   // snapshot's: the set is built then anyway for the aggregates, and a missing file is caught up by the next run.
   const farmAreas = await step("farmAreas", "farm areas", () => writeFarmAreas({ added, rebuild, dataAsOf }, { build: aggregateSet }));
+  // The instance entrances and encounters (lib/instance-facts-store.ts), about 160 KB from the same set, so the armory
+  // character and guild pages never parse the aggregates for their progression. Same rule as the farm areas.
+  const instanceFacts = await step("instanceFacts", "instance facts", () => writeInstanceFacts({ added, rebuild, dataAsOf }, { build: aggregateSet }));
   // Nothing after this reads the set; the corpus stays for the views below.
   aggregatesRead = null;
   releaseKept();
@@ -230,7 +235,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, npcFacts, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, rankingWeeks: rankingWeeksView, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
+  return { settled, itemView, npcFacts, aggregates, searchNames, farmAreas, instanceFacts, auctionHistory, professions, mapPins, databaseActivity, rankingWeeks: rankingWeeksView, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**

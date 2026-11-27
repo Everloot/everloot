@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { PublicGuildHistory, PublicHistory } from "./progression-store";
-const state = vi.hoisted(() => ({ query: vi.fn(), facts: vi.fn(), caches: [] as unknown[][] }));
+const state = vi.hoisted(() => ({ query: vi.fn(), facts: vi.fn(), stored: vi.fn(), caches: [] as unknown[][] }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown, ...args: unknown[]) => { state.caches.push(args); return fn; } }));
 vi.mock("./supabase/server", () => ({ authQuery: state.query, getUser: () => { throw new Error("Public progression must not read sessions"); } }));
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: state.facts }));
+vi.mock("./instance-facts-store", () => ({ loadStoredInstanceFacts: state.stored }));
 import { loadGuildProgression, loadGuildProgressionRanking, loadCharacterProgression, loadInstanceClears, loadRosterProgression } from "./progression";
 import { createCloudProgressionStore, progressionStore } from "./progression-store";
 
@@ -16,6 +17,7 @@ beforeEach(() => {
   vi.stubEnv("SUPABASE_URL", "https://example.invalid");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-only");
   state.facts.mockResolvedValue({ entrances: [{ installId: "invented-observer", instanceMapId: 33, name: "Invented Dungeon", instanceType: "party", mapId: 1, x: 20, y: 30 }], encounters: [], unreachable: false });
+  state.stored.mockResolvedValue(null);
   state.query.mockImplementation(async (path: string) => path === "rpc/public_boss_kills" ? rows : rows.map((r) => ({ ...r, guild_slug: "star-watch", guild_name: "Star Watch" })));
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -68,6 +70,15 @@ test("only observed-open instances score", async () => {
 test("unavailable facts are unknown availability", async () => {
   state.facts.mockRejectedValue(new Error("down"));
   expect((await loadCharacterProgression("us", slugs[0])).instances.every((r) => r.availability === "unknown")).toBe(true);
+});
+test("with the stored instance facts, armory progression never reads the aggregate set; without them it does", async () => {
+  state.stored.mockResolvedValue({ dataAsOf: null, instances: { entrances: [], encounters: [{ installId: "invented-observer", encounterId: 2748, name: "Invented Boss", instanceMapId: 33, success: true, npcIds: [] }] } });
+  expect((await loadGuildProgression(members)).score).toBe(5);
+  expect((await loadCharacterProgression("us", slugs[0])).instances.find((r) => r.id === 33)?.availability).toBe("open");
+  expect(state.facts).not.toHaveBeenCalled();
+  state.stored.mockResolvedValue(null);
+  expect((await loadGuildProgression(members)).score).toBe(5);
+  expect(state.facts).toHaveBeenCalledTimes(1);
 });
 test("public reads use five-minute caches invalidated by character and guild hides", () => {
   expect(state.caches).toEqual([

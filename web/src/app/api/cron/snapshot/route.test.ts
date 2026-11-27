@@ -24,6 +24,8 @@ const searchNames = vi.hoisted(() => ({ writeSearchNames: vi.fn() }));
 vi.mock("@/lib/search-names-store", () => searchNames);
 const farmAreas = vi.hoisted(() => ({ writeFarmAreas: vi.fn() }));
 vi.mock("@/lib/farm-areas-store", () => farmAreas);
+const instanceFacts = vi.hoisted(() => ({ writeInstanceFacts: vi.fn() }));
+vi.mock("@/lib/instance-facts-store", () => instanceFacts);
 const npcFactsStore = vi.hoisted(() => ({ writeNpcFacts: vi.fn(), loadStoredNpcFacts: vi.fn(async () => null) }));
 vi.mock("@/lib/npc-facts-store", () => npcFactsStore);
 const rankingWeeksStore = vi.hoisted(() => ({ writeRankingWeeks: vi.fn() }));
@@ -49,6 +51,7 @@ beforeEach(() => {
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
   searchNames.writeSearchNames.mockReset().mockResolvedValue({ written: false });
   farmAreas.writeFarmAreas.mockReset().mockResolvedValue({ written: false });
+  instanceFacts.writeInstanceFacts.mockReset().mockResolvedValue({ written: false });
   npcFactsStore.writeNpcFacts.mockReset().mockResolvedValue({ written: false });
   rankingWeeksStore.writeRankingWeeks.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
