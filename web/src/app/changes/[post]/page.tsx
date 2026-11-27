@@ -5,8 +5,10 @@ import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
-import { GAME_LABEL, TYPE_LABEL, loadTimeline, loadWriteups, postIdOfSegment, postPath, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
-import { loadSiteAssets } from "@/lib/game-assets";
+import { GAME_LABEL, TYPE_LABEL, loadTimeline, loadWriteups, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
+import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { blueWriteupJsonLd, breadcrumbJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { mentionIndex, siteSpellNames, type MentionIndex } from "@/lib/spell-mentions";
@@ -117,11 +119,15 @@ function Nearby({ newer, older }: { newer: ChangeEntry | null; older: ChangeEntr
 export default async function BluePostPage(props: Props) {
   const segment = (await props.params).post;
   const found = await find(segment);
+  // The bundled posts (the build's render, or a store outage) may lack this post: its page, or its 404, is kept seconds.
+  const timelineDown = await keepBrieflyIf(await timelineDegraded());
   if (!found) notFound();
   if (`/changes/${segment}` !== found.path) permanentRedirect(found.path);
   const { entry, all, path, writeup } = found;
 
   const assets = await loadSiteAssets();
+  // Spell tooltips need the asset files: a failed read is kept seconds too.
+  const degraded = timelineDown || await keepBrieflyIf(siteAssetsFailed(assets));
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
   const excerpt = clampExcerpt(entry.excerpt);
   const day = entry.at.slice(0, 10);
@@ -140,6 +146,7 @@ export default async function BluePostPage(props: Props) {
   return (
     <Container width="wide" className="grid gap-12 lg:grid-cols-[minmax(0,48rem)_minmax(0,1fr)]">
       <article data-blue-post className="min-w-0">
+        <EdgeDegraded when={degraded} />
         <JsonLd data={breadcrumbJsonLd([...trailFor("/changes")!, { name: entry.title, path }])} />
         {writeup && (
           <JsonLd data={blueWriteupJsonLd({ title: entry.title, description: describe(found), path, reviewedOn: writeup.reviewed.on, original: { url: entry.url, at: entry.at } })} />

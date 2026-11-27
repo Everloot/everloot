@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl, stripBelow } from "@/components/ui";
-import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
+import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
-import { loadSiteAssets } from "@/lib/game-assets";
+import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { changesJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { mentionIndex, siteSpellNames } from "@/lib/spell-mentions";
@@ -103,6 +104,8 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   // The game's icon and tooltip on spells the posts name, only when the asset URL is set and the upload has them.
   const assets = await loadSiteAssets();
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
+  // The bundled posts or no spell art (a store outage): the edge keeps this render a minute, not its five.
+  const degraded = siteAssetsFailed(assets) || await timelineDegraded();
 
   const typeLabel = (e: ChangeEntry) => e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type];
   const isBluePost = (e: ChangeEntry) => e.type !== "build" && (e.source === "forum" || e.source === "news" || e.source === "bluesky");
@@ -217,6 +220,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded} />
       <article>
         <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown.map((e) => e.source === "manual" ? { ...e, at: e.at.slice(0, 10), author: "Everloot" } : e) })} />
         <DataTitle

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "@/components/Link";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { filterTimeline, loadTimeline, type ChangeEntry } from "@/lib/changes";
+import EdgeDegraded from "@/components/EdgeDegraded";
+import { filterTimeline, loadTimeline, timelineDegraded, type ChangeEntry } from "@/lib/changes";
+import { keepBrieflyIf } from "@/lib/degraded-render";
 import { hubIndexable, loadNews, publishedPosts } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import ChangeList from "../changes/change-list";
@@ -34,8 +36,11 @@ export default async function NewsHub() {
   const posts = publishedPosts(loadNews());
   // Who wrote it is checked before the six newest are taken, so an Everloot entry can neither show nor push one out.
   const blizzard = filterTimeline(await loadTimeline(), "all", "forever").filter(fromBlizzard).slice(0, FROM_BLIZZARD);
+  // Drawn from the bundled posts (the build's render, or a store outage): kept seconds, not the hour.
+  const degraded = await keepBrieflyIf(await timelineDegraded());
   return (
     <Container width="wide">
+      <EdgeDegraded when={degraded} />
       <PageHeader trail={trailFor("/news")!} title="News" lede={LEDE} meta={<a href="/news/feed.xml" className={LINK}>RSS</a>} />
       <div className="space-y-12">
         {posts.length === 0 ? (

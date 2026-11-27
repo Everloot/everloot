@@ -5,14 +5,16 @@ import JsonLd from "@/components/JsonLd";
 import { Card, PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
-import { couldBeBluePost, loadTimeline, postPathForUrl } from "@/lib/changes";
+import EdgeDegraded from "@/components/EdgeDegraded";
+import { couldBeBluePost, loadTimeline, postPathForUrl, timelineDegraded } from "@/lib/changes";
+import { keepBrieflyIf } from "@/lib/degraded-render";
 import { newsArticleJsonLd } from "@/lib/jsonld";
 import { FIGURE_SIZE, postFigure } from "@kb/news/post";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import { NewsCard } from "../news-card";
 import { loadWiki, publishedPage } from "@/lib/wiki";
-import { resolveTokens } from "@/lib/wiki-names";
+import { readTokens } from "@/lib/wiki-names";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
 
 /**
@@ -64,7 +66,8 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   if (!post) notFound();
 
   const wiki = loadWiki();
-  const ctx: TextContext = { tokens: await resolveTokens(post), pages: (s) => publishedPage(wiki, s), linkable: (href) => {
+  const read = await readTokens(post);
+  const ctx: TextContext = { tokens: read.tokens, pages: (s) => publishedPage(wiki, s), linkable: (href) => {
     const target = href.match(/^\/(?:beta\/)?news\/([^/?#]+)\/?(?:[?#].*)?$/);
     return !target || (target[1] !== post.slug && publishedPost(news, target[1]) !== null);
   } };
@@ -75,7 +78,10 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   const sources = sourceNames(post);
   // A source that is a Blizzard post Everloot keeps a page for links that page too. Only a source on the forums or
   // Bluesky can be one, so a post citing nothing there never loads the timeline (and keeps its hourly rebuild).
-  const timeline = post.sources.some((s) => couldBeBluePost(s.url)) ? await loadTimeline() : [];
+  const bluePosts = post.sources.some((s) => couldBeBluePost(s.url));
+  const timeline = bluePosts ? await loadTimeline() : [];
+  // A token name or the timeline that could not be read (the build's render, or an outage): kept seconds, not the hour.
+  const degraded = await keepBrieflyIf(read.degraded || (bluePosts && await timelineDegraded()));
   const minutes = readingMinutes(post.blocks);
   // Contents from the body's own headings; a post with fewer than two needs none. Sources and Related appear once each.
   const headings = body.blocks.flatMap((b, i) => (b.type === "heading" ? [{ i, id: anchor(i, b.text), label: b.text }] : []));
@@ -102,6 +108,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
   return (
     <div data-news-article className={`mx-auto w-full max-w-[66rem] ${ARTICLE}`}>
       <ReadingLayout items={toc}>
+        <EdgeDegraded when={degraded} />
         <JsonLd data={newsArticleJsonLd({ title: post.title, description: postDescription(post), path, published: post.published, modified: lastChanged(post), author: post.author, ...(post.hero ? { image: post.hero.share ?? post.hero.src } : {}) })} />
         <article data-news-post>
           <PageHeader trail={trail} title={post.title} lede={<span className="text-base leading-relaxed">{post.summary}</span>} />

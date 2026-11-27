@@ -187,6 +187,21 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
   await expect(RealmPage(realm("forever", { page: "9" }))).rejects.toThrow("NOT_FOUND");
 });
 
+test("a realm filtered to a region it is not in says so in its header, links to its prices and offers no addon", async () => {
+  const us = scans(dayAgo(0), [[2589, 200, 205]], "CAMWOW US1 Realm 4 PvP");
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), us, today), dataAsOf: today.toISOString() });
+  const html = await realmHtml("camwow-us1-realm-4-pvp", { region: "eu" });
+  const words = text(html);
+  expect(words).not.toContain("No public scan yet");
+  expect(words).toContain("This realm isn't in EU");
+  expect(words).toContain("CAMWOW US1 Realm 4 PvP is not in EU, so this region filter hides its prices.");
+  expect(html).toMatch(/<a href="\/tools\/auctions\/camwow-us1-realm-4-pvp">Show its prices<\/a>/);
+  expect(html).not.toContain('href="/addon"');
+  expect(html).not.toContain("data-empty-state");
+  // The same realm with no filter keeps its newest scan in the header.
+  expect(text(await realmHtml("camwow-us1-realm-4-pvp"))).toContain(`Newest scan ${todayText}`);
+});
+
 test("an empty realm or house shows the meter at its count, says why, and is not indexed", async () => {
   const html = await realmHtml("nightfall");
   expect(text(html)).toContain("No public prices in Nightfall yet: a price shows once 3 players scan the same item there.");

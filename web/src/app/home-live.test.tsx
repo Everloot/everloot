@@ -26,6 +26,7 @@ const live = vi.hoisted(() => ({
   week: null as HomeWeek | null,
   coverage: null as CoverageSummary | null,
   timeline: undefined as ChangeEntry[] | undefined,
+  timelineDown: false,
 }));
 vi.mock("@/lib/coverage-summary", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/coverage-summary")>()),
@@ -33,7 +34,7 @@ vi.mock("@/lib/coverage-summary", async (importOriginal) => ({
 }));
 vi.mock("@/lib/changes", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/changes")>();
-  return { ...real, loadTimeline: async () => live.timeline ?? real.loadTimeline() };
+  return { ...real, loadTimeline: async () => live.timeline ?? real.loadTimeline(), timelineDegraded: async () => live.timelineDown };
 });
 vi.mock("@/lib/home-live", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/home-live")>()),
@@ -78,6 +79,7 @@ beforeEach(() => {
   live.week = WEEK;
   live.coverage = COVERAGE;
   live.timeline = undefined;
+  live.timelineDown = false;
   kept.calls = [];
 });
 
@@ -186,6 +188,12 @@ test.each(["newest", "ladder", "week", "coverage"] as const)("when the %s read f
   expect(html).toMatch(DEGRADED_TAG);
   expect(shortened()).toHaveLength(1);
   expect(shortened()[0].revalidate).toBeLessThanOrEqual(15);
+});
+
+test("drawn from the bundled posts (no blue store, as on the build), the render is marked degraded and kept only seconds", async () => {
+  live.timelineDown = true;
+  expect(await render()).toMatch(DEGRADED_TAG);
+  expect(shortened()).toHaveLength(1);
 });
 
 test("with the guild pages off, the missing ladder is not a failure", async () => {

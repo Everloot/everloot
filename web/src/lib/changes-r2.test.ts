@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { forgetTimeline, loadTimeline, buildTimeline, groupAnnouncements, manualEntries } from "./changes";
+import { forgetTimeline, loadTimeline, buildTimeline, groupAnnouncements, manualEntries, timelineDegraded } from "./changes";
 import posts from "../../../kb/changes/blue-posts.json";
 import builds from "../../../kb/changes/builds.json";
 import manual from "../../../kb/curated/manual-changes.json";
@@ -46,6 +46,19 @@ it.each(["network", "http", "json"])("falls back when the R2 read fails: %s", as
     return new Response(failure === "json" ? "invalid" : "unavailable", { status: failure === "http" ? 503 : 200 });
   }));
   expect(await loadTimeline()).toEqual(bundled());
+});
+
+// The deploy's build has no R2 settings: a page drawn from the bundled posts must say so (lib/degraded-render.ts).
+it("says the timeline is degraded when it is the bundled posts, and not when the store answered", async () => {
+  vi.stubEnv("R2_ACCOUNT_ID", "");
+  expect(await timelineDegraded()).toBe(true);
+  forgetTimeline();
+  configure();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("unavailable", { status: 503 })));
+  expect(await timelineDegraded()).toBe(true);
+  forgetTimeline();
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ posts: [] })));
+  expect(await timelineDegraded()).toBe(false);
 });
 
 it("reads R2 posts through the blue tagged fetch cache", async () => {

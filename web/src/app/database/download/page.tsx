@@ -5,6 +5,8 @@ import type { ManifestFile } from "@kb/open-data/manifest";
 import { GAME_FILES_LABEL, OPEN_DATA_EXCLUDED, OPEN_DATA_METHOD, OPEN_DATA_NOT_YET, OPEN_DATA_READING, OPEN_DATA_VERIFY } from "@kb/open-data/text";
 import { Container, DataTable, DataTitle, Facts } from "@/components/ui";
 import { loadOpenData } from "@/lib/open-data";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { pageMetadata } from "@/lib/seo";
 import { LINK } from "../entity";
 
@@ -27,6 +29,8 @@ const P = "mt-2 max-w-reading text-sm text-fg-2";
 export default async function DownloadPage() {
   const loaded = await loadOpenData();
   const ok = loaded.state === "ok" ? loaded : null;
+  // A manifest that could not be read (the build's render, or an outage) is kept seconds, not five minutes.
+  const degraded = await keepBrieflyIf(loaded.state === "unreachable");
   const columns = (base: string) => [
     { key: "file", header: "File", cell: (f: ManifestFile) => <a href={`${base}/${f.path}`} className={LINK}>{f.path}</a> },
     { key: "rows", header: "Rows", numeric: true, cell: (f: ManifestFile) => n(f.rows) },
@@ -38,6 +42,7 @@ export default async function DownloadPage() {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded} />
       <article>
         <DataTitle title="Download the data" meta={ok ? `Made ${day(ok.manifest.generatedAt)} · data as of ${day(ok.manifest.dataAsOf)}` : "No export to download yet"} />
         <p className={P}>

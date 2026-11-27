@@ -9,13 +9,15 @@ import { CC_BY_SA, wikiArticleJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { isBound, linkedFrom, loadWiki, publishedPage, publishedPages, sectionsInOrder, TYPE_LABEL, wikiHref, wikiIndexable, wikiTitle, type PageType, type WikiPage } from "@/lib/wiki";
 import { isDungeonType, loadDungeonFacts } from "@/lib/wiki-dungeon";
-import { resolveTokens } from "@/lib/wiki-names";
+import { readTokens } from "@/lib/wiki-names";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { slugify } from "@kb/lore-slug";
 import { PREP_SECTION } from "@kb/wiki/page";
 import { ADVICE_NOTE, DungeonBosses, DungeonGlance, DungeonLoadingArt, DungeonRecordedFacts } from "../dungeon-facts";
-import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
+import { loadingArt, loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { loadDungeonRecords } from "@/lib/wiki-dungeon-records";
 import { WikiBlock, type TextContext } from "../wiki-text";
 
@@ -76,7 +78,8 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
   const page = publishedPage(wiki, slug);
   if (!page) notFound();
 
-  const ctx: TextContext = { tokens: await resolveTokens(page), pages: (s) => publishedPage(wiki, s) };
+  const read = await readTokens(page);
+  const ctx: TextContext = { tokens: read.tokens, pages: (s) => publishedPage(wiki, s) };
   const sections = sectionsInOrder(page);
   const inbound = linkedFrom(wiki, page.slug);
   const categories = page.categories.map((c) => wiki.categories.get(c) ?? c);
@@ -89,13 +92,17 @@ export default async function WikiArticle(props: { params: Promise<{ slug: strin
   const records = facts ? await loadDungeonRecords(facts.row) : null;
   // A build-time or transient storage failure must not persist as an hour-long page response.
   if (facts?.unreachable || records?.unavailable) noStore();
-  const art = facts ? loadingArt(await loadSiteAssets(), facts.row.instanceMapId) : null;
+  const assets = facts ? await loadSiteAssets() : null;
+  const art = facts ? loadingArt(assets, facts.row.instanceMapId) : null;
+  // A token name or the loading art that could not be read: kept seconds, not the hour.
+  const degraded = await keepBrieflyIf(read.degraded || Boolean(facts && siteAssetsFailed(assets))) || facts?.unreachable === true || records?.unavailable === true;
   const blocks = bound ? DATA_BLOCKS[page.type] : [];
   const path = wikiHref(page.slug);
   const trail = [...trailFor("/wiki")!, { name: page.title, path }];
 
   return (
     <Container width="reading">
+      <EdgeDegraded when={degraded} />
       <JsonLd data={wikiArticleJsonLd({ title: page.title, summary: page.summary, path, reviewedOn: page.reviewed?.on ?? null, about: boundEntity(page) })} />
       <article>
         <PageHeader

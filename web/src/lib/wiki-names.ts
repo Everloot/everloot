@@ -1,7 +1,7 @@
 import type { TokenKind } from "@kb/wiki/page";
 import { entityHref } from "@/components/EntityLink";
 import { factionHref, loadCatalog } from "@/lib/completion-lists";
-import { loadQuestNames } from "@/lib/game-assets";
+import { PRIVATE_UNREACHABLE, readQuestNames } from "@/lib/game-assets";
 import gameBuild from "@/data/game-data/build-version.json";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames, tokenNamer } from "@/lib/shown-item-names";
@@ -21,15 +21,25 @@ export const tokenKey = (kind: TokenKind, id: number) => `${kind}:${id}`;
  * Only the sources a page's tokens need are read.
  */
 export async function resolveTokens(page: Pick<WikiPage, "blocks">): Promise<Map<string, TokenTarget>> {
+  return (await readTokens(page)).tokens;
+}
+
+/**
+ * `resolveTokens`, and whether a source a token needed could not be read (its name may then read "Item N"): a kept
+ * page drawn that way is kept only briefly (lib/degraded-render.ts).
+ */
+export async function readTokens(page: Pick<WikiPage, "blocks">): Promise<{ tokens: Map<string, TokenTarget>; degraded: boolean }> {
   const ids: Record<TokenKind, Set<number>> = { item: new Set(), npc: new Set(), quest: new Set(), zone: new Set(), faction: new Set() };
   for (const b of page.blocks) for (const run of inlinesOf(b)) for (const t of run) if (t.kind === "entity") ids[t.entity].add(t.id);
 
-  const [shown, world, questWiki, catalog] = await Promise.all([
+  const [shown, world, questRead, catalog] = await Promise.all([
     ids.item.size ? loadShownNames() : null,
     ids.npc.size || ids.quest.size ? loadWorldFacts() : null,
-    ids.quest.size ? loadQuestNames(gameBuild.version) : null,
+    ids.quest.size ? readQuestNames(gameBuild.version) : null,
     ids.faction.size ? loadCatalog() : null,
   ]);
+  const questWiki = questRead === PRIVATE_UNREACHABLE ? null : questRead;
+  const degraded = shown?.degraded === true || world?.unreachable === true || questRead === PRIVATE_UNREACHABLE || (ids.faction.size > 0 && catalog === null);
   const nameOf = tokenNamer({ shown, world, questWiki });
 
   const out = new Map<string, TokenTarget>();
@@ -45,5 +55,5 @@ export async function resolveTokens(page: Pick<WikiPage, "blocks">): Promise<Map
     const faction = catalog?.factions.find((f) => f.factionId === id);
     out.set(tokenKey("faction", id), faction ? { name: faction.name, href: factionHref(faction.factionId, faction.name) } : { name: fallback("faction", id), href: null });
   }
-  return out;
+  return { tokens: out, degraded };
 }

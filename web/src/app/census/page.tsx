@@ -5,6 +5,7 @@ import { dataAgeLabel } from "@/lib/data-age";
 import { loadCensus } from "@/lib/rollup-compute";
 import { REPO_URL } from "@/lib/source";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
@@ -277,6 +278,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
   const icons = ready && !w.collecting ? await censusIcons() : {};
   return (
     <Container width="data">
+      <EdgeDegraded when={Boolean(unreachable)} />
       <article>
         <PageHeader
           trail={trailFor("/census")!}

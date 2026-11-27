@@ -18,7 +18,9 @@ import { loadCatalog } from "@/lib/talents/catalogs";
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import type { TalentCatalog } from "@/lib/talents/types";
 import { loadWiki, publishedPage, type Block } from "@/lib/wiki";
-import { resolveTokens } from "@/lib/wiki-names";
+import { readTokens } from "@/lib/wiki-names";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { guideLinkTarget, sitePath } from "@kb/guides/guide";
 import { slugify } from "@kb/lore-slug";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
@@ -116,8 +118,11 @@ export default async function GuidePage({ params }: Params) {
 
   const { catalog, freshness } = await freshnessOf(guide);
   const wiki = loadWiki();
+  const read = await readTokens(guide);
+  // A token name that could not be read (the build's render, or an outage): kept seconds, not the hour.
+  const degraded = await keepBrieflyIf(read.degraded);
   const ctx: TextContext = {
-    tokens: await resolveTokens(guide),
+    tokens: read.tokens,
     pages: (s) => publishedPage(wiki, s),
     // A link to another guide is drawn only while that guide is published, whatever reached main, and through a version's
     // prefix as well (/beta/guides/x shows the same page). Links off the site are not this page's to judge.
@@ -153,6 +158,7 @@ export default async function GuidePage({ params }: Params) {
 
   return (
     <ReadingLayout items={toc} meta={meta}>
+      <EdgeDegraded when={degraded} />
       <JsonLd data={published && guide.reviewed ? guideArticleJsonLd({ title: guide.title, summary: guide.summary, path, published, modified: guide.reviewed.on }) : null} />
       <article data-guide>
         <PageHeader

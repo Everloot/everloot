@@ -7,6 +7,8 @@ import { pageMetadata } from "@/lib/seo";
 import { coverageText, formatCopper, MARKET_RULE, marketCoverage, reportersText } from "@kb/market";
 import { handleStoredAuctionHistory } from "@kb/auction-history";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { keepBrieflyIf } from "@/lib/degraded-render";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { storedAuctionHistory } from "@/lib/auction-history-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
@@ -77,6 +79,8 @@ export default async function RealmItemPage(props: Props) {
   // The cron's stored days. With no stored file to read the history is unrecorded: the page never reads the whole corpus.
   const stored = row ? await storedAuctionHistory(realm, itemId) : null;
   const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : row ? STORAGE_UNREACHABLE : null;
+  // A rollup or stored history that could not be read is kept seconds, not five minutes.
+  const degraded = await keepBrieflyIf(market.state === null || (row !== null && stored === null));
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
@@ -93,6 +97,7 @@ export default async function RealmItemPage(props: Props) {
 
   return (
     <Container>
+      <EdgeDegraded when={degraded} />
       {row && v && (
         <JsonLd data={marketDatasetJsonLd({
           name: `${label} auction prices on ${realm}, ${row.house} auction house`,

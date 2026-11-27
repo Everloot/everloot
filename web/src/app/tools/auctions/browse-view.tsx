@@ -1,6 +1,7 @@
 import ClientCoins from "./ClientCoins";
 import type { AuctionHouse } from "@everloot/protocol";
 import Link from "@/components/Link";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { notFound, redirect } from "next/navigation";
 import { QUALITIES } from "@kb/item-taxonomy";
 import { MARKET_RULE } from "@kb/market";
@@ -118,6 +119,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const pageHref = (page: number) => ahHref(path, { ...q, page });
   const strip = <ResultStrip total={results.length} noun={results.length === 1 ? "item" : "items"} page={q.page} perPage={AH_PER_PAGE} href={pageHref} label="Result pages" />;
   const board = slug ? findBoard(realmWide, slug) : null;
+  // A realm with prices, filtered to a region it is not in: the header and the body say so, not that it has none.
+  const otherRegion = slug && q.region && stored && !board && findBoard(stored.boards(null), slug) ? q.region : null;
   // Freshness: the newest public day behind the shown prices, as every Auction House page states it; on the all-realms
   // page also when the file was rebuilt, which is not a new scan.
   const newest = newestScanDay(rows);
@@ -233,9 +236,16 @@ export async function browseView({ slug, search }: { slug: string | null; search
     body = <EmptyState message={`${rulesetName} opens after launch, and no realm is on ${rulesetName} yet.`} />;
   } else if (rows.length === 0 && ruleset) {
     body = <EmptyState message={`No public prices on ${rulesetName} realms${q.region ? ` in ${REGION_LABEL[q.region]}` : ""}${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
-  } else if (rows.length === 0 && slug && q.region && findBoard(stored.boards(null), slug)) {
-    // The realm has prices, just not in the region picked: say that, not that it has none.
-    body = <EmptyState message={`${realmName} is not in ${REGION_LABEL[q.region]}, so this region filter hides its prices.`} />;
+  } else if (otherRegion) {
+    // The realm has prices, just not in the region picked: say that and link them. There is nothing to scan here.
+    body = (
+      <Card>
+        <p className="text-fg-2" role="status">
+          {realmName} is not in {REGION_LABEL[otherRegion]}, so this region filter hides its prices.{" "}
+          <Link href={here({ region: undefined })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Show its prices</Link>
+        </p>
+      </Card>
+    );
   } else if (rows.length === 0) {
     const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
     body = slug
@@ -268,6 +278,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
 
   return (
     <Container width="data">
+      {/* A rollup that could not be read: the edge keeps this render a minute, not its five. */}
+      <EdgeDegraded when={!stored} />
       <article>
         <DataTitle
           title={realmName ? <RealmName name={realmName} /> : title}
@@ -276,7 +288,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <Facts items={[
               // With no prices to show, the time says when the rollup was last read, not that anything changed.
               ...(slug
-                ? [newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet"]
+                ? [otherRegion ? `This realm isn't in ${REGION_LABEL[otherRegion]}` : newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet"]
                 : rebuilt === null ? ["Rebuild time unrecorded"]
                 : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest, now)}`}</>]),
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
@@ -349,7 +361,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
           </div>
         </div>
         <div className="mt-8 space-y-4">
-          <Contribute />
+          {!otherRegion && <Contribute />}
           <div>
             <Disclosure summary="How are market values made?">
               <p>{MARKET_RULE}</p>

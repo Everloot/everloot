@@ -45,11 +45,10 @@ export function AssistantMessage({ m, onChoose = () => {}, onSave, onSaveItem }:
   });
   return (
     <div className="space-y-2">
-      {/* A model's answer is drawn as Markdown with its first sentence as the summary; search hits stay as written. */}
+      {/* A model's answer is drawn as Markdown with its first sentence as the summary; search hits are drawn the same
+          way without one, so their "- " pieces are a list, not bullets as text. */}
       <div ref={body}>
-        {m.model
-          ? <AnswerText text={m.text} summary />
-          : <div className="whitespace-pre-wrap break-words text-base leading-[1.6] text-fg">{shownText(m)}</div>}
+        <AnswerText text={shownText(m)} summary={Boolean(m.model)} />
       </div>
       {m.item && <ItemResult item={m.item} onChoose={onChoose} onSave={onSaveItem} />}
       {everloot && (
