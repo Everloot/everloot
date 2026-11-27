@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import GuildProfile from "@/components/guild-profile";
 import GuildCrest from "@/components/guild-crest";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Card, Container, Contribute, DataTitle, Disclosure, EmptyState, FilterBar, LinkTabs, SectionHeading, type FilterControl } from "@/components/ui";
 import { FARM_CATEGORIES, farmingAreas, inLevels, MOVED_CATEGORIES, type FarmCategory } from "@/lib/farming";

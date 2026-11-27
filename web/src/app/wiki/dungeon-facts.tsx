@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { bossLine, bossRows, instanceTitle, type InstancePlace } from "@/lib/instances";
 import { mapHref } from "@/lib/map-view";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { pageMetadata } from "@/lib/seo";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadCensus } from "@/lib/rollup-compute";
