@@ -427,6 +427,9 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
   // Debuffs not covered may still be possible with a talent, so the summary names the missing ones: they and the
   // missing buffs add up to the Missing list.
   const debuffsMissing = cov.debuffs.filter((f) => f.raid === "missing").length;
+  // Said apart as the buffs are: a debuff only a talent brings (Winter's Chill) is neither covered nor missing.
+  const debuffsPossible = cov.debuffs.filter((f) => f.raid === "possible").length;
+  const debuffsUnknown = cov.debuffs.filter((f) => f.raid === "unknown").length;
 
   const dragClass = drag ? (drag.source.kind === "class" ? drag.source.class : slots[drag.source.index]?.class ?? null) : null;
   const overSlot = drag?.over?.kind === "slot" ? drag.over.index : null;
@@ -675,7 +678,8 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
             <span role="status" aria-live="polite">
               Buffs for the whole raid: {cov.summary.covered} of {cov.buffs.length} yes, {cov.summary.cast} by cast,{" "}
               {cov.summary.possible} if talented, {cov.summary.unknown} unknown reach, {cov.summary.missing} missing.
-              Debuffs: {debuffsCovered} of {cov.debuffs.length}, {debuffsMissing} missing.
+              Debuffs: {debuffsCovered} of {cov.debuffs.length}, {debuffsPossible} if talented,{" "}
+              {debuffsUnknown > 0 && `${debuffsUnknown} unknown reach, `}{debuffsMissing} missing.
             </span>
           }
         >

@@ -105,4 +105,7 @@ test("ranks of one spell say which rank each is, so a name never repeats without
   const html = await renderToStaticMarkup(await ClassSpellsPage(params("warlock")));
   expect(html).toMatch(/href="\/database\/spells\/686"[^>]*>Shadow Bolt<(?:\/[^>]+>)*(?:<[^>]+>)*\s*Rank 1</);
   expect(html).toMatch(/href="\/database\/spells\/695"[^>]*>Shadow Bolt<(?:\/[^>]+>)*(?:<[^>]+>)*\s*Rank 2</);
+  // The rank sits on the name's own line (inside its row), so a ranked spell is no taller than an unranked one and
+  // the grid's rows stay even.
+  expect(html).toMatch(/href="\/database\/spells\/686"[^>]*>Shadow Bolt<\/a><span[^>]*>Rank 1<\/span><\/span><\/li>/);
 });

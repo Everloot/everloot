@@ -572,8 +572,9 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       <Card padding="none" className="!overflow-clip">
         {/* The build at a glance: which tree leads, the split, points left, the level it needs, and the link. */}
         <section aria-label="Build" className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-line px-4 py-2 md:gap-y-3 md:py-3">
-          {/* A phone puts the link beside the build and the figures under them; a wide screen keeps them on one line. */}
-          <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
+          {/* A phone puts the link beside the build and the figures under them; a wide screen keeps them on one line. Never
+              narrower than the class name, so the link wraps to the next line rather than covering it. */}
+          <div className="flex flex-1 items-center gap-3 lg:flex-none">
             {classIcon && <GameIcon src={classIcon} size={36} />}
             <p className="text-xl font-bold tracking-tight">
               <span className={classText}>{lead ?? catalog.className}</span>{" "}
@@ -644,9 +645,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
             room for a talent with focus. */}
         <div>
           <div ref={treeSwitch} className={`top-header z-10 border-b border-line bg-panel px-4 pb-2 pt-1 md:hidden ${switchSticks ? "[@media(min-height:37.5rem)]:sticky" : ""}`}>
-            {/* A long tree name wraps inside its button, and a word too long for it is hyphenated, rather than running
-                into the next one. */}
-            <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="min-w-0 whitespace-normal text-center leading-tight [overflow-wrap:anywhere] hyphens-auto">{t.name} {shownPerTree.get(t.id) ?? 0}</span> }))} />
+            {/* The points go under the tree's name, and a button is never narrower than its longest word, so a name such as
+                Demonology or Assassination never breaks inside a word; a two-word name (Beast Mastery) wraps at its space. */}
+            <div data-tree-switch className="[&_button]:min-w-min [&_button]:px-2">
+              <Segmented stretch label="Show tree" value={view} onChange={setView} options={catalog.trees.map((t, i) => ({ value: i, label: <span className="flex flex-col items-center whitespace-normal text-center leading-tight"><span>{t.name}</span> <span className="font-mono text-xs tabular-nums">{shownPerTree.get(t.id) ?? 0}</span></span> }))} />
+            </div>
             {/* The status line already reads every change out; this copy is for the eye only. During a preview it says which
                 point the trees show, since the preview's own controls are under the trees. */}
             <p aria-hidden="true" data-tree-status className="mt-1 text-xs text-fg-2">

@@ -91,10 +91,10 @@ export default async function ClassSpellsPage({ params }: Params) {
   // The class hub counts every spell with a level; this page says where each of those went.
   const placed = byLevel.levels.reduce((n, l) => n + l.spells.length, 0);
   const repeats = placed - count - apart.length;
+  // The rank sits on the name's line, so a ranked spell is no taller than an unranked one and the grid's rows stay even.
   const item = (id: number) => (
     <li key={id} className="min-w-0">
-      <NameCell href={`/database/spells/${id}`} icon={assets?.spellIcons.get(id)}>{names?.names.get(id) || `Spell ${id}`}</NameCell>
-      {ranks.has(id) && <span className="ml-2 text-meta text-fg-2">{`Rank ${ranks.get(id)}`}</span>}
+      <NameCell href={`/database/spells/${id}`} icon={assets?.spellIcons.get(id)} after={ranks.has(id) && <span className="shrink-0 text-meta text-fg-2">{`Rank ${ranks.get(id)}`}</span>}>{names?.names.get(id) || `Spell ${id}`}</NameCell>
     </li>
   );
 

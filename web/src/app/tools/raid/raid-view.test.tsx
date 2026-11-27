@@ -19,3 +19,13 @@ test("the art credit comes at the end of the page, after the lede and the questi
   expect(credit).toBeGreaterThan(html.indexOf("Fill a 10, 20 or 40 player"));
   expect(credit).toBeGreaterThan(html.indexOf("Can the addon fill in my raid?"));
 });
+
+test("the banner is not inside the page's column, so its full-width art lines up with the window", async () => {
+  // The banner's art is centred on its parent and as wide as the window: that only fills the window when the parent is
+  // <main>, not the left-aligned column, which left a black strip on the right of a wide screen.
+  const { default: RaidView } = await import("./RaidView");
+  const html = renderToStaticMarkup(await RaidView());
+  const banner = html.indexOf("data-banner=");
+  expect(banner).toBeGreaterThan(-1);
+  expect(html.indexOf("data-container=")).toBeGreaterThan(banner);
+});

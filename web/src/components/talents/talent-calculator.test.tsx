@@ -503,6 +503,21 @@ test("the phone's tree switch names each tree with its points and shows one tree
   expect(node(11).textContent).toContain("1/5");
 });
 
+test("the phone's tree switch never breaks a tree name inside a word: the points go under the name", async () => {
+  await render();
+  const options = [...switchBar().querySelectorAll<HTMLButtonElement>('[aria-label="Show tree"] button')];
+  for (const option of options) {
+    // "Demonology 0" read "Demonolo / gy 0" at 390 px: nothing in the button may break a word or hyphenate it.
+    for (const el of [option, ...option.querySelectorAll("*")]) expect(el.className).not.toMatch(/overflow-wrap:anywhere|break-all|hyphens-auto/);
+    // The name and its points are separate lines, so the name has the button's whole width.
+    const [name, points] = [...option.querySelectorAll("span > span")];
+    expect(name?.textContent).toMatch(/^(Left|Middle|Right)$/);
+    expect(points?.textContent).toBe("0");
+  }
+  // The switch lets each button be as wide as its longest word, never narrower.
+  expect(switchBar().querySelector("[data-tree-switch]")?.className).toContain("[&_button]:min-w-min");
+});
+
 test("Copy link stays in the build bar beside Save, and without it", async () => {
   await render();
   expect(button(/^Copy link/)?.closest('section[aria-label="Build"]')).not.toBeNull();
