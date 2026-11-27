@@ -194,6 +194,46 @@ describe("item tooltip, as the card and the page box draw it", () => {
   });
 });
 
+// A made-up pattern and the item it teaches, in the shard's shape.
+const PATTERN: ItemRecord = { ...base, n: "Pattern: Synthetic Vest", q: 1, l: 7, b: 1, c: 9, sc: 2, sp: 50, rq: ["Requires Tailoring (35)"], t: "Teaches a test." };
+const VEST: ItemRecord = { ...base, n: "Synthetic Vest", q: 2, l: 12, r: 7, b: 2, s: 5, c: 4, sc: 1, sp: 120, st: [7] };
+
+describe("a recipe and the item it teaches", () => {
+  test("the taught item's tooltip sits under the recipe's lines, above its sell price, with its name in its quality colour", () => {
+    const t = itemTooltip(input(PATTERN, { taught: { id: 9100, tip: tipOf(VEST), name: named(VEST.n), category: { class: null, subclass: null, slot: null, quality: { id: 2, name: "", slug: "" } } } }));
+    expect(t.card.lines).toEqual(["Binds when picked up", "Requires Tailoring (35)", "Item Level 7", '"Teaches a test."', "Sell Price: 50c"]);
+    expect(t.card.taught).toEqual({
+      id: 9100, title: "Synthetic Vest", quality: 2, color: null, at: 4,
+      lines: ["Binds when equipped", "Chest · Cloth", "[?] Armor", "+[?] Stamina", "Requires Level 7", "Item Level 12", "Sell Price: 1s 20c"],
+    });
+    // The taught item's [?] get their reasons under the box, as the recipe's would.
+    expect(t.card.notes).toEqual(itemTipText(VEST, []).why);
+    // The page box links the taught item's name to its page; the hover card takes no pointer.
+    expect(t.links["Synthetic Vest"]).toBe("/database/items/9100");
+    const page = drawn(t, true);
+    const block = page.querySelector<HTMLElement>("[data-card-taught]")!;
+    expect(block.querySelector("a")?.getAttribute("href")).toBe("/database/items/9100");
+    expect(block.querySelector("p")!.className).toContain("text-q-uncommon");
+    // In the box between the recipe's flavour text and its sell price.
+    expect(block.previousElementSibling!.textContent).toContain('"Teaches a test."');
+    expect(block.nextElementSibling!.textContent).toMatch(/^Sell Price:/);
+    expect(block.textContent).toContain("Sell Price:");
+    expect(drawn(t).querySelector("[data-card-taught] a")).toBeNull();
+  });
+
+  test("no taught block where the taught item's tooltip may not show, or the recipe's own may not", () => {
+    // The caller passes no `tip` for a taught item its gates hide (held back, unreleased): nothing of it is drawn.
+    const hidden = itemTooltip(input(PATTERN, { taught: { id: 9100, tip: undefined, name: null, category: null } }));
+    expect(hidden.card.taught).toBeUndefined();
+    expect(hidden.links["Item 9100"]).toBeUndefined();
+    expect(drawn(hidden).querySelector("[data-card-taught]")).toBeNull();
+    const gated = itemTooltip(input(PATTERN, { tip: undefined, taught: { id: 9100, tip: tipOf(VEST), name: named(VEST.n), category: null } }));
+    expect(gated.card.taught).toBeUndefined();
+    // A development leftover's name stays out, as in the lists.
+    expect(itemTooltip(input(PATTERN, { taught: { id: 9100, tip: tipOf(VEST), name: named("Monster - Synthetic Vest"), category: null } })).card.taught).toBeUndefined();
+  });
+});
+
 // A covered item in the shape of 19019's record (made-up numbers): its box must not change when the uncovered-item line lands.
 const COVERED: ItemRecord = { ...base, n: "Synthetic Blessed Blade", q: 5, l: 80, r: 60, b: 1, s: 13, c: 2, sc: 7, d: 1900, sp: 615_24, st: [3], fx: ["Chance on hit: Synthetic lightning."] };
 const LEATHER_HEAD = { class: { id: 4, name: "Armor", label: "Armor", slug: "armor" }, subclass: { id: 2, name: "Leather", slug: "leather" }, slot: { inventoryType: 1, name: "Head", slug: "head" }, quality: null };

@@ -7,7 +7,7 @@ import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, forgetSiteAssets, iconUrl,
   instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
 } from "./game-assets";
-import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
+import { itemTipText, qualityColor, tipLines, tooltipMoney, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
 import { itemIndex, memoryStore, shard0, siteManifest } from "./game-assets.fixture";
 
@@ -162,6 +162,22 @@ test("whether the build's item index was read, so a page may say the files hold 
   expect((await readItemTips(a, [30], memoryStore({}))).indexed).toBe(false);
   expect((await readItemTips(a, [30], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).indexed).toBe(false);
   expect((await readItemTips(a, [30], null)).indexed).toBe(false);
+});
+
+test("a stack size from a newer shard prints above the sell price; an older shard, or keys this reader does not know, still read", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  // A newer extractor's record: the stack size, and a key no reader knows yet (what a later shard may add).
+  const newer = { ...shard0, "9": { ...shard0["9"], ss: 20, zz: [1] } };
+  const read = await readItemTips(a, [9], memoryStore({ [`${FOLDER}/items.json`]: itemIndex, [`${FOLDER}/items/0.json`]: newer }));
+  expect(read.degraded).toBe(false);
+  const lines = read.tips.get(9)!.lines;
+  expect(lines.slice(-2)).toEqual(["Stacks to 20", `Sell Price: ${tooltipMoney(shard0["9"].sp)}`]);
+  // The shard the site reads today has no stack size: no line, and nothing marked unknown for it.
+  const older = (await readItemTips(a, [9], memoryStore(privateFiles))).tips.get(9)!;
+  expect(older.lines.some((l) => l.startsWith("Stacks to"))).toBe(false);
+  expect(older.partial).toBe(false);
+  // A stack of one prints nothing, as the game prints nothing.
+  expect(itemTipText({ ...shard0["9"], ss: 1 }).lines.some((l) => l.startsWith("Stacks to"))).toBe(false);
 });
 
 test("an item the files give only an icon for reads as an icon, not a tooltip, and is no broken record", async () => {

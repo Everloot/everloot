@@ -19,6 +19,7 @@ import { WORLD_MAP } from "./world-map";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
 import { itemTooltip } from "./item-tooltip";
+import { taughtItemId } from "./recipe-catalog";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
 import { CLIENT_EDGES } from "@kb/client-layer-file";
@@ -231,15 +232,21 @@ async function itemCard(id: number): Promise<SiteCardResult> {
   if (shown.unreachable || shown.degraded) return UNAVAILABLE;
   // The item page's test for its game file box; any other id may be unreleased content.
   if (!shown.showsTip(id)) return { status: 404, error: NOT_FOUND };
+  // A recipe's taught item, under the same gate as its own card: one no page shows is never read.
+  const taughtId = taughtItemId(id);
+  const taught = taughtId !== null && shown.showsTip(taughtId) ? taughtId : null;
   // As the item page's box: the numbers 3 installs agree on, with their installs, build and date.
-  const [files, reported] = await Promise.all([
-    loadSiteAssets().then((assets) => (assets || !assetsBaseUrl() ? readItemTips(assets, [id]) : null)),
+  const [files, reported, taughtReported] = await Promise.all([
+    loadSiteAssets().then((assets) => (assets || !assetsBaseUrl() ? readItemTips(assets, taught === null ? [id] : [id, taught]) : null)),
     loadCardFacts(id),
+    taught === null ? null : loadCardFacts(taught),
   ]);
   // A manifest that did not load (with its URL set), a private file that could not be read or is broken, or the aggregates.
-  if (!files || files.unreachable || files.degraded || reported.unreachable) return UNAVAILABLE;
+  if (!files || files.unreachable || files.degraded || reported.unreachable || taughtReported?.unreachable) return UNAVAILABLE;
   const filesTip = files.tips.get(id);
   const tip = filesTip && withReported(filesTip, reported);
+  const taughtFiles = taught === null ? undefined : files.tips.get(taught);
+  const taughtTip = taughtFiles && taughtReported ? withReported(taughtFiles, taughtReported) : undefined;
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
   // The set's pieces and bonuses, as the item page's box shows them: the bonus names are the private spell names file's,
   // so a failed read of it is a 503, never a cached card with "Spell N" in their place.
@@ -253,6 +260,10 @@ async function itemCard(id: number): Promise<SiteCardResult> {
       ...set,
       pieceName: (item) => shownItemName(item, shown.agreed, shown.matched?.names)?.name,
       spellName: (spell) => spells?.names.get(spell),
+    },
+    taught: taught === null ? undefined : {
+      id: taught, tip: taughtTip, name: shownItemName(taught, shown.agreed, shown.matched?.names, taughtTip),
+      category: categoryOf(CLIENT_TAXONOMY, taught), namesQuality: shown.matched?.names.get(taught)?.quality,
     },
   });
   return { status: 200, body: { type: "item", id, ...card } };

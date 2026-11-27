@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { DATA_SIZE, QUALITIES, tokens } from "@/design/tokens";
 import TooltipFrame from "@/components/ui/TooltipFrame";
 import TooltipLines from "@/components/ui/TooltipLines";
-import { qualityOf } from "@/components/ui/quality";
+import { QUALITY_TEXT, qualityOf } from "@/components/ui/quality";
 import { PLACEHOLDER } from "@/lib/placeholder";
 import GameIcon from "./GameIcon";
 
@@ -24,7 +24,24 @@ export interface CardContent {
   evidence?: { summary: string; lines: string[] };
   /** What the files lack for the item, in one muted line inside the box (lib/item-tooltip.ts). */
   missing?: string;
+  /** A recipe's taught item, drawn inside the box before `lines[at]` (lib/item-tooltip.ts). */
+  taught?: { id: number; title: string; quality: number | null; color: string | null; lines: string[]; at: number };
   foot: string | null;
+}
+
+const qualityFor = (q: number | null | undefined, color: string | null | undefined) =>
+  typeof q === "number" && q >= 0 && q <= 5 ? qualityOf(q) : QUALITIES.find((x) => tokens.dark[`q-${x}`] === color);
+
+/** The taught item under a recipe, as the game draws it: its name in its quality colour, then its lines. */
+function Taught({ item, href }: { item: NonNullable<CardContent["taught"]>; href?: string }) {
+  const quality = qualityFor(item.quality, item.color);
+  const title = href ? <a href={href} className="hover:underline focus-visible:underline">{item.title}</a> : item.title;
+  return (
+    <div data-card-taught className="my-2">
+      <p className={`text-[14px] font-semibold leading-[18px] [overflow-wrap:anywhere] ${quality ? QUALITY_TEXT[quality] : "text-fg"}`} style={!quality && item.color ? { color: item.color } : undefined}>{title}</p>
+      {item.lines.length > 0 && <TooltipLines lines={item.lines} />}
+    </div>
+  );
 }
 
 const ICON = 48;
@@ -37,8 +54,10 @@ const MARGIN = 8;
  * passes `links` and its region `label`.
  */
 export function GameCard({ card, links, label }: { card: CardContent; links?: Readonly<Record<string, string>>; label?: string }) {
-  const quality = typeof card.quality === "number" && card.quality >= 0 && card.quality <= 5 ? qualityOf(card.quality) : QUALITIES.find((q) => tokens.dark[`q-${q}`] === card.color);
-  const notes = card.notes?.length && card.lines.some((line) => line.includes(PLACEHOLDER)) ? card.notes : null;
+  const quality = qualityFor(card.quality, card.color);
+  const notes = card.notes?.length && [...card.lines, ...(card.taught?.lines ?? [])].some((line) => line.includes(PLACEHOLDER)) ? card.notes : null;
+  const at = card.taught ? Math.min(card.taught.at, card.lines.length) : card.lines.length;
+  const before = card.lines.slice(0, at), after = card.lines.slice(at);
   return (
     <div>
       <TooltipFrame
@@ -48,7 +67,9 @@ export function GameCard({ card, links, label }: { card: CardContent; links?: Re
         foot={card.foot ?? undefined}
         label={label}
       >
-        {card.lines.length > 0 ? <TooltipLines lines={card.lines} links={links} /> : null}
+        {before.length > 0 ? <TooltipLines lines={before} links={links} /> : null}
+        {card.taught && <Taught item={card.taught} href={links?.[card.taught.title]} />}
+        {after.length > 0 ? <TooltipLines lines={after} links={links} /> : null}
         {card.evidence && (
           // One line in the box; each number's own line on demand (a click on the page, the title on hover).
           <details data-card-evidence className="text-xs text-muted">
