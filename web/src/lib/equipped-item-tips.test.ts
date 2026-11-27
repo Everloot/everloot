@@ -35,6 +35,18 @@ test("an item is unknown to the files only after a complete read of this build's
   expect((await loadEquippedItems(null, items, store())).unknown.size).toBe(0);
 });
 
+test("the game files' item levels come from the files' records only, never from a card built from the armory's own fields", async () => {
+  const read = await loadEquippedItems(parseSiteManifest(siteManifest, BASE)!, [
+    { itemId: 9, name: "Linen Cloth", quality: "COMMON", level: null },
+    { itemId: 25, name: "Worn Shortsword", quality: "RARE", level: null },
+    // An icon only in the files: its card carries the armory's level, which is not the files'.
+    { itemId: 30, name: "Witchblade", quality: "EPIC", level: 70 },
+    { itemId: 31, name: "Nothing In The Files", quality: "RARE", level: null },
+  ], store());
+  expect([...read.levels]).toEqual([[9, 5], [25, 2]]);
+  expect((await loadEquippedItems(null, [{ itemId: 9, name: "Linen Cloth", quality: "COMMON" }], store())).levels.size).toBe(0);
+});
+
 test("an item with an icon only gets its type and slot from the client layer", async () => {
   const tips = await loadEquippedTips(parseSiteManifest(siteManifest, BASE)!, [{ itemId: 35, name: "Bent Staff", quality: "COMMON" }], store());
   // Item 35 is [35, Weapon, Staves, Two-Hand, Common] in the client layer.

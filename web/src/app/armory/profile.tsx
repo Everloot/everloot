@@ -33,8 +33,10 @@ const ICON = 40;
  * it, lib/equipped-item-tips.ts) has a nameless database page and a hover card that would 404, so it gets no link and
  * a tooltip from what Blizzard's armory read (name, quality, item level, slot) instead.
  */
-export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center }: {
+export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center, fromFiles }: {
   character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; unknown?: ReadonlySet<number>; heading?: boolean; center?: ReactNode;
+  /** The slots whose level is the game files', not the armory read's (lib/armory-file-levels.ts). */
+  fromFiles?: ReadonlySet<string>;
 }) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
   const slot = (key: string, mirror: boolean) => {
@@ -57,7 +59,9 @@ export function Equipment({ character: c, tips, unknownIcon = null, unknown: unk
       <div className="min-w-0 flex-1">
         <p className={`flex items-baseline gap-2 text-cell-2 text-muted ${mirror ? "lg:justify-end" : ""}`}>
           <span>{slotLabel(key)}</span>
-          {item?.level != null && <span className="font-mono tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}
+          {item?.level != null && (fromFiles?.has(key)
+            ? <span className="font-mono tabular-nums text-fg-2 underline decoration-dotted underline-offset-4" title="Item level from the game files" aria-label={`Item level ${item.level}, from the game files`}>{item.level}</span>
+            : <span className="font-mono tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>)}
         </p>
         {item ? (tip ? <ItemTip tip={tip} icon={null}>{name!}</ItemTip> : name) : <p className="text-cell text-muted">Not equipped</p>}
       </div>
@@ -66,6 +70,9 @@ export function Equipment({ character: c, tips, unknownIcon = null, unknown: unk
   return <section aria-labelledby={heading ? "armory-gear" : undefined} aria-label={heading ? undefined : "Equipment"} className="space-y-3">
     {heading && <SectionHeading id="armory-gear">Equipment</SectionHeading>}
     {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
+    {fromFiles && fromFiles.size > 0 && <p data-file-levels className="text-meta text-muted">
+      Blizzard&apos;s armory no longer sends item levels, so the levels underlined with dots are the game files&apos; levels for the same items.
+    </p>}
     <div data-paper-doll className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,19rem)_minmax(0,1fr)]">
       <ol aria-label="Left side" className="grid content-start gap-2">{LEFT.map((k) => slot(k, false))}</ol>
       {center

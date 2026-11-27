@@ -24,6 +24,16 @@ test("the two item levels each say what they are: the ranked 17-slot number and 
   expect(summary).toMatch(/Blizzard&#x27;s average item level<\/dt><dd[^>]*>58</);
 });
 
+test("a ranked item level and Gear Score computed from the game files' levels say so on the page", () => {
+  const c = armoryCharacter({ itemLevel: 7, gearScore: 8 });
+  const facts = renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} computed={{ itemLevel: true, gearScore: true }} />);
+  expect(facts).toMatch(/Ranked item level<\/dt><dd[^>]*>7</);
+  expect(facts).toContain("Ranked item level and Gear Score are computed on this page from the game files&#x27; item levels");
+  expect(facts).toContain("not ranked until a read stores them");
+  // Stored numbers say nothing of the kind.
+  expect(renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} />)).not.toContain("computed on this page");
+});
+
 test("an item level of 0 while gear is worn shows a dash, not 0", () => {
   const c = armoryCharacter({ level: 1, itemLevel: 0, averageItemLevel: 0 });
   expect(renderToStaticMarkup(<CharacterFacts character={c} lastRead={null} now={0} />)).toMatch(/Ranked item level<\/dt><dd[^>]*><span[^>]*>—</);
