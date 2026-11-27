@@ -5,7 +5,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
-import { GAME_LABEL, TYPE_LABEL, foldTitleDay, fullerCopy, loadTimeline, loadWriteups, postDay, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry, type TitleDayRow } from "@/lib/changes";
+import { GAME_LABEL, TYPE_LABEL, foldTitleDay, fullerCopy, loadTimeline, loadWriteups, newestFirst, postDay, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry, type TitleDayRow } from "@/lib/changes";
 import { keepBrieflyIf } from "@/lib/degraded-render";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
@@ -136,11 +136,13 @@ export default async function BluePostPage(props: Props) {
   // The copy whose words are shown: the header names its forum and time.
   const shown = fuller ?? entry;
   const day = postDay(entry);
-  // Newest first, as the timeline lists them.
-  const posts = all.filter((e) => e.game === entry.game && isPost(e)).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
-  const at = posts.findIndex((e) => e.id === entry.id);
-  const newer = at > 0 ? posts[at - 1] : null;
-  const older = at >= 0 && at < posts.length - 1 ? posts[at + 1] : null;
+  // Newest day first, as the timeline lists them; Newer and Older are the rows either side of this post's row
+  // (one per title and day), so they are never another post under this one's title that day.
+  const posts = all.filter((e) => e.game === entry.game && isPost(e)).sort(newestFirst);
+  const rows = foldTitleDay(posts);
+  const at = rows.findIndex((r) => r.posts.includes(entry));
+  const newer = at > 0 ? rows[at - 1].entry : null;
+  const older = at >= 0 && at < rows.length - 1 ? rows[at + 1].entry : null;
   // Each title and day is listed once around the page: this post, Newer and Older first, then Same day, then More from the author.
   const rowKey = (e: ChangeEntry) => `${postDay(e)}|${e.title}`;
   const listed = new Set([entry, newer, older].filter((e) => e !== null).map(rowKey));

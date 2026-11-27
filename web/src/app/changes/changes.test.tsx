@@ -122,6 +122,21 @@ test("pages keep the sort: newest first by default, oldest first on request", as
     expect(firstTitle(await page(params))).toBe(first);
   }
 });
+test("cards are in the order of the day they show: a reply after midnight UTC sits with the day its title names", async () => {
+  const titles = (html: string) => [...html.matchAll(/<h2[^>]*><a href="\/changes\/[^"]+"[^>]*>([^<]+)<\/a>/g)].map((m) => m[1]);
+  const post = (id: number, at: string, title: string): ChangeEntry => ({ ...entries[1], id: `forum:${id}`, at, title, url: `https://us.forums.blizzard.com/en/wow/t/x/${id}` });
+  timeline.entries = [
+    post(30863849, "2026-11-12T00:48:47.076Z", "WoW: Forever Hotfixes - November 11, 2026"),
+    post(30863700, "2026-11-12T00:30:00.000Z", "Share your screenshots"),
+    post(30860000, "2026-11-11T20:00:00.000Z", "Realm restarts"),
+  ];
+  try {
+    expect(titles(await page())).toEqual(["Share your screenshots", "WoW: Forever Hotfixes - November 11, 2026", "Realm restarts"]);
+    expect(titles(await page({ sort: "date" }))).toEqual(["Realm restarts", "WoW: Forever Hotfixes - November 11, 2026", "Share your screenshots"]);
+  } finally {
+    timeline.entries = entries;
+  }
+});
 test("markup in a title is escaped, not rendered", async () => {
   const html = await page();
   expect(html).toContain("Synthetic beta notice &lt;b&gt;");

@@ -9,7 +9,7 @@ import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
 import { keep } from "./kept";
 
 export {
-  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, manualEntries, parseFilter, postDay, postIdOfSegment,
+  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, manualEntries, newestFirst, parseFilter, postDay, postIdOfSegment,
   postPath, renderFeed, type BlueThread, type TitleDayRow, type ChangeEntry, type ChangeGame, type ChangeFilter,
 } from "@kb/changes";
 export type { BlueWriteup } from "@kb/blue-writeups";
