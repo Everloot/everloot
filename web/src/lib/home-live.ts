@@ -3,7 +3,12 @@ import { guildLadder } from "@kb/guilds";
 import { QUALITIES } from "@/design/tokens";
 import { loadDatabaseActivity } from "./database-activity-store";
 import type { PublicFact } from "./database-activity";
-import { loadSiteAssets, readItemTips } from "./game-assets";
+import { loadItemNames, loadQuestNames, loadSiteAssets, PRIVATE_UNREACHABLE, readItemTips } from "./game-assets";
+import gameBuild from "@/data/game-data/build-version.json";
+import type { Names } from "./names";
+import { loadStoredSearchNames } from "./search-names-store";
+import { shownSearchNamesFromStored } from "./shown-item-names";
+import { loadWikiEntityNames } from "./wiki-entity-names";
 import { loadStoredGuildLadder } from "./guild-ladder-store";
 import { GUILD_SEARCH_TAG, guildsOn, loadGuildData, raidsOpen, type GuildData } from "./guilds";
 import { loadStoredRankingWeeks } from "./ranking-weeks-store";
@@ -45,6 +50,30 @@ export function newestFacts(entries: readonly PublicFact[], tips: ReadonlyMap<nu
         ...(tip ? { icon: tip.icon, quality: QUALITIES.find((q) => q === tip.quality.toLowerCase()) ?? null } : {}),
       };
     });
+}
+
+const FALLBACK = { item: "Item", npc: "NPC", quest: "Quest", object: "Object" } as const;
+const PAGE_NAMES = { item: "items", npc: "npcs", quest: "quests", object: "objects" } as const;
+const isFallback = (e: PublicFact): e is PublicFact & { kind: keyof typeof FALLBACK } => e.kind in FALLBACK && e.name === `${FALLBACK[e.kind as keyof typeof FALLBACK]} #${e.id}`;
+
+/**
+ * The activity file names a fact only by the 3-install agreed name, else "Item #id". A fact under that fallback takes
+ * the name its own page shows (shown-item-names.ts: the game files and Warcraft Wiki names); one whose page has no
+ * name either keeps the fallback. Agreed names already are the pages' first choice, so they stay.
+ */
+export function pageNamed<T extends PublicFact>(entries: readonly T[], names: Names | null): T[] {
+  if (!names) return [...entries];
+  return entries.map((e) => {
+    const shown = isFallback(e) ? names[PAGE_NAMES[e.kind]].get(e.id) : undefined;
+    return shown ? { ...e, name: shown } : e;
+  });
+}
+
+/** The page names, read only when a shown fact needs one: the stored search names file, never the corpus (#1354). */
+async function loadPageNames(): Promise<Names> {
+  const [stored, read, quests, npcWiki] = await Promise.all([loadStoredSearchNames(), loadItemNames(gameBuild.version), loadQuestNames(gameBuild.version), loadWikiEntityNames("npc")]);
+  const empty = { names: { items: new Map(), npcs: new Map(), objects: new Map(), quests: new Map() }, candidates: new Map<number, string>() };
+  return shownSearchNamesFromStored(stored ?? empty, { matched: read === PRIVATE_UNREACHABLE ? null : read, quests, npcWiki });
 }
 
 export interface HomeLadder {
@@ -106,11 +135,13 @@ async function orNull<T>(read: () => Promise<T>): Promise<T | null> {
 
 const cachedNewest = unstable_cache(async (): Promise<HomeFact[]> => {
   const file = (await loadDatabaseActivity()) ?? failed("database activity");
-  const shown = newestFacts(file.entries);
-  const items = shown.filter((e) => e.kind === "item").map((e) => e.id);
+  const latest = [...file.entries].sort((a, b) => b.publicAt.localeCompare(a.publicAt)).slice(0, HOME_NEWEST);
+  // Page names are an extra too: without the name files a fact keeps the name the activity file gave it.
+  const entries = latest.some(isFallback) ? pageNamed(latest, await orNull(loadPageNames)) : latest;
+  const items = entries.filter((e) => e.kind === "item").map((e) => e.id);
   // Icons and quality are extras: without the asset files the names still show.
   const tips = items.length ? (await orNull(async () => (await readItemTips(await loadSiteAssets(), items)).tips)) ?? new Map() : new Map();
-  return newestFacts(file.entries, tips);
+  return newestFacts(entries, tips);
 }, ["home-newest"], { revalidate: KEEP_SECONDS });
 
 // Tagged with the guild search tag: recording a guild hide clears it at once, as it clears the guild pages.

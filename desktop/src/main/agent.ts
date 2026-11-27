@@ -149,13 +149,28 @@ export async function answer(options: AgentOptions): Promise<AgentReply> {
   throw new Error(`config.json: unknown provider type ${entry.type}`);
 }
 
+/** What a player reads in place of answer_sources' note to AI clients that it has nothing answering the question. */
+export const NO_RECORDED_ANSWER = "Everloot's data has no recorded answer to that yet. Related pages:";
+
+/**
+ * The notices answer_sources opens with that are meant for a player (kb/src/answer-sources.ts): no page held every
+ * word, or the words were read another way. Any other first line is a note to AI clients and is not shown.
+ */
+const VISITOR_NOTICE = /^(?:No page has every word|Read ".+" as ")/;
+/** answer_sources' note to AI clients that nothing it found answers the question, naming the tools to try instead. */
+const UNAVAILABLE_NOTE = /^answer_sources has no permitted evidence\b/;
+
 /**
  * answer_sources' text as the player reads it: a notice on its first line, then the labelled pieces with their indented
- * Source and More lines; the notes after them are for AI clients. The site's chat reads it the same way
- * (`evidenceLines` in web/src/lib/chat/agent.ts, which this main process does not import).
+ * Source and More lines; the notes after them are for AI clients, and so is a first line naming tools: when nothing
+ * answers the question, the player reads NO_RECORDED_ANSWER instead. The site's chat reads it the same way
+ * (`evidenceLines` in web/src/lib/chat/agent.ts, which this main process does not import): change both together.
  */
 export function evidenceLines(text: string): string {
-  return text.split("\n").filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && l.trim() !== "")).join("\n").trim();
+  const lines = text.split("\n");
+  const kept = lines.filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && VISITOR_NOTICE.test(l)));
+  if (UNAVAILABLE_NOTE.test(lines[0] ?? "") && kept.length) kept.unshift(NO_RECORDED_ANSWER);
+  return kept.join("\n").trim();
 }
 
 /** No provider: answer_sources' evidence for the question, verbatim and labelled. */
