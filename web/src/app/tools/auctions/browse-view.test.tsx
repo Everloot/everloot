@@ -149,3 +149,13 @@ test("a result row's item link loads on click, not all at once as the page opens
   const html = renderToStaticMarkup(<ItemLink id={2589} href="/tools/auctions/forever/2589" tip={undefined} names={new Map()} />);
   expect(html).toContain('<a href="/tools/auctions/forever/2589" data-prefetch="false">');
 });
+
+test("the page opens on its title: the Blizzard data link sits in the links row under it, beside the daily report", async () => {
+  const html = await hub({});
+  const title = html.indexOf("<h1");
+  const blizzard = html.indexOf('href="/blizzard-auctions"');
+  expect(title).toBeGreaterThanOrEqual(0);
+  expect(html.split('href="/blizzard-auctions"')).toHaveLength(2);
+  expect(blizzard).toBeGreaterThan(html.indexOf("</header>"));
+  expect(html).toMatch(/<p [^>]*>(?:<a href="\/tools\/auctions\/report"[^>]*>Daily market report and share image<\/a>)[^<]*<a href="\/blizzard-auctions"[^>]*>Blizzard auction house data<\/a><\/p>/);
+});

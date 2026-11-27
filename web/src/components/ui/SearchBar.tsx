@@ -197,7 +197,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setPicked(row.href)}
         onClick={() => setOpen(false)}
-        className={`flex h-9 items-center gap-3 px-3 text-cell ${i === active ? "bg-canvas" : ""}`}
+        className={`flex h-11 items-center gap-3 px-3 text-cell sm:h-9 ${i === active ? "bg-canvas" : ""}`}
       >
         {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
         {row.faction && <span role="img" aria-label={row.faction} className={`h-2 w-2 shrink-0 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} />}

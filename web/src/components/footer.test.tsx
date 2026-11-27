@@ -146,3 +146,20 @@ test("says when the beta ended and when the game launches, and from the launch i
     vi.useRealTimers();
   }
 });
+
+test("on phones every footer link outside a sentence takes a 44 px tall touch area, and desktop keeps its sizes", () => {
+  const markup = html();
+  const classOf = (re: RegExp) => (markup.match(re) ?? []).map((m) => m.match(/class="([^"]*)"/)![1].split(" "));
+  const groupLinks = classOf(/<a [^>]*>(?:About|Database|Get the addon)<\/a>/g);
+  expect(groupLinks.length).toBe(6);
+  for (const c of groupLinks) expect(c).toEqual(expect.arrayContaining(["min-h-11", "md:min-h-6"]));
+  const legal = classOf(/<a [^>]*>(?:Privacy policy|Accessibility)<\/a>/g);
+  expect(legal.length).toBe(2);
+  for (const c of legal) expect(c).toEqual(expect.arrayContaining(["min-h-11", "md:min-h-6"]));
+  for (const c of classOf(/<summary [^>]*>/g)) expect(c).toContain("min-h-11");
+  for (const c of classOf(/<a [^>]*aria-label="(?:Discord|GitHub)"[^>]*>/g)) expect(c).toEqual(expect.arrayContaining(["h-11", "w-11", "md:h-8", "md:w-8"]));
+  expect(classOf(/<a [^>]*href="\/"[^>]*>/g)[0]).toContain("tap-44");
+  expect(markup).toMatch(/<li class="[^"]*\[&amp;&gt;button\]:min-h-11 [^"]*md:\[&amp;&gt;button\]:min-h-6/);
+  // The build pill keeps its height: its links take the touch area as padding cancelled by an equal negative margin.
+  for (const c of classOf(/<a [^>]*>(?:files read|newest seen) [^<]*<\/a>/g)) expect(c).toEqual(expect.arrayContaining(["py-3.5", "-my-3.5", "md:py-0", "md:my-0"]));
+});

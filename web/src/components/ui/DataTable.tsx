@@ -1,5 +1,6 @@
 import Link from "./PendingLink";
 import type { ReactNode } from "react";
+import { sansWords } from "./num-cell";
 
 export type SortDirection = "asc" | "desc";
 
@@ -7,7 +8,7 @@ export interface Column<Row> {
   key: string;
   header: ReactNode;
   cell: (row: Row) => ReactNode;
-  /** Numbers, counts and ids: right-aligned, mono, tabular figures. */
+  /** Numbers, counts and ids: right-aligned, mono, tabular figures. Words in the cell ("Not read") stay sans. */
   numeric?: boolean;
   /** The column can be sorted; its header becomes a link when the table has `sortHref`. */
   sortable?: boolean;
@@ -112,7 +113,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
                     key={col.key}
                     className={`h-11 px-4 py-2 align-middle text-fg ${col.numeric ? "text-right font-mono tabular-nums" : "text-left"} ${col.nowrap || col.numeric ? "whitespace-nowrap" : ""}`}
                   >
-                    {col.cell(row)}
+                    {col.numeric ? sansWords(col.cell(row)) : col.cell(row)}
                   </td>
                 ))}
               </tr>
@@ -179,7 +180,7 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
                     key={col.key}
                     className={`dt-td${col.numeric ? " dt-num" : col.nowrap ? " dt-nowrap" : ""}${folds && i > 0 ? " dt-fold" : ""}`}
                   >
-                    {col.cell(row)}
+                    {col.numeric ? sansWords(col.cell(row)) : col.cell(row)}
                     {folds && i === 0 && <div className="dt-meta">{meta!(row)}</div>}
                   </td>
                 ))}

@@ -340,6 +340,29 @@ describe("DataTable", () => {
     expect(html).toContain('colSpan="2"');
     expect(html).toContain("data-empty-state");
   });
+
+  test("words in a numeric column are set in the sans face; digits, signs and short units stay mono", () => {
+    type Cell = { id: number; v: ReactNode };
+    const cells: Cell[] = [
+      { id: 1, v: "Not read" },
+      { id: 2, v: <span className="text-muted">Not known</span> },
+      { id: 3, v: <>12 <span className="text-cell-2">seen</span></> },
+      { id: 4, v: "1,204" },
+      { id: 5, v: "5g 64s" },
+      { id: 6, v: "—" },
+    ];
+    const cols: Column<Cell>[] = [{ key: "v", header: "Value", numeric: true, cell: (r) => r.v }];
+    for (const dense of [false, true]) {
+      const html = render(<DataTable dense={dense} caption="Values" columns={cols} rows={cells} rowKey={(r) => String(r.id)} />);
+      expect(html).toContain('<span class="font-sans">Not read</span>');
+      expect(html).toContain('<span class="text-muted"><span class="font-sans">Not known</span></span>');
+      expect(html).toContain('12 <span class="text-cell-2"><span class="font-sans">seen</span></span>');
+      // The cell keeps its tabular figures, so a word's neighbours still line up; numbers are untouched.
+      expect(html).toMatch(/>1,204<\/td>/);
+      expect(html).toMatch(/>5g 64s<\/td>/);
+      expect(html).toMatch(/>—<\/td>/);
+    }
+  });
 });
 
 describe("Facts list", () => {

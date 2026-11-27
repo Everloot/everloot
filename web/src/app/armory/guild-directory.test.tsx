@@ -478,8 +478,8 @@ describe("the guild home", () => {
     expect(out).toContain('aria-labelledby="addon-members"');
     expect(out).toContain("Ashka");
     expect(out).not.toContain("Usmir");
-    // A roster member the armory has not read shows the day the addon saw them.
-    expect(out).toMatch(/2026-11-07[^<]*<span[^>]*>seen<\/span>/);
+    // A roster member the armory has not read shows the day the addon saw them ("seen" in the sans face).
+    expect(out).toMatch(/2026-11-07[^<]*<span[^>]*><span class="font-sans">seen<\/span><\/span>/);
     vi.stubEnv("EVERLOOT_GUILDS", "");
     expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain("Ashka");
   });

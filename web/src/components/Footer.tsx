@@ -68,9 +68,10 @@ const LEGAL: Item[] = [
 const groupItems = (group: (typeof GROUPS)[number]): Item[] =>
   group.title === "Data and API" ? [...group.items, { label: "Source", href: sourceUrl(), external: true }] : group.items;
 
-const itemClass = "inline-flex min-h-8 min-w-6 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
-const legalClass = "inline-flex min-h-6 items-center hover:text-accent transition-colors";
-const iconClass = "inline-flex h-8 w-8 items-center justify-center rounded-control text-fg-2 hover:text-accent transition-colors";
+// Phones: a 44 px tall touch area on every link outside a sentence (a folded group's list, the legal row).
+const itemClass = "inline-flex min-h-11 min-w-6 items-center text-meta text-fg-2 hover:text-accent transition-colors md:min-h-6";
+const legalClass = "inline-flex min-h-11 items-center hover:text-accent transition-colors md:min-h-6";
+const iconClass = "inline-flex h-11 w-11 items-center justify-center rounded-control text-fg-2 hover:text-accent transition-colors md:h-8 md:w-8";
 
 function FooterLink({ item, className = itemClass }: { item: Item; className?: string }) {
   if (item.external) return <a href={item.href} rel="noopener" className={className}>{item.label}</a>;
@@ -99,7 +100,7 @@ export default function Footer() {
           <div className="flex flex-col gap-2 py-3 md:flex-row md:items-start md:gap-8">
             <div className="flex items-start justify-between gap-4 md:block md:w-56 md:shrink-0">
               <div>
-                <Link href="/" className="inline-flex min-h-8 items-center gap-2 font-bold tracking-tight text-fg">
+                <Link href="/" className="tap-44 inline-flex min-h-8 items-center gap-2 font-bold tracking-tight text-fg">
                   <Icon name="diamond" size={14} className="text-accent" />
                   everloot
                 </Link>
@@ -122,7 +123,7 @@ export default function Footer() {
             <div className="flex flex-wrap gap-x-6 md:hidden">
               {GROUPS.map((group) => (
                 <details key={group.title} className="group">
-                  <summary className="inline-flex min-h-8 cursor-pointer items-center gap-1 text-xs font-medium text-muted hover:text-fg-2 transition-colors">
+                  <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-xs font-medium text-muted hover:text-fg-2 transition-colors">
                     {group.title}
                     <svg aria-hidden="true" viewBox="0 0 10 6" width="10" height="6" className="group-open:rotate-180"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
                   </summary>
@@ -138,7 +139,7 @@ export default function Footer() {
             <h2 className="sr-only">Legal</h2>
             <ul className="flex flex-wrap items-center gap-x-4">
               {LEGAL.map((item) => <li key={item.href}><FooterLink item={item} className={legalClass} /></li>)}
-              <li className="text-xs [&>button]:min-h-6 [&>button]:text-xs [&>button]:text-muted"><CookiePreferencesButton /></li>
+              <li className="text-xs [&>button]:min-h-11 [&>button]:text-xs [&>button]:text-muted md:[&>button]:min-h-6"><CookiePreferencesButton /></li>
             </ul>
           </div>
         </nav>
@@ -149,7 +150,8 @@ export default function Footer() {
           </p>
           <SiteCredit />
           {/* The header shows the builds only from 1536 px; here they are at every width. */}
-          <GameVersionLabel className="py-1" />
+          {/* Phones: 10 px more above and below, which the pill's links take as their 44 px touch area. */}
+          <GameVersionLabel className="py-2.5 md:py-1" linkClassName="py-3.5 -my-3.5 md:py-0 md:my-0" />
           <p>
             &copy; {year} {OPERATOR}. Code AGPL-3.0.
             {sha && <> Build <a href={sourceUrl()} rel="noopener" className="font-mono hover:text-accent transition-colors">{sha.slice(0, 7)}</a>.</>}
