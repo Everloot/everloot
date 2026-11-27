@@ -37,7 +37,10 @@ function site(calls: string[]) {
 const TOOLS: ToolDef[] = [{ name: "search_knowledge", description: "Search", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }];
 
 test("a visitor sees answer_sources' labelled pieces and their links, not the notes for AI clients", () => {
-  expect(evidenceLines(EVIDENCE)).toBe(EVIDENCE.split("\n").slice(0, 3).join("\n"));
+  expect(evidenceLines(EVIDENCE)).toBe([
+    "- **Warcraft Wiki 2023, may differ in WoW: Forever:** Leeroy Jenkins is a valiant human paladin.",
+    ...EVIDENCE.split("\n").slice(1, 3),
+  ].join("\n"));
   // A notice on the first line (no page held every word) stays.
   expect(evidenceLines(`No page has every word.\n${EVIDENCE}`).split("\n")[0]).toBe("No page has every word.");
   // The note to AI clients about archive lore is for a model, not for the visitor reading the pieces.
@@ -56,6 +59,20 @@ const HOGGER = [
 ].join("\n");
 /** Words only the tools' notes to a model use: a visitor's answer never holds them. */
 const TOOL_TEXT = /answer_sources|search_knowledge|get_entity|permitted evidence|context only|Tool error/;
+
+test("each piece's source reads as a label a visitor understands, not the bracketed tag the tools give a model", () => {
+  const tagged = [
+    "- [game files, found in game files and unconfirmed] Deadmines: a dungeon, level 16, entered from Westfall at 38.2, 77.5.",
+    "- [observed in play, 3 installs] Hogger was seen in Elwynn Forest.",
+    "- [curated] Everloot's own note.",
+  ].join("\n");
+  expect(evidenceLines(tagged).split("\n")).toEqual([
+    "- **Game files, unconfirmed:** Deadmines: a dungeon, level 16, entered from Westfall at 38.2, 77.5.",
+    "- **Seen in play, 3 installs:** Hogger was seen in Elwynn Forest.",
+    "- **Everloot:** Everloot's own note.",
+  ]);
+  expect(evidenceLines(tagged)).not.toContain("[");
+});
 
 test("a visitor never sees answer_sources' note to AI clients: a question it cannot answer says so plainly, then the context", () => {
   const shown = evidenceLines(HOGGER);

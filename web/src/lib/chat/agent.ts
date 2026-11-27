@@ -179,13 +179,30 @@ const VISITOR_NOTICE = /^(?:No page has every word|Read ".+" as ")/;
 const UNAVAILABLE_NOTE = /^answer_sources has no permitted evidence\b/;
 
 /**
+ * A piece's bracketed source tag (kb/src/answer-sources.ts KIND_LABEL, written for a model) as a bold label a visitor
+ * reads: "[game files, found in game files and unconfirmed]" is "Game files, unconfirmed:".
+ */
+function readableTag(line: string): string {
+  const m = /^- \[([^\]]+)\] /.exec(line);
+  if (!m) return line;
+  const tag = m[1]!;
+  const observed = /^observed in play(, \d+ installs?)?$/.exec(tag);
+  const label = observed ? `Seen in play${observed[1] ?? ""}`
+    : tag === "curated" ? "Everloot"
+    : tag.startsWith("game files") ? "Game files, unconfirmed"
+    : tag.startsWith("lore ") ? "Warcraft Wiki 2023, may differ in WoW: Forever"
+    : tag;
+  return `- **${label}:** ${line.slice(m[0].length)}`;
+}
+
+/**
  * answer_sources' text as a visitor reads it: a notice on its first line, then the labelled pieces with their indented
  * Source and More lines. The notes after them are for AI clients (the observed layer's state, links to read, the data's age),
  * and so is a first line naming tools: when nothing answers the question, the visitor reads NO_RECORDED_ANSWER instead.
  */
 export function evidenceLines(text: string): string {
   const lines = text.split("\n");
-  const kept = lines.filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && VISITOR_NOTICE.test(l)));
+  const kept = lines.filter((l, i) => /^(?:- |\s+\S)/.test(l) || (i === 0 && VISITOR_NOTICE.test(l))).map(readableTag);
   if (UNAVAILABLE_NOTE.test(lines[0] ?? "") && kept.length) kept.unshift(NO_RECORDED_ANSWER);
   return kept.join("\n").trim();
 }

@@ -7,7 +7,7 @@ import { objectList } from "@kb/object-page";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
-import { loadCatalog } from "@/lib/completion-lists";
+import { loadCatalog, titleRows } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { currencyEntries, mountEntries, petEntries, toyEntries } from "@/lib/collectibles";
 import { holidayEntries, petFamilyEntries } from "@/lib/world-events";
@@ -117,7 +117,7 @@ export default async function DatabasePage() {
     "/database/spells": listed(spellNames?.names.size),
     "/database/achievements": listed(catalog?.achievements.length),
     "/database/factions": listed(catalog?.factions.length),
-    "/database/titles": listed(catalog?.titles.length),
+    "/database/titles": listed(catalog ? titleRows(catalog.titles).length : undefined),
     "/database/quest-chains": listed(catalog?.chains.length),
     // The item sets the game files list, like the zone count: it reads the files, not the uploads.
     "/database/item-sets": n(ITEM_SETS.length),

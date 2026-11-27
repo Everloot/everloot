@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import ArtThumb from "@/components/game/ArtThumb";
 import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, type InstanceRow } from "@/lib/instances";
+import { bossRows, compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, type InstanceRow } from "@/lib/instances";
 import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -52,8 +52,9 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
   const matched = all.filter((r) => !text || (id !== null ? r.instanceMapId === id : ranked!.has(r)));
   const sort = q.sort ?? DEFAULT_SORT;
   // The plain list keeps its own order (level, then name); a level sorts by its low end, then its high end.
-  // Bosses sort by the count the column shows: players' when reported, else the files'.
-  const bossCount = (r: InstanceRow) => (!seen.unreachable && r.bosses.length ? r.bosses.length : r.encounters.length || null);
+  // The bosses the instance's page lists (bossRows: the files' encounters and any other reported one); they sort the column.
+  const listedBosses = (r: InstanceRow) => bossRows(seen.unreachable ? { bosses: [], encounters: r.encounters } : r).length;
+  const bossCount = (r: InstanceRow) => listedBosses(r) || null;
   const enteredFrom = (r: InstanceRow) => r.files[0] ?? r.confirmed[0];
   const key = (r: InstanceRow): string | number | null => sort.key === "name" ? r.name?.toLowerCase() ?? null
     : sort.key === "type" ? (r.raid === null ? null : r.raid ? "raid" : "dungeon") : sort.key === "bosses" ? bossCount(r)
@@ -82,10 +83,14 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     // What it is, its numbers, where it is entered, whether players confirmed that, and where to read more.
     { key: "type", header: "Type", sortable: true, cell: (r) => (r.raid === null ? PLACEHOLDER : r.raid ? "Raid" : "Dungeon") },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => levelLabel(r.level) ?? dash },
-    // Player-first: the reported count, else the files' count marked unconfirmed, else a dash.
-    { key: "bosses", header: "Bosses", numeric: true, sortable: true, cell: (r) => (!seen.unreachable && r.bosses.length
-      ? r.bosses.length
-      : r.encounters.length ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{r.encounters.length}</span> : dash) },
+    // The page's count: all of them when players confirmed every one, "7 of 8" when some, else the files' count marked
+    // unconfirmed, else a dash.
+    { key: "bosses", header: "Bosses", numeric: true, sortable: true, cell: (r) => {
+      const listed = listedBosses(r);
+      const reported = seen.unreachable ? 0 : r.bosses.length;
+      if (reported) return reported >= listed ? reported : `${reported} of ${listed}`;
+      return listed ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{listed}</span> : dash;
+    } },
     { key: "zone", header: "Entered from", sortable: true, cell: (r) => {
       const at = enteredFrom(r);
       return at ? <Link prefetch={false} href={zoneHref(at.mapId, at.zoneName)} className={link}>{at.zoneName}</Link> : dash;
@@ -120,7 +125,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
         {seen.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The entrances below are from the game files.</p>}
         {!seen.unreachable && (
           <ListNote>
-            {q.sort ? "" : "Sorted by level, lowest first. "}The level is read from the game files, which give one level for most instances rather than a range; a dash there means the files give none. Entrances are read from the game files and confirmed once 3 installs zone in from the same place. A boss is counted once 3 installs report it; until then the count is the game files' own list, marked unconfirmed. A dash in the other columns means nobody has yet, not that there is none. Guide links to the instance's prep page once it is published, and to the raid builder for a raid.
+            {q.sort ? "" : "Sorted by level, lowest first. "}The level is read from the game files, which give one level for most instances rather than a range; a dash there means the files give none. Entrances are read from the game files and confirmed once 3 installs zone in from the same place. A boss is counted once 3 installs report it; until then the count is the game files' own list, marked unconfirmed. Bosses reads 7 of 8 when 3 installs confirm 7 of the 8 bosses the instance's page lists. A dash in the other columns means nobody has yet, not that there is none. Guide links to the instance's prep page once it is published, and to the raid builder for a raid.
             {countNote && <span data-instance-count-note>{` Of the ${all.length} instances, ${countNote}`}</span>}
           </ListNote>
         )}

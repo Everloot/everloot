@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { AchievementEntry } from "@kb/completion";
 import Link from "@/components/Link";
-import { Card, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl, stripBelow } from "@/components/ui";
+import { Card, Container, DataTable, DataTitle, FilterBar, ResultStrip, filledColumns, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import { achievementHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { byRank, nameMatches, Respelled,
@@ -56,11 +56,12 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
-  const columns: Column<Listed<AchievementEntry>>[] = [
+  const columns: SparseColumn<Listed<AchievementEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={achievementHref(x.achievementId, x.name)} icon={assets?.achievementIcons.get(x.achievementId)}>{x.name}</NameCell> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
-    // Most of the files' achievements carry no points: a dash, as any list shows a blank, not a column of zeros.
-    { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points || <span className="text-muted">—</span> },
+    // The files give nearly every achievement 0 points (2 of 233): the column shows only on a page where a row has
+    // some, and a row with none is an empty cell there, not a column of dashes.
+    { key: "points", header: "Points", numeric: true, sortable: true, blank: (x) => !x.points, cell: (x) => x.points || null },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
@@ -103,7 +104,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
           <DataTable
             dense
             caption={listCaption("achievements", rows, confirmations)}
-            columns={columns}
+            columns={filledColumns(columns, shown)}
             rows={shown}
             rowKey={(x) => String(x.achievementId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}

@@ -72,9 +72,10 @@ test("on a phone the overview folds behind a disclosure; rows say 1 point, not 1
   expect(out).not.toMatch(/(?<!\d)1 points\b/);
 });
 
-test("an achievement with no points shows a dash in the Points column and no \"0 points\" anywhere", async () => {
+test("a page whose achievements have no points leaves the Points column out, and says \"0 points\" nowhere", async () => {
   const out = await html({ category: "Eastern Kingdoms" });
   expect(out).toContain("Explore Dun Morogh");
   expect(out).not.toMatch(/(?<!\d)0 points?\b/);
-  expect(out).toMatch(/<td class="dt-td dt-num dt-fold"><span class="text-muted">—<\/span><\/td>/);
+  expect(out).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Points</);
+  expect(out).not.toMatch(/<td class="dt-td dt-num dt-fold"><span class="text-muted">—<\/span><\/td>/);
 });

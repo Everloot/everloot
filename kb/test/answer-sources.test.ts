@@ -207,3 +207,16 @@ test.each(["Thrall and Peacebloom", "where do I learn Mining", "What is Thrall"]
     expect({ answer, text: formatAnswerSources(answer, false) }).toMatchSnapshot();
   } finally { db.close(); }
 });
+
+test("Where is the Deadmines entrance? The files' entrance answers it; lore pages that only mention the entrance stay out", async () => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+    row("kobold", "Kobold Digger (Deadmines)", "Kobold Diggers are kobolds found within the entrance section of the Deadmines."),
+    row("vanessa", "A Note from Vanessa", "A note found at the entrance door of the ship's cabin of Ironclad Cove in Deadmines."),
+  ]);
+  const files = { build: "test-build", extractedAt: null, facts: [{ kind: "instance" as const, name: "Deadmines", claim: "Deadmines: a dungeon, level 16, entered from Westfall at 38.2, 77.5." }] };
+  const answer = await answerSources(db, { question: "Where is the Deadmines entrance?", limit: 3 }, null, null, files);
+  expect(answer.evidence.map((piece) => piece.kind)).toEqual(["files"]);
+  expect(answer.evidence[0]!.claim).toContain("entered from Westfall at 38.2, 77.5");
+  db.close();
+});

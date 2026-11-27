@@ -101,9 +101,10 @@ test("a companion pet page names its creature, links its summon spell and shows 
   expect(out).toContain("No player report confirms companion pets yet.");
 });
 
-test("the pet list links each pet's summon spell page, by its id", async () => {
+test("the pet list links each pet's summon spell page by the spell's name, as the pet page does; a spell with no shown name keeps its id", async () => {
   const out = await page(PetListPage(list({ q: "39" })));
-  expect(out).toMatch(/<a [^>]*href="\/database\/spells\/4055"[^>]*>4055<\/a>/);
+  expect(out).toMatch(/<a [^>]*href="\/database\/spells\/4055"[^>]*>Mechanical Squirrel<\/a>/);
+  expect(out).not.toMatch(/>4055<\/a>/);
 });
 
 test("a currency page carries the files' own text and cap in the box, and no icon the manifest lacks", async () => {

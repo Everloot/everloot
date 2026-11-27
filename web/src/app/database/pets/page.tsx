@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "@/components/Link";
-import { loadSiteAssets } from "@/lib/game-assets";
+import EntityLink from "@/components/EntityLink";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { petEntries, petHref } from "@/lib/collectibles";
 import type { ClientPet } from "@kb/client-collections";
 import { CollectibleList, collectibleListMetadata, type CollectibleRow } from "../collectible-list";
@@ -14,13 +15,14 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 }
 
 export default async function PetListPage(props: { searchParams?: Promise<Search> }) {
-  const assets = await loadSiteAssets();
+  const [assets, spellNames] = await Promise.all([loadSiteAssets(), loadSpellNames(CLIENT_LAYER.build.version)]);
   const rows: (CollectibleRow & ClientPet)[] | null = petEntries()?.map((p) => ({ ...p, href: petHref(p.id, p.name), icon: assets?.petIcons.get(p.id) })) ?? null;
   return (
     <CollectibleList
       path={META.path} title="Companion pets" noun={["companion pet", "companion pets"]} rows={rows} search={(await props.searchParams) ?? {}}
       note="Every companion pet species the game files list, named by its creature. No player report confirms a pet yet."
-      columns={[{ key: "spell", header: "Summon spell", numeric: true, cell: (r) => <Link prefetch={false} href={`/database/spells/${r.spellId}`} className="text-fg-2 underline decoration-edge underline-offset-4 hover:decoration-fg">{r.spellId}</Link> }]}
+      // The spell by the name its page shows (the files' name, under the name rule), as the pet page links it; else "Spell N".
+      columns={[{ key: "spell", header: "Summon spell", cell: (r) => <EntityLink prefetch={false} kind="spell" id={r.spellId} name={spellNames?.names.get(r.spellId)} /> }]}
     />
   );
 }

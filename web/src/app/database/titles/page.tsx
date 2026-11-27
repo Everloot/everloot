@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, ResultStrip, type SparseColumn, stripBelow } from "@/components/ui";
-import { loadCatalog, titleDisplayName, titleFilesName, titleHref, titlePlacement, type Listed } from "@/lib/completion-lists";
+import { loadCatalog, titleDisplayName, titleFilesName, titleHref, titlePlacement, titleRows, titleWords, type Listed } from "@/lib/completion-lists";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
@@ -28,14 +28,15 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
   const catalog = await loadCatalog();
-  const all = catalog?.titles ?? [];
+  // One row per title: a confirmed title and its game-files row merge (titleRows).
+  const all = titleRows(catalog?.titles ?? []);
   const confirmations = catalog?.confirmations ?? false;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
   const matched = all.filter((x) => !text || (id !== null ? x.titleId === id : ranked!.has(x)));
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.titleId), sort.desc, (x) => x.titleId), ranked, Boolean(q.sort));
+  const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? titleWords(x.name).toLowerCase() : x.titleId), sort.desc, (x) => x.titleId), ranked, Boolean(q.sort));
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 

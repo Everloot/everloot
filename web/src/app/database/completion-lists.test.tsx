@@ -561,3 +561,30 @@ test("the quest chain list shows the agreed level range and the start NPC", asyn
   expect(defias).toContain('href="/database/npcs/234');
   expect(rowOf(out, "/database/quest-chains/901-long-road")).not.toContain("–");
 });
+
+test("a confirmed title and its game-files row are one row: the files' kind, the confirmed mark, sorted by the readable title", async () => {
+  // Players report "Private" and "Corporal" under the game's own ids (4, 5); the files list "Private %s" (1258) and
+  // "Corporal %s" (1259). "Sergeant %s" twice (Alliance and Horde) with no report stays as two files rows.
+  game.titles = [{ id: 1017, name: "%s of the Magram" }, { id: 1258, name: "Private %s" }, { id: 1259, name: "Corporal %s" }, { id: 1260, name: "Sergeant %s" }, { id: 1273, name: "Sergeant %s" }];
+  const out = await html(TitleList(search()));
+  expect(linked(out, "titles")).toEqual(["4-private", "5-corporal", "1017-of-the-magram", "1260-sergeant", "1273-sergeant"]);
+  expect(out).toContain("Titles in the game files or reported by players: 5, 2 confirmed by players");
+  const corporal = rowOf(out, "/database/titles/5-corporal");
+  expect(corporal).toContain("Corporal &lt;Name&gt;");
+  expect(corporal).toMatch(/>Prefix</);
+  expect(corporal).toMatch(/>Confirmed</);
+  expect(out).not.toContain('href="/database/titles/1259-corporal"');
+  // Name order reads the title, not the "<Name>" slot: Corporal, of the Magram, Private, Sergeant.
+  expect(linked(await html(TitleList(search({ sort: "name" }))), "titles")).toEqual(["5-corporal", "1017-of-the-magram", "4-private", "1260-sergeant", "1273-sergeant"]);
+});
+
+test("the achievement list leaves out Points when no row on the page has any, and a row with none is an empty cell, not a dash", async () => {
+  game.achievements = { "50": { title: "Loremaster", points: 0, criteria: [{}] }, "60": { title: "Skilled", points: 0, criteria: [] } };
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const none = await html(AchievementList(search()));
+  expect(none).not.toMatch(/<th[^>]*>(?:<[^>]*>)*Points</);
+  game.achievements["60"]!.points = 1;
+  const some = await html(AchievementList(search()));
+  expect(some).toMatch(/<th[^>]*>(?:<[^>]*>)*Points</);
+  expect(rowOf(some, "/database/achievements/50-loremaster")).not.toContain("—");
+});

@@ -3,11 +3,10 @@ import Link from "@/components/Link";
 import TerrainGearTable, { type GearNames } from "@/components/TerrainGearTable";
 import { Container, DataTitle, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemLooks } from "@/lib/item-look";
 import { instanceHref, instanceRows } from "@/lib/instances";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
-import { itemNames } from "@/lib/names";
-import { loadItemFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
 import { NO_AREA, speedGear, TERRAIN_BUILD, TERRAIN_PATH, terrainGear, terrainTypes } from "@/lib/terrain";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
@@ -30,13 +29,13 @@ export default async function TerrainPage() {
   const speed = speedGear(gear);
   const instances = new Map([...instanceRows()].map(([id, r]) => [id, r.name]));
   const ids = [...new Set(gear.flatMap((g) => g.set?.pieces ?? [g.itemId]))];
-  const [facts, spells, sets, assets] = await Promise.all([
-    loadItemFacts(), loadSpellNames(CLIENT_LAYER.build.version), loadItemSetNames(CLIENT_LAYER.build.version), loadSiteAssets(),
+  const [spells, sets, assets] = await Promise.all([
+    loadSpellNames(CLIENT_LAYER.build.version), loadItemSetNames(CLIENT_LAYER.build.version), loadSiteAssets(),
   ]);
-  const tips = await loadItemTips(assets, ids);
-  const named = facts.unreachable ? new Map<number, string>() : itemNames(facts);
+  // Each item's name, quality and icon as its own page and hover card show them (lib/item-look.ts).
+  const look = await loadItemLooks(assets, ids);
   const names: GearNames = {
-    item: (id) => ({ name: named.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+    item: look,
     spell: (id) => spells?.names.get(id),
     set: (id) => sets?.names.get(id),
     instances,
