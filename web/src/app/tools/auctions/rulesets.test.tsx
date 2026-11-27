@@ -75,7 +75,7 @@ test("with the map empty, a realm whose name ends in its ruleset is filed under 
   const all = await hub({});
   expect(tabs(all).map((t) => t.label)).toEqual(["All rulesets", "PvE (0)", "PvP (1)", "RP (0)", "RP-PvP (0)"]);
   const pvp = text(await hub({ ruleset: "pvp" }));
-  expect(pvp).toContain("CAMWOW US1 Realm 4 PvP");
+  expect(pvp).toContain("US1 · Realm 4 PvP");
   // The name and its ruleset are split, the ruleset in its own colour, as in the addon's tooltip.
   expect(await hub({ ruleset: "pvp" })).toContain('US1 · Realm 4 <span data-ruleset="pvp" class="font-medium text-realm-pvp">PvP</span>');
   expect(pvp).not.toContain("Realms not mapped yet");

@@ -8,7 +8,9 @@ import Coins, { CoinSprite, CoinText, MoneyText } from "./Coins";
 test.each([
   [21894, "2 gold 18 silver 94 copper", 3],
   [0, "0 copper", 1],
-  [10000, "1 gold 0 silver 0 copper", 3],
+  [10000, "1 gold", 1],
+  [200, "2 silver", 1],
+  [10005, "1 gold 5 copper", 2],
   [-110, "minus 1 silver 10 copper", 2],
 ] as const)("%s copper keeps an accessible price and fixed-size decorative coins", (copper, spoken, count) => {
   const root = document.createElement("div");
@@ -57,9 +59,18 @@ test("large gold amounts group their thousands", () => {
   expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("1,234,567 89 1");
   expect(root.querySelector(".sr-only")?.textContent).toBe("1,234,567 gold 89 silver 1 copper");
   root.innerHTML = renderToStaticMarkup(<Coins copper={9_999_0000} />);
-  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("9,999 0 0");
+  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("9,999");
   root.innerHTML = renderToStaticMarkup(<Coins copper={999_0000} />);
-  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("999 0 0");
+  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("999");
+});
+
+test("a formatted price leaves out a zero coin below the largest, as the game prints it", () => {
+  const root = document.createElement("div");
+  for (const [text, spoken, shown] of [["2s 0c", "2 silver", "2"], ["1g 0s 5c", "1 gold 5 copper", "1 5"], ["0c", "0 copper", "0"], ["-3g 0s 0c", "minus 3 gold", "-3"]] as const) {
+    root.innerHTML = renderToStaticMarkup(<CoinText text={text} />);
+    expect(root.querySelector(".sr-only")?.textContent, text).toBe(spoken);
+    expect(root.querySelector('[aria-hidden="true"]')?.textContent, text).toBe(shown);
+  }
 });
 
 test("unknown and unavailable amounts remain text", () => {

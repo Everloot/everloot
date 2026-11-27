@@ -22,13 +22,18 @@ export function Coin({ metal }: { metal: Metal }) {
   return <svg aria-hidden="true" className="coin"><use href={`#coin-${metal[0]}`} /></svg>;
 }
 
-/** A formatted price keeps its text for assistive technology and uses coins visually. */
+/**
+ * A formatted price keeps its text for assistive technology and uses coins visually. A zero coin is left out, as the
+ * game prints a price ("2s 0c" shows as 2s); a price of nothing keeps its one coin (0c).
+ */
 export function CoinText({ text }: { text: string }) {
   const parsed = tipLine(`Sell Price: ${text.replace(/^-/, "")}`);
   if (parsed.kind !== "price") return text;
+  const nonZero = parsed.coins.filter((c) => c.amount > 0);
+  const coins = nonZero.length ? nonZero : parsed.coins.slice(-1);
   return <span className="whitespace-nowrap tabular-nums">
-    <span className="sr-only">{text.startsWith("-") ? "minus " : ""}{parsed.coins.map((c) => `${grouped(c.amount)} ${c.metal}`).join(" ")}</span>
-    <span aria-hidden="true">{text.startsWith("-") && "-"}{parsed.coins.map((c, i) => <span key={c.metal}>{i > 0 && " "}{grouped(c.amount)}<Coin metal={c.metal} /></span>)}</span>
+    <span className="sr-only">{text.startsWith("-") ? "minus " : ""}{coins.map((c) => `${grouped(c.amount)} ${c.metal}`).join(" ")}</span>
+    <span aria-hidden="true">{text.startsWith("-") && "-"}{coins.map((c, i) => <span key={c.metal}>{i > 0 && " "}{grouped(c.amount)}<Coin metal={c.metal} /></span>)}</span>
   </span>;
 }
 
@@ -36,15 +41,13 @@ export function CoinText({ text }: { text: string }) {
 const grouped = (n: number) => n.toLocaleString("en-US");
 
 /**
- * A price in coins. `game` leaves out a coin that is zero, as the game's tooltips and vendor window print a price
- * ("1s", "1g 1c"; tooltipMoney in lib/tip-line.ts); without it every coin below the largest shows ("1s 0c").
+ * A price in coins, leaving out a coin that is zero as the game's tooltips and vendor window print a price
+ * ("1s", "1g 1c"; tooltipMoney in lib/tip-line.ts). Nothing at all is "0c".
  */
-export default function Coins({ copper, game = false }: { copper: number | null; game?: boolean }) {
+export default function Coins({ copper }: { copper: number | null }) {
   if (copper === null) return "unrecorded";
   const value = Math.round(Math.abs(copper));
-  if (game && value > 0) return <CoinText text={`${copper < 0 ? "-" : ""}${tooltipMoney(value)}`} />;
-  const g = Math.floor(value / 10000), s = Math.floor(value % 10000 / 100), c = value % 100;
-  return <CoinText text={`${copper < 0 ? "-" : ""}${g ? `${g}g ` : ""}${g || s ? `${s}s ` : ""}${c}c`} />;
+  return <CoinText text={`${copper < 0 && value > 0 ? "-" : ""}${value > 0 ? tooltipMoney(value) : "0c"}`} />;
 }
 
 /** Money inside a prose answer retains its line breaks and surrounding words. */

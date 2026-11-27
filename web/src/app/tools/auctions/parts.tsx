@@ -2,6 +2,7 @@ import { CoinText } from "@/components/ui/Coins";
 import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
+import GameIcon from "@/components/game/GameIcon";
 import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
 import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
@@ -27,14 +28,15 @@ export function itemQuality(id: number, tip: Tip | undefined, named: boolean): Q
   return q === undefined || q === null || q > 5 ? null : qualityToken(q);
 }
 
-/** An item's label in its quality colour, its icon in front and the game tooltip on hover and focus. */
-export function ItemLink({ id, href, tip, names }: { id: number; href: string; tip: Tip | undefined; names: ItemNames }) {
+/**
+ * An item's label in its quality colour, its icon in front and the game tooltip on hover and focus. `icon` is the
+ * files' icon for an item they give nothing else for (no tooltip): drawn only beside a shown name, as the item page does.
+ */
+export function ItemLink({ id, href, tip, icon, names }: { id: number; href: string; tip: Tip | undefined; icon?: string; names: ItemNames }) {
   const q = itemQuality(id, tip, names.has(id));
-  return (
-    <ItemTip tip={tip}>
-      <Link prefetch={false} href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>
-    </ItemTip>
-  );
+  const link = <Link prefetch={false} href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>;
+  if (!tip && icon && names.has(id)) return <span className="inline-flex items-center gap-1.5 align-middle"><GameIcon src={icon} quality={q ?? undefined} />{link}</span>;
+  return <ItemTip tip={tip}>{link}</ItemTip>;
 }
 
 /** The trend in a results row: the market value over the last two weeks, or nothing under two solid days. */

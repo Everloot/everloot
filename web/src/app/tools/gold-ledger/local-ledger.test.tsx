@@ -68,7 +68,7 @@ test("reads Everloot.lua in the browser and shows the ledger, sending nothing", 
   const text = container.textContent!;
   expect(text).toContain("Thrall");
   expect(text).toContain("123 gold 45 silver 67 copper"); // gold
-  expect(text).toContain("200 gold 0 silver 0 copper"); // peak
+  expect(text).toMatch(/200 gold(?! \d)/); // peak
   expect(text).toContain("1 gold 23 silver 45 copper"); // quest, in the week card and the receipts
   expect(text).toContain("2 silver 50 copper"); // flight
   expect(text).toContain("1 gold 20 silver 95 copper"); // net this week
@@ -100,11 +100,11 @@ test("the window's local ledger shows repairs, vendor purchases and transfers be
   expect(categories).toContain("43 silver 21 copper");
   expect(categories).toContain("Vendor purchases");
   expect(categories).not.toContain("Mail out");
-  expect(categories).toMatch(/2 gold 0 silver 0 copper.* moved between your own characters/);
+  expect(categories).toMatch(/2 gold(?! \d).* moved between your own characters/);
   const receipts = container.querySelector('[aria-labelledby="ledger-receipts"]')!.textContent!;
   expect(receipts).toContain("Mail out, your character");
   // The roster's gold is newer than the file's snapshot, and Jaina has no snapshot at all.
-  expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toContain("130 gold 0 silver 0 copper");
+  expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toMatch(/130 gold(?! \d)/);
   expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toContain("Jaina");
   expect(fetchSpy).not.toHaveBeenCalled();
 });
@@ -130,7 +130,7 @@ test("the spending insights follow the period and the auction sales show the hou
   // 30 days by default: both payments, the repair the larger.
   expect(spending()).toContain("Repairs");
   expect(spending()).toContain("Auction purchases");
-  expect(spending()).toMatch(/Spent.*12 gold 0 silver 0 copper/);
+  expect(spending()).toMatch(/Spent.*(?<!\d)12 gold(?! \d)/);
   expect(container.querySelectorAll("[data-daily-spending] > li")).toHaveLength(30);
   const largest = [...container.querySelectorAll('[aria-labelledby="ledger-largest"] tbody tr')].map((tr) => tr.textContent);
   expect(largest[0]).toContain("Repairs");
@@ -139,13 +139,13 @@ test("the spending insights follow the period and the auction sales show the hou
   await act(async () => { seven.click(); });
   expect(seven.getAttribute("aria-pressed")).toBe("true");
   expect(spending()).not.toContain("Repairs");
-  expect(spending()).toMatch(/Spent.*3 gold 0 silver 0 copper/);
+  expect(spending()).toMatch(/Spent.*(?<!\d)3 gold(?! \d)/);
   expect(container.querySelectorAll("[data-daily-spending] > li")).toHaveLength(7);
   expect(container.querySelectorAll("[data-river] > li")).toHaveLength(7);
 
   const sales = container.querySelector('[aria-labelledby="ledger-sales"]')!.textContent!;
   expect(sales).toContain("Linen Cloth");
-  expect(sales).toMatch(/House cut.*10 silver 0 copper.*\(5%\)/);
+  expect(sales).toMatch(/House cut.*(?<!\d)10 silver(?! \d).*\(5%\)/);
   expect(sales).toContain("1 sale is waiting in the mailbox");
   expect(fetchSpy).not.toHaveBeenCalled();
 });

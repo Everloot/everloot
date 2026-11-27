@@ -64,6 +64,9 @@ test("region browsing isolates recorded markets, scopes counts, and preserves th
   expect(us).toMatch(/<td[^>]*><a href="\/tools\/auctions\/camwow-us1-realm-4-pvp\?house=horde&amp;region=us"/);
   expect(us).toContain('title="CAMWOW US1 Realm 4 PvP"');
   expect(us).toContain('US1 · Realm 4');
+  // The phone line under the item names the realm as the Realm column does, not by its recorded code.
+  expect(us).toMatch(/<div class="dt-meta"><span><abbr title="CAMWOW US1 Realm 4 PvP"[^>]*>US1 · Realm 4/);
+  expect(us).not.toContain('<span>CAMWOW US1 Realm 4 PvP</span>');
   expect(headerQuery(us, "Units").get("region")).toBe("us");
   expect(us).toContain('region=us&amp;ruleset=pvp');
   expect(us).toMatch(/Horde.*?\(1\)/);
@@ -141,13 +144,34 @@ test("a result row hands its prices to the client as amounts, so the page's flig
   // The server HTML is the same coins as before: the spoken price and the sprite's references.
   const html = await hub({ house: "horde" });
   // 2589's minimum buyout today is 200 copper.
-  expect(html).toContain('<span class="sr-only">2 silver 0 copper</span><span aria-hidden="true"><span>2<svg aria-hidden="true" class="coin"><use href="#coin-s"></use></svg></span><span> 0<svg aria-hidden="true" class="coin"><use href="#coin-c"></use></svg></span></span>');
+  // A zero coin below the largest is left out, as the game prints a price: "2s", not "2s 0c".
+  expect(html).toContain('<span class="sr-only">2 silver</span><span aria-hidden="true"><span>2<svg aria-hidden="true" class="coin"><use href="#coin-s"></use></svg></span></span>');
 });
 
 test("a result row's item link loads on click, not all at once as the page opens", async () => {
   const { ItemLink } = await import("./parts");
   const html = renderToStaticMarkup(<ItemLink id={2589} href="/tools/auctions/forever/2589" tip={undefined} names={new Map()} />);
   expect(html).toContain('<a href="/tools/auctions/forever/2589" data-prefetch="false">');
+});
+
+test("an item the files give only an icon for shows that icon beside its shown name, and an unnamed one draws none", async () => {
+  const { ItemLink } = await import("./parts");
+  const icon = "https://assets.example/icons/132381.webp";
+  const named = renderToStaticMarkup(<ItemLink id={9399} href="/tools/auctions/forever/9399" tip={undefined} icon={icon} names={new Map([[9399, "Precision Arrow"]])} />);
+  expect(named).toMatch(/<img src="https:\/\/assets\.example\/icons\/132381\.webp"[^>]*data-game-icon[^>]*>(?:<[^>]*>)*<a href="\/tools\/auctions\/forever\/9399"[^>]*>Precision Arrow<\/a>/);
+  const unnamed = renderToStaticMarkup(<ItemLink id={9399} href="/tools/auctions/forever/9399" tip={undefined} icon={icon} names={new Map()} />);
+  expect(unnamed).not.toContain("<img");
+});
+
+test("a 7-day cell with no change to show says why in its title", async () => {
+  // 2589 has today's day and one 3 days back: nothing 7 to 10 days before today to compare with.
+  const fresh = await hub({ house: "horde" });
+  expect(fresh).toMatch(/<span class="text-muted" title="No public scan 7 to 10 days before [^"]+ to compare with">—<\/span>/);
+  // No public scan in the last two days: the week's change needs a newest day of today or yesterday.
+  const stale = foldMarket(emptyMarket(), [...scans(dayAgo(7), [[2589, 200, 205]]), ...scans(dayAgo(14), [[2589, 180, 190]])], today);
+  store.loadMarket.mockResolvedValue({ state: stale, dataAsOf: today.toISOString() });
+  const html = await hub({ house: "horde" });
+  expect(html).toMatch(/<span class="text-muted" title="No public scan since [^"]+: a 7-day change needs one from today or yesterday">—<\/span>/);
 });
 
 test("the page opens on its title: the Blizzard data link sits in the links row under it, beside the daily report", async () => {

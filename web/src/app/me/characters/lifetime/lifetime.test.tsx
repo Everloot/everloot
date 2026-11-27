@@ -81,7 +81,7 @@ test("with private sync on, the addon's gold joins each of the account's own cha
   for (const text of ["Total gold acquired", "Most gold ever owned (one character)", "from your addon"]) expect(html, text).toContain(text);
   // 1,150,905 + 50 copper; the most ever owned total is the largest, not the sum.
   expect(html).toContain("115 gold 9 silver 55 copper");
-  expect(html).toContain("200 gold 0 silver 0 copper");
+  expect(html).toMatch(/200 gold(?! \d)/);
   expect(html).not.toContain("200 gold 0 silver 30 copper");
   // Orla has no gold fact: "Not reported", never 0.
   expect(html.match(/Not reported/g)).toHaveLength(2);

@@ -150,6 +150,21 @@ test("profession specialisations are grouped apart from the reputations, under t
   expect(found.split("data-specialisations")[1]).toContain('href="/database/factions/551-engineering-gnome"');
 });
 
+test("profession specialisations group by their profession, each group and its names in name order", async () => {
+  game.factions = [
+    { id: 551, name: "Engineering - Gnome", shown: true }, { id: 549, name: "Leatherworking - Tribal", shown: true },
+    { id: 46, name: "Blacksmithing - Weaponsmithing", shown: true }, { id: 550, name: "Engineering - Goblin", shown: true },
+    { id: 548, name: "Leatherworking - Elemental", shown: true }, { id: 47, name: "Blacksmithing - Armorsmithing", shown: true },
+  ];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const specs = (await html(FactionList(search()))).split("data-specialisations")[1] ?? "";
+  expect([...specs.matchAll(/<h3[^>]*>([^<]+)<\/h3>/g)].map((m) => m[1])).toEqual(["Blacksmithing", "Engineering", "Leatherworking"]);
+  expect([...specs.matchAll(/href="\/database\/factions\/([^"]+)"/g)].map((m) => m[1])).toEqual([
+    "47-blacksmithing-armorsmithing", "46-blacksmithing-weaponsmithing", "551-engineering-gnome", "550-engineering-goblin",
+    "548-leatherworking-elemental", "549-leatherworking-tribal",
+  ]);
+});
+
 test("an agreed faction shows as confirmed and keeps the rollup's header", async () => {
   game.factions = [{ id: 69, name: "Darnassus (base)", shown: true }, { id: 72, name: "Stormwind", shown: true }];
   const out = await html(FactionList(search()));

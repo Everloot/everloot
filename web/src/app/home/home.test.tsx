@@ -317,9 +317,9 @@ test("gold shows on the hero only from the owner's own synced statistics", async
   const hero = section.slice(0, section.indexOf('aria-label="Alts"'));
   expect(linked.goldFor).toEqual([USER.id]);
   expect(hero).toContain("Total gold acquired");
-  expect(hero).toContain("123 gold 45 silver 0 copper");
+  expect(hero).toMatch(/123 gold 45 silver(?! \d)/);
   expect(hero).toContain("Most gold ever owned");
-  expect(hero).toContain("50 gold 0 silver 0 copper");
+  expect(hero).toMatch(/(?<!\d)50 gold(?! \d)/);
   expect(hero).toContain("Only you see your gold.");
   expect(section.slice(section.indexOf('aria-label="Alts"'))).not.toContain("gold");
 });

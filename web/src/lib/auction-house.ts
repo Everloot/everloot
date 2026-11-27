@@ -432,6 +432,18 @@ export function priceMove(row: MarketRow, span: MoveSpan, now: Date): Move | nul
   return move;
 }
 
+/**
+ * Why a row shows no week's move (priceMove is null), for the "7 days" cell's title: no public scan from today or
+ * yesterday, no solid day 7 to 10 days before the newest to compare with, or the same value on both. Null with a move.
+ */
+export function noWeekMoveReason(row: MarketRow, now: Date): string | null {
+  if (priceMove(row, 7, now)) return null;
+  const to = solidDays(row.points).at(-1);
+  if (!to) return "No public day to compare";
+  if (todayNumber(now) - dayNumber(to.day) > 1) return `No public scan since ${scanDayText(to.day, now)}: a 7-day change needs one from today or yesterday`;
+  return priceMoveOf(row.points, 7, now) ? "Unchanged over 7 days" : `No public scan 7 to 10 days before ${scanDayText(to.day, now)} to compare with`;
+}
+
 export const SPARK_DAYS = 14;
 export const SPARK_BOX = { width: 64, height: 16 } as const;
 
