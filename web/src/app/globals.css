@@ -289,6 +289,44 @@ main p a, main .list-disc a {
 .fm-lbl {
   @apply min-w-0 flex-1 truncate;
 }
+/* The profession recipe tables (app/tools/professions/recipe-table.tsx): GameIcon, the files Badge, the item link and
+   the cell layouts in one class each, the same styles, so a 200-row page does not repeat each list hundreds of times. */
+.pf-ic {
+  @apply inline-block shrink-0 rounded-sm border border-[#3d3a2e] align-middle;
+}
+.pf-ic0 {
+  @apply shrink-0 rounded-sm border border-line;
+}
+.pf-16 { width: 16px; height: 16px; }
+.pf-20 { width: 20px; height: 20px; }
+.pf-24 { width: 24px; height: 24px; }
+.pf-f {
+  @apply inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center align-middle;
+}
+.pf-fd {
+  @apply block h-2 w-2 rotate-45 rounded-[1px] border-[1.5px] border-edge;
+}
+.pf-ir {
+  @apply inline-flex min-w-0 items-center gap-1.5;
+}
+.pf-il {
+  @apply min-w-0 hover:underline underline-offset-4;
+}
+.pf-q {
+  @apply font-mono tabular-nums text-fg-2;
+}
+.pf-rc {
+  @apply flex min-w-0 flex-col gap-1;
+}
+.pf-rn {
+  @apply inline-flex min-w-0 items-center gap-2;
+}
+.pf-rl {
+  @apply flex flex-col gap-1;
+}
+.pf-rt {
+  @apply inline-flex flex-wrap items-center gap-x-2 text-cell-2 text-fg-2;
+}
 /* RegionChip (app/armory/parts.tsx): its colour classes stay on the element. */
 .region-chip {
   @apply inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 font-mono text-xs;

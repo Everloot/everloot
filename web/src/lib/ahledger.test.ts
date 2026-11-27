@@ -85,6 +85,8 @@ const ALLOWED = [
   "web/src/app/tools/auctions/AhledgerPanel.tsx",
   "web/src/app/tools/auctions/AhledgerHistory.tsx",
   "web/src/app/tools/auctions/AhledgerCrafting.tsx",
+  // The margins table the page above draws its rows with (client side, from the same read).
+  "web/src/app/tools/auctions/AhledgerCraftingTable.tsx",
   "web/src/app/tools/auctions/AhledgerMarket.tsx",
   "web/src/app/tools/auctions/page.tsx",
   "web/src/app/tools/professions/[profession]/page.tsx",

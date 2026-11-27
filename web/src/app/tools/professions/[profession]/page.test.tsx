@@ -417,6 +417,51 @@ test("the recipe tables' spell and item links load on click, not all at once as 
   for (const [a, attrs] of links) expect(attrs, a).toContain('data-prefetch="false"');
 });
 
+// The recipe rows used to be some 4.4 kB of HTML each, and as much again in the page's RSC data (live alchemy: 901 kB).
+const recipeRows = (html: string) => {
+  const tables = html.slice(html.indexOf("data-skill-group="), html.indexOf('aria-labelledby="prof-path"'));
+  return { bytes: Buffer.byteLength(tables), rows: tables.match(/<tr class="dt-tr"/g)?.length ?? 0 };
+};
+
+test("a recipe row stays within a byte budget, with every link, icon, count and marker it showed before", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const html = await render("alchemy", { size: "200" });
+  const { bytes, rows } = recipeRows(html);
+  const all = Math.min(professionBySegment("alchemy")!.recipes.length, 200);
+  expect(rows).toBe(all);
+  expect(bytes / rows).toBeLessThan(1700);
+  // Nothing is lost: the spell and item links, the icons, the counts and the files marker with its tooltip.
+  expect(spellLinks(html)).toBe(all);
+  // (The icons themselves: the stored-facts test above shows Earthroot's.)
+  expect(html).toMatch(/<span class="pf-q">2×<\/span><a[^>]*href="\/database\/items\/2449"[^>]*>[^<]+<\/a>/);
+  expect(html).toContain('data-badge="files" title="From the game files, not yet confirmed by players"');
+  expect(html).toContain('href="/tools/professions/alchemy?recipe=2329&amp;size=200#recipe-shopping"');
+});
+
+test("the recipe table's client data names each item once and carries ids, not markup", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const { default: RecipeTables } = await import("../recipe-table");
+  const element = await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ size: "200" }) });
+  const found: { props: Parameters<typeof RecipeTables>[0] }[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === RecipeTables) found.push(el as never);
+    walk(el.props.children);
+  };
+  walk(element);
+  expect(found).toHaveLength(1);
+  const props = found[0].props;
+  const rows = props.groups.reduce((n, g) => n + g.rows.length, 0);
+  expect(rows).toBe(Math.min(professionBySegment("alchemy")!.recipes.length, 200));
+  expect(JSON.stringify(props).length / rows).toBeLessThan(400);
+  // A reagent is an [item id, count] pair; Empty Vial (3371), a reagent of dozens of these recipes, is named once in `items`.
+  const used = props.groups.flatMap((g) => g.rows).find((r) => r.reagents.length)!;
+  expect(used.reagents[0]).toEqual([expect.any(Number), expect.any(Number)]);
+  expect(props.items[3371]?.name).toBeTruthy();
+});
+
 const ledgerScans = (realm: string, house: string, installs = ["install-a", "install-b", "install-c"]) => installs.map((installId) => ({
   kind: "auction_snapshot", installId, eventId: `${installId}:${realm}:${house}`, capturedAt: new Date().toISOString(), realm,
   scanId: `${installId}-${realm}-${house}`, part: 1, parts: 1, items: [[2589, 1, 3, 100, 100]], house,

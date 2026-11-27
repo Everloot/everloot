@@ -1,12 +1,10 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import GameIcon from "@/components/game/GameIcon";
-import { DataTable, FilterBar, ResultStrip, type Column, type SortDirection } from "@/components/ui";
-import { ahledgerMarketLabel, isAhledgerProfession, salesText, type AhledgerCraft, type AhledgerCredit } from "@/lib/ahledger";
+import { FilterBar, ResultStrip } from "@/components/ui";
+import { ahledgerMarketLabel, isAhledgerProfession, type AhledgerCraft, type AhledgerCredit } from "@/lib/ahledger";
 import { SKILL_BRACKETS } from "@/lib/professions";
 import { clampPageSize, DEFAULT_RECIPE_PAGE_SIZE, RECIPE_PAGE_SIZES, recipePage } from "@/lib/recipe-list";
 import { AhledgerPanel } from "./AhledgerPanel";
-import Coins from "./ClientCoins";
+import CraftingTable from "./AhledgerCraftingTable";
 
 /**
  * The profession page's AH Ledger crafting margins, read, filtered, sorted and paged on the server, with all of it in
@@ -108,9 +106,6 @@ interface CraftingProps {
   none?: string;
 }
 
-const dash = <span className="text-muted">—</span>;
-const coins = (n: number | null) => (n === null ? dash : <Coins copper={n} />);
-
 export default function AhledgerCrafting({ profession, market, read, path, search, spellIcon, picker, none }: CraftingProps) {
   if (!isAhledgerProfession(profession)) return null;
   const controls = <>{picker}<p data-ahledger-market className="text-meta text-fg-2">{market ? `AH Ledger market: ${ahledgerMarketLabel(market)}` : none}</p></>;
@@ -120,27 +115,6 @@ export default function AhledgerCrafting({ profession, market, read, path, searc
   const q = craftingQuery(search);
   const here = (change: Partial<CraftingQuery>) => craftingHref(path, search, q, change);
   const listed = recipePage(craftingRows(read.recipes, q), q);
-  const columns: Column<AhledgerCraft>[] = [
-    {
-      // No prefetch: /database sits behind Cloudflare's bot challenge, so a prefetch before the visitor has passed it is
-      // refused (403) and logs an error for every recipe in view. The link itself works.
-      key: "recipe", header: "Recipe", cell: (r) => {
-        const icon = spellIcon?.(r.spellId);
-        return (
-          <span className="inline-flex min-w-0 items-center gap-2">
-            {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
-            <Link href={`/database/spells/${r.spellId}`} prefetch={false}>{r.name}</Link>
-          </span>
-        );
-      },
-    },
-    { key: "skill", header: "Skill", numeric: true, cell: (r) => r.skill ?? dash },
-    { key: "cost", header: "Cost", numeric: true, sortable: true, cell: (r) => r.cost === null ? "unpriced" : <Coins copper={r.cost} /> },
-    { key: "net", header: "Net value", numeric: true, sortable: true, cell: (r) => coins(r.netValue) },
-    { key: "margin", header: "Margin", numeric: true, sortable: true, cell: (r) => coins(r.margin) },
-    { key: "sales", header: "Sales per day", numeric: true, sortable: true, cell: (r) => salesText(r.salesPerDay) },
-    { key: "profit", header: "Profit per day", numeric: true, sortable: true, cell: (r) => coins(r.profitPerDay) },
-  ];
   const active = Number(q.skillMin !== null || q.skillMax !== null) + Number(q.minSales !== null) + Number(q.priced);
   const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={q.size} href={(page) => here({ page })} label={`${profession} crafting margin pages`} nofollow />;
 
@@ -176,16 +150,14 @@ export default function AhledgerCrafting({ profession, market, read, path, searc
         aside={strip}
         nofollow
       />
-      <DataTable
-        dense
+      <CraftingTable
         caption={`${profession} crafting margins from AH Ledger`}
-        columns={columns}
-        rows={listed.rows}
-        rowKey={(r) => String(r.spellId)}
+        rows={listed.rows.map((r) => { const icon = spellIcon?.(r.spellId); return icon ? { ...r, icon } : r; })}
         sort={{ key: q.sort.key, direction: q.sort.desc ? "desc" : "asc" }}
-        sortHref={(key, direction: SortDirection) => here({ sort: { key: key as CraftSort, desc: direction === "desc" } })}
+        sortHrefs={Object.fromEntries((Object.keys(CRAFT_SORTS) as CraftSort[]).map((key) => [key, {
+          asc: here({ sort: { key, desc: false } }), desc: here({ sort: { key, desc: true } }),
+        }]))}
         empty={<p className="py-3 text-meta text-fg-2">No recipes match these filters.</p>}
-        nofollow
       />
       {listed.pages > 1 && strip}
     </>}
