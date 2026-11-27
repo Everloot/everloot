@@ -9,10 +9,11 @@ import EntityLink from "@/components/EntityLink";
 import { Badge, DataTable, Tabs, TooltipFrame, TooltipLines, type Fact, type TabItem } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { classLabel, type ClassSlug } from "@/lib/class-context";
-import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadSiteAssets, loadSpellNames, readItemTips } from "@/lib/game-assets";
+import { loadItemSeen } from "@/lib/item-seen";
 import { itemSet, itemSetClasses, itemSetHref, ITEM_SETS_BUILD } from "@/lib/item-sets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
-import { CLIENT_TAXONOMY, shownItemName } from "@/lib/items";
+import { CLIENT_TAXONOMY, shownItemName, SOURCES, type SourceSlug } from "@/lib/items";
 import { professionHrefById } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
@@ -55,7 +56,7 @@ export default async function ItemSetPage(props: Props) {
   const set = id === null ? undefined : itemSet(id);
   if (!set) notFound();
   const version = CLIENT_LAYER.build.version;
-  const [setNames, spellNames, shown, assets] = await Promise.all([loadItemSetNames(version), loadSpellNames(version), loadShownNames(), loadSiteAssets()]);
+  const [setNames, spellNames, shown, assets, itemSeen] = await Promise.all([loadItemSetNames(version), loadSpellNames(version), loadShownNames(), loadSiteAssets(), loadItemSeen()]);
   const { agreed, matched, showsTip, degraded } = shown;
   const name = setNames?.names.get(set.id);
   const title = name ?? `Item set ${set.id}`;
@@ -66,9 +67,19 @@ export default async function ItemSetPage(props: Props) {
   // A development leftover among the pieces stays out, as it does in the item lists; the line under the table counts it.
   const pieces = set.items.filter((item) => !isDevelopmentItemName(pieceName(item)?.name));
   const leftovers = set.items.length - pieces.length;
-  const tips = await loadItemTips(assets, pieces.filter(showsTip));
+  // A piece's icon: its tooltip's, or the icon of a piece the files give nothing else for (no ItemSparse row), as on its item page.
+  const { icons } = await readItemTips(assets, pieces.filter(showsTip));
   const spellName = (spell: number) => spellNames?.names.get(spell);
   const bonusLine = ([count, spell]: [number, number]) => `(${count}) Set: ${spellName(spell) ?? `Spell ${spell}`}`;
+  // Where players got each piece: the item lists' Source column (3 installs), each label opening the item page's tab.
+  const TAB: Record<SourceSlug, string> = { drop: "dropped-by", object: "dropped-by", vendor: "sold-by", crafted: "created-by", quest: "reward-from" };
+  const sourceLabels = (item: number) => itemSeen.from.get(item)?.map((slug) => SOURCES.find((x) => x.slug === slug)!.label).join(", ");
+  const sourceCell = (item: number) => {
+    if (itemSeen.unreachable) return <span className="text-muted">Unrecorded</span>;
+    const from = itemSeen.from.get(item);
+    if (!from?.length) return <span className="text-muted">—</span>;
+    return from.map((slug, i) => <span key={slug}>{i > 0 && ", "}<a href={`/database/items/${item}#${TAB[slug]}`} className={LINK}>{SOURCES.find((x) => x.slug === slug)!.label}</a></span>);
+  };
   const classes = itemSetClasses(set.items) as ClassSlug[] | null;
   const skill = set.skill ? { id: set.skill[0], rank: set.skill[1], name: CLIENT_SKILLS.get(set.skill[0]) ?? `Skill ${set.skill[0]}`, href: professionHrefById(set.skill[0]) } : null;
 
@@ -103,12 +114,13 @@ export default async function ItemSetPage(props: Props) {
             columns={[
               { key: "item", header: "Item", cell: ({ item }: Piece) => {
                 const n = pieceName(item);
-                return <span className="inline-flex flex-wrap items-center gap-1"><EntityLink kind="item" id={item} name={n?.name} icon={tips.get(item)?.icon} />{n?.source === "files" && <Badge tone="files" />}</span>;
+                return <span className="inline-flex flex-wrap items-center gap-1"><EntityLink kind="item" id={item} name={n?.name} icon={icons.get(item)} />{n?.source === "files" && <Badge tone="files" />}</span>;
               } },
               { key: "slot", header: "Slot", cell: ({ item }: Piece) => categoryOf(CLIENT_TAXONOMY, item)?.slot?.name ?? "—" },
+              { key: "source", header: "Source", cell: ({ item }: Piece) => sourceCell(item) },
               { key: "id", header: "ID", numeric: true, cell: ({ item }: Piece) => item },
             ]}
-            meta={({ item }) => [categoryOf(CLIENT_TAXONOMY, item)?.slot?.name, `ID ${item}`].filter(Boolean).join(" · ")}
+            meta={({ item }) => [categoryOf(CLIENT_TAXONOMY, item)?.slot?.name, sourceLabels(item), `ID ${item}`].filter(Boolean).join(" · ")}
             rows={pieces.map((item) => ({ item }))}
             rowKey={({ item }) => String(item)}
           />

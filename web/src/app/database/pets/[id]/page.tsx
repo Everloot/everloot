@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { collectionsBuild, petEntries, petHref } from "@/lib/collectibles";
 import { parseSegment } from "@/lib/completion-lists";
-import { loadSiteAssets } from "@/lib/game-assets";
+import { CLIENT_LAYER } from "@kb/client-layer-file";
+import EntityLink from "@/components/EntityLink";
+import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CollectiblePage, collectibleMetadata, FILES_NAME } from "../../collectible-page";
-import { LINK } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ export default async function PetPage(props: Props) {
   if (!pet) notFound();
   const path = petHref(pet.id, pet.name);
   if (`/database/pets/${segment}` !== path) permanentRedirect(path);
-  const assets = await loadSiteAssets();
+  const [assets, spellNames] = await Promise.all([loadSiteAssets(), loadSpellNames(CLIENT_LAYER.build.version)]);
   const summary = [
     "A companion pet in WoW: Forever.",
     "No player report confirms companion pets yet.",
@@ -40,7 +40,7 @@ export default async function PetPage(props: Props) {
       list="/database/pets" path={path} name={pet.name} kind="Companion pet" id={pet.id}
       icon={assets?.petIcons.get(pet.id)}
       facts={[
-        { label: "Summoned by", value: <Link href={`/database/spells/${pet.spellId}`} className={LINK}>Spell {pet.spellId}</Link> },
+        { label: "Summoned by", value: <EntityLink kind="spell" id={pet.spellId} name={spellNames?.names.get(pet.spellId)} icon={assets?.spellIcons.get(pet.spellId)} /> },
         { label: "Creature", value: pet.creatureId, numeric: true },
         { label: "Build", value: collectionsBuild() ?? "Unrecorded", numeric: true },
       ]}

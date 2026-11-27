@@ -12,9 +12,14 @@ const art = vi.hoisted(() => ({ assets: null as unknown }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSiteAssets: async () => art.assets,
+  // The private spell names file: the Brown Horse's spell and the Mechanical Squirrel's.
+  loadSpellNames: async () => ({ version: "x", names: new Map([[458, "Brown Horse"], [4055, "Mechanical Squirrel"]]) }),
 }));
 // The toy list names a toy as its item page does: here only item 1973 has a name.
-vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({ agreed: new Map([[1973, "Thief's Tools"]]), matched: null }) }));
+// Item 823 (whose Use line casts the Brown Horse's spell) has a name players agreed on; 901 none, so it is not listed.
+vi.mock("@/lib/shown-item-names", () => ({
+  loadShownNames: async () => ({ agreed: new Map([[1973, "Thief's Tools"], [823, "Sturdy Bridle"]]), matched: null, showsTip: (id: number) => id === 1973 || id === 823 }),
+}));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -58,7 +63,10 @@ test("a mount page: icon, riding skill, the spell that teaches it, and the uncon
   expect(out).toMatch(/data-entity-meta[^>]*>.*Mount.*ID 6/);
   expect(out).toContain('src="https://a.test/icons/132261.webp"');
   expect(out).toContain("data-unconfirmed");
-  expect(factOf(out, "Taught by")).toContain('href="/database/spells/458"');
+  expect(factOf(out, "Taught by")).toMatch(/href="\/database\/spells\/458"[^>]*>(?:<[^>]*>)*Brown Horse</);
+  expect(factOf(out, "Taught by")).toContain('src="https://a.test/icons/132261.webp"');
+  // The items whose Use line casts the spell, under the item name rule.
+  expect(factOf(out, "Item")).toMatch(/href="\/database\/items\/823"[^>]*>(?:<[^>]*>)*Sturdy Bridle</);
   expect(factOf(out, "Player reports")).toBe("None yet");
   expect(out).toContain("found in game files, unconfirmed");
   expect(out).toContain("The name is shown from the game files; players have not reported it yet.");
@@ -88,7 +96,7 @@ test("a companion pet page names its creature, links its summon spell and shows 
   const out = await page(PetPage(params("39-mechanical-squirrel")));
   expect(out).toMatch(/<h1[^>]*>Mechanical Squirrel<\/h1>/);
   expect(out).toContain('src="https://a.test/icons/132761.webp"');
-  expect(factOf(out, "Summoned by")).toContain('href="/database/spells/4055"');
+  expect(factOf(out, "Summoned by")).toMatch(/href="\/database\/spells\/4055"[^>]*>(?:<[^>]*>)*Mechanical Squirrel</);
   expect(factOf(out, "Creature")).toBe("2671");
   expect(out).toContain("No player report confirms companion pets yet.");
 });
