@@ -70,9 +70,16 @@ export function developmentLeftovers(rows: readonly ItemRow[], name: (id: number
  * development leftovers) are not in the plain list, so they are not counted.
  */
 export function categoryNamedEnough(classId: number | undefined, subclassId: number | undefined, named: { has(id: number): boolean }, page = 1, hidden?: { has(id: number): boolean }): boolean {
-  const rows = sortItems(filterItems(CLIENT_TAXONOMY, { classId, subclassId }).filter((row) => !hidden?.has(row[0])), undefined, { name: (id) => (named.has(id) ? "" : undefined) });
-  const shown = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  return shown.length > 0 && shown.filter((row) => named.has(row[0])).length / shown.length >= MIN_NAMED_SHARE;
+  // Named rows come first, so only the counts matter: no sort is needed to know how many named rows a page holds.
+  let rows = 0, namedRows = 0;
+  for (const row of filterItems(CLIENT_TAXONOMY, { classId, subclassId })) {
+    if (hidden?.has(row[0])) continue;
+    rows++;
+    if (named.has(row[0])) namedRows++;
+  }
+  const start = (page - 1) * PER_PAGE;
+  const shown = Math.min(PER_PAGE, rows - start);
+  return shown > 0 && Math.min(shown, Math.max(0, namedRows - start)) / shown >= MIN_NAMED_SHARE;
 }
 
 /** Slot slugs any item in the build uses, in inventory type order (robes and chest pieces share "chest"). */
