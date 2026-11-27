@@ -7,6 +7,9 @@ import { Badge, Container, DataTable, DataTitle, filledColumns, FilterBar, Resul
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@/lib/world-lists";
 import { parseZoneSegment, publicZones, zoneHref, zoneSlug } from "@/lib/zones";
+import { loadWikiEntityNames } from "@/lib/wiki-entity-names";
+import { wikiNpcNames } from "@/lib/wiki-npc-names";
+import { NAME_FROM } from "@/lib/items";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
@@ -61,8 +64,16 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 export default async function NpcListPage(props: { searchParams?: Promise<Search> }) {
   const q = npcQuery((await props.searchParams) ?? {});
   if (!q) notFound();
-  const [facts, { rates }] = await Promise.all([loadWorldFacts(), computeRollups()]);
-  const reported = facts.unreachable ? [] : npcRows(facts, rates);
+  const [facts, { rates }, wiki] = await Promise.all([loadWorldFacts(), computeRollups(), loadWikiEntityNames("npc")]);
+  // The name each NPC's own page shows (shownNpcName): the agreed one, else the Warcraft Wiki name a unanimous report matches.
+  const wikiNames = wikiNpcNames(facts, wiki);
+  const fromWiki = new Set<number>();
+  const reported = facts.unreachable ? [] : npcRows(facts, rates).map((n) => {
+    const hit = n.name ? undefined : wikiNames?.get(n.npcId);
+    if (!hit) return n;
+    fromWiki.add(n.npcId);
+    return { ...n, name: hit.name };
+  });
   // An NPC known from a public quest (its giver or turn-in) or a vendor with agreed prices has a page too, so it is
   // listed like the rest, its unknown cells "—".
   const known = new Set(reported.map((n) => n.npcId));
@@ -88,7 +99,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const dash = <span className="text-muted">—</span>;
   // What it is (type, rank, reaction), its numbers (level, drops), where it stands, its id.
   const columns: SparseColumn<NpcRow>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (n) => <NameCell href={`/database/npcs/${n.npcId}`}>{n.name ?? `NPC ${n.npcId}`}</NameCell> },
+    { key: "name", header: "Name", sortable: true, cell: (n) => <NameCell href={`/database/npcs/${n.npcId}`} after={fromWiki.has(n.npcId) && <span className="sr-only"> ({NAME_FROM.wiki.toLowerCase()})</span>}>{n.name ?? `NPC ${n.npcId}`}</NameCell> },
     { key: "type", header: "Type", sortable: true, cell: (n) => n.creatureType ?? dash, blank: (n) => !n.creatureType },
     // A rank above normal (elite, rare, boss) is what you scan the list for, so it is a badge.
     { key: "rank", header: "Rank", sortable: true, cell: (n) => (!n.rank ? dash : n.rank === "normal" ? RANK_LABEL[n.rank] : <Badge tone="neutral">{RANK_LABEL[n.rank]}</Badge>), blank: (n) => !n.rank },

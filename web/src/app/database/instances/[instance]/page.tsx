@@ -21,6 +21,7 @@ import { agreedNpc } from "@kb/world-pages";
 import { loadRenders } from "@/lib/game-renders";
 import EntityLink from "@/components/EntityLink";
 import { loadingArt, loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemLooks } from "@/lib/item-look";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import GameIcon from "@/components/game/GameIcon";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
@@ -128,21 +129,20 @@ export default async function InstancePage(props: Props) {
   const lootBosses = bosses.map((b) => ({ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, href: bossHref(b.encounterId, b.name), npcIds: b.boss?.npcIds ?? [] }));
   const loot = unreachable || !lootBosses.some((b) => b.npcIds.length) ? null : await loadLootTables();
   const lootTables = new Map(loot && !loot.unreachable ? lootBosses.flatMap((b) => b.npcIds).map((id) => [id, npcLootTable(loot.tables, id)]) : []);
-  // Item names (and icons, when the game files have them) for the drop rows; an item nobody named stays "Item N".
+  // Each drop row's name, quality and icon as the item's own page and hover card show them (lib/item-look.ts).
   const droppedIds = [...lootTables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
   const lootRows: InstanceLootRow[] = lootBosses.flatMap((b) => b.npcIds.flatMap((id) => (lootTables.get(id)?.rows ?? []).map((r) => ({ ...r, encounterId: b.encounterId }))));
-  const itemFacts = droppedIds.length ? await loadItemFacts() : null;
-  const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
+  const look = droppedIds.length ? await loadItemLooks(assets, droppedIds) : null;
   // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
   const terrain = instanceTerrain(row.instanceMapId);
   const gear = gearFor({ instance: row.instanceMapId });
   const gearIds = gear.flatMap((g) => g.set?.pieces ?? [g.itemId]);
-  const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
-  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : names;
+  const gearFacts = gear.length ? await loadItemFacts() : null;
+  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : new Map<number, string>();
   const [spellNames, setNames] = gear.length
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
-  const tips = await loadItemTips(droppedIds.length || gearIds.length ? assets : null, [...droppedIds, ...gearIds]);
+  const tips = await loadItemTips(gearIds.length ? assets : null, gearIds);
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
   const tied = lootBosses.some((b) => b.npcIds.length);
@@ -167,7 +167,7 @@ export default async function InstancePage(props: Props) {
   };
   const topDrops = (b: BossRow) => npcsOf(b).flatMap((id) => lootTables.get(id)?.rows ?? [])
     .sort((x, y) => y.rate - x.rate || y.withItem - x.withItem || x.itemId - y.itemId).slice(0, 3);
-  const itemLink = (itemId: number) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />;
+  const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; };
   // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
   // reads as names with their unconfirmed marker, not rows of [?].
   const bossColumns: SparseColumn<BossRow>[] = [

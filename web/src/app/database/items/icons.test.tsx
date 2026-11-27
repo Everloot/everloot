@@ -187,6 +187,17 @@ test("a category row without an icon shows the question mark from the same asset
   expect(page).not.toContain("assets.everloot.app");
 });
 
+test("a named category row the files give only an icon for shows that icon, as its page does, not the question mark", async () => {
+  state.assets = assets;
+  const ids = clothIds();
+  state.missingTip = true;
+  state.matched = { ...eyeOfRend(), names: new Map([[ids[0], { name: `Wiki name ${ids[0]}`, color: "#ffffff", wikiPage: "https://warcraft.wiki.gg/wiki/W", source: "wiki" as const }]]) };
+  state.iconOnly = new Map([[ids[0], `${BASE}/icons/135661.webp`]]);
+  const page = await html(cloth());
+  expect(page).toMatch(new RegExp(`<img src="${BASE}/icons/135661\\.webp"[^>]*>(?:<[^>]*>)*Wiki name ${ids[0]}<`));
+  expect(page).not.toMatch(new RegExp(`icons/134400\\.webp"[^>]*>(?:<[^>]*>)*Wiki name ${ids[0]}<`));
+});
+
 test("a category row shows a name the game files and the wiki agree on, in its quality colour, its source in the hover card and in words for a screen reader, no printed label", async () => {
   state.assets = assets;
   const ids = clothIds();

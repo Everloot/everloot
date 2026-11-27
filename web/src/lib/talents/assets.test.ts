@@ -176,6 +176,9 @@ const SHOWS_ART = new Set([
   // The hover card on the site's own database links, one entity per request, under the pages' rules; and the
   // icons beside the item hits of /search and the type-ahead, for the items whose pages show them.
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
+  // An item in another page's drop table (an NPC's, a boss's, an instance's): the name, quality and icon its own page
+  // and hover card show, under the same gate.
+  "web/src/lib/item-look.ts",
   // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
   "web/src/lib/showcase-gear-art.ts",
   // Gear Blizzard's armory reports equipped: its tooltips, or the armory's name with the files' icon (docs/DATA_POLICY.md).

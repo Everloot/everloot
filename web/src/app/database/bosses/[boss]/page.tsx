@@ -10,14 +10,15 @@ import { bossEntry, bossHref, type BossEntry } from "@/lib/bosses";
 import { trailFor } from "@/lib/breadcrumbs";
 import { observedLine } from "@/lib/evidence";
 import { entityTitle } from "@/lib/entity-meta";
-import { loadingArt, loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemLooks } from "@/lib/item-look";
 import { loadRenders } from "@/lib/game-renders";
 import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
-import { itemNames, npcNames } from "@/lib/names";
+import { npcNames } from "@/lib/names";
 import { loadInstanceClears } from "@/lib/progression";
 import { dayLabel } from "@/lib/report-labels";
-import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
+import { loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { EmptyTab, EntityArt, EntityPage, known, LINK, ModelPicture, Unreachable } from "../../entity";
@@ -89,9 +90,8 @@ export default async function BossPage(props: Props) {
   ]);
   const tables = new Map(loot && !loot.unreachable ? npcIds.map((id) => [id, npcLootTable(loot.tables, id)]) : []);
   const droppedIds = [...tables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
-  const itemFacts = droppedIds.length ? await loadItemFacts() : null;
-  const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const tips = await loadItemTips(assets, droppedIds);
+  // Each item's name, quality and icon as its own page and hover card show them (lib/item-look.ts).
+  const look = droppedIds.length ? await loadItemLooks(assets, droppedIds) : null;
   const npcName = world && !world.unreachable ? npcNames(world) : new Map<number, string>();
   // The level 3 installs agree on for the first creature tied to the boss that has one.
   const level = world && !world.unreachable ? npcIds.map((id) => agreedNpc(id, world)?.level ?? null).find((l) => l !== null) ?? null : null;
@@ -167,7 +167,7 @@ export default async function BossPage(props: Props) {
                   title={title}
                   dataAsOf={loot!.dataAsOf}
                   pages={{ page: dropPage, href: (page) => `${listHref(path, [["drops", page === 1 ? undefined : String(page)]])}#loot` }}
-                  item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
+                  item={(itemId) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; }}
                 />
               </div>
             ))}
