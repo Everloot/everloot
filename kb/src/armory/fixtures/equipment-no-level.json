@@ -1,0 +1,661 @@
+{
+  "equipped_items": [
+    {
+      "item": {
+        "id": 252605
+      },
+      "slot": {
+        "type": "HEAD",
+        "name": "Head"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Black Dragonscale Helm",
+      "inventory_type": {
+        "type": "HEAD",
+        "name": "Head"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_EQUIP",
+        "name": "Binds when equipped"
+      },
+      "requirements": {
+        "level": {
+          "value": 56,
+          "display_string": "Requires Level 56"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 22150
+      },
+      "slot": {
+        "type": "NECK",
+        "name": "Neck"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beads of Ogre Might",
+      "inventory_type": {
+        "type": "NECK",
+        "name": "Neck"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      }
+    },
+    {
+      "item": {
+        "id": 226884
+      },
+      "slot": {
+        "type": "SHOULDER",
+        "name": "Shoulders"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beastmaster's Mantle",
+      "inventory_type": {
+        "type": "SHOULDER",
+        "name": "Shoulder"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 5107
+      },
+      "slot": {
+        "type": "SHIRT",
+        "name": "Shirt"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "COMMON",
+        "name": "Common"
+      },
+      "name": "Deckhand's Shirt",
+      "inventory_type": {
+        "type": "BODY",
+        "name": "Shirt"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      }
+    },
+    {
+      "item": {
+        "id": 252483
+      },
+      "slot": {
+        "type": "CHEST",
+        "name": "Chest"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Dawn Armor",
+      "inventory_type": {
+        "type": "CHEST",
+        "name": "Chest"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Leather",
+        "id": 2
+      },
+      "binding": {
+        "type": "ON_EQUIP",
+        "name": "Binds when equipped"
+      },
+      "requirements": {
+        "level": {
+          "value": 56,
+          "display_string": "Requires Level 56"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 226888
+      },
+      "slot": {
+        "type": "WAIST",
+        "name": "Waist"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beastmaster's Belt",
+      "inventory_type": {
+        "type": "WAIST",
+        "name": "Waist"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 226882
+      },
+      "slot": {
+        "type": "LEGS",
+        "name": "Legs"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beastmaster's Pants",
+      "inventory_type": {
+        "type": "LEGS",
+        "name": "Legs"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 226881
+      },
+      "slot": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Beastmaster's Treads",
+      "inventory_type": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 226885
+      },
+      "slot": {
+        "type": "WRIST",
+        "name": "Wrist"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beastmaster's Bindings",
+      "inventory_type": {
+        "type": "WRIST",
+        "name": "Wrist"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 226883
+      },
+      "slot": {
+        "type": "HANDS",
+        "name": "Hands"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Beastmaster's Gauntlets",
+      "inventory_type": {
+        "type": "HAND",
+        "name": "Hands"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 272408
+      },
+      "slot": {
+        "type": "FINGER_1",
+        "name": "Ring 1"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Cutthroat's Signet",
+      "inventory_type": {
+        "type": "FINGER",
+        "name": "Finger"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "level": {
+          "value": 60,
+          "display_string": "Requires Level 60"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 19325
+      },
+      "slot": {
+        "type": "FINGER_2",
+        "name": "Ring 2"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Don Julio's Band",
+      "inventory_type": {
+        "type": "FINGER",
+        "name": "Finger"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "level": {
+          "value": 55,
+          "display_string": "Requires Level 55"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 19120
+      },
+      "slot": {
+        "type": "TRINKET_1",
+        "name": "Trinket 1"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "UNCOMMON",
+        "name": "Uncommon"
+      },
+      "name": "Rune of the Guard Captain",
+      "inventory_type": {
+        "type": "TRINKET",
+        "name": "Trinket"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      }
+    },
+    {
+      "item": {
+        "id": 13965
+      },
+      "slot": {
+        "type": "TRINKET_2",
+        "name": "Trinket 2"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Blackhand's Breadth",
+      "inventory_type": {
+        "type": "TRINKET",
+        "name": "Trinket"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Miscellaneous",
+        "id": 0
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      }
+    },
+    {
+      "item": {
+        "id": 272414
+      },
+      "slot": {
+        "type": "BACK",
+        "name": "Back"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Howler's Furs",
+      "inventory_type": {
+        "type": "CLOAK",
+        "name": "Back"
+      },
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Cloth",
+        "id": 1
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "level": {
+          "value": 60,
+          "display_string": "Requires Level 60"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 18520
+      },
+      "slot": {
+        "type": "MAIN_HAND",
+        "name": "Main Hand"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Barbarous Blade",
+      "inventory_type": {
+        "type": "TWOHWEAPON",
+        "name": "Two-Hand"
+      },
+      "item_class": {
+        "name": "Weapon",
+        "id": 2
+      },
+      "item_subclass": {
+        "name": "Sword",
+        "id": 8
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "requirements": {
+        "level": {
+          "value": 58,
+          "display_string": "Requires Level 58"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": 19107
+      },
+      "slot": {
+        "type": "RANGED",
+        "name": "Ranged"
+      },
+      "quantity": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Bloodseeker",
+      "inventory_type": {
+        "type": "RANGEDRIGHT",
+        "name": "Ranged"
+      },
+      "item_class": {
+        "name": "Weapon",
+        "id": 2
+      },
+      "item_subclass": {
+        "name": "Crossbow",
+        "id": 18
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      }
+    },
+    {
+      "item": {
+        "id": 11285
+      },
+      "slot": {
+        "type": "AMMO",
+        "name": "Ammo"
+      },
+      "quality": {
+        "type": "COMMON",
+        "name": "Common"
+      },
+      "name": "Jagged Arrow",
+      "inventory_type": {
+        "type": "AMMO",
+        "name": "Ammo"
+      },
+      "item_class": {
+        "name": "Projectile",
+        "id": 6
+      },
+      "item_subclass": {
+        "name": "Arrow",
+        "id": 2
+      },
+      "requirements": {
+        "level": {
+          "value": 40,
+          "display_string": "Requires Level 40"
+        }
+      }
+    }
+  ]
+}

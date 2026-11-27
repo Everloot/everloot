@@ -66,6 +66,17 @@ export interface LookupDeps {
   budgetMs?: number;
   /** Keeps the lookup running after its answer (the Worker's waitUntil), so a found character is still stored. */
   background?: (work: Promise<unknown>) => void;
+  /**
+   * The game files' item level (ItemSparse) for each of `ids` that has one. Blizzard's equipment answer has no item
+   * level since 2026-11-27, so a first read takes it from the files (kb/src/armory/parse.ts). A failure gives none.
+   */
+  fileLevels?: (ids: readonly number[]) => Promise<ReadonlyMap<number, number>>;
+}
+
+/** The item ids in an equipment answer, whatever else it holds; the parser checks its shape. */
+function equippedIds(body: unknown): number[] {
+  const items = (body as { equipped_items?: unknown } | null)?.equipped_items;
+  return Array.isArray(items) ? items.map((i) => (i as { item?: { id?: unknown } })?.item?.id).filter((id): id is number => typeof id === "number") : [];
 }
 
 /** A stored character for the full name, read from Blizzard now, or null (see the notes at the top). Never throws. */
@@ -89,7 +100,9 @@ export async function lookupCharacter(text: string, deps: LookupDeps): Promise<A
       if (profile.status !== 200) return null;
       const [equipment, pvp] = await Promise.all([api.get(`${path}/equipment`, "profile"), api.get(`${path}/pvp-summary`, "profile")]);
       if (equipment.status !== 200 || pvp.status !== 200) return null;
-      const row = parseCharacter(profile.body, equipment.body, pvp.body, profile.lastModified, slug);
+      const ids = equippedIds(equipment.body);
+      const levels = ids.length && deps.fileLevels ? await deps.fileLevels(ids).catch(() => new Map<number, number>()) : new Map<number, number>();
+      const row = parseCharacter(profile.body, equipment.body, pvp.body, profile.lastModified, slug, { fileLevel: (id) => levels.get(id) ?? null });
       if (row.slug !== slug || !(await deps.store.storeLookup(region, row))) return null;
       return { region, slug, name: row.name, surname: row.surname, level: row.level, class: row.class, race: row.race, ruleset: row.ruleset, guildName: row.guild_name };
     }
@@ -141,5 +154,10 @@ export function findCharacter(text: string, admit: () => Promise<boolean>, env: 
     api: (region) => (apis[region] ??= new ForeverApi({ clientId, clientSecret, region, fetchImpl })),
     forgetApi: () => { held.__everlootLookupApi = {}; },
     background: waitUntil,
+    fileLevels: async (ids) => {
+      const { loadItemLevels, loadSiteAssets } = await import("./game-assets");
+      const levels = await loadItemLevels(await loadSiteAssets(), ids);
+      return new Map([...levels].filter(([, l]) => l.level > 0).map(([id, l]) => [id, l.level]));
+    },
   });
 }

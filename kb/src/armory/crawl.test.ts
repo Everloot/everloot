@@ -5,6 +5,7 @@ import { rowFailureLimit, runCrawl } from "./crawl.js";
 import type { ProfileDetails } from "./details.js";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
+import noLevel from "./fixtures/equipment-no-level.json";
 import pvp from "./fixtures/pvp.json";
 import guild from "./fixtures/guild.json";
 import roster from "./fixtures/roster.json";
@@ -846,4 +847,15 @@ it("a statistics 404 or a profile with no achievements link stores an empty play
   const unlinked = setup();
   await runCrawl({ region: "eu", budget: 11, store: unlinked.store, api: unlinked.api, details: true });
   expect((unlinked.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
+});
+
+it("a re-read of a character whose equipment answer has no levels keeps the stored levels and item level", async () => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => ({ status: 200, lastModified: "new", body: path.endsWith("equipment") ? noLevel : bodyFor(path) }));
+  const levels = noLevel.equipped_items.map((i) => ({ slot: i.slot.type, item_id: i.item.id, name: i.name, level: 60, quality: "RARE", inventory_type: "HEAD" }));
+  store.character.mockResolvedValue([{ last_modified: "date", item_level: 56, gear_score: 57, equipment: levels }]);
+  await runCrawl({ region: "eu", budget: 11, store, api });
+  const row = store.upsertCharacters.mock.calls[0]?.[1][0] as { item_level: number; equipment: { level: number | null }[] };
+  expect(row.equipment.every((e) => e.level === 60)).toBe(true);
+  expect(row.item_level).toBe(60);
 });
