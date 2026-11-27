@@ -20,6 +20,8 @@ import { loadObjectFacts } from "./objects";
 import { loadWiki, publishedPages, wikiHref } from "./wiki";
 import { WORLD_MAP } from "./world-map";
 import { zoneHref } from "./zones";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { spellRank } from "./spell-card";
 
 export { byTypo, editDistance } from "./name-match";
 
@@ -36,6 +38,11 @@ export type SearchType = "class" | "item" | "npc" | "vendor" | "quest" | "object
  */
 export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number; page?: number; respelled?: string }
 export const GROUP_LIMIT = 8;
+/**
+ * The four queries the empty search page offers (and its field's placeholder, from the second): each finds an exact
+ * page from the game files alone (a zone, a dungeon, its boss, an item id), so none depends on the names players report.
+ */
+export const SEARCH_EXAMPLES = ["Elwynn Forest", "Deadmines", "Edwin VanCleef", "6948"] as const;
 export const LORE_LIMIT = 5;
 
 export const HEADINGS: Record<SearchType, string> = {
@@ -99,12 +106,15 @@ export function sortedNames(names: Map<number, string>): NamedRow[] {
   return rows;
 }
 
-/** `byName` over rows already in name order: a stable sort by rank keeps the name order within a rank. */
+/**
+ * `byName` over rows already in name order: a stable sort by rank keeps the name order within a rank. A development
+ * leftover ("Deprecated …", "[DNT] …", "Monster - …") is left out, as the database lists leave it out; its id still opens it.
+ */
 function bySortedName(rows: readonly NamedRow[], match: Match): { entry: NamedRow; exact: boolean; r: number }[] {
   const hits: { entry: NamedRow; exact: boolean; r: number }[] = [];
   for (const entry of rows) {
     const r = match(entry.n);
-    if (r !== null) hits.push({ entry, exact: r === 0, r });
+    if (r !== null && !isDevelopmentItemName(entry.name)) hits.push({ entry, exact: r === 0, r });
   }
   return hits.sort((a, b) => a.r - b.r);
 }
@@ -192,6 +202,8 @@ function vendorHits(ids: Set<number>, npcs: Map<number, string>, match: Match, i
 }
 
 const spellHref = (id: number) => entityHref("spell", id);
+/** A spell row's note: its rank where the files give it a rank chain (spell-card.ts), so same-named ranks tell apart. */
+const spellNote = (id: number, idText: string) => { const rank = spellRank(id); return rank ? `Rank ${rank} · ${idText}` : idText; };
 const UNNAMED_SET = { known: (id: number) => itemSet(id) !== undefined, label: (id: number) => `Item set ${id}` };
 
 type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
@@ -308,7 +320,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       if (want("holiday")) hits.set("holiday", fileHits(holidayEntries(), match, id, holidayHref));
       if (want("family")) hits.set("family", fileHits(petFamilyEntries(), match, id, petFamilyHref));
       // Spells, item sets and vendors by the names their lists show, which only a page passes in (never the API).
-      if (spells) hits.set("spell", namedHits(spells, match, id, spellHref));
+      if (spells) hits.set("spell", namedHits(spells, match, id, spellHref).map((x) => ({ ...x, note: spellNote(x.id!, `id ${x.id}`) })));
       if (itemSets) hits.set("item-set", namedHits(itemSets, match, id, itemSetHref, UNNAMED_SET));
       if (vendors) hits.set("vendor", vendorHits(vendors, names.npcs, match, id));
     }
@@ -406,11 +418,13 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(start, start + limit).map(strip), total: f.total, ...(paged ? { page: current } : {}), ...(respelled ? { respelled } : {}) };
     })
     .filter((g) => want(g.type) && g.results.length > 0)
-    .map((g, i) => ({ g, i, tier: tier(g) }))
+    .map((g, i) => ({ g, i, tier: tier(g, q) }))
     .sort((a, b) => a.tier - b.tier || a.i - b.i)
     .map(({ g }) => g);
 }
 
+/** Places and people: a name of one that starts with the text leads the items, quests and spells that also do. */
+const PLACES: ReadonlySet<SearchType> = new Set(["zone", "instance", "npc"]);
 /** The things a player meets in the game: their groups lead the page. */
 const GAME: ReadonlySet<SearchType> = new Set(["item", "npc", "quest", "object", "zone", "instance"]);
 const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "boss", "vendor", "spell", "achievement", "faction", "title", "chain", "item-set", "guide"]);
@@ -420,10 +434,11 @@ const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "boss", "ve
  * then any other exact hit, then the game entries, then the rest of the database, tools and docs. The lore archive
  * (Warcraft Wiki copies) comes after every other group, even on an exact name: the Forever record comes first.
  */
-function tier(g: SearchGroup): number {
+function tier(g: SearchGroup, q: string): number {
   const exact = g.results.some((r) => r.exact);
   if (g.type === "lore") return 6;
   if (exact) return GAME.has(g.type) ? 0 : 1;
+  if (PLACES.has(g.type) && g.results.some((r) => r.label.toLowerCase().replace(/^the /, "").startsWith(q.replace(/^the /, "")))) return 1.5;
   return GAME.has(g.type) ? 2 : DATABASE.has(g.type) ? 3 : 5;
 }
 
@@ -457,31 +472,40 @@ export async function suggest(raw: string, scope?: Scope, names?: Names, { toler
   const all = names ?? await loadNames();
   const order: Scope[] = scope ? [scope] : [...SCOPES];
   const rows = async (match: Match) => {
-    const ranked: { s: Suggestion; r: number; t: number }[] = [];
+    // `p` puts a zone, dungeon or raid, NPC or vendor ahead of an item, quest, object or spell of the same name rank.
+    const ranked: { s: Suggestion; r: number; t: number; p?: number }[] = [];
     for (const [t, type] of order.entries()) {
       if (type === "object") {
         for (const o of (await objectHits(match, id, all.objects, objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
         continue;
       }
       for (const x of agreed(type, all[`${type}s`], match, id).results.slice(0, SUGGEST_LIMIT)) {
-        ranked.push({ s: { type, id: x.id!, label: x.label, href: x.href, ...(type === "item" ? { quality: x.quality ?? null } : {}) }, r: x.r, t });
+        ranked.push({ s: { type, id: x.id!, label: x.label, href: x.href, ...(type === "item" ? { quality: x.quality ?? null } : {}) }, r: x.r, t, p: type === "npc" ? 0 : 1 });
       }
     }
     if (!scope) {
       for (const x of zoneHits(match).slice(0, SUGGEST_LIMIT)) {
-        ranked.push({ s: { type: "zone", id: x.id, label: x.label, href: x.href, note: "Zone" }, r: x.r, t: order.length });
+        ranked.push({ s: { type: "zone", id: x.id, label: x.label, href: x.href, note: "Zone" }, r: x.r, t: order.length, p: 0 });
       }
       for (const x of instanceHits(match).slice(0, SUGGEST_LIMIT)) {
-        ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length + 1 });
+        ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length + 1, p: 0 });
       }
       if (vendors) for (const x of vendorHits(vendors, all.npcs, match, id).slice(0, SUGGEST_LIMIT)) {
-        ranked.push({ s: { type: "vendor", id: x.id!, label: x.label, href: x.href }, r: x.r, t: order.length + 2 });
+        ranked.push({ s: { type: "vendor", id: x.id!, label: x.label, href: x.href }, r: x.r, t: order.length + 2, p: 0 });
       }
-      if (spells) for (const x of namedHits(spells, match, id, spellHref).slice(0, SUGGEST_LIMIT)) {
-        ranked.push({ s: { type: "spell", id: x.id!, label: x.label, href: x.href }, r: x.r, t: order.length + 3 });
+      // Same-named spells with no rank to tell them apart (eight "Fireball" rows) come once: the first, by id.
+      const seen = new Set<string>();
+      if (spells) for (const x of namedHits(spells, match, id, spellHref)) {
+        const rank = spellRank(x.id!);
+        if (!rank && seen.has(x.label)) continue;
+        seen.add(x.label);
+        ranked.push({ s: { type: "spell", id: x.id!, label: x.label, href: x.href, ...(rank ? { note: `Rank ${rank} · Spell ${x.id}` } : {}) }, r: x.r, t: order.length + 3 });
+        if (ranked.filter((y) => y.s.type === "spell").length >= SUGGEST_LIMIT) break;
       }
     }
-    return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);
+    // Only an exact or prefix name: a typed id (rank -1) keeps the type order, item first.
+    const place = (x: { r: number; p?: number }) => (x.r === 0 || x.r === 1 ? x.p ?? 1 : 1);
+    return ranked.sort((a, b) => a.r - b.r || place(a) - place(b) || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);
   };
   if (!tolerant) return rows(byPhrase(q));
   const found = await rows(byWords(q));

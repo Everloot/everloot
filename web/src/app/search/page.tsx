@@ -9,7 +9,7 @@ import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkT
 import { CLASS_TEXT, classNameOf } from "@/components/ui/class-colour";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
-import { HEADINGS, isResultScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
+import { HEADINGS, isResultScope, SEARCH_EXAMPLES, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
 import { loadSearchShown } from "@/lib/shown-search-names";
 import { shownItemIcons } from "@/lib/item-icons";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
@@ -76,8 +76,8 @@ const KINDS: { type: SearchType; href: string }[] = [
   ...(Object.keys(LIST_OF) as ResultScope[]).map((type) => ({ type, href: LIST_OF[type] })),
   { type: "class", href: "/classes" }, { type: "guide", href: "/wiki" }, { type: "lore", href: "/lore" }, { type: "tool", href: "/tools" }, { type: "doc", href: "/docs" },
 ];
-/** Four queries to try: the lookup /chat opens with (ChatWelcome), then the field's own placeholder. */
-const EXAMPLES = ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"];
+/** Four queries to try, each finding a page from the game files alone; the field's placeholder from the second. */
+const EXAMPLES = SEARCH_EXAMPLES;
 
 /** The empty page's hint: the kinds a search finds and four queries to try. */
 function SearchStart({ heading = "What you can search" }: { heading?: string }) {

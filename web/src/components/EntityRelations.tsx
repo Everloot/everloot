@@ -11,12 +11,14 @@ import Badge, { UNCONFIRMED_TITLE } from "./ui/Badge";
 /** A spell's icon URL, when the page has the asset manifest. Items get none here: their icons follow the reported-items rule. */
 export type SpellIconFor = (spellId: number) => string | undefined;
 
-/** Where an entity has a page on this site; null where it has none yet (spells, icons). */
+/** Where an entity has a page on this site; null where it has none yet (icons). */
 function hrefFor(kind: EdgeKind, id: number, rel: Rel): string | null {
   if (kind === "item") return `/database/items/${id}`;
   if (kind === "npc") return rel === "sold_by" ? `/database/vendors/${id}` : `/database/npcs/${id}`;
   if (kind === "object") return `/database/objects/${id}`;
   if (kind === "quest") return `/database/quests/${id}`;
+  // A spell a relation names always has a page: the spell page answers for any spell with a relation.
+  if (kind === "spell") return `/database/spells/${id}`;
   if (kind === "zone") {
     // Released zones only: a zone found just in the game files gets no page, so no link.
     const zone = zoneByMapId(id);

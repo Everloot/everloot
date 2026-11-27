@@ -87,9 +87,10 @@ test("without a query it says what a search finds, with each list and four queri
     expect(html, kind).toContain(`href="${href}"`);
     expect(html, kind).toContain(`>${kind}</a>`);
   }
-  // The examples are the lookups /chat opens with and the field's own placeholder, each a search.
-  for (const q of ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"]) expect(html, q).toContain(`href="/search?q=${encodeURIComponent(q)}"`);
-  expect(html).toContain('placeholder="A name or an id: Thrall, Elwynn Forest, 6948"');
+  // Each one finds an exact page from the game files alone (site-search.test.ts), so none is a dead end like "Thrall".
+  for (const q of ["Elwynn Forest", "Deadmines", "Edwin VanCleef", "6948"]) expect(html, q).toContain(`href="/search?q=${encodeURIComponent(q)}"`);
+  expect(html).not.toContain("q=Thrall");
+  expect(html).toContain('placeholder="A name or an id: Deadmines, Edwin VanCleef, 6948"');
   // The hint never needs a store read: the page asked nothing of the search or the icons.
   expect(icons.asked.at(-1)).toEqual([]);
 
@@ -417,7 +418,7 @@ test("no results says so with the query, then the kinds a search finds and queri
   siteSearch.groups = [];
   const html = await render({ q: "zzzz" });
   expect(html).toContain("No results for “zzzz”");
-  expect(html).toContain('href="/search?q=Thrall"');
+  expect(html).toContain('href="/search?q=Deadmines"');
   expect(html).toContain('href="/database/items"');
   expect(html).toContain('href="/database/npcs"');
 });

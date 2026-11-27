@@ -135,9 +135,8 @@ test("a dungeon row says which it is and its level, and is picked like any other
   await type("deadm");
   await answer("deadm", [{ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" }, suggestion(4, "Deadmines Map")]);
   const options = [...container.querySelectorAll("[role=option]")];
-  // Items come before zones, dungeons and NPCs.
-  expect(options.map((o) => o.textContent)).toEqual(["Deadmines MapItem 4", "DeadminesDungeon, level 16", "All results for “deadm”Search"]);
-  await press("ArrowDown");
+  // The sections keep the server's ranking: the dungeon it ranks first comes before the item.
+  expect(options.map((o) => o.textContent)).toEqual(["DeadminesDungeon, level 16", "Deadmines MapItem 4", "All results for “deadm”Search"]);
   await press("ArrowDown");
   const clicks = watchClicks();
   await press("Enter");
@@ -342,6 +341,18 @@ test("any suggestions end with a row for every result on the search page, in the
 test("the type-ahead asks in lower case, so every casing is one cached request", () => {
   expect(suggestUrl(" Thrall ", "")).toBe("/search/suggest?q=thrall");
   expect(suggestUrl("THRALL", "npc")).toBe("/search/suggest?q=thrall&in=npc");
+});
+
+test("sections follow the ranked rows: a zone the server ranks first heads the list above the items", async () => {
+  await type("elwyn");
+  await answer("elwyn", [
+    { type: "zone", id: 37, label: "Elwynn Forest", href: "/database/zones/37", note: "Zone" },
+    suggestion(203750, "Elwynn Treasure Map"),
+    { type: "spell", id: 116, label: "Elwynn Spell", href: "/database/spells/116", note: "Rank 2 · Spell 116" },
+  ]);
+  expect(headings()).toEqual(["Zones & NPCs", "Items", "Spells"]);
+  expect(texts()[0]).toContain("Elwynn Forest");
+  expect(texts()[2]).toContain("Rank 2 · Spell 116");
 });
 
 test("vendors sit with the NPCs and spells in a section of their own, each row saying its type and id", async () => {

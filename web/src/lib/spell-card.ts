@@ -99,11 +99,15 @@ export function mechanicName(s: ClientSpell, table: ClientSpells = CLIENT_SPELLS
  * link touches gives an empty list.
  */
 export function spellRanks(id: number, table: ClientSpells = CLIENT_SPELLS): number[] {
-  const next = new Map<number, number>();
-  for (const [key, s] of Object.entries(table.spells)) {
-    if (!s.supersedes) continue;
-    const cur = next.get(s.supersedes);
-    if (cur === undefined || Number(key) < cur) next.set(s.supersedes, Number(key));
+  let next = nextRanks.get(table);
+  if (!next) {
+    next = new Map<number, number>();
+    for (const [key, s] of Object.entries(table.spells)) {
+      if (!s.supersedes) continue;
+      const cur = next.get(s.supersedes);
+      if (cur === undefined || Number(key) < cur) next.set(s.supersedes, Number(key));
+    }
+    nextRanks.set(table, next);
   }
   if (!table.spells[String(id)]?.supersedes && !next.has(id)) return [];
   let first = id;
@@ -115,6 +119,15 @@ export function spellRanks(id: number, table: ClientSpells = CLIENT_SPELLS): num
   const chain = [first];
   for (let n = next.get(first); n !== undefined && !chain.includes(n); n = next.get(n)) chain.push(n);
   return chain;
+}
+
+/** Each table's "replaced by" links, built once: search asks for a rank per suggested spell, per keystroke. */
+const nextRanks = new WeakMap<ClientSpells, Map<number, number>>();
+
+/** The spell's rank in its chain (1 for the first), as its page prints it; undefined for a spell with no ranks. */
+export function spellRank(id: number, table: ClientSpells = CLIENT_SPELLS): number | undefined {
+  const chain = spellRanks(id, table);
+  return chain.length > 1 ? chain.indexOf(id) + 1 : undefined;
 }
 
 export const ITEM_TRIGGER = { 0: "Use", 1: "Equip", 2: "Chance on hit" } as Record<number, string>;
