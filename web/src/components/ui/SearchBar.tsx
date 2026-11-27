@@ -89,7 +89,7 @@ export function allResultsRow(text: string, scope: string): Suggestion {
  */
 export function couldBeName(text: string): boolean {
   if (!/\p{L}/u.test(text)) return false;
-  return /^\p{L}{2,24}(\s+\p{L}{1,24})?$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(text));
+  return /^\p{L}{2,24}(\s+\p{L}{1,24})?$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '\u2019-]*$/u.test(text));
 }
 
 /**

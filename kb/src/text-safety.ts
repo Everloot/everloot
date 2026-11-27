@@ -28,7 +28,7 @@ export const MAX_EXCERPT_SENTENCES = 2;
 const ABBREVIATIONS = new Set(["mr", "mrs", "ms", "dr", "st", "vs", "e.g", "i.e", "approx", "inc", "lvl", "lv"]);
 
 /** Where a sentence ends: end punctuation, then a space, then a letter, digit, quote or bracket. */
-const BOUNDARY = /[.!?]+["”’)\]]*\s+(?=[\p{L}\p{N}"“‘'(\[])/gu;
+const BOUNDARY = /[.!?]+["\u201d\u2019)\]]*\s+(?=[\p{L}\p{N}"\u201c\u2018'(\[])/gu;
 
 function sentencesOf(text: string): string[] {
   const out: string[] = [];

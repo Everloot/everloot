@@ -694,7 +694,7 @@ export function validPlayerName(name: unknown): name is string {
 
 /** A guild name: letters, digits, spaces, apostrophes and hyphens, 2 to 24 characters. */
 export function validGuildName(name: unknown): name is string {
-  return typeof name === "string" && name.length >= 2 && name.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(name);
+  return typeof name === "string" && name.length >= 2 && name.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '\u2019-]*$/u.test(name);
 }
 
 /** One character, as the addon last saw it. The site keeps the newest row per character and realm. */

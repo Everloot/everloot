@@ -57,7 +57,7 @@ export function linkKey(guid: string, secret: string): string {
  * are one realm, so a spelling cannot dodge a freeze or a hide.
  */
 export function linkRealmKey(realm: string): string {
-  return realm.toLowerCase().replace(/’/g, "'").replace(/[\s-]+/g, " ").trim();
+  return realm.toLowerCase().replace(/\u2019/g, "'").replace(/[\s-]+/g, " ").trim();
 }
 
 /**

@@ -23,7 +23,7 @@ export const AFTER_LAUNCH: ReadonlySet<RulesetSlug> = new Set(["hardcore"]);
  * "mal’ganis", "malganis" and the character links' key "mal'ganis" are one realm, as are "Argent Dawn" and "argent-dawn".
  */
 export function realmMapKey(name: string): string {
-  return name.toLowerCase().replace(/['’]/g, "").replace(/[\s-]+/g, " ").trim();
+  return name.toLowerCase().replace(/['\u2019]/g, "").replace(/[\s-]+/g, " ").trim();
 }
 
 export interface RealmInfo { ruleset: RulesetSlug; region: Region }

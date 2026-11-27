@@ -58,7 +58,7 @@ const GAMEPLAY_NUMBER = [
 
 /** Text with quotes, links' addresses and URLs taken out: what the number rule reads. */
 function ownText(text: string): string {
-  return text.replace(/\]\([^)]*\)/g, "]").replace(/https?:\/\/\S+/g, " ").replace(/"[^"\n]*"|“[^”\n]*”/g, " ");
+  return text.replace(/\]\([^)]*\)/g, "]").replace(/https?:\/\/\S+/g, " ").replace(/"[^"\n]*"|\u201c[^\u201d\n]*\u201d/g, " ");
 }
 
 export const typedNumber = (text: string): string | null => {
@@ -76,7 +76,7 @@ const inlines = (b: Block): Inline[][] => (b.type === "quote" ? [b.inline] : pro
 /** Words of the page's own prose: paragraphs and lists, not headings or quotes. A token counts as one word. */
 export function proseWords(blocks: Block[]): number {
   let n = 0;
-  for (const b of blocks) for (const i of prose(b)) n += (inlineText(i).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
+  for (const b of blocks) for (const i of prose(b)) n += (inlineText(i).match(/[\p{L}\p{N}][\p{L}\p{N}'\u2019-]*/gu) ?? []).length;
   return n;
 }
 

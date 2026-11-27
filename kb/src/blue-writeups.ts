@@ -78,7 +78,7 @@ const unquote = (s: string) => s.trim().replace(/^(["'])(.*)\1$/, "$2");
 
 /** One write-up file. Throws with the reason when the file breaks a rule. */
 export function parseWriteupFile(name: string, text: string): BlueWriteup | DraftWriteup {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text.replace(/^﻿/, ""));
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text.replace(/^\ufeff/, ""));
   if (!m) throw new Error(`${name}: no front matter`);
   const fields: Record<string, string> = {};
   let parent = "";

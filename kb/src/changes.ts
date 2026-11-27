@@ -283,7 +283,7 @@ export const TYPE_LABEL: Record<ChangeType, string> = { post: "Blue post", hotfi
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[c]!);
 // Characters XML 1.0 cannot carry would make the whole feed unreadable; drop them.
-const clean = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, "");
+const clean = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\ufffe\uffff]/g, "");
 
 /** One feed line for a person or a feed reader: what it is, and when. */
 export function entryDescription(e: ChangeEntry): string {

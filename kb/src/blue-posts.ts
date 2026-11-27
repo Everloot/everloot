@@ -163,8 +163,8 @@ export function parseBlueskyFeed(json: unknown, now: Date): BluePost[] {
     const firstLine = plainText(text.split(/\n/).find((l) => l.trim()) ?? text);
     const title = firstLine.length > 100 ? `${firstLine.slice(0, 99).replace(/\s+\S*$/, "")}…` : firstLine;
     const whole = plainText(text);
-    const core = title.replace(/…$/, "");
-    const rest = (whole.startsWith(core) ? whole.slice(core.length) : whole).replace(/^[\s.:;,\-–—]+/, "");
+    const core = title.replace(/\u2026$/, "");
+    const rest = (whole.startsWith(core) ? whole.slice(core.length) : whole).replace(/^[\s.:;,\-\u2013\u2014]+/, "");
     posts.push({
       id: `bluesky:${key}`,
       source: "bluesky",

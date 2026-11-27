@@ -35,7 +35,7 @@ export interface RealmRef {
  * "malganis". A realm called Item gets "item-realm", since /tools/auctions/item/<id> is the cross-realm page.
  */
 export function realmSlug(name: string): string {
-  const slug = name.trim().toLowerCase().replace(/['’]/g, "").replace(/[\s-]+/g, "-").replace(/-+$/, "");
+  const slug = name.trim().toLowerCase().replace(/['\u2019]/g, "").replace(/[\s-]+/g, "-").replace(/-+$/, "");
   return slug === "item" ? "item-realm" : slug;
 }
 

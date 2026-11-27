@@ -56,7 +56,7 @@ type Report = (message: string, line?: number) => void;
  * points at the nearest one around it that is, and at the opening --- when there is none.
  */
 function fieldLines(source: string): LineOf {
-  const fm = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(source.replace(/^﻿/, "").replace(/\r\n?/g, "\n"));
+  const fm = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(source.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n"));
   if (!fm) return () => 1;
   const doc = parseDocument(fm[1]);
   // The front matter starts on the file's second line.
