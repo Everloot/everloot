@@ -305,7 +305,7 @@ test("the Missing count is the buffs and debuffs the summary calls missing, adde
   await dragTo(tile("Warrior"), slot(0));
   const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
   const buffs = Number(/(\d+) missing\.\s*Debuffs/.exec(note)?.[1]);
-  const debuffs = Number(/Debuffs: \d+ of \d+, (\d+) missing/.exec(note)?.[1]);
+  const debuffs = Number(/Debuffs: \d+ of \d+, \d+ if talented, (?:\d+ unknown reach, )?(\d+) missing/.exec(note)?.[1]);
   // The heading names both kinds, so it never reads as more buffs missing than the summary's count.
   const heading = container.querySelector("#raid-missing")!.textContent!;
   expect(heading).toMatch(/^Missing buffs and debuffs \(\d+\)$/);
@@ -325,4 +325,17 @@ test("a slot's class and tree wrap instead of being cut, so a long tree name rea
   // No fixed height or one-line cut on the slot or its label.
   expect(button.className).not.toMatch(/(?:^|\s)h-9(?:\s|$)/);
   expect(button.querySelector(".truncate")).toBeNull();
+});
+
+test("the debuff summary says how many a talent could bring, as the buff summary does", async () => {
+  await render();
+  await dragTo(tile("Priest"), slot(0));
+  await dragTo(tile("Mage"), slot(1));
+  const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
+  // Winter's Chill comes only through a Frost talent: "if talented", never counted in with the missing.
+  const m = /Debuffs: (\d+) of (\d+), (\d+) if talented, (?:(\d+) unknown reach, )?(\d+) missing\./.exec(note);
+  expect(m, note).not.toBeNull();
+  const [covered, total, possible, unknown, missing] = [m![1], m![2], m![3], m![4] ?? "0", m![5]].map(Number);
+  expect(possible).toBeGreaterThan(0);
+  expect(covered + possible + unknown + missing).toBe(total);
 });
