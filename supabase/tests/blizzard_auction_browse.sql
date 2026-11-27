@@ -28,6 +28,17 @@ insert into public.blizzard_auction_prices(item_id,region,house_id,kind,day,snap
   (954,'us',113,'items',current_date - 31,now() - interval '31 days',130,140,16,8),
   (954,'us',110,'items',current_date - 31,now() - interval '31 days',150,160,18,9);
 
+-- Twenty days of two more houses (20,000 rows), each document at its own time, to measure what a house read touches.
+insert into public.blizzard_auction_houses(region,house_id,name,items_at,commodities_at) values
+  ('us',112,'Neutral Auction House',now() - interval '30 minutes',now() - interval '40 minutes'),
+  ('eu',112,'Neutral Auction House',now() - interval '35 minutes',now() - interval '45 minutes');
+insert into public.blizzard_auction_prices(item_id,region,house_id,kind,day,snapshot_at,min_unit,typical_unit,quantity,auctions)
+select 10000 + i, h.region, h.house_id, k.kind, current_date - g,
+  case k.kind when 'items' then h.items_at else h.commodities_at end - g * interval '1 day', 10, 20, 4, 2
+from public.blizzard_auction_houses h, generate_series(0, 19) g, unnest(array['items','commodities']) k(kind), generate_series(1, 250) i
+where h.house_id = 112;
+analyze public.blizzard_auction_prices;
+
 set local role service_role;
 do $$
 begin
@@ -42,6 +53,21 @@ begin
     then raise exception 'history values'; end if;
   if exists (select 1 from public.blizzard_auction_item_history(954) where snapshot_at < now() - interval '30 days') then raise exception 'expired history'; end if;
   if exists (select 1 from public.blizzard_auction_item_history(999)) then raise exception 'unknown item'; end if;
+end $$;
+
+-- A house read touches that house's current rows, not every stored day of every house: the page calls it once per
+-- 1,000 rows, so a whole-table read per call outgrew the page's 8-second limit (US, 11/27).
+do $$
+declare
+  t regclass := 'public.blizzard_auction_prices';
+  before bigint := pg_stat_get_xact_tuples_returned(t) + pg_stat_get_xact_tuples_fetched(t);
+  got integer;
+  touched bigint;
+begin
+  select count(*) into got from public.blizzard_auction_house_items('us',112::smallint);
+  touched := pg_stat_get_xact_tuples_returned(t) + pg_stat_get_xact_tuples_fetched(t) - before;
+  if got <> 500 then raise exception 'house 112 current rows: %', got; end if;
+  if touched > 2 * got then raise exception 'house read touched % price rows for % current rows', touched, got; end if;
 end $$;
 reset role;
 rollback;
