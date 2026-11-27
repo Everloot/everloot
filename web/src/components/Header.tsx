@@ -96,8 +96,10 @@ const isCurrent = (path: string, href: string) => path === href || path.startsWi
 
 /** Where the page sits in the bar: the longest matching link and its item, so /tools/gold-ledger is Profile's Gold
  *  ledger, not the Tools menu's "All tools". Every switch counts as on, so a page behind one still marks its item.
- *  A /database page is Database's even where another menu also links it (Guides' "Dungeons and raids"). */
+ *  A /database page is Database's even where another menu also links it (Guides' "Dungeons and raids"). The changes
+ *  (Blizzard's posts) are linked from Guides to be found, but are no guide: no item is marked on them. */
 function currentPlace(path: string): { label: string; href: string } | undefined {
+  if (isCurrent(path, "/changes")) return undefined;
   let best: { label: string; href: string } | undefined;
   for (const item of navItems({ guilds: true, players: true, profiles: true, savedBuilds: true, reviewedGuides: true })) {
     if (item.label !== "Database" && isCurrent(path, "/database")) continue;

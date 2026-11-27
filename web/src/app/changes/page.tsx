@@ -5,7 +5,7 @@ import AdSlot from "@/components/AdSlot";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl, stripBelow } from "@/components/ui";
-import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
+import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, foldTitleDay, forumRegions, loadTimeline, parseFilter, postPath, timelineDegraded, type ChangeEntry, type ChangeFilter, type TitleDayRow } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
 import { changesJsonLd } from "@/lib/jsonld";
@@ -96,9 +96,11 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     const c = ka === kb ? 0 : ka === null ? 1 : kb === null ? -1 : ka.localeCompare(kb) * dir;
     return c || b.at.localeCompare(a.at) || a.id.localeCompare(b.id);
   });
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+  // One card per title and day: the replies Blizzard posts in a thread that day all carry its title.
+  const folded = foldTitleDay(rows);
+  const pages = Math.max(1, Math.ceil(folded.length / PER_PAGE));
   if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
+  const shown = folded.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<ChangesQuery>) => href({ ...q, page: 1, ...over });
 
   // The game's icon and tooltip on spells the posts name, only when the asset URL is set and the upload has them.
@@ -125,18 +127,21 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
       ? <>Summary by Everloot{e.url ? "; the title links the original source" : ""}.{e.summary && <> {e.summary}</>}</>
       : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
   // A blue post's byline, as on WoW's blue tracker: the poster in blue, a Blizzard badge, the role, and where it was posted.
-  const blueByline = (e: ChangeEntry) => (
+  const blueByline = (e: ChangeEntry, where: string) => (
     <p data-byline className="flex flex-wrap items-center gap-2 text-cell-2">
       {e.author && <span data-poster className="font-semibold text-blue-post">{e.author}</span>}
       <Badge tone="blizzard" />
-      {e.role && e.role !== SOURCE_LABEL(e) && <span data-role className="text-fg-2">{e.role}</span>}
-      <span data-source-chip><Badge tone="neutral">{SOURCE_LABEL(e)}</Badge></span>
+      {e.role && e.role !== where && <span data-role className="text-fg-2">{e.role}</span>}
+      <span data-source-chip><Badge tone="neutral">{where}</Badge></span>
     </p>
   );
-  const card = (e: ChangeEntry) => {
-    const body = excerpt(e);
+  // Several posts under one title that day: every forum any of them was posted on, their words in thread order, and a link to each.
+  const card = ({ entry: e, posts }: TitleDayRow) => {
     const blue = isBluePost(e);
-    const byline = [e.author && (e.role ? `${e.author} (${e.role})` : e.author), SOURCE_LABEL(e)].filter(Boolean).join(" · ");
+    const thread = [...posts].sort((a, b) => (a.postNumber ?? 0) - (b.postNumber ?? 0) || a.at.localeCompare(b.at));
+    const where = posts.length > 1 ? `${forumRegions({ ...e, copies: posts.flatMap(copiesOf) }).map((r) => r.toUpperCase()).join(" · ")} forum` : SOURCE_LABEL(e);
+    const bodies = (posts.length > 1 ? thread : [e]).map((p) => [p, excerpt(p)] as const).filter(([, body]) => body);
+    const byline = [e.author && (e.role ? `${e.author} (${e.role})` : e.author), where].filter(Boolean).join(" · ");
     return (
       <Card as="li" key={e.id} padding="none" className={`p-4${blue ? " border-l-4 border-l-blue-post" : ""}`}>
         <div data-change-row data-blue-post={blue ? "" : undefined} className="min-w-0 space-y-1.5">
@@ -149,11 +154,23 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
               {e.at.slice(0, 10)}
             </time>
             <span data-type><Badge tone="neutral">{typeLabel(e)}</Badge></span>
+            {posts.length > 1 && <span data-posts className="text-muted">{posts.length} posts</span>}
             {q.game === "all" && <span className="text-muted">{GAME_LABEL[e.game]}</span>}
           </p>
           <h2 className="text-base">{title(e)}</h2>
-          {blue ? blueByline(e) : byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
-          {body && <p data-excerpt className={`text-cell ${blue ? "text-blue-post" : "text-fg"}`}>{body}</p>}
+          {blue ? blueByline(e, where) : byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
+          {bodies.map(([p, body]) => <p key={p.id} data-excerpt className="text-cell text-fg">{body}</p>)}
+          {posts.length > 1 && (
+            <p data-thread-posts className="text-cell-2 text-fg-2">
+              Each post:{" "}
+              {thread.map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && " · "}
+                  <Link href={postPath(p)!} className={LINK}>{p.postNumber ? `post ${p.postNumber}` : stamp(p.at)}</Link>
+                </span>
+              ))}
+            </p>
+          )}
         </div>
       </Card>
     );
@@ -205,7 +222,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "entry" : "entries"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Change pages" />;
+  const strip = <ResultStrip total={folded.length} noun={folded.length === 1 ? "entry" : "entries"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Change pages" />;
   const chips = [
     ...(q.q ? [{ label: `Search: ${q.q}`, href: here({ q: undefined }) }] : []),
     ...(q.show !== "all" ? [{ label: TYPE_FILTER_LABEL[q.show], href: here({ show: "all" }) }] : []),
@@ -222,7 +239,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     <Container width="data">
       <EdgeDegraded when={degraded} />
       <article>
-        <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown.map((e) => e.source === "manual" ? { ...e, at: e.at.slice(0, 10), author: "Everloot" } : e) })} />
+        <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown.map(({ entry: e }) => e.source === "manual" ? { ...e, at: e.at.slice(0, 10), author: "Everloot" } : e) })} />
         <DataTitle
           title={TITLE}
           meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a> · <Link href="/news" className={LINK}>Everloot news</Link> · <Link href="/database/recent" className={LINK}>New public facts</Link></>}
@@ -237,7 +254,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
         />
         <div className="mt-2">
           {shown.length > 0
-            ? <ol data-change-feed aria-label={`Changes, ${GAMES[q.game]}: ${rows.length}`} className="max-w-3xl space-y-3">{shown.map(card)}</ol>
+            ? <ol data-change-feed aria-label={`Changes, ${GAMES[q.game]}: ${folded.length}`} className="max-w-3xl space-y-3">{shown.map(card)}</ol>
             : empty}
         </div>
         {pages > 1 && <div className="mt-2">{stripBelow(strip)}</div>}

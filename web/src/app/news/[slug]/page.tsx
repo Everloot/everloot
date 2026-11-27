@@ -10,7 +10,7 @@ import { couldBeBluePost, loadTimeline, postPathForUrl, timelineDegraded } from 
 import { keepBrieflyIf } from "@/lib/degraded-render";
 import { newsArticleJsonLd } from "@/lib/jsonld";
 import { FIGURE_SIZE, postFigure } from "@kb/news/post";
-import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
+import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames, tagLabel } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import { NewsCard } from "../news-card";
 import { loadWiki, publishedPage } from "@/lib/wiki";
@@ -115,7 +115,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
           {byline}
           {post.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 text-meta text-muted">
-              {post.tags.map((t) => <span key={t} className="rounded-control border border-line px-2">{t}</span>)}
+              {[...new Set(post.tags.map(tagLabel))].map((label) => <span key={label} data-news-tag className="rounded-control border border-line px-2">{label}</span>)}
             </div>
           )}
 

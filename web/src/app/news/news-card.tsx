@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import { longDate } from "@/data/wow-forever";
-import { newsHref, sourceNames, type NewsPost } from "@/lib/news";
+import { newsHref, sourceNames, tagLabel, type NewsPost } from "@/lib/news";
 
 /**
  * The /news cards: a 16:9 thumbnail (the post's hero `thumb`, else its `src`, else a branded placeholder),
@@ -12,10 +12,8 @@ type CardPost = Pick<NewsPost, "slug" | "title" | "summary" | "published" | "tag
 
 const chipLabel = (tags: string[]): string | null => {
   const tag = tags.find((t) => t !== "news-recap") ?? tags[0];
-  // A "blue post" is a Blizzard staff post; Everloot writes about one, so the chip must not read as one.
-  if (tag === "blue-post") return "About a blue post";
-  // "wow-forever" reads "WoW forever", not "Wow forever".
-  return tag ? (tag.charAt(0).toUpperCase() + tag.slice(1).replace(/-/g, " ")).replace(/\bwow\b/gi, "WoW") : null;
+  // A "blue post" is a Blizzard staff post; Everloot writes about one, so the chip must not read as one (tagLabel).
+  return tag ? tagLabel(tag) : null;
 };
 
 /** The publishers a post cites, named as the post's byline names them. */

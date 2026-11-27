@@ -223,3 +223,22 @@ test("what's new shows two posts with the same title on the same day as one row,
   expect(block).toContain("Hotfixes - November 24");
   expect(block).not.toMatch(/1 posts?/);
 });
+
+test("what's new counts posts the way /changes folds them: a twin on the other forum is no extra post", async () => {
+  const { buildTimeline, groupAnnouncements } = await import("@/lib/changes");
+  const reply = (id: string, region: "us" | "eu", n: number, postedAt: string, excerpt: string) => ({
+    id, source: "forum", region, url: `https://${region}.forums.blizzard.com/en/wow/t/h/${n}`, title: "WoW: Forever Hotfixes - November 25, 2026",
+    author: "Kaivax", postedAt, category: "WoW: Forever", game: "forever", kind: "hotfix", excerpt, topicId: region === "us" ? 2403040 : 639885, postNumber: n,
+  });
+  live.timeline = groupAnnouncements(buildTimeline([
+    reply("forum:30863849", "us", 8, "2026-11-12T00:48:47.000Z", "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+    reply("forum:eu:6495278", "eu", 7, "2026-11-12T00:50:13.000Z", "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+    reply("forum:30863846", "us", 7, "2026-11-12T00:48:41.000Z", "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on November 17."),
+    reply("forum:eu:6495276", "eu", 6, "2026-11-12T00:49:22.000Z", "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on 18 November."),
+  ], []));
+  const html = await render();
+  const start = html.indexOf('id="whats-new"');
+  const block = html.slice(start, html.indexOf("</section>", start));
+  expect(block.match(/Hotfixes - November 11, 2026/g)).toHaveLength(1);
+  expect(block).toMatch(/Hotfixes - November 11, 2026<\/a>(?:<[^>]*>)*\s*·\s*2 posts/);
+});

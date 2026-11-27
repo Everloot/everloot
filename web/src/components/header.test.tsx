@@ -101,6 +101,10 @@ test("the item holding the page is marked, by its longest matching link", () => 
   expect(currentItem("/tools/auctions/nightslayer")).toBe("Tools");
   expect(currentItem("/guilds/eu/realm/guild")).toBe("Guilds");
   expect(currentItem("/players/us/realm/name")).toBe("Players");
+  // Guides links the changes for finding them, but Blizzard's posts are not a guide: no item is marked there.
+  expect(currentItem("/changes")).toBeUndefined();
+  expect(currentItem("/changes/us-30876030-wow-forever-hotfixes-november-12-2026")).toBeUndefined();
+  expect(currentItem("/news")).toBeUndefined();
   expect(currentItem("/rankings/classes")).toBe("Community");
   expect(currentItem("/lore/npcs")).toBe("Guides");
   expect(currentItem("/chat")).toBe("Chat");
