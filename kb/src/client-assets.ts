@@ -25,6 +25,7 @@ import {
   atlasPieces, blpSize, FACTION_ELEMENTS, LOGO_ELEMENTS, narrowCrop, planLoadingScreens, POI_ELEMENTS, RACE_ATLAS, RACE_SEXES, raceElement, racesInBuild,
 } from "./assets/banners.js";
 import { buildItemSet, shardRecords, ITEM_SHARD_SIZE } from "./assets/items.js";
+import { mayShowSpellName } from "./game-name-rule.js";
 import { planMapArt, stitchPlan } from "./assets/map-art.js";
 import { resolveTooltip, type EffectFacts, type SpellFacts } from "./assets/tooltip.js";
 import { buildTalentCatalog, type Rows, type TableReader } from "./talents/build-catalog.js";
@@ -130,8 +131,9 @@ export const AssetManifest = z.object({
   /** By profession name in lower case: SkillLine rows of the profession and secondary skill categories. */
   professions: z.record(z.string(), z.object({ skillLineId: z.number().int(), name: z.string(), icon: z.string().nullable() })).default({}),
   /**
-   * Spell id -> icon name (SpellMisc.SpellIconFileDataID): the raid buff list's spells, and the spells the client
-   * layer's relations point at (created by, reagent for) for the /database pages.
+   * Spell id -> icon name (SpellMisc.SpellIconFileDataID): the raid buff list's spells, the spells the client
+   * layer's relations point at (created by, reagent for) for the /database pages, mount spells, and every spell
+   * the spell name rule names (each has a spell page).
    */
   spellIcons: z.record(z.string(), z.string()).default({}),
   /** Pet family id -> icon name (CreatureFamily.IconFileID). */
@@ -447,10 +449,12 @@ export async function buildAssetsFromTables(opts: { get: TableReader; build: Bui
   }
 
   // Spell icons: the raid builder's buff spells, the spells items are created by or used in on the /database pages,
-  // and the spells that teach a mount, for the mount pages.
+  // the spells that teach a mount, for the mount pages, and every spell the spell name rule names, since each of those
+  // has a spell page, a row in the spell list and a hover card (game-names writes the same set to spell-names.json).
   const mountSpells = list(get("Mount")).map((row) => num(row.SourceSpellID)).filter((id) => id > 0);
+  const namedSpells = [...names].filter(([id, name]) => name !== null && mayShowSpellName(id, name)).map(([id]) => id);
   const spellIconOf = new Map<number, number>();
-  for (const id of new Set([...(opts.buffSpells ?? []), ...(opts.relationSpells ?? []), ...mountSpells])) {
+  for (const id of new Set([...(opts.buffSpells ?? []), ...(opts.relationSpells ?? []), ...mountSpells, ...namedSpells])) {
     const file = num(misc.get(id)?.SpellIconFileDataID);
     if (file > 0) spellIconOf.set(id, file);
   }

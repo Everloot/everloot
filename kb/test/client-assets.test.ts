@@ -173,8 +173,8 @@ test("the site's other art: class, tree, profession, buff and item icons, item s
     alchemy: { skillLineId: 171, name: "Alchemy", icon: "6003.webp" },
     cooking: { skillLineId: 185, name: "Cooking", icon: null },
   });
-  // A listed spell with no icon row is left out, not given one.
-  expect(manifest.spellIcons).toEqual({ "6673": "6004.webp" });
+  // A listed spell with no icon row is left out, not given one; 1001 is a named spell, so it has its icon too.
+  expect(manifest.spellIcons).toEqual({ "1001": "5001.webp", "6673": "6004.webp" });
 
   // Items go to the private folder only: the public folder and its manifest never name an item.
   expect(privateDir).toBe(`${dir}-private`);
@@ -220,6 +220,28 @@ test("database art: icons of the spells the relations point at and of pet famili
   expect(manifest.spellIcons).toEqual({ "1001": "5001.webp", "6673": "6004.webp" });
   // The cat's icon is encrypted and Remote Control has none.
   expect(manifest.familyIcons).toEqual({ "1": "6007.webp" });
+});
+
+test("every named spell gets its icon, as every named spell has a page; an unnamed one and one without an icon file do not", async () => {
+  const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
+  const withSpells: Record<string, Rows> = {
+    ...site,
+    // 284 and 439 are named with a readable icon; 5530 has an icon row but no name; 7000 is named but has no icon row.
+    SpellName: t([...site.SpellName.values(), { ID: 284, Name_lang: "Heroic Strike" }, { ID: 439, Name_lang: "Healing Potion" }, { ID: 5530, Name_lang: "  " }, { ID: 7000, Name_lang: "No Icon" }]),
+    SpellMisc: t([
+      ...site.SpellMisc.values(),
+      { ID: 10, SpellID: 284, DifficultyID: 0, SpellIconFileDataID: 6010 },
+      { ID: 11, SpellID: 439, DifficultyID: 0, SpellIconFileDataID: 6011 },
+      { ID: 12, SpellID: 5530, DifficultyID: 0, SpellIconFileDataID: 6012 },
+    ]),
+  };
+  const reads: number[] = [];
+  const src: TableSource = { ...source(reads), fileStatus: (id) => ({ ...siteStatus, 6010: "present", 6011: "present", 6012: "present" } as Record<number, FileStatus>)[id] ?? "absent" };
+  const { manifest } = await buildAssetsFromTables({ get: (n) => withSpells[n], build, outDir, source: src, convert: fakeConvert });
+  // 1001 is a named talent spell with a readable icon; 1002's is encrypted and 1003's absent, so neither gets one.
+  expect(manifest.spellIcons).toEqual({ "284": "6010.webp", "439": "6011.webp", "1001": "5001.webp" });
+  // The unnamed spell's icon is not fetched at all.
+  expect(reads).not.toContain(6012);
 });
 
 test("collection art: currency and companion pet icons by id, and the icon of each mount's spell", async () => {
