@@ -263,7 +263,7 @@ export default async function InstancePage(props: Props) {
         <DataTable
           dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
           meta={anyReport ? bossMeta : undefined}
-          footer={anyBossReported && bosses.some((b) => !b.boss) ? "— means not reported by 3 installs yet."
+          footer={anyBossReported && bosses.some((b) => !b.boss) ? "Not confirmed yet, or — in a column, means 3 installs have not reported that boss yet."
             : bosses.length > 0 && !anyBossReported ? (unreachable
             ? "Players' reports cannot be shown right now; this list is the game files' own."
             : anyReport

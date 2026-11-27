@@ -62,10 +62,10 @@ test("region browsing isolates recorded markets, scopes counts, and preserves th
   expect(us).not.toContain('/tools/auctions/forever/1366');
   expect(us).toContain('name="region" value="us"');
   expect(us).toMatch(/<td[^>]*><a href="\/tools\/auctions\/camwow-us1-realm-4-pvp\?house=horde&amp;region=us"/);
-  expect(us).toContain('title="CAMWOW US1 Realm 4 PvP"');
+  expect(us).toContain('title="US1 · Realm 4 PvP"');
   expect(us).toContain('US1 · Realm 4');
   // The phone line under the item names the realm as the Realm column does, not by its recorded code.
-  expect(us).toMatch(/<div class="dt-meta"><span><abbr title="CAMWOW US1 Realm 4 PvP"[^>]*>US1 · Realm 4/);
+  expect(us).toMatch(/<div class="dt-meta"><span><span title="US1 · Realm 4 PvP">US1 · Realm 4/);
   expect(us).not.toContain('<span>CAMWOW US1 Realm 4 PvP</span>');
   expect(headerQuery(us, "Units").get("region")).toBe("us");
   expect(us).toContain('region=us&amp;ruleset=pvp');
@@ -163,15 +163,15 @@ test("an item the files give only an icon for shows that icon beside its shown n
   expect(unnamed).not.toContain("<img");
 });
 
-test("a 7-day cell with no change to show says why in its title", async () => {
+test("a 7-day cell with no change to show says why on hover, on keyboard focus and to screen readers", async () => {
   // 2589 has today's day and one 3 days back: nothing 7 to 10 days before today to compare with.
   const fresh = await hub({ house: "horde" });
-  expect(fresh).toMatch(/<span class="text-muted" title="No public scan 7 to 10 days before [^"]+ to compare with">—<\/span>/);
+  expect(fresh).toMatch(/<span tabindex="0" title="(No public scan 7 to 10 days before [^"]+ to compare with)"><span aria-hidden="true" class="text-muted">—<\/span><span class="sr-only">\1<\/span><\/span>/);
   // No public scan in the last two days: the week's change needs a newest day of today or yesterday.
   const stale = foldMarket(emptyMarket(), [...scans(dayAgo(7), [[2589, 200, 205]]), ...scans(dayAgo(14), [[2589, 180, 190]])], today);
   store.loadMarket.mockResolvedValue({ state: stale, dataAsOf: today.toISOString() });
   const html = await hub({ house: "horde" });
-  expect(html).toMatch(/<span class="text-muted" title="No public scan since [^"]+: a 7-day change needs one from today or yesterday">—<\/span>/);
+  expect(html).toMatch(/<span tabindex="0" title="(No public scan since [^"]+: a 7-day change needs one from today or yesterday)"><span aria-hidden="true" class="text-muted">—<\/span><span class="sr-only">\1<\/span><\/span>/);
 });
 
 test("the page opens on its title: the Blizzard data link sits in the links row under it, beside the daily report", async () => {

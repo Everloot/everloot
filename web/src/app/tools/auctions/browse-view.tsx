@@ -41,6 +41,12 @@ const WIDE_SORTS: AhSort[] = ["name", "ilvl", "req"];
 export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.region && !q.ruleset && !q.sort && q.page === 1;
 
 /** One category in the left tree, its open children under it. */
+/** A 7-day cell with no change: the dash, with its reason on hover, on keyboard focus and for screen readers. */
+function NoMove({ reason }: { reason: string | null }) {
+  if (!reason) return <span className="text-muted">—</span>;
+  return <span tabIndex={0} title={reason}><span aria-hidden="true" className="text-muted">—</span><span className="sr-only">{reason}</span></span>;
+}
+
 function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
   return (
     <li>
@@ -204,7 +210,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
     { key: "min", header: "Min buyout", numeric: true, sortable: true, cell: ({ row }) => <ClientCoins copper={row.value.min} /> },
     { key: "units", header: "Units", numeric: true, sortable: true, cell: ({ row }) => `${row.value.quantity.toLocaleString("en-US")}${row.value.thin ? " (thin)" : ""}` },
     ...(listings ? [{ key: "listings", header: "Listings", numeric: true, sortable: true, cell: ({ row }: BrowseRow) => row.listings?.toLocaleString("en-US") ?? <span className="text-muted">—</span> }] : []),
-    { key: "change", header: "7 days", numeric: true, sortable: true, cell: ({ row, move }) => (move ? <span className={move.change > 0 ? "text-accent" : "text-fg"}>{percent(move.change)}</span> : <span className="text-muted" title={noWeekMoveReason(row, now) ?? undefined}>—</span>) },
+    { key: "change", header: "7 days", numeric: true, sortable: true, cell: ({ row, move }) => (move ? <span className={move.change > 0 ? "text-accent" : "text-fg"}>{percent(move.change)}</span> : <NoMove reason={noWeekMoveReason(row, now)} />) },
     { key: "trend", header: <span className="sr-only">Trend</span>, cell: ({ row }) => <Sparkline points={row.points} now={now} /> },
   ];
   // What the URL means with no sort: the week's movers lead by change, everything else by units.

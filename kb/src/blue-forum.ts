@@ -261,6 +261,20 @@ export function ownWords(cooked: unknown): string {
   return html;
 }
 
+const DAY_HEADING = /^(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4}$/;
+
+/**
+ * Headings left out of an excerpt, so it reads as sentences: a heading element, a paragraph that is only bold words
+ * ("Classes"), and the bold words opening a list item over a nested list ("Druid"). A day heading stays, as a lead-in
+ * ("November 25, 2026: "), since a hotfix post's own day is read from its first words (changes.ts ownTitle).
+ */
+export function withoutHeadings(html: string): string {
+  return html
+    .replace(/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi, " ")
+    .replace(/<p>\s*<(strong|b)>([^<]*)<\/\1>\s*<\/p>/gi, (_, _tag: string, words: string) => (DAY_HEADING.test(words.trim()) ? ` ${words.trim()}: ` : " "))
+    .replace(/(<li\b[^>]*>)\s*<(strong|b)>[^<]*<\/\2>\s*(?=<[uo]l\b)/gi, "$1");
+}
+
 const displayName = (username: string, name: string) => clampText(name, 100) || username.replace(/-\d+$/, "");
 
 export const postId = (region: BlueRegion, id: number) => (region === "us" ? `forum:${id}` : `forum:${region}:${id}`);
@@ -310,7 +324,7 @@ export function bluePostsOf(
       category: game.category,
       game: game.game,
       kind: /hotfix/i.test(view.topic.title) ? "hotfix" : "post",
-      excerpt: clampExcerpt(ownWords(p.cooked)),
+      excerpt: clampExcerpt(withoutHeadings(ownWords(p.cooked))),
       topicId: view.topic.id,
       topicSlug: view.topic.slug,
       postNumber,

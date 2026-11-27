@@ -526,7 +526,9 @@ test("with some bosses confirmed, In short counts them of the table's rows, Inst
       expect(r).not.toContain("[?]");
       expect(r).toContain("—");
     }
-    expect(text(bosses)).toContain("— means not reported by 3 installs yet.");
+    // The phone line under each pending boss says "Not confirmed yet"; the legend names that text as well as the dash.
+    expect(text(bosses)).toContain("Not confirmed yet");
+    expect(text(bosses)).toContain("Not confirmed yet, or — in a column, means 3 installs have not reported that boss yet.");
   } finally {
     state.seen = { unreachable: true };
   }

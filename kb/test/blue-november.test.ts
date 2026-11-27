@@ -83,3 +83,13 @@ test("a resumed list catches a topic shifted onto the previous page without reop
   expect(second.store.posts).toContainEqual(expect.objectContaining({ topicId: 2416343 }));
   expect(second.store.fetched["list:us:forever"].scan).toBeUndefined();
 });
+
+test("a hotfix post's headings never run into its excerpt; the day it opens with stays, as a lead-in", () => {
+  // The shape of Blizzard's hotfix posts (US post 31066529, 2026-11-25): a day, a section and a class as bold headings.
+  const json = JSON.parse(fixture("november-xp.json"));
+  json.post_stream.posts[0].cooked = "<p><strong>November 25, 2026</strong></p>\n<p><strong>Classes</strong></p>\n<ul>\n<li><strong>Druid</strong>\n<ul>\n"
+    + "<li>Hurricane now correctly lands its final hit.</li>\n<li><strong>Balance</strong>\n<ul>\n<li>Improved Wrath is now renamed Starlight Wrath.</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>";
+  const view = parseTopicView(json);
+  const [post] = bluePostsOf("us", view, view.posts, staffIndex("us", [], emptyOverrides()), now);
+  expect(post!.excerpt).toBe("November 25, 2026: Hurricane now correctly lands its final hit. Improved Wrath is now renamed Starlight Wrath.");
+});

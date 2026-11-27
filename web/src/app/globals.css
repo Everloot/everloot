@@ -160,10 +160,17 @@ body:has([data-chat-page]) > footer {
 body:has([data-chat-page]) [data-report-pill] {
   display: none;
 }
-/* From md the bug pill floats bottom-left; the page end keeps its height free so the footer's last row never sits under it. */
+/* From md the page end keeps the bug pill's height free: it sits there until 1600 px, and floats bottom-left from there, so the footer's last row never sits under it. */
 @media (min-width: 48rem) {
   body:has([data-report-pill]) > footer {
     padding-bottom: 4.5rem;
+  }
+}
+/* From 1600 px even the 1440 px data pages leave a gutter, so the pill floats there (BugReport.tsx sits it in flow below). */
+@media (min-width: 1600px) {
+  body > [data-report-pill] {
+    position: fixed;
+    margin: 0;
   }
 }
 

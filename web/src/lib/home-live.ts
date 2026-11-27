@@ -135,9 +135,11 @@ async function orNull<T>(read: () => Promise<T>): Promise<T | null> {
 
 const cachedNewest = unstable_cache(async (): Promise<HomeFact[]> => {
   const file = (await loadDatabaseActivity()) ?? failed("database activity");
-  const latest = [...file.entries].sort((a, b) => b.publicAt.localeCompare(a.publicAt)).slice(0, HOME_NEWEST);
-  // Page names are an extra too: without the name files a fact keeps the name the activity file gave it.
-  const entries = latest.some(isFallback) ? pageNamed(latest, await orNull(loadPageNames)) : latest;
+  const sorted = [...file.entries].sort((a, b) => b.publicAt.localeCompare(a.publicAt));
+  // Page names are an extra too: without the name files a fact keeps the name the activity file gave it. A fact
+  // still under its "NPC #id" fallback is left out of this showcase; it stays on /database/recent and its own page.
+  const named = sorted.some(isFallback) ? pageNamed(sorted, await orNull(loadPageNames)) : sorted;
+  const entries = named.filter((e) => !isFallback(e)).slice(0, HOME_NEWEST);
   const items = entries.filter((e) => e.kind === "item").map((e) => e.id);
   // Icons and quality are extras: without the asset files the names still show.
   const tips = items.length ? (await orNull(async () => (await readItemTips(await loadSiteAssets(), items)).tips)) ?? new Map() : new Map();
