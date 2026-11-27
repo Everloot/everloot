@@ -10,6 +10,7 @@ test("Blizzard browse, history and stored-time readers preserve snapshots, reten
     await db.exec(read("migrations/20261113120000_blizzard_auctions.sql"));
     await db.exec(read("tests/blizzard_auctions.sql"));
     for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261115160000_blizzard_auction_browse.sql"));
+    for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261127113600_blizzard_auction_house_read.sql"));
     await db.exec(read("tests/blizzard_auction_browse.sql"));
     for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261116230000_blizzard_auction_stamps.sql"));
     await db.exec(read("tests/blizzard_auction_stamps.sql"));
