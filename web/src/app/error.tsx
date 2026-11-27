@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, Container, PageHeader } from "@/components/ui";
 
 // The site-wide boundary for a page that throws and has no boundary of its own. The header and footer

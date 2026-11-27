@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { pageMetadata } from "@/lib/seo";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
 import { COMMENT_LIMITS } from "@/lib/comments-shared";

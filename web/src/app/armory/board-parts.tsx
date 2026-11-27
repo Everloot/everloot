@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, DataTable, type Column } from "@/components/ui";
 import Tooltip from "@/components/ui/Tooltip";
 import { CLASS_BG, classColour } from "@/components/ui/class-colour";

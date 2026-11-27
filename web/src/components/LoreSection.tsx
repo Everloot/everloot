@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { Card, SectionHeading } from "@/components/ui";
 import { loreSlug, UNAVAILABLE, type LoreMatch, type Unavailable } from "@/lib/lore";

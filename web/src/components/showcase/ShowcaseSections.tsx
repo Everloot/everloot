@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { BossStrip, Progress } from "@/app/guilds/parts";
 import { Bar } from "@/app/tools/collections/CompletionView";

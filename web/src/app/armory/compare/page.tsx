@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import GameIcon from "@/components/game/GameIcon";
 import ItemTip from "@/components/game/ItemTip";
@@ -9,7 +9,7 @@ import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
 import {
   ARMORY_BOARDS, armoryBoardHref, armoryCharacterPath, armoryOn, classTokenOfName, isArmoryRegion, metricOfKey, metricValue,
-  PLAY_HISTORY_METRICS, rankText, regionLabel, slotLabel,
+  boardValue, PLAY_HISTORY_METRICS, rankable, rankText, regionLabel, slotLabel,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -62,7 +62,7 @@ const PLAY_HISTORY_KEYS = new Set<string>(PLAY_HISTORY_METRICS.map((m) => ARMORY
 function rankBadges(c: ArmoryCharacter, ranks: ArmoryRank[]): RankBadge[] {
   return ranks.flatMap((r) => {
     const metric = metricOfKey(r.metric);
-    if (!metric || PLAY_HISTORY_KEYS.has(r.metric)) return [];
+    if (!metric || PLAY_HISTORY_KEYS.has(r.metric) || !rankable(boardValue(c, r.metric))) return [];
     const href = armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId });
     return [{ label: `${regionLabel(c.region)} ${c.ruleset} · ${ARMORY_BOARDS[metric].title} ${rankText(r)}`, href }];
   });

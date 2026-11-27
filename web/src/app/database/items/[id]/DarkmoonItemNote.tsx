@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, SectionHeading } from "@/components/ui";
 import { DARKMOON, DARKMOON_HREF, DARKMOON_STATUS } from "@/lib/darkmoon";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import EntityLink from "@/components/EntityLink";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { Badge, DataTable, type Column } from "@/components/ui";

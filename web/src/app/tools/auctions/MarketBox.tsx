@@ -1,5 +1,5 @@
 import { CoinText } from "@/components/ui/Coins";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { DataTable, type Column } from "@/components/ui";
 import { uploadStore } from "@/lib/upload-store";
 import { crossRealmHref, itemHref, itemRows, money, type MarketRow } from "@/lib/auction-house";

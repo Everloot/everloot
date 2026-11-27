@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SectionHeading } from "@/components/ui";
 import { ChangeEntry } from "@kb/build-watch/changes";
 import { entityChanges, type EntityBuildChanges, type EntityRef } from "@kb/build-watch/entity-changes";

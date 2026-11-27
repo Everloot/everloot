@@ -322,7 +322,10 @@ token or workflow problem, not a GitHub hiccup). The next clean check closes it.
 publication pass reads the same opt-outs whatever the other workflows' `SUPABASE_*` secrets hold),
 `GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`,
 `GAME_DATA_S3_ENDPOINT` and `EVERLOOT_TRUSTED_INSTALLS`. It needs neither
-`EVERLOOT_CHARACTER_KEY` nor `EVERLOOT_OPS_HMAC_SECRET`.
+`EVERLOOT_CHARACTER_KEY` nor `EVERLOOT_OPS_HMAC_SECRET`. It also reads the repository variable
+`NEXT_PUBLIC_GAME_ASSETS_URL`, the one the site deploy uses, to name items from the game files.
+Without it, or without the `GAME_DATA_*` reader, the market boards step fails instead of storing
+boards that name only the items players agree on.
 
 **Switching on, in order:**
 

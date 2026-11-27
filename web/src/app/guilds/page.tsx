@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
@@ -90,6 +90,9 @@ const searchColumns: Column<GuildSummary>[] = [
 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
 
+/** A guild needs this many members read before the average item level order ranks it: one geared character is no average. */
+const GUILD_ITEM_LEVEL_MIN_READ = 10;
+
 /** The directory's count columns, each the header link for its own order (highest first). */
 const SORT_OF_COLUMN: Record<string, GuildSortSlug> = { read: "members", il: "item-level", l60: "level-60" };
 
@@ -102,7 +105,7 @@ function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
     { key: "roster", header: "Roster", numeric: true, cell: (g) => number(g.memberCount) },
     { key: "read", header: "Members read", numeric: true, sortable: true, cell: (g) => number(g.membersRead) },
     { key: "il", header: "Avg item level", numeric: true, sortable: true, cell: (g) => (g.averageItemLevel === null ? muted("Not read") : metricValue("item-level", g.averageItemLevel)) },
-    { key: "l60", header: "Level 60", numeric: true, sortable: true, cell: (g) => number(g.level60) },
+    { key: "l60", header: "Level 60 read", numeric: true, sortable: true, cell: (g) => number(g.level60) },
     // Numeric cells already set figures in mono (dt-num).
     { key: "at", header: "Last read", numeric: true, cell: (g) => day(g.fetchedAt) },
   ];
@@ -166,7 +169,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
     prefix ? loadGuildSearch(prefix) : null,
     // Without a readable hide list no guild is counted, as no guild is listed.
     !data || data.unreachable ? null : loadGuildRealms(),
-    armory ? hiddenGuilds().then((hidden) => loadGuildDirectory(d, hidden)) : null,
+    armory ? hiddenGuilds().then((hidden) => loadGuildDirectory(d, hidden, d.sort === "item-level" ? GUILD_ITEM_LEVEL_MIN_READ : undefined)) : null,
   ]);
   // The one box feeds both searches; it says the rule only when neither could take the text.
   const refused = Boolean(q) && !prefix && (!armory || d.prefix === null);
@@ -228,7 +231,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
           {dir && (dir.state === "unreachable" ? <Unreachable /> : (
             <section aria-labelledby="directory" className="space-y-3">
-              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. A character who asked to be hidden is not counted.">
+              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. Level 60 read counts the characters read at level 60, each as of its own read, so it can differ from the guild page's roster count. A character who asked to be hidden is not counted.">
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <FilterBar
@@ -262,6 +265,13 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     sort={dir.state === "ready" ? { key: Object.keys(SORT_OF_COLUMN).find((k) => SORT_OF_COLUMN[k] === d.sort)!, direction: "desc" } : undefined}
                     sortHref={dir.state === "ready" ? (key) => guildDirectoryHref({ ...d, page: 1, sort: SORT_OF_COLUMN[key]! }) : undefined}
                   />}
+              {dir.state === "ready" && d.sort === "item-level" && (
+                <p className="text-meta text-muted" data-min-read-note>
+                  {dir.minRead === undefined
+                    ? "Ranked by average item level. Guilds with few members read can lead this order until the database update is applied."
+                    : `Ranked by average item level: guilds with at least ${dir.minRead} members read.`}
+                </p>
+              )}
               <p className="text-meta text-muted" data-disbanded-note>Disbanded guilds are left out of this list and its counts.</p>
             </section>
           ))}

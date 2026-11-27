@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { ArmoryCredit, link, newest } from "@/app/armory/parts";
 import { readTimes } from "@/app/armory/profile";

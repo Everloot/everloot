@@ -167,3 +167,31 @@ test("the cron's names follow the Auction House pages' rule and refuse a degrade
   shown.loadShownNames.mockResolvedValue({ agreed: new Map(), matched: null, degraded: true });
   await expect(writeMarketBoards(now, { cloud, fetch, market: async () => ({ state, dataAsOf: marketAsOf }) })).rejects.toThrow("item names unreachable");
 });
+
+test("the cron stores the names file's names, and stores nothing when that file was not read", async () => {
+  vi.resetModules();
+  const puts: string[] = [];
+  const fetch = vi.fn(async (req: Request) => {
+    if (req.method === "HEAD") return new Response(null, { status: 404 });
+    puts.push(await req.text());
+    return new Response(null);
+  }) as unknown as typeof globalThis.fetch;
+  const write = () => writeMarketBoards(now, { cloud, fetch, market: async () => ({ state, dataAsOf: marketAsOf }) });
+  // The names file's shape (game-assets.ts MatchedName): 101 from the wiki, 102 from the game files alone; 103 agreed by players.
+  const matched = { version: "1", wiki: { name: "Warcraft Wiki", url: "https://warcraft.wiki.gg/" }, names: new Map([
+    [101, { name: "Made-up Cloth", color: "#ffffff", quality: 1, wikiPage: "https://warcraft.wiki.gg/wiki/Made-up_Cloth", source: "wiki" }],
+    [102, { name: "Made-up Herb", color: "#ffffff", quality: 1, wikiPage: null, source: "files" }],
+  ]) };
+  shown.loadShownNames.mockResolvedValue({ agreed: new Map([[103, "Players' Name"]]), matched, degraded: false });
+  await write();
+  const file = JSON.parse(puts[0]!) as BoardsFile;
+  expect(file.items["101"]?.[0]).toBe("Made-up Cloth");
+  expect(file.items["102"]?.[0]).toBe("Made-up Herb");
+  expect(file.items["103"]?.[0]).toBe("Players' Name");
+
+  // The stored-views job ran without NEXT_PUBLIC_GAME_ASSETS_URL: no names file, no failed read. Stored, every item
+  // but the agreed ones read "Item N" on the pages until the rollup changed; now the pages build live instead.
+  shown.loadShownNames.mockResolvedValue({ agreed: new Map([[103, "Players' Name"]]), matched: null, degraded: false });
+  await expect(write()).rejects.toThrow("item names file not read");
+  expect(puts).toHaveLength(1);
+});

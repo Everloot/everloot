@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { approvedAddon } from "@/data/addon-repos";
 import { BADGES, buildBoards, loadEcosystem, staleNote, type BadgeId, type ProjectView } from "@/lib/ecosystem";
 import { pageMetadata } from "@/lib/seo";

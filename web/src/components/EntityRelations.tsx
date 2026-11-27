@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { CLIENT_SKILLS } from "@kb/client-layer-file";
 import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "@kb/edges";

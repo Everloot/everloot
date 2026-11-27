@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "@kb/world-pages";
 import { Badge, Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";

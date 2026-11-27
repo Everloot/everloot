@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import GuildProfile from "@/components/guild-profile";
 import GuildCrest from "@/components/guild-crest";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";
@@ -195,9 +195,13 @@ type RankNames = ReadonlyMap<number, string>;
 /** A rank's name from the officers' roster when it has one; otherwise 0 is the guild master and the rest go by number. */
 const rankName = (rank: number, ranks: RankNames) => ranks.get(rank) ?? (rank === 0 ? "Guild Master" : `Rank ${rank}`);
 
-/** The phone line under a name: level and rank; the other columns show on wider screens. */
-const rowMeta = (ranks: RankNames) => ({ m }: Row): string =>
-  [m.level === null ? null : `Level ${m.level}`, m.rank === null ? null : rankName(m.rank, ranks)].filter(Boolean).join(" · ");
+/** The phone line under a name: level, race and class, rank and item level; the columns show on wider screens. */
+const rowMeta = (ranks: RankNames) => ({ m, token }: Row): string => [
+  m.level === null ? null : `Level ${m.level}`,
+  `${raceOfId(m.raceId)} ${token ? className(token) : UNKNOWN}`,
+  m.rank === null ? null : rankName(m.rank, ranks),
+  m.itemLevel === null ? null : `ilvl ${metricValue("item-level", m.itemLevel)}`,
+].filter(Boolean).join(" · ");
 
 /** First names that are one character on each list, so a match by name is one person. */
 function uniqueNames(roster: readonly ArmoryMember[], addon: readonly GuildMember[]): Set<string> {
@@ -437,7 +441,8 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
       <Facts items={[
         { label: "On the roster", value: members.length.toLocaleString("en-US"), numeric: true },
         { label: "Members read", value: read.toLocaleString("en-US"), numeric: true },
-        { label: "Level 60", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
+        // Blizzard's roster, as of its read below; /guilds counts the characters read at 60 instead.
+        { label: "Level 60 on the roster", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
         {
           label: "Average item level",
           value: s.averageItemLevel === null ? "Not read" : `${metricValue("item-level", s.averageItemLevel)} (${s.itemLevelsRead} read)`,

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SOCIAL_PROFILES } from "@/lib/social";
 import { CONTACT_EMAIL, DISCORD_INVITE, OPERATOR, SITE_BLURB } from "@/lib/jsonld";
 import { deployedSha, REPO_URL, sourceUrl } from "@/lib/source";

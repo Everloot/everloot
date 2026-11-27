@@ -1,5 +1,5 @@
-import { CENSUS_CLASSES, CENSUS_RACES } from "@kb/census";
-import { ARMORY_RULESETS, armoryNameQuery } from "./armory";
+import { CENSUS_CLASSES } from "@kb/census";
+import { ARMORY_RACES, ARMORY_RULESETS, armoryNameQuery } from "./armory";
 import type { ArmoryDirectoryFilter } from "./armory-store";
 import { parsePer, PER_PAGE } from "./page-size";
 
@@ -41,7 +41,7 @@ export function playerDirectoryQuery(params: PlayerSearchParams): PlayerDirector
   const cls = CENSUS_CLASSES.find((c) => c.token === get("class").toUpperCase() || c.name.toLowerCase() === get("class").toLowerCase());
   return {
     q, prefix: q ? armoryNameQuery(q) ?? (/^\p{L}$/u.test(q) ? q.toLowerCase() : q) : null,
-    class: cls?.name ?? null, race: choice(get("race"), CENSUS_RACES.map((r) => r.name)),
+    class: cls?.name ?? null, race: choice(get("race"), ARMORY_RACES),
     faction: choice(get("faction"), ["Alliance", "Horde"]), region: choice(get("region"), ["us", "eu"]),
     rulesetId: ARMORY_RULESETS.find((r) => String(r.id) === get("ruleset"))?.id ?? null,
     minLevel: level(get("min")), maxLevel: level(get("max")), guildPrefix: get("guild").slice(0, 80) || null,

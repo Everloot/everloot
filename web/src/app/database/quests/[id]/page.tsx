@@ -3,7 +3,7 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { dayLabel } from "@/lib/report-labels";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
 import { agreedNpc, npcPage, questPage, questTraits } from "@kb/world-pages";
