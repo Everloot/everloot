@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AhledgerPrices from "./AhledgerPrices";
+import { salesText } from "@/lib/ahledger";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -43,14 +44,25 @@ test("each market's row links to AH Ledger's item page; a market without a price
   expect(text).toContain("PvP Alliance");
   expect(text).toContain("no price");
   expect(text).toContain("9,085");
-  expect(text).toContain("18,095.4");
+  // Sales a day round to a whole number; a market with no price shows a dash in its empty cells.
+  expect(text).toContain("18,095");
+  expect(text).not.toContain("18,095.4");
+  const alliance = [...container.querySelectorAll("tbody tr")].find((tr) => tr.textContent?.includes("PvP Alliance"))!;
+  expect([...alliance.querySelectorAll("td")].slice(2).map((td) => td.textContent)).toEqual(["—", "—", "—", "—"]);
   expect(text).toContain("15 Nov, 15:03 UTC");
   expect(container.querySelector('a[href="https://ahledger.com/items/2589/forever.pvp.horde.us"]')).not.toBeNull();
-  expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AHledger");
+  expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AH Ledger");
 
   const eu = [...container.querySelectorAll("button")].find((b) => b.textContent === "EU")!;
   await act(async () => eu.click());
   expect(fetchImpl.mock.calls.at(-1)?.[0]).toBe("/api/ahledger/forever.pvp.horde.eu?items=2589");
+});
+
+test("sales a day under one say so instead of rounding to zero", () => {
+  expect(salesText(0.4)).toBe("under 1");
+  expect(salesText(40392.4)).toBe("40,392");
+  expect(salesText(0)).toBe("0");
+  expect(salesText(null)).toBe("unrecorded");
 });
 
 test("a failed read says AH Ledger could not be read, not that there is no price", async () => {

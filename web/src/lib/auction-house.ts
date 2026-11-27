@@ -267,6 +267,8 @@ export interface RulesetSummary {
   items: number;
   /** The newest scan behind an open public day there (epoch ms); null with none. */
   updatedAt: number | null;
+  /** The newest public day on its realms (`newestScanDay`); null with none. */
+  newestDay: string | null;
   /** The biggest week moves there, by size, at most `MOVES_SHOWN`. */
   moves: Move[];
 }
@@ -291,7 +293,7 @@ export function rulesetSummaries(source: BoardSource, now: Date, house: AuctionH
       .slice(0, MOVES_SHOWN);
     return {
       ruleset, mapped: !isRulesetSlug(ruleset) || mapped.has(ruleset), realms: boards.length,
-      items: new Set(rows.map((r) => r.value.itemId)).size, updatedAt: updated.length ? Math.max(...updated) : null, moves,
+      items: new Set(rows.map((r) => r.value.itemId)).size, updatedAt: updated.length ? Math.max(...updated) : null, newestDay: newestScanDay(rows), moves,
     };
   });
 }
@@ -392,6 +394,22 @@ export interface Move {
   to: PublicDay;
   /** (to - from) / from. */
   change: number;
+}
+
+/**
+ * The newest public day among some rows ("2026-11-20"), null with none: the one freshness every Auction House page
+ * states, so a realm, its items, its week and the ruleset table never disagree about when the newest scan was.
+ */
+export function newestScanDay(rows: readonly { value: { day: string } }[]): string | null {
+  let newest: string | null = null;
+  for (const r of rows) if (newest === null || r.value.day > newest) newest = r.value.day;
+  return newest;
+}
+
+/** A public day as the pages write it: "20 Nov", with the year when it is not `now`'s. */
+export function scanDayText(day: string, now: Date): string {
+  const at = new Date(`${day}T00:00:00Z`);
+  return at.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(at.getUTCFullYear() !== now.getUTCFullYear() ? { year: "numeric" } : {}), timeZone: "UTC" });
 }
 
 const moveMemo = new WeakMap<MarketRow, Map<string, Move | null>>();

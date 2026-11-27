@@ -30,7 +30,9 @@ import RealmPage, { generateMetadata as realmMetadata } from "./[realm]/page";
 import RealmItemPage, { generateMetadata as itemMetadata } from "./[realm]/[itemId]/page";
 import CrossRealmItemPage, { generateMetadata as crossMetadata } from "./item/[itemId]/page";
 import { MarketBox, loadMarketBox } from "./MarketBox";
-import { UNNAMED_REASON } from "./parts";
+import { PriceChart, UNNAMED_REASON } from "./parts";
+import { TabCount } from "@/components/ui/tab-style";
+import type { PublicDay } from "@kb/market";
 import DatabaseItemPage from "../../database/items/[id]/page";
 import { GET as sitemapIndex } from "../../auctions-sitemap.xml/route";
 import { GET as sitemapChunk } from "../../auctions-sitemap/[n]/route";
@@ -62,6 +64,8 @@ const text = (html: string) => {
   document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
   return (document.body.textContent ?? "").replace(/[<>]/g, "").replace(/ gold/g, "g").replace(/ silver/g, "s").replace(/ copper/g, "c");
 };
+// The newest scan day as every Auction House page writes it: "27 Nov".
+const todayText = today.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const hub = async (searchParams: Record<string, string>) =>
   renderToStaticMarkup(await AuctionHousePage({ searchParams: Promise.resolve(searchParams) }));
 const realm = (slug: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ realm: slug }), searchParams: Promise.resolve(search) });
@@ -95,7 +99,9 @@ test("the hub is the browse view across realms: names, realms, house switch, cat
   const html = await hub({});
   const words = text(html);
   expect(html).toContain("Auction House");
-  expect(words).toContain("Updated 4 min ago");
+  // The time is when the file was rebuilt; the scan day is the newest public day, read like every other AH page.
+  expect(words).toContain(`Rebuilt 4 min ago · newest scan ${todayText}`);
+  expect(words).not.toContain("Updated");
   // The facts under the title are separated by a dot with a space each side.
   expect(html).toContain('<span aria-hidden="true"> · </span>');
   expect(html).toContain('href="/tools/auctions/forever"');
@@ -198,6 +204,7 @@ test("with no realm public yet, the hub says when it last checked, not that it w
   expect(words).toContain("No realm has public prices yet");
   expect(words).toContain("Checked 4 min ago");
   expect(words).not.toContain("Updated");
+  expect(words).not.toContain("newest scan");
 });
 
 test("with no realm public yet, the hub lists each realm with scans and how many of the 3 players have scanned", async () => {
@@ -221,7 +228,8 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   const html = renderToStaticMarkup(await RealmItemPage(item("forever", "2589")));
   const words = text(html);
   expect(words).toContain("Market value1s 98c");
-  expect(words).toContain("Updated");
+  expect(words).toContain(`Newest scan ${todayText}`);
+  expect(words).toMatch(new RegExp(`Newest scan[\\s\\S]*Horde1s 98c2s 0c[\\d,]+${todayText}`));
   expect(html).toContain("<svg");
   expect(html).toContain('href="/tools/auctions/malganis/2589"');
   expect(html).toContain('href="/tools/auctions/item/2589"');
@@ -408,4 +416,47 @@ test.each(["missing", "thin"])("item prices omit the one-day move when yesterday
   const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "765"))));
   expect(html).not.toContain("1-day change");
   expect(html).toContain("7-day change+22%");
+});
+
+test("a realm page names its newest scan day, and its Region filter stays on the realm", async () => {
+  const html = await realmHtml("forever");
+  const words = text(html);
+  expect(words).toContain(`Newest scan ${todayText}`);
+  expect(words).not.toContain("Update time unrecorded");
+  // Quality and Req. level stay on the realm; so does Region.
+  expect(html).toContain('href="/tools/auctions/forever?region=eu"');
+  expect(html).not.toMatch(/href="\/tools\/auctions\?region=/);
+});
+
+test("the ruleset table names the newest scan day and says its counts are totals across every house", async () => {
+  const words = text(await hub({}));
+  expect(words).toMatch(new RegExp(`Realms not mapped yet\\d+\\d+${todayText}`));
+  expect(words).not.toContain("Over a week ago");
+  expect(words).toContain("Ruleset counts are totals across every house; the filters below do not change them.");
+});
+
+test("tab counts use thousands separators", () => {
+  expect(renderToStaticMarkup(<TabCount count={7150} />)).toContain("(7,150)");
+});
+
+test("the 60-day chart fits its axis to the public days, so the line runs end to end under its dates", () => {
+  const point = (day: string, market: number) => ({ day, market, min: market, quantity: 40, thin: false, reporters: 3 }) as PublicDay;
+  const html = renderToStaticMarkup(<PriceChart points={[point("2026-11-05", 100), point("2026-11-12", 120), point("2026-11-20", 110)]} />);
+  const line = /<polyline points="([^"]+)"/.exec(html)![1]!.split(" ");
+  expect(line[0]).toMatch(/^8\.0,/);
+  expect(line.at(-1)).toMatch(/^992\.0,/);
+  expect(text(html)).toContain("2026-11-05 to 2026-11-20");
+});
+
+test("a realm item page's AH Ledger panels open on the page's own ruleset, region and house", async () => {
+  const name = "CAMWOW US1 Realm 4 PVP";
+  const rows = [...scans(dayAgo(0), [[2589, 900, 900]], name, undefined, { house: "Horde" })];
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, today), dataAsOf: today.toISOString() });
+  const html = renderToStaticMarkup(await RealmItemPage(item("camwow-us1-realm-4-pvp", "2589")));
+  // The history's market picker starts on Horde, the house the page shows, not on the first market.
+  expect(html).toMatch(/<option value="horde" selected="">Horde<\/option>/);
+  expect(html).not.toMatch(/<option value="alliance" selected="">/);
+  // The ruleset and region are named once.
+  expect(text(html)).toContain("AH Ledger prices, PvP US");
+  expect(html).not.toContain("PvP US, US");
 });

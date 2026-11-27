@@ -94,7 +94,9 @@ test("the stored boards path: risers, fallers and the rows without a comparison,
   expect(t).toContain("1 riser · Forever, Horde auction house");
   expect(t).toContain("3 items: 1 new, 1 thin, 1 no baseline");
   expect(t).toContain("Units listed are offered inventory on the scan day, not sales");
-  expect(t).toContain("Scans up to");
+  // The header names the newest scan day, the same source every Auction House page reads.
+  expect(t).toContain("Newest scan 20 Nov");
+  expect(t).not.toContain("Scans up to");
   expect(html).toContain(`href="/tools/auctions/report/${day(0)}"`);
   expect(html).toContain('href="/tools/auctions/forever?house=horde"');
   // Only the stored file was read: no live boards, no board built from the rollup.
@@ -108,6 +110,32 @@ test("the stored boards path: risers, fallers and the rows without a comparison,
   // No report for the week's end day: no link.
   store.reportDates.mockResolvedValue([]);
   expect(await page("forever")).not.toContain("/tools/auctions/report/");
+});
+
+test("with every row stale the explanation names the newest scan day instead of blank dates", async () => {
+  // Five days on, no house was scanned since 20 Nov: nothing has a current week end.
+  vi.setSystemTime(new Date("2026-11-25T12:00:00Z"));
+  try {
+    const t = text(await page("forever"));
+    expect(t).not.toMatch(/End: ,|Start: ,/);
+    expect(t).toContain("No week comparison: the newest scan in this house is 20 Nov, older than yesterday (UTC), so the week has no current end.");
+    expect(t).toContain("Newest scan 20 Nov");
+  } finally {
+    vi.setSystemTime(now);
+  }
+});
+
+test("counts in the footer use thousands separators", async () => {
+  // One scan part holds at most 500 items: three parts per install, one scan.
+  const items = Array.from({ length: 1_200 }, (_, i) => [1_000 + i, 2, 40, 100, 100]);
+  const parts = ["install-a", "install-b", "install-c"].flatMap((installId) => [0, 1, 2].map((part) => ({
+    kind: "auction_snapshot", installId, capturedAt: at(0), realm: "Forever", faction: "Horde", scanId: `${installId}-scan`, part: part + 1, parts: 3,
+    items: items.slice(part * 400, part * 400 + 400),
+  })));
+  const many = foldMarket(emptyMarket(), parts, now);
+  store.boards.mockResolvedValue(boardsFromFile(parseBoards(JSON.stringify(await buildMarketBoards(many, at(0), now, names)))!));
+  const t = text(await page("forever"));
+  expect(t).toContain("25 of 1,200 items: 1,200 new");
 });
 
 test("the metadata names the realm and house; only the plain view with a move is indexed", async () => {

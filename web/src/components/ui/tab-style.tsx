@@ -15,7 +15,7 @@ export const TAB_SCROLL = "overflow-x-auto [scrollbar-width:none] [&::-webkit-sc
 /** "Dropped by (3)": the count beside the label, as data pages list it. */
 export function TabCount({ count }: { count: number }) {
   // The space is for the text a screen reader or a copy gets; in the flex row the margin draws it.
-  return <span className="ml-1 tabular-nums text-muted">{` (${count})`}</span>;
+  return <span className="ml-1 tabular-nums text-muted">{` (${count.toLocaleString("en-US")})`}</span>;
 }
 
 /**

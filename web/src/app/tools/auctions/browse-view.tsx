@@ -13,8 +13,8 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, onRuleset, percent,
-  realmHref, rulesetSummaries, slugWords,
+  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, newestScanDay, onRuleset, percent,
+  realmHref, rulesetSummaries, scanDayText, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
 import { auctionNames, itemArt, type ItemTip } from "./art";
@@ -82,7 +82,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const rulesetName = ruleset ? RULESET_LABEL[ruleset] : null;
   const mine = slug ? boards.filter((b) => b.realm.slug === slug) : onRuleset(boards, ruleset);
   const realmsHere = slug ? realmWide : onRuleset(realmWide, ruleset);
-  const realmName = slug ? (findBoard(realmWide, slug)?.realm.name ?? mine[0]?.realm.name ?? slugWords(slug)) : null;
+  const realmName = slug ? (findBoard(realmWide, slug)?.realm.name ?? mine[0]?.realm.name ?? (stored && findBoard(stored.boards(null), slug)?.realm.name) ?? slugWords(slug)) : null;
   const rows = mine.flatMap((b) => b.rows);
   const allIds = [...new Set(rows.map((r) => r.value.itemId))];
 
@@ -118,7 +118,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const pageHref = (page: number) => ahHref(path, { ...q, page });
   const strip = <ResultStrip total={results.length} noun={results.length === 1 ? "item" : "items"} page={q.page} perPage={AH_PER_PAGE} href={pageHref} label="Result pages" />;
   const board = slug ? findBoard(realmWide, slug) : null;
-  const updated = slug ? (mine[0]?.updatedAt ?? board?.updatedAt ?? null) : market.dataAsOf ? Date.parse(market.dataAsOf) : null;
+  // Freshness: the newest public day behind the shown prices, as every Auction House page states it; on the all-realms
+  // page also when the file was rebuilt, which is not a new scan.
+  const newest = newestScanDay(rows);
+  const rebuilt = market.dataAsOf ? Date.parse(market.dataAsOf) : null;
   const title = realmName ?? (rulesetName ? `${rulesetName} Auction House` : "Auction House");
   const trail: Crumb[] = [...trailFor(AH_PATH)!, ...(slug ? [{ name: title, path }] : [])];
   const showRealm = !slug;
@@ -151,9 +154,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
     {
       type: "menu", key: "region", label: "Region",
       options: [
-        { label: "All regions", href: ahHref(AH_PATH, { ...q, region: undefined, page: 1 }), on: !q.region, reset: true },
+        // Like Quality and Req. level, the region stays on the page it was picked on: a realm page keeps its realm.
+        { label: "All regions", href: here({ region: undefined }), on: !q.region, reset: true },
         ...(Object.keys(REGION_LABEL) as RegionFilter[]).map((region) => ({
-          label: REGION_LABEL[region], href: ahHref(AH_PATH, { ...q, region, page: 1 }), on: q.region === region,
+          label: REGION_LABEL[region], href: here({ region }), on: q.region === region,
         })),
       ],
     },
@@ -229,6 +233,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
     body = <EmptyState message={`${rulesetName} opens after launch, and no realm is on ${rulesetName} yet.`} />;
   } else if (rows.length === 0 && ruleset) {
     body = <EmptyState message={`No public prices on ${rulesetName} realms${q.region ? ` in ${REGION_LABEL[q.region]}` : ""}${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
+  } else if (rows.length === 0 && slug && q.region && findBoard(stored.boards(null), slug)) {
+    // The realm has prices, just not in the region picked: say that, not that it has none.
+    body = <EmptyState message={`${realmName} is not in ${REGION_LABEL[q.region]}, so this region filter hides its prices.`} />;
   } else if (rows.length === 0) {
     const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
     body = slug
@@ -268,7 +275,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
           meta={state && (
             <Facts items={[
               // With no prices to show, the time says when the rollup was last read, not that anything changed.
-              updated !== null ? <>{rows.length ? "Updated" : "Checked"} <TimeAgo at={updated} renderedAt={now.getTime()} /></> : "Update time unrecorded",
+              ...(slug
+                ? [newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet"]
+                : rebuilt === null ? ["Rebuild time unrecorded"]
+                : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest, now)}`}</>]),
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
               ...(!slug && realmsHere.length ? [count(realmsHere.length, "realm")] : []),
             ]} />
@@ -291,6 +301,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
               tabs={[{ href: here({ ruleset: undefined }), label: <>All<span className="sr-only"> rulesets</span></>, current: !ruleset }, ...rulesetTabs]}
               aside={laterRulesets.length ? <span>{laterRulesets.map((r) => RULESET_LABEL[r]).join(", ")}: after launch</span> : undefined}
             />
+            <p className="mt-2 text-meta text-fg-2">Ruleset counts are totals across every house; the filters below do not change them.</p>
             {summaryRows.length > 0 && (
               <div className="mt-3 mb-4">
                 <RulesetSummaryTable rows={summaryRows} now={now} names={names} href={(r) => here({ ruleset: r })} />

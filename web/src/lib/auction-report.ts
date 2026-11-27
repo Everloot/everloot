@@ -14,6 +14,21 @@ export interface AuctionReport {
  risers: ReportGood[]; fallers: ReportGood[]; mostListed: ReportGood[];
  categories: { name: string; up: number; down: number; total: number }[]; spreads: ReportSpread[];
 }
+const UTC_TIME = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
+/** A report time as the pages write it: "20 Nov, 04:21 UTC". */
+export const reportTime = (iso: string) => `${UTC_TIME.format(new Date(iso))} UTC`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+/**
+ * The report's lede, from its categories, goods and houses: the leading category's moves in plain words, or what the
+ * day covers when no category leans. Worked out at render too, so reports stored with older wording read the same.
+ */
+export function reportHeadline(r: Pick<AuctionReport, "categories" | "goods" | "houses">): string {
+ const lead = r.categories.find(c => c.down > c.up || c.up > c.down);
+ if (!lead) return `${plural(r.goods, "good")} with public asking prices across ${plural(r.houses.length, "scanned house")}.`;
+ const subject = lead.name === "Other" ? "Prices" : `${lead.name} prices`;
+ const counted = r.houses.length === 1 ? "items compared with the day before." : "item prices compared with the day before, each house counted apart.";
+ return `${subject} ${lead.down > lead.up ? "fell" : "rose"} for ${Math.max(lead.up, lead.down).toLocaleString("en-US")} of ${lead.total.toLocaleString("en-US")} ${counted}`;
+}
 const previousDay = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
 /** Public daily market asking prices, not the rolling 14-day value. A comparison is always the same house,
  * region and item on consecutive UTC days. Thin days never drive a movement or spread. No scans are replayed. */
@@ -57,11 +72,10 @@ export function buildAuctionReports(state: MarketState, now: Date, items: Readon
   // Keep each ruleset represented rather than letting one busy market fill the whole report.
   const top = (up: boolean) => [...new Set(rows.map(r => r.ruleset))].flatMap(ruleset => moving.filter(r => r.ruleset === ruleset && (up ? r.change! > 0 : r.change! < 0)).sort((a,b) => up ? b.change!-a.change! : a.change!-b.change!).slice(0, 5));
   const cats = [...categories.values()].filter(c => c.total >= 3).sort((a,b) => b.total-a.total);
-  const lead = cats.find(c => c.down > c.up || c.up > c.down);
   const goods = new Set(rows.map(r => r.itemId)).size;
+  const houses = [...new Set(rows.map(r => `${reportRegion(r.region)} · ${r.realm} · ${r.house} · ${reportRuleset(r.ruleset)}`))].sort();
   return { date, publishedAt: now.toISOString(), goods, scannedThrough: time ? new Date(time).toISOString() : null, includesOwnScans: own,
-   houses: [...new Set(rows.map(r => `${reportRegion(r.region)} · ${r.realm} · ${r.house} · ${reportRuleset(r.ruleset)}`))].sort(),
-   headline: lead ? `${lead.name}: ${Math.max(lead.up,lead.down)} of ${lead.total} comparable item-house prices ${lead.down > lead.up ? "fell" : "rose"} from the day before.` : `${goods} ${goods === 1 ? "good" : "goods"} with public asking prices across ${new Set(rows.map(r => `${r.realm}|${r.house}`)).size} scanned houses.`,
+   houses, headline: reportHeadline({ categories: cats, goods, houses }),
    risers: top(true), fallers: top(false), mostListed: rows.filter(r => r.listings !== null).sort((a,b) => b.listings!-a.listings!).slice(0, 10), categories: cats, spreads };
  });
 }

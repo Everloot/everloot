@@ -116,3 +116,10 @@ test("the realm and house picker reads ?realm= and ?house= as the old form did a
   expect(html).toContain('href="/tools/disenchanting?realm=forever&amp;house=alliance"');
   expect(html).toContain('href="/tools/disenchanting?realm=forever&amp;house=neutral"');
 });
+
+test("a house with no prices says its values are hidden, not that they are averaged there", async () => {
+  const html = await page({ realm: "forever", house: "neutral" });
+  const bands = text(section(html, "disenchant-bands"));
+  expect(bands).toContain("No Neutral prices yet on Forever, so values are hidden.");
+  expect(bands).not.toContain("Average material value per disenchant");
+});

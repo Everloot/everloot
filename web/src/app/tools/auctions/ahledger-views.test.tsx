@@ -44,7 +44,7 @@ for (const p of panels) {
     expect(container.querySelector('a[href="https://ahledger.com"]')).not.toBeNull();
     await act(async () => finish(Response.json({ ok: true, [p.field]: p.empty, credit })));
     expect(container.textContent).toContain(p.message);
-    expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AHledger");
+    expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AH Ledger");
   });
 
   test(`${p.name}: failed reads say failed, not empty, and keep credit`, async () => {
@@ -66,7 +66,9 @@ test("history reads the realm's initial market, renders both lines and band, and
   expect(container.querySelector("[data-history-band]")).not.toBeNull();
   expect(container.querySelector("linearGradient")).toBeNull();
   expect(container.textContent).toContain("7-day median"); expect(container.textContent).toContain("30-day median");
-  expect(container.textContent).toContain("3.5 (7-day window)");
+  // Sales a day round to a whole number.
+  expect(container.textContent).toContain("4 (7-day window)");
+  expect(container.textContent).not.toContain("3.5");
   const faction = container.querySelectorAll("select")[2];
   await act(async () => { faction.value = "horde"; faction.dispatchEvent(new Event("change", { bubbles: true })); });
   expect(fetchImpl.mock.calls).toHaveLength(2);

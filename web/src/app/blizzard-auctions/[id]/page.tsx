@@ -19,23 +19,34 @@ import { BlizzardHistory } from "./history";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Blizzard auction house data",
-  description: "An item's auction house prices from Blizzard's API, with the time Blizzard published them.",
-  robots: { index: false, follow: false },
+type Props = { params: Promise<{ id: string }> };
+
+const TITLE = "Blizzard auction house data";
+const validId = (id: string) => /^[1-9]\d{0,8}$/.test(id);
+/** The item's shown name, as the heading uses it; "Item N" without one. */
+const itemName = async (itemId: number) => {
+  const { agreed, matched } = await loadShownNames();
+  return shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`;
 };
 
-type Props = { params: Promise<{ id: string }> };
+/** The tab title names the item like the heading does; an id the page refuses keeps the plain title. */
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const { id } = await props.params;
+  return {
+    title: validId(id) ? `${await itemName(Number(id))}: ${TITLE}` : TITLE,
+    description: "An item's auction house prices from Blizzard's API, with the time Blizzard published them.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function BlizzardAuctionPage(props: Props) {
   const { id } = await props.params;
-  if (!/^[1-9]\d{0,8}$/.test(id)) notFound();
+  if (!validId(id)) notFound();
   const itemId = Number(id);
-  const [read, history, { agreed, matched }] = await Promise.all([loadBlizzardPrices(itemId), loadBlizzardHistory(itemId), loadShownNames()]);
-  const name = shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`;
+  const [read, history, name] = await Promise.all([loadBlizzardPrices(itemId), loadBlizzardHistory(itemId), itemName(itemId)]);
   return (
     <Container>
-      <h1 className="text-title-sm text-fg [overflow-wrap:anywhere] sm:text-title">{name}: Blizzard auction house data</h1>
+      <h1 className="text-title-sm text-fg [overflow-wrap:anywhere] sm:text-title">{name}: {TITLE}</h1>
       <p className="mt-2 text-meta text-fg-2">
         {/* A plain link: the item page carries ads, so the move back loads its own document. */}
         <a href={`/database/items/${itemId}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Back to the item page</a>, where

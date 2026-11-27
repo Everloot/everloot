@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { emptyMarket, foldMarket } from "@kb/market";
-import { buildAuctionReports } from "./auction-report";
+import { buildAuctionReports, reportHeadline, reportTime } from "./auction-report";
 const now = new Date("2026-11-15T12:00:00Z");
 const scans = (day: string, house = "Horde", quantity = 40, reporters = 3) => Array.from({ length: reporters }, (_, i) => ({ kind: "auction_snapshot", installId: `reporter-${i}`, realm: "CAMWOW US1 Realm 4 PvP", house, capturedAt: `${day}T18:00:00Z`, items: [[765, 8, quantity, day === "2026-11-14" ? 200 : 100, day === "2026-11-14" ? 200 : 100]] }));
 const build = (rows: unknown[]) => buildAuctionReports(foldMarket(emptyMarket(), rows, now), now, new Map([[765, { name: "Silverleaf", category: "Herbs" }]]));
@@ -37,4 +37,17 @@ test("a category trend needs at least three public comparisons", () => {
  const r=buildAuctionReports(foldMarket(emptyMarket(),rows,now),now,items).at(-1)!;
  expect(r.categories).toEqual([{name:"Herbs",up:3,down:0,total:3}]);
  expect(r.headline).toContain("3 of 3");
+});
+test("the headline reads as plain prose: what fell or rose, of how many items, and one house is singular", () => {
+ const herbs = [{ name: "Herbs", up: 1, down: 20, total: 27 }];
+ expect(reportHeadline({ categories: herbs, goods: 30, houses: ["US · Realm · Horde · PvP"] })).toBe("Herbs prices fell for 20 of 27 items compared with the day before.");
+ expect(reportHeadline({ categories: [{ name: "Other", up: 20, down: 55, total: 81 }], goods: 81, houses: ["a"] })).toBe("Prices fell for 55 of 81 items compared with the day before.");
+ expect(reportHeadline({ categories: herbs, goods: 30, houses: ["a", "b"] })).toBe("Herbs prices fell for 20 of 27 item prices compared with the day before, each house counted apart.");
+ expect(reportHeadline({ categories: [], goods: 1_250, houses: ["a"] })).toBe("1,250 goods with public asking prices across 1 scanned house.");
+ expect(reportHeadline({ categories: [], goods: 1, houses: ["a", "b"] })).toBe("1 good with public asking prices across 2 scanned houses.");
+ const r = build(scans("2026-11-14")).at(-1)!;
+ expect(r.headline).toBe("1 good with public asking prices across 1 scanned house.");
+});
+test("report times read as a day and a UTC time, not raw ISO", () => {
+ expect(reportTime("2026-11-20T04:21:05.000Z")).toBe("20 Nov, 04:21 UTC");
 });

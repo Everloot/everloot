@@ -11,7 +11,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import {
-  AH_PATH, crossRealmHref, indexable, itemIdParam, itemLabel, itemRows, type MarketRow,
+  AH_PATH, crossRealmHref, indexable, itemIdParam, itemLabel, itemRows, scanDayText, type MarketRow,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, Facts, PriceFacts, RealmPrices, UnnamedReason, count, itemQuality } from "../../parts";
@@ -35,7 +35,7 @@ async function load(params: Props["params"]) {
   const rows = market.state ? itemRows(market.state, now, itemId) : [];
   const { tips } = await itemArt(rows.length ? [itemId] : []);
   const names = await auctionNames([itemId], tips);
-  return { itemId, market, rows, tip: tips.get(itemId), names, label: itemLabel(itemId, names) };
+  return { itemId, now, market, rows, tip: tips.get(itemId), names, label: itemLabel(itemId, names) };
 }
 
 const realmCount = (rows: MarketRow[]) => new Set(rows.map((r) => r.realm.key)).size;
@@ -60,7 +60,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 export default async function CrossRealmItemPage(props: Props) {
-  const { itemId, market, rows, tip, names, label } = await load(props.params);
+  const { itemId, now, market, rows, tip, names, label } = await load(props.params);
   const state = market.state;
   const path = crossRealmHref(itemId);
   const low = extreme(rows, (a, b) => a < b);
@@ -86,7 +86,7 @@ export default async function CrossRealmItemPage(props: Props) {
         title={label}
         quality={itemQuality(itemId, tip, names.has(itemId)) ?? undefined}
         lede="Auction House prices on every realm with public scans, each auction house apart."
-        meta={rows.length > 0 && <Facts items={[count(realmCount(rows), "realm"), `Newest public day ${days.at(-1)}`]} />}
+        meta={rows.length > 0 && <Facts items={[count(realmCount(rows), "realm"), `Newest scan ${scanDayText(days.at(-1)!, now)}`]} />}
         actions={<Link href={`/database/items/${itemId}`} className="btn">Item details</Link>}
       />
 

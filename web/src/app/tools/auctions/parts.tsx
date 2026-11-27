@@ -3,13 +3,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
 import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
+import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
 import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "@kb/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
-import TimeAgo from "./TimeAgo";
 import ClientCoins from "./ClientCoins";
 
 export { RealmName };
@@ -49,20 +48,20 @@ export function Sparkline({ points, now }: { points: PublicDay[]; now: Date }) {
   );
 }
 
-/** One item on one realm in each auction house: market value, minimum, units and when it was last scanned. */
+/** One item on one realm in each auction house: market value, minimum, units and its newest scan day. */
 export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption: string; now: Date }) {
   const columns: Column<MarketRow>[] = [
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><ClientCoins copper={r.value.market} /></span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => <ClientCoins copper={r.value.min} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
-    { key: "updated", header: "Updated", numeric: true, cell: (r) => (r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : r.value.day) },
+    { key: "updated", header: "Newest scan", numeric: true, cell: (r) => scanDayText(r.value.day, now) },
   ];
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house} />;
 }
 
 /**
- * One line per ruleset: realms, items priced, the last scan and the week's biggest moves, across every house. A
+ * One line per ruleset: realms, items priced, the newest scan day and the week's biggest moves, across every house. A
  * ruleset with nothing says why: no realm is mapped to it yet, or its realms have no public prices yet.
  */
 export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetSummary[]; now: Date; names: ItemNames; href: (r: RulesetSlug) => string }) {
@@ -75,10 +74,10 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
     { key: "realms", header: "Realms", numeric: true, cell: (r) => r.realms.toLocaleString("en-US") },
     { key: "items", header: "Items priced", numeric: true, cell: (r) => r.items.toLocaleString("en-US") },
     {
-      key: "updated", header: "Last scan", nowrap: true,
+      key: "updated", header: "Newest scan", nowrap: true,
       cell: (r) => (!r.mapped ? <span className="text-muted">Not mapped yet</span>
-        : !r.items ? <span className="text-muted">No public prices yet</span>
-        : r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : <span className="text-muted">Over a week ago</span>),
+        : !r.items || r.newestDay === null ? <span className="text-muted">No public prices yet</span>
+        : scanDayText(r.newestDay, now)),
     },
     {
       key: "moves", header: "Biggest moves, 7 days",
@@ -171,18 +170,21 @@ export function PriceFacts({ facts, note }: { facts: { label: string; value: Rea
   );
 }
 
-/** Market value per public day across the 60-day window; one thin line, drawn only with two or more days. */
+/**
+ * Market value per public day in the 60-day window; one thin line, drawn only with two or more days. The axis runs
+ * from the first public day to the newest, the two dates under it, so the line spans the box instead of sitting in
+ * the last weeks of an empty window.
+ */
 export function PriceChart({ points }: { points: PublicDay[] }) {
   if (points.length < 2) {
     return <p className="text-sm text-muted">The line starts once a second public day is in.</p>;
   }
   const width = 1000, height = 140, pad = 8;
   const days = points.map((p) => Date.parse(`${p.day}T00:00:00Z`) / 86_400_000);
-  const last = days[days.length - 1]!;
-  const first = last - (HISTORY_DAYS - 1);
+  const first = days[0]!, span = Math.max(1, days[days.length - 1]! - first);
   const values = points.map((p) => p.market);
   const low = Math.min(...values), high = Math.max(...values);
-  const x = (d: number) => pad + ((d - first) / (HISTORY_DAYS - 1)) * (width - 2 * pad);
+  const x = (d: number) => pad + ((d - first) / span) * (width - 2 * pad);
   const y = (v: number) => (high === low ? height / 2 : pad + (1 - (v - low) / (high - low)) * (height - 2 * pad));
   const line = points.map((p, i) => `${x(days[i]!).toFixed(1)},${y(p.market).toFixed(1)}`).join(" ");
   return (

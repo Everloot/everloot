@@ -11,5 +11,5 @@ export async function generateMetadata() {
 export default async function Page() {
  const dates = await reportDates();
  const report = dates[0] ? await storedAuctionReport(dates[0]) : null;
- return <ReportView report={report} dates={dates} />;
+ return <ReportView report={report} dates={dates} now={new Date()} />;
 }
