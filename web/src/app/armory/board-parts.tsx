@@ -4,7 +4,7 @@ import { Card, DataTable, type Column } from "@/components/ui";
 import Tooltip from "@/components/ui/Tooltip";
 import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import { classText } from "@/app/players/player-view";
-import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
+import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, boardRanks, boardRankText, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion, type BoardRank } from "@/lib/armory";
 import type { ArmoryBoardRow } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { RegionChip } from "./parts";
@@ -34,31 +34,43 @@ export function BoardValue({ row, metric, top }: { row: ArmoryBoardRow; metric: 
   );
 }
 
-/** The rank sits in the name cell: on a phone a dense table keeps its first column only. */
-const rankMark = (rank: number) => <span className="w-6 shrink-0 font-mono tabular-nums text-muted">{rank}</span>;
-
 /**
- * The rank each row shows: a row on the same value as the one above it shares that row's rank, as the character page's
- * rank does ("#1 (tied with 9)"), rather than the board's running count. `rows` are highest first.
+ * The rank before a name. The top three sit in a round badge, the first filled with the accent and the next two ringed
+ * by it, so the head of a board reads at a glance without medal colours; the rest are plain muted numbers. A tie says
+ * so in words, for a screen reader and on hover.
  */
-export function sharedRanks(rows: readonly ArmoryBoardRow[]): Map<ArmoryBoardRow, number> {
-  const out = new Map<ArmoryBoardRow, number>();
-  rows.forEach((r, i) => {
-    const above = rows[i - 1];
-    out.set(r, above && above.value === r.value ? out.get(above)! : r.rank);
-  });
-  return out;
+export function RankMark({ rank }: { rank: BoardRank }) {
+  const text = boardRankText(rank);
+  const top = rank.rank <= 3;
+  const look = !top ? "text-muted" : rank.rank === 1 ? "rounded-full bg-accent font-semibold text-canvas" : "rounded-full border border-accent text-fg";
+  return (
+    <span data-rank={rank.rank} data-rank-top={top ? "" : undefined} title={rank.tied ? text : undefined}
+      className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center self-center px-1 font-mono text-cell-2 tabular-nums ${look}`}>
+      <span aria-hidden="true">{rank.rank.toLocaleString("en-US")}</span><span className="sr-only">{text}</span>
+    </span>
+  );
+}
+
+/** A board's rows' ranks, the board's own count seeding each run of equal values. `rows` are highest first. */
+export function sharedRanks(rows: readonly ArmoryBoardRow[]): Map<ArmoryBoardRow, BoardRank> {
+  const ranks = boardRanks(rows, (r) => r.value, (r) => r.rank);
+  return new Map(rows.map((r, i) => [r, ranks[i]!]));
+}
+
+/** A character's name in its class colour, linking its one page. */
+export function BoardName({ row }: { row: ArmoryBoardRow }) {
+  return <Link href={armoryCharacterPath(row.region, row.slug)} className={`${classText(row.class.toUpperCase())} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{row.name} {row.surname}</Link>;
 }
 
 /** A leaderboard row: the rank, the name in its class colour with the class and faction, the guild, the value. */
-function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoardRow, number>): Column<ArmoryBoardRow>[] {
+function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoardRow, BoardRank>): Column<ArmoryBoardRow>[] {
   return [
     {
       key: "name", header: "Character",
       cell: (r) => (
-        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          {rankMark(ranks.get(r) ?? r.rank)}
-          <Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(r.class.toUpperCase())} font-medium underline decoration-edge underline-offset-4 hover:decoration-current`}>{r.name} {r.surname}</Link>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+          <RankMark rank={ranks.get(r) ?? { rank: r.rank, tied: false }} />
+          <BoardName row={r} />
           <BoardClass row={r} />
         </span>
       ),
@@ -72,7 +84,11 @@ function regionColumns(metric: ArmoryMetric, top: number, ranks: Map<ArmoryBoard
  * One region's column of a board, ranked within that region alone: US and EU stand side by side, so a region with
  * more characters read never pushes the other off the list. Null rows when the store could not answer.
  */
-export function RegionBoard({ metric, region, rows, footer }: { metric: ArmoryMetric; region: ArmoryRegion; rows: ArmoryBoardRow[] | null; footer: ReactNode }) {
+export function RegionBoard({ metric, region, rows, footer, shown }: {
+  metric: ArmoryMetric; region: ArmoryRegion; rows: ArmoryBoardRow[] | null; footer: ReactNode;
+  /** The page of rows to print, as slice bounds; ranks still come from the whole list, so a tie across pages holds. */
+  shown?: readonly [number, number];
+}) {
   const title = ARMORY_BOARDS[metric].title;
   const heading = <h3 id={`board-${region}`} className="flex items-center gap-2 px-4 pt-3 text-h2-sm text-fg"><RegionChip region={region} />{title}</h3>;
   return (
@@ -82,7 +98,7 @@ export function RegionBoard({ metric, region, rows, footer }: { metric: ArmoryMe
           dense
           caption={`${title}, ${regionLabel(region)}, top ${rows.length}`}
           columns={regionColumns(metric, rows[0]?.value ?? 0, sharedRanks(rows))}
-          rows={rows}
+          rows={shown ? rows.slice(shown[0], shown[1]) : rows}
           rowKey={(r) => `${r.region}/${r.slug}`}
           meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>}
           empty={<p className="px-4 py-3 text-cell text-fg-2">No character with this number here yet.</p>}

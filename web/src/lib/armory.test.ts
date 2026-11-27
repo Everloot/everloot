@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   HUB_PREVIEW_METRICS, isArmoryMetric, metricOfKey, PLAY_HISTORY_METRICS,
   armoryBoardHref, armoryBoardQuery, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
-  metricValue, namesFromSlug, raceOfId, rankText, readLine, slotLabel, slugFromSegment, validArmorySlug,
+  boardRanks, boardRankText, metricValue, namesFromSlug, raceOfId, rankText, readLine, slotLabel, slugFromSegment, validArmorySlug,
 } from "./armory";
 
 test("the switch is on only for EVERLOOT_ARMORY=1", () => {
@@ -91,6 +91,17 @@ test("a rank says how many share it and, on a large board near the top, the shar
   expect(rankText({ rank: 9000, of: 20943, tied: 0 })).toBe("#9,000 of 20,943");
   expect(rankText({ rank: 2, of: 40, tied: 0 })).toBe("#2 of 40");
   expect(rankText({ rank: 2, of: 40, tied: 3 })).toBe("#2 (tied with 3) of 40");
+});
+
+test("a board's rows share a rank on equal values and say they are tied, without claiming how many", () => {
+  const rows = [{ v: 70 }, { v: 61 }, { v: 61 }, { v: 61 }, { v: 50 }];
+  const ranks = boardRanks(rows, (r) => r.v);
+  expect(ranks.map((r) => r.rank)).toEqual([1, 2, 2, 2, 5]);
+  expect(ranks.map((r) => r.tied)).toEqual([false, true, true, true, false]);
+  // A board's own rank (the SQL's running count) seeds each run of equal values.
+  expect(boardRanks([{ v: 9, n: 4 }, { v: 9, n: 5 }], (r) => r.v, (r) => r.n).map((r) => r.rank)).toEqual([4, 4]);
+  expect(boardRankText({ rank: 2, tied: true })).toBe("#2 (tied)");
+  expect(boardRankText({ rank: 1, tied: false })).toBe("#1");
 });
 
 test("a rank read before the database counts ties reads as it always has", () => {

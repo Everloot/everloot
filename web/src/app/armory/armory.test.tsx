@@ -570,7 +570,7 @@ describe("the boards", () => {
     expect(spy).toHaveBeenCalledWith("item_level", "eu", null, "Mage", null, 100);
     const us = out.slice(out.indexOf('aria-labelledby="board-us"'), out.indexOf('aria-labelledby="board-eu"'));
     expect(us).toContain('href="/armory/us/maren-holt"');
-    expect(us).toMatch(/<span[^>]*>1<\/span><a href="\/armory\/us\/maren-holt" class="[^"]*text-class-mage/);
+    expect(us).toMatch(/data-rank="1"[^>]*>(?:<[^>]*>)*1<\/span><span class="sr-only">#1<\/span><\/span><a href="\/armory\/us\/maren-holt" class="[^"]*text-class-mage/);
     // Each column opens its region's full table, the other filters kept.
     expect(us).toContain('href="/armory/rankings/item-level?region=us&amp;class=mage"');
     expect(out).toContain("No character with this number here yet.");
@@ -579,6 +579,38 @@ describe("the boards", () => {
     const eu = await html(pages.board("item-level", { region: "eu" }));
     expect(eu).not.toContain('aria-labelledby="board-us"');
     expect(eu).not.toContain("maren-holt");
+  });
+
+  test("a board's header says what it ranks, how it counts and when it was read; names wear class colours, ties share a rank, the top three wear a badge", async () => {
+    mem.putCharacter(armoryCharacter({ slug: "orla-venn", name: "Orla", surname: "Venn", class: "Warrior", classId: 1, itemLevel: 99, fetchedAt: "2026-11-09T08:00:00.000Z" }));
+    mem.putCharacter(armoryCharacter({ slug: "pell-venn", name: "Pell", surname: "Venn", class: "Mage", classId: 8, itemLevel: 99, fetchedAt: "2026-11-09T08:00:00.000Z" }));
+    const out = await html(pages.board("item-level", { region: "eu" }));
+    expect(out).toMatch(/<a href="\/armory\/eu\/orla-venn" class="[^"]*text-class-warrior/);
+    expect(out).toMatch(/<a href="\/armory\/eu\/pell-venn" class="[^"]*text-class-mage/);
+    const ranks = [...out.matchAll(/data-rank="(\d+)"/g)].map((m) => m[1]);
+    expect(ranks.slice(0, 2)).toEqual(["1", "1"]);
+    expect(out.match(/sr-only">#1 \(tied\)/g)).toHaveLength(2);
+    expect(out.match(/data-rank-top/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(out).toContain("Each region is ranked on its own");
+    expect(out).toContain("equal numbers share a rank");
+    expect(out).toContain("data-armory-credit");
+  });
+
+  test("a board pages its top 100 as the database lists do, the filters kept in the address", async () => {
+    for (let i = 0; i < 60; i++) mem.putCharacter(armoryCharacter({ slug: `alt-${i}`, name: `Alt${i}`, surname: "Row", itemLevel: 1 + i / 100 }));
+    const one = await html(pages.board("item-level", { region: "eu" }));
+    expect(one).toContain("data-result-strip");
+    expect(one).toContain('href="/armory/rankings/item-level?region=eu&amp;page=2"');
+    expect(one).not.toContain('href="/armory/eu/alt-0"');
+    const two = await html(pages.board("item-level", { region: "eu", page: "2" }));
+    expect(two).toContain('href="/armory/eu/alt-0"');
+    expect(two).not.toContain('href="/armory/eu/alt-59"');
+    expect(two).toContain('data-rank="51"');
+    // A page past the end, or not a number, is the first page rather than an empty list.
+    expect(await html(pages.board("item-level", { region: "eu", page: "9" }))).toContain('href="/armory/eu/alt-59"');
+    expect(await html(pages.board("item-level", { region: "eu", page: "x" }))).toContain('href="/armory/eu/alt-59"');
+    // With both regions side by side, the two columns page together.
+    expect(await html(pages.board("item-level", { page: "2" }))).toContain('href="/armory/eu/alt-0"');
   });
 });
 
