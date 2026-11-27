@@ -30,7 +30,7 @@ import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import {
-  creatureLevels, hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneFlightMasters, zoneHref, zoneMapHref,
+  creatureLevels, hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneFlightPins, zoneHref, zoneMapHref,
   type ZoneEntrance, type ZoneFaction, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { SIDE_LABEL, SIDE_TONE } from "@/lib/world-lists";
@@ -271,12 +271,14 @@ export default async function ZonePage(props: Props) {
   ];
   // The named places the game files list in the zone: points of interest at their spot, then the subzones.
   const places = zonePlaces(zone.mapId);
+  const flights = zoneFlightPins(zone.mapId);
   // The map slot: everything the tabs place, on the zone's art. Agreed pins filled; entrances only the game files
-  // place, and the places they name, hollow.
+  // place, the flight masters and the places they name, hollow.
   const marks: MapMark[] = [
     ...(here?.npcs ?? []).map((n): MapMark => ({ kind: n.vendor ? "vendor" : "npc", mapId: zone.mapId, x: n.x, y: n.y, label: nameOf(n), agreed: true })),
     ...treasures.map((t): MapMark => ({ kind: "object", mapId: zone.mapId, x: t.x, y: t.y, label: t.name ?? `Object ${t.objectId}`, agreed: true })),
     ...entrances.map((e): MapMark => ({ kind: "entrance", mapId: zone.mapId, x: e.x, y: e.y, label: e.names.join(", "), agreed: e.confirmed !== null })),
+    ...flights.flatMap((f): MapMark[] => (f.at ? [{ kind: "flight", mapId: zone.mapId, x: f.at.x, y: f.at.y, label: f.name, agreed: false }] : [])),
     ...(places?.pois ?? []).flatMap((p): MapMark[] => (p.x !== null && p.y !== null ? [{ kind: "place", mapId: zone.mapId, x: p.x, y: p.y, label: p.name, agreed: false }] : [])),
   ];
   const mapZones = entityMapZones(marks, assets?.maps);
@@ -306,7 +308,6 @@ export default async function ZonePage(props: Props) {
   // The zone at a glance. The game files give its entrances and flight masters; the counts are what 3 installs agreed on,
   // a row only for a kind with one (no row is not "none"), and none at all while storage is down.
   const levels = creatureLevels(npcs);
-  const flights = zoneFlightMasters(zone.mapId);
   const counted = facts.unreachable ? [] : ([["NPCs", npcs.length], ["Vendors", vendors.length], ["Quests", quests.length], ["Objects", treasures.length]] as const).filter(([, n]) => n > 0);
   const quickFacts: Fact[] = [
     ...(entrances.length ? [{ label: "Dungeons and raids", value: (
@@ -317,13 +318,15 @@ export default async function ZonePage(props: Props) {
       </span>
     ) }] : []),
     ...(flights.length ? [{ label: "Flight masters", value: (
-      <span data-zone-flights>
-        {flights.map((n, i) => (
-          <span key={n.id}>
-            {i > 0 && " · "}<span>{n.name}</span>
+      // One master a line, each opening its spot on the world map: two Booty Bays side by side wrapped into one run.
+      <span data-zone-flights className="flex flex-col gap-1">
+        {flights.map((n) => {
+          const href = n.at ? pinLink(zone.mapId, n.at.x, n.at.y) : null;
+          return <span key={n.id}>
+            {href ? <Link prefetch={false} href={href} className={link}>{n.name}</Link> : <span>{n.name}</span>}
             {(n.faction === "alliance" || n.faction === "horde") && <span> (<span className={SIDE_TONE[n.faction]}>{SIDE_LABEL[n.faction]}</span>)</span>}
-          </span>
-        ))}
+          </span>;
+        })}
       </span>
     ) }] : []),
     ...counted.map(([label, n]) => ({ label, value: n, numeric: true })),

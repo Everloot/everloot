@@ -28,6 +28,7 @@ import {
   costText, dispelName, durationText, effectValue, ITEM_TRIGGER, mechanicName, schoolNames, spellNumbers, spellRanks, spellUses,
   SPELLS_BUILD, timeText, tooltipRows,
 } from "@/lib/spell-card";
+import { CLIENT_PROFESSIONS, professionHref, recipeBySpell, type RecipeView } from "@/lib/professions";
 import { loadSpell } from "./load-spell";
 
 /**
@@ -50,22 +51,41 @@ const relLabel: Record<string, string> = {
  */
 const otherEnd = (e: Edge) => (e.toKind === "spell" ? { kind: e.fromKind, id: e.fromId } : { kind: e.toKind, id: e.toId });
 
-/** Where a spell''s relation target has a page, a link to it; otherwise the kind and the id. */
-function SpellTarget({ edge }: { edge: Edge }) {
+type ItemLook = { name?: string; icon?: string | null };
+
+/**
+ * Where a spell's relation target has a page, a link to it; otherwise the kind and the id. An item goes by the name
+ * the item name rule shows (else its id), and a skill line the files list as a profession by its name and page.
+ */
+function SpellTarget({ edge, item }: { edge: Edge; item: (id: number) => ItemLook }) {
   const { kind, id } = otherEnd(edge);
+  if (kind === "item") return <EntityLink kind="item" id={id} name={item(id).name} icon={item(id).icon} />;
+  const profession = kind === "skill" ? CLIENT_PROFESSIONS.find((p) => p.id === id) : undefined;
+  if (profession) return <Link prefetch={false} href={professionHref(profession.slug)} className={LINK}>{profession.name}</Link>;
   const label = entityLabel(kind, id);
-  const href = kind === "item" ? `/database/items/${id}`
-    : kind === "npc" ? `/database/npcs/${id}`
+  const href = kind === "npc" ? `/database/npcs/${id}`
     : kind === "quest" ? `/database/quests/${id}`
     : kind === "object" ? `/database/objects/${id}`
     : null;
   return href ? <Link href={href} className={LINK}>{label}</Link> : <span>{label}</span>;
 }
 
-const relationColumns: Column<Edge>[] = [
-  { key: "to", header: "What", cell: (e) => <SpellTarget edge={e} /> },
-  { key: "build", header: "Build", cell: (e) => e.build ?? "—" },
-];
+/**
+ * A relation tab's columns: what, and the build. A recipe's reagents add the count the recipe file gives, and the
+ * profession that teaches it the skill ranks the files give (a column only where the recipe has a value).
+ */
+function relationColumns(rel: Rel, recipe: RecipeView | undefined, item: (id: number) => ItemLook): Column<Edge>[] {
+  const rank = (n: number | null | undefined) => n ?? "—";
+  const ranks = rel === "in_skill_line" && recipe ? ([["learn", "Needs"], ["yellow", "Yellow"], ["grey", "Grey"]] as const).filter(([k]) => recipe[k]) : [];
+  return [
+    { key: "to", header: "What", cell: (e) => <SpellTarget edge={e} item={item} /> },
+    ...(rel === "reagent_for" && recipe?.reagents.length
+      ? [{ key: "count", header: "Count", numeric: true, cell: (e: Edge) => rank(recipe.reagents.find((r) => r.itemId === otherEnd(e).id)?.count) }]
+      : []),
+    ...ranks.map(([k, header]) => ({ key: k, header, numeric: true, cell: () => rank(recipe![k]) })),
+    { key: "build", header: "Build", cell: (e) => e.build ?? "—" },
+  ];
+}
 
 /** The row gate as the catalog states it: the points, and where they count when the files say. */
 function gateText(t: SpellTalent): string {
@@ -143,9 +163,13 @@ export default async function SpellPage(props: Props) {
   const schools = schoolNames(numbers?.school);
   const rows = numbers ? tooltipRows(numbers) : [];
   const duration = durationText(numbers?.durationMs);
+  const rel = (r: Rel) => all.filter((e) => e.rel === r);
+  const creates = rel("created_by");
+  const costs = rel("reagent_for");
+  const recipe = recipeBySpell(spellId);
   // Items follow the item name rule, as on the item pages: one the rule does not show yet is counted, never listed.
   const [shown, setNames] = await Promise.all([
-    uses.items.length ? loadShownNames() : null,
+    uses.items.length || creates.length || costs.length ? loadShownNames() : null,
     uses.sets.length ? loadItemSetNames(CLIENT_LAYER.build.version) : null,
   ]);
   const itemName = (item: number) => (shown ? shownItemName(item, shown.agreed, shown.matched?.names) : undefined);
@@ -153,20 +177,23 @@ export default async function SpellPage(props: Props) {
   // A development leftover stays out, as in the item lists and on the item set pages; the line under the table counts it.
   const shownItems = tipped.filter((u) => !isDevelopmentItemName(itemName(u.item)?.name));
   const leftovers = tipped.length - shownItems.length;
-  const itemTips = shownItems.length ? await loadItemTips(assets, [...new Set(shownItems.map((u) => u.item))]) : new Map<number, { icon: string | null }>();
+  // Icons for the items the rule shows: those that cast the spell, and those it creates or costs.
+  const relationItems = [...creates, ...costs].map((e) => otherEnd(e)).filter((o) => o.kind === "item" && shown?.showsTip(o.id)).map((o) => o.id);
+  const iconIds = [...new Set([...shownItems.map((u) => u.item), ...relationItems])];
+  const itemTips = iconIds.length ? await loadItemTips(assets, iconIds) : new Map<number, { icon: string | null }>();
+  const itemLook = (id: number): ItemLook => ({ name: itemName(id)?.name, icon: itemTips.get(id)?.icon });
   const spellName = (id: number) => spellNames?.names.get(id);
-  const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
   const build = edges.client.find((e) => e.fromId === spellId || e.toId === spellId)?.build ?? CLIENT_LAYER.build.version;
 
-  const creates = rel("created_by");
-  const costs = rel("reagent_for");
-
-  // The page in three lines: what it is, what the files say it does, and where the name came from.
+  // The page in three lines: what it is, what the files say it does, and where the name came from. A spell that creates
+  // nothing says what the files do give it (its ranks, the items that cast it) before it says they give nothing.
   const summary = entitySummary({
     identity: [tip?.name ?? name, `Spell ${spellId}`].filter(Boolean).join(" · "),
     observed: creates.length
       ? `The files say it creates ${creates.length} ${creates.length === 1 ? "item" : "items"}${costs.length ? ` and costs ${costs.length} ${costs.length === 1 ? "reagent" : "reagents"}` : ""}.`
+      : rank ? `The files list ${ranks.length} ranks; this is rank ${rank}.`
+      : uses.items.length ? `The files list ${uses.items.length} ${uses.items.length === 1 ? "item that casts" : "items that cast"} it.`
       : "The files say nothing about what it creates.",
     // Spell names come from the game files' names (or their tooltips); a wiki name only when the files have none.
     nameFrom: fromWiki ? "wiki" : name ? "files" : "none",
@@ -180,7 +207,7 @@ export default async function SpellPage(props: Props) {
     if (!rows.length) return null;
     return {
       id, label, count: rows.length,
-      panel: <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>,
+      panel: <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns(r, recipe, itemLook)} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>,
     };
   };
 
@@ -203,7 +230,7 @@ export default async function SpellPage(props: Props) {
           ? <span aria-current="true" className="font-semibold text-fg">{spellName(r.spell) ?? `Spell ${r.spell}`} (this spell)</span>
           : <EntityLink kind="spell" id={r.spell} name={spellName(r.spell)} icon={assets?.spellIcons.get(r.spell)} /> },
         { key: "level", header: "Spell level", numeric: true, cell: (r: RankRow) => spellNumbers(r.spell)?.level ?? "—" },
-        { key: "cost", header: "Cost", cell: (r: RankRow) => spellNumbers(r.spell)?.costs?.map((c) => costText(c)).join(", ") ?? "—" },
+        { key: "cost", header: "Cost", nowrap: true, cell: (r: RankRow) => spellNumbers(r.spell)?.costs?.map((c) => costText(c)).join(", ") ?? "—" },
       ]} /></>,
     } : null,
     uses.items.length ? {

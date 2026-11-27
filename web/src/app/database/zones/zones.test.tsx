@@ -352,6 +352,10 @@ test("a zone page shows its map art as the header icon and its map in the map sl
   expect(map).toContain('src="https://a.test/maps/1436.webp"');
   expect(map).toContain("left:40%;top:50%");
   expect(page).not.toContain("data-zone-preview");
+  // Sentinel Hill's flight master is on the map too, hollow (the game files place it), and named in the legend.
+  expect(map).toMatch(/data-mark="flight" data-agreed="false"/);
+  expect(map).toContain("Sentinel Hill, Westfall · ");
+  expect(map).toContain(">Flight master<");
   art.assets = null;
   const plain = await html(ZonePage(props("1436-westfall")));
   expect(plain.split("data-entity-header")[1]?.split("</header>")[0]).not.toContain("data-game-icon");
@@ -391,6 +395,8 @@ test("the quick facts link the zone's dungeons and flight masters from the game 
   expect(facts).toMatch(/Dungeons and raids<\/dt><dd[^>]*>(?:<[^>]*>)*Deadmines/);
   expect(facts).toContain('href="/database/instances/36-deadmines"');
   expect(facts).toMatch(/Flight masters<\/dt><dd[^>]*>(?:<[^>]*>)*Sentinel Hill, Westfall/);
+  // Each flight master opens its own spot on the world map.
+  expect(facts).toMatch(/href="\/map\?[^"]*zone=1436[^"]*"[^>]*>Sentinel Hill, Westfall</);
   expect(facts).toMatch(/NPCs<\/dt><dd[^>]*>(?:<[^>]*>)*1</);
   expect(facts).toMatch(/Quests<\/dt><dd[^>]*>(?:<[^>]*>)*1</);
   // Nothing agreed of a kind: no row for it, not a zero.

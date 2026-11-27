@@ -8,7 +8,7 @@ import { WORLD_MAP } from "@/lib/world-map";
  */
 
 /** What a mark on an entity's map is; each kind has its colour and shape in the legend. */
-export type MarkKind = "npc" | "vendor" | "giver" | "turnin" | "object" | "entrance" | "place";
+export type MarkKind = "npc" | "vendor" | "giver" | "turnin" | "object" | "entrance" | "flight" | "place";
 
 /**
  * One position on a zone map, x and y from 0 to 100 as the pin tables print them. `agreed` is true for a position 3

@@ -13,6 +13,7 @@ const KINDS: Record<MarkKind, { label: string; shape: string; fill: string; edge
   turnin: { label: "Turn-in", shape: "rounded-full", fill: "bg-warning", edge: "border-warning" },
   object: { label: "Object", shape: "rounded-[2px]", fill: "bg-fg", edge: "border-fg" },
   entrance: { label: "Dungeon or raid entrance", shape: "rotate-45", fill: "bg-fg", edge: "border-fg" },
+  flight: { label: "Flight master", shape: "rounded-t-full", fill: "bg-fg", edge: "border-fg" },
   place: { label: "Place", shape: "rounded-full", fill: "bg-fg-2", edge: "border-fg-2" },
 };
 const ORDER = Object.keys(KINDS) as MarkKind[];
