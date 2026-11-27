@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { QUALITY_LABEL, QUALITY_TEXT, type Quality } from "./quality";
 
 /** The tooltip on the unconfirmed marker. */

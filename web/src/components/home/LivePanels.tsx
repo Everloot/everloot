@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, QUALITY_TEXT, SectionHeading } from "@/components/ui";
 import GameIcon from "@/components/game/GameIcon";

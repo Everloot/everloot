@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { longDate } from "@/data/wow-forever";
 import { TYPE_LABEL, postPath, type ChangeEntry } from "@/lib/changes";
 

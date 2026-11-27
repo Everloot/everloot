@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { DataTable, type Column } from "@/components/ui";
 import type { FarmArea } from "@/lib/farming";
 import { zoneHref, zoneMapHref } from "@/lib/zones";

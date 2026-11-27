@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { cache } from "react";
 import type { Fact } from "@/components/ui";
 import {

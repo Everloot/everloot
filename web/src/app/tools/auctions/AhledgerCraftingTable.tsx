@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import DataTable, { type Column, type SortDirection } from "@/components/ui/DataTable";
 import { salesText, type AhledgerCraft } from "@/lib/ahledger";

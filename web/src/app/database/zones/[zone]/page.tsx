@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";

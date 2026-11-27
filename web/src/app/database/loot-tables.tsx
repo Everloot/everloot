@@ -1,6 +1,6 @@
 import { dropTierLabel } from "@kb/drop-rollup";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { DataTable, ResultStrip, type Column, type SortDirection } from "@/components/ui";
 import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "@kb/loot-tables";
 import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "@kb/drop-rate-settling";

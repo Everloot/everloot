@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import GuideEditor from "@/components/guides/GuideEditor";
 import { Container, DataTitle, Prose, SectionHeading } from "@/components/ui";

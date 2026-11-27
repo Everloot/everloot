@@ -1,5 +1,5 @@
 import type { GuildProgress } from "@kb/guild-progression";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { PROGRESSION_BUILD, PROGRESSION_GROUPS, trackedDungeons, type CharacterProgress } from "@kb/progression";
 import { Badge } from "@/components/ui";
 import { SPACE } from "@/design/tokens";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useState } from "react";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 

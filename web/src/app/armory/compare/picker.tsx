@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useState } from "react";
 import type { PeopleSearch, PersonResult } from "@/lib/people-search-types";
 import { compareHref, compareSide, type Side } from "./sides";

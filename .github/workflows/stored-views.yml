@@ -55,6 +55,8 @@ jobs:
           # Its own pair, set from the values the cron Worker holds, so the publication pass reads the same opt-outs.
           SUPABASE_URL: ${{ secrets.VIEWS_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VIEWS_SUPABASE_SERVICE_ROLE_KEY }}
+          # Inlined into the site's build; the job reads it at run time, to name items from the game files.
+          NEXT_PUBLIC_GAME_ASSETS_URL: ${{ vars.NEXT_PUBLIC_GAME_ASSETS_URL }}
           GAME_DATA_ACCESS_KEY_ID: ${{ secrets.GAME_DATA_ACCESS_KEY_ID }}
           GAME_DATA_SECRET_ACCESS_KEY: ${{ secrets.GAME_DATA_SECRET_ACCESS_KEY }}
           GAME_DATA_BUCKET: ${{ secrets.GAME_DATA_BUCKET }}

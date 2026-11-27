@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import EmailAuthForm from "@/components/EmailAuthForm";
 import { signInMethods } from "@/lib/auth/auth";
 import { pageMetadata } from "@/lib/seo";

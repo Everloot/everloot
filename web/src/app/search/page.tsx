@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import LoreSearchForm from "@/components/LoreSearchForm";

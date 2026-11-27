@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { PROGRESSION_GROUPS } from "@kb/progression";
 import { Badge } from "@/components/ui";
 import type { DungeonsAndRaidsData, InstanceClear } from "@/lib/dungeon-clears";
