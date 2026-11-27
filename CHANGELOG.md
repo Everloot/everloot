@@ -329,6 +329,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: quest pages show the Warcraft Wiki blurb as its own paragraph; armory pages compute Ranked item level and Gear Score only from slots with a known level (and say when too few are known); dungeon pages say how many bosses are confirmed and which are waiting; the players list sets Hide apart from the name; item tooltips read "Shoulder, Cloth" (#1647).
 - Site: /changes, its feed and What's new list posts by the day each card shows, so a hotfix posted after midnight UTC sits with its own day; Newer and Older on a post page follow that order and skip the post's own same-title replies (#1643).
 - Site: armory characters stored without item levels show the game files' level for each item, and a ranked item level and Gear Score computed from them, each labelled (#1644).
 - Site: quest pages label the Warcraft Wiki blurb as such and show it once; instance facts read "Bosses confirmed: 7 of 8" and say why an entrance is still unconfirmed; item lists explain wiki names once above the table; map links no longer leave a stray ": Zone at x, y" line; the AH Ledger history panel says when AH Ledger's history is unavailable (#1645).
