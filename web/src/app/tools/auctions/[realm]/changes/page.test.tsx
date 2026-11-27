@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterAll, beforeEach, expect, test, vi } from "vitest";
 import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), boards: vi.fn(), live: vi.fn(), reportDates: vi.fn() }));
@@ -39,6 +39,10 @@ import MarketChangesPage, { generateMetadata } from "./page";
 import { boardsFromFile, buildMarketBoards, parseBoards } from "@/lib/market-boards";
 import * as auctionHouse from "@/lib/auction-house";
 
+// A fixed clock: the page's "today" and the expected days must match, even when the run crosses midnight UTC.
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
+afterAll(() => vi.useRealTimers());
 const now = new Date();
 const day = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString().slice(0, 10);
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000 - 60_000).toISOString();

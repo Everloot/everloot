@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, expect, test, vi } from "vitest";
 import LocalLedger, { STORAGE_KEY } from "./LocalLedger";
 
+// A fixed clock: "today" here and in the component must be the same day, even when the run crosses midnight UTC.
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
+afterAll(() => vi.useRealTimers());
 const today = new Date().toISOString().slice(0, 10);
 const LUA = `EverlootDB = {
   ["version"] = "0.2.6",
