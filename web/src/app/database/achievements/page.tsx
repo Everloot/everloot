@@ -55,14 +55,16 @@ export default async function AchievementListPage(props: { searchParams?: Promis
     : sort.key === "points" ? x.points : sort.key === "criteria" ? x.criteriaCount : x.achievementId;
   const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.achievementId), ranked, Boolean(q.sort));
   const { shown, pages, per } = paged(rows, q);
+  // Points show on a page (column and phone line alike) only where a row there has some.
+  const pointsShown = shown.some((x) => x.points > 0);
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
   const columns: SparseColumn<Listed<AchievementEntry>>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => <NameCell href={achievementHref(x.achievementId, x.name)} icon={assets?.achievementIcons.get(x.achievementId)}>{x.name}</NameCell> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
-    // The files give nearly every achievement 0 points (2 of 233): the column shows only on a page where a row has
-    // some, and a row with none is an empty cell there, not a column of dashes.
-    { key: "points", header: "Points", numeric: true, sortable: true, blank: (x) => !x.points, cell: (x) => x.points || null },
+    // The files give nearly every achievement 0 points (14 of 438): the column shows only on a page where a row has
+    // some, and there every row gives its points, 0 included, so a blank never reads as unknown.
+    { key: "points", header: "Points", numeric: true, sortable: true, blank: (x) => !x.points, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },
     { key: "confirmed", header: "Confirmed", cell: (x) => <ConfirmedCell entry={x} confirmations={confirmations} /> },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.achievementId },
@@ -110,7 +112,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
             rowKey={(x) => String(x.achievementId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => [x.category, x.points > 0 && plural(x.points, "point"), `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].filter(Boolean).join(" · ")}
+            meta={(x) => [x.category, pointsShown && plural(x.points, "point"), `${x.criteriaCount} criteria`, `ID ${x.achievementId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

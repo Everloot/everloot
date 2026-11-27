@@ -104,12 +104,13 @@ const unlisted = (id: number, name: string) => ["one", "two", "three"].map((i) =
   criteria: ["A", "B", "C"].map((t) => ({ text: `${t} by ${i}`, required: 1 })),
 }));
 
-test("a confirmed achievement whose criteria text nobody agreed on: the count is the players', the list is the game files'", async () => {
+test("a confirmed achievement whose criteria text nobody agreed on: the list shown is the game files', and the count is that list's", async () => {
   serve(unlisted(50, "Loremaster"));
   const out = await html("50-loremaster");
-  expect(out).toContain("An achievement in Quests, 10 points, 3 criteria.");
-  expect(factOf(out, "Criteria")).toBe("3");
-  expect(out).toContain("The category, points and criteria count are as three installs reported them; the criteria list is the game files&#x27; (build 1.15.8.70862), unconfirmed.");
+  // The count beside the list counts the list (the files' one criterion), never the installs' 3 next to one row.
+  expect(out).toContain("An achievement in Quests, 10 points, 1 criterion.");
+  expect(factOf(out, "Criteria")).toBe("1");
+  expect(out).toContain("The category and points are as three installs reported them; the criteria and their count are the game files&#x27; (build 1.15.8.70862), unconfirmed.");
   expect(out).not.toContain("and so is the criteria list");
   // The list on the page is the files' one criterion, not the three the installs sent.
   expect(out).toContain("Elwynn");
@@ -200,4 +201,13 @@ test("one point reads as one point, in the box and in short", async () => {
   const out = await html("900-lone-step");
   expect(out).toMatch(/<p>1 point<\/p>/);
   expect(out).toContain("An achievement, 1 point, 0 criteria.");
+});
+
+test("a raid kill installs report with 0 criteria counts the one criterion the files list (Conqueror of the Lair)", async () => {
+  game.achievements = { ...game.achievements, "684": { title: "Conqueror of the Lair", points: 1, criteria: [{ text: "Onyxia" }] } };
+  serve(from(3, { achievementId: 684, name: "Conqueror of the Lair", categoryId: 4, category: "Raids", points: 1, criteriaCount: 0, criteria: [] }));
+  const out = await html("684-conqueror-of-the-lair");
+  expect(out).toContain("Onyxia");
+  expect(factOf(out, "Criteria")).toBe("1");
+  expect(out).toContain("An achievement in Raids, 1 point, 1 criterion.");
 });

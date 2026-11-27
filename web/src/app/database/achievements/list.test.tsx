@@ -74,6 +74,15 @@ test("on a phone the overview folds behind a disclosure; rows say 1 point, not 1
   expect(out).not.toMatch(/(?<!\d)1 points\b/);
 });
 
+test("a page where some achievements have points gives every row its points, 0 included, so a blank never reads as unknown", async () => {
+  const out = await html();
+  const row = (name: string) => out.split("<tr").find((r) => r.includes(`>${name}<`)) ?? "";
+  // The files give Conqueror of the Lair 1 point and the Explore achievements none.
+  expect(row("Conqueror of the Lair")).toMatch(/Raids · 1 point · /);
+  expect(row("Explore Dun Morogh")).toMatch(/Eastern Kingdoms · 0 points · 18 criteria/);
+  expect(row("Explore Dun Morogh")).toMatch(/<td class="dt-td dt-num[^"]*">0<\/td>/);
+});
+
 test("a page whose achievements have no points leaves the Points column out, and says \"0 points\" nowhere", async () => {
   const out = await html({ category: "Eastern Kingdoms" });
   expect(out).toContain("Explore Dun Morogh");

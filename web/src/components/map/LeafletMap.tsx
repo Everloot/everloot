@@ -250,7 +250,8 @@ export default function LeafletMap(props: LeafletMapProps) {
       else { now.onSelect(null); now.onPoint(x, y); }
     });
 
-    const observer = new ResizeObserver(() => m.invalidateSize());
+    // A box with no size (a tab switch hiding the map) has no view to keep: wait for it to have one again.
+    const observer = new ResizeObserver(() => { if (el.clientWidth && el.clientHeight) m.invalidateSize(); });
     observer.observe(el);
     relabel.current();
     resync.current();

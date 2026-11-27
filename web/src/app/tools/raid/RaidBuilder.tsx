@@ -546,7 +546,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
                           onClick={() => pickSlot(index)}
                           onPointerDown={slot ? startDrag({ kind: "slot", index }) : undefined}
                           onDragStart={(e) => e.preventDefault()}
-                          className={`flex h-9 w-full min-w-0 items-center gap-2 rounded-control border px-2 text-left transition-colors ${draggable} ${
+                          className={`flex min-h-9 w-full min-w-0 items-center gap-2 rounded-control border px-2 py-1 text-left transition-colors ${draggable} ${
                             slot
                               ? `border-l-4 bg-canvas ${CLASS_BORDER[slot.class]} cursor-grab ${selected === index ? "border-accent" : "border-edge hover:border-fg-2"}`
                               : `border-dashed ${selected === index ? "border-accent" : "border-edge hover:border-fg-2"}`
@@ -555,7 +555,8 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
                           {slot ? (
                             <>
                               {classIcon(slot.class, 20, "")}
-                              <span className="min-w-0 truncate text-cell">
+                              {/* The tree wraps under the class rather than being cut ("Retribution" in a phone's column). */}
+                              <span className="min-w-0 text-cell leading-tight [overflow-wrap:anywhere]">
                                 <span className={`font-medium ${CLASS_TEXT[slot.class]}`}>{titleCase(slot.class)}</span>{" "}
                                 <span className="text-cell-2 text-fg-2">{treeName}</span>
                               </span>
@@ -686,7 +687,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
           <p className="text-meta text-fg-2">Nothing missing.</p>
         ) : (
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5">
-            <h3 id="raid-missing" className="text-meta font-medium text-fg">Missing ({missing.length})</h3>
+            <h3 id="raid-missing" className="text-meta font-medium text-fg">Missing buffs and debuffs ({missing.length})</h3>
             <ul aria-labelledby="raid-missing" data-raid-missing className="flex flex-wrap items-center gap-1.5">
               {missing.slice(0, MISSING_SHOWN).map((m) => <li key={m.id}><Badge tone="neutral">{m.label}</Badge></li>)}
             </ul>

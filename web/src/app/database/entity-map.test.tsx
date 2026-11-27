@@ -52,6 +52,20 @@ test("the map draws each position on the zone's art, lazily, with a legend of th
   expect(out).not.toContain("data-zone-switcher");
 });
 
+test("rarer kinds are drawn after the plain NPC and place pins, so a vendor next to NPCs stays on top", () => {
+  const zones = entityMapZones([
+    mark(1436, 52, 47, { kind: "vendor", label: "Quartermaster" }),
+    mark(1436, 52, 47.5),
+    mark(1436, 51, 48, { kind: "place", agreed: false }),
+    mark(1436, 52, 46, { kind: "flight", agreed: false }),
+  ], [art(1436)]);
+  const out = renderToStaticMarkup(<EntityMap name="Westfall" zones={zones} />);
+  const drawn = [...out.matchAll(/data-mark="(\w+)"/g)].map((m) => m[1]).slice(0, 4);
+  expect(drawn).toEqual(["place", "npc", "vendor", "flight"]);
+  // Each pin still names itself on hover.
+  expect(out).toContain('title="Quartermaster · 52, 47"');
+});
+
 test("positions in several zones get a zone switcher, the first zone shown", () => {
   const zones = entityMapZones([mark(1429, 40, 60), mark(1436, 10, 20)], [art(1429), art(1436)]);
   const out = renderToStaticMarkup(<EntityMap name="Guard Thomas" zones={zones} />);

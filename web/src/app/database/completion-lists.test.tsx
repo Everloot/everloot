@@ -131,6 +131,25 @@ test("factions list shows base entries unconfirmed when the rollup is null", asy
   expect(out).not.toContain("unreachable");
 });
 
+test("profession specialisations are grouped apart from the reputations, under their own heading", async () => {
+  game.factions = [
+    { id: 72, name: "Stormwind", shown: true }, { id: 46, name: "Blacksmithing - Armorsmithing", shown: true },
+    { id: 551, name: "Engineering - Gnome", shown: true }, { id: 549, name: "Leatherworking - Tribal", shown: true },
+  ];
+  store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
+  const out = await html(FactionList(search()));
+  // The reputation table: Stormwind alone, and its count says so.
+  const table = out.split("data-specialisations")[0]!;
+  expect(linked(table, "factions")).toEqual(["72-stormwind"]);
+  expect(table).toContain("Factions in the game files: 1");
+  const specs = out.split("data-specialisations")[1] ?? "";
+  expect(specs).toContain(">Profession specialisations<");
+  for (const slug of ["46-blacksmithing-armorsmithing", "549-leatherworking-tribal", "551-engineering-gnome"]) expect(specs, slug).toContain(`href="/database/factions/${slug}"`);
+  // A search for one finds it in its group.
+  const found = await html(FactionList(search({ q: "gnome" })));
+  expect(found.split("data-specialisations")[1]).toContain('href="/database/factions/551-engineering-gnome"');
+});
+
 test("an agreed faction shows as confirmed and keeps the rollup's header", async () => {
   game.factions = [{ id: 69, name: "Darnassus (base)", shown: true }, { id: 72, name: "Stormwind", shown: true }];
   const out = await html(FactionList(search()));

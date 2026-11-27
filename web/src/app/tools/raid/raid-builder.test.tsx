@@ -306,7 +306,23 @@ test("the Missing count is the buffs and debuffs the summary calls missing, adde
   const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
   const buffs = Number(/(\d+) missing\.\s*Debuffs/.exec(note)?.[1]);
   const debuffs = Number(/Debuffs: \d+ of \d+, (\d+) missing/.exec(note)?.[1]);
-  const header = Number(/Missing \((\d+)\)/.exec(container.querySelector("#raid-missing")!.textContent!)?.[1]);
+  // The heading names both kinds, so it never reads as more buffs missing than the summary's count.
+  const heading = container.querySelector("#raid-missing")!.textContent!;
+  expect(heading).toMatch(/^Missing buffs and debuffs \(\d+\)$/);
+  const header = Number(/\((\d+)\)/.exec(heading)?.[1]);
   expect(Number.isNaN(debuffs)).toBe(false);
   expect(buffs + debuffs).toBe(header);
+});
+
+test("a slot's class and tree wrap instead of being cut, so a long tree name reads in full on a phone", async () => {
+  await render();
+  await dragTo(tile("Paladin"), slot(0));
+  await click(slot(0));
+  const picker = container.querySelector('[role="group"][aria-label="Pick for group 1, slot 1"]')!;
+  await click([...picker.querySelectorAll('[aria-label="Talent tree"] button')][3]!);
+  const button = slot(0);
+  expect(button.textContent).toContain("Retribution");
+  // No fixed height or one-line cut on the slot or its label.
+  expect(button.className).not.toMatch(/(?:^|\s)h-9(?:\s|$)/);
+  expect(button.querySelector(".truncate")).toBeNull();
 });
