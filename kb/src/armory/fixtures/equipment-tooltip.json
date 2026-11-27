@@ -1,0 +1,514 @@
+{
+  "equipped_items": [
+    {
+      "item": {
+        "id": 226884
+      },
+      "slot": {
+        "type": "SHOULDER",
+        "name": "Shoulders"
+      },
+      "quantity": 1,
+      "context": 11,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Beastmaster's Mantle",
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "inventory_type": {
+        "type": "SHOULDER",
+        "name": "Shoulder"
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "armor": {
+        "value": 286,
+        "display": {
+          "display_string": "286 Armor"
+        }
+      },
+      "stats": [
+        {
+          "type": {
+            "type": "INTELLECT",
+            "name": "Intellect"
+          },
+          "value": 12,
+          "display": {
+            "display_string": "+12 Intellect"
+          }
+        },
+        {
+          "type": {
+            "type": "AGILITY",
+            "name": "Agility"
+          },
+          "value": 13,
+          "display": {
+            "display_string": "+13 Agility"
+          }
+        },
+        {
+          "type": {
+            "type": "STAMINA",
+            "name": "Stamina"
+          },
+          "value": 18,
+          "display": {
+            "display_string": "+18 Stamina"
+          }
+        }
+      ],
+      "sell_price": {
+        "value": 27739,
+        "display_strings": {
+          "header": "Sell Price:",
+          "gold": "2",
+          "silver": "77",
+          "copper": "39"
+        }
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      },
+      "set": {
+        "item_set": {
+          "name": "Beastmaster Armor",
+          "id": 1669
+        },
+        "items": [
+          {
+            "item": {
+              "name": "Beastmaster's Treads",
+              "id": 226881
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Chest",
+              "id": 226904
+            }
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Gauntlets",
+              "id": 226883
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Helm",
+              "id": 226901
+            }
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Pants",
+              "id": 226882
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Mantle",
+              "id": 226884
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Belt",
+              "id": 226888
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Bindings",
+              "id": 226885
+            },
+            "is_equipped": true
+          }
+        ],
+        "effects": [
+          {
+            "display_string": "Set: +8 All Resistances.",
+            "required_count": 2,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: Restores 8 mana per 5 sec.",
+            "required_count": 3,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: Your melee and ranged autoattacks have a 5% chance to energize you for 200 mana.",
+            "required_count": 4,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: When struck in combat, has a 8% chance to remove a Root effect from yourself. Can only occur once every 60 sec.",
+            "required_count": 5,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: +40 Attack Power.",
+            "required_count": 6,
+            "is_active": true
+          }
+        ],
+        "display_string": "Beastmaster Armor (6/8)"
+      },
+      "durability": {
+        "value": 70,
+        "display_string": "Durability 70 / 70"
+      }
+    },
+    {
+      "item": {
+        "id": 18520
+      },
+      "enchantments": [
+        {
+          "display_string": "Enchanted: Agility +15",
+          "source_item": {
+            "name": "Enchant 2H Weapon - Lesser Agility",
+            "id": 273617
+          },
+          "enchantment_id": 2618,
+          "enchantment_slot": {
+            "id": 0,
+            "type": "PERMANENT"
+          }
+        }
+      ],
+      "slot": {
+        "type": "MAIN_HAND",
+        "name": "Main Hand"
+      },
+      "quantity": 1,
+      "context": 1,
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Barbarous Blade",
+      "item_class": {
+        "name": "Weapon",
+        "id": 2
+      },
+      "item_subclass": {
+        "name": "Sword",
+        "id": 8
+      },
+      "inventory_type": {
+        "type": "TWOHWEAPON",
+        "name": "Two-Hand"
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "weapon": {
+        "damage": {
+          "min_value": 138,
+          "max_value": 207,
+          "display_string": "138 - 207 Damage",
+          "damage_class": {
+            "type": "PHYSICAL",
+            "name": "Physical"
+          }
+        },
+        "attack_speed": {
+          "value": 3200,
+          "display_string": "Speed 3.20"
+        },
+        "dps": {
+          "value": 53.90625,
+          "display_string": "(53.9 damage per second)"
+        }
+      },
+      "stats": [
+        {
+          "type": {
+            "type": "CRIT_RATING",
+            "name": "Critical Strike"
+          },
+          "value": 14,
+          "is_equip_bonus": true,
+          "display": {
+            "display_string": "+14 Critical Strike"
+          }
+        },
+        {
+          "type": {
+            "type": "ATTACK_POWER",
+            "name": "Attack Power"
+          },
+          "value": 50,
+          "is_equip_bonus": true,
+          "display": {
+            "display_string": "+50 Attack Power"
+          }
+        },
+        {
+          "type": {
+            "type": "BONUS_STAT_ATTACK_POWER_VS_HUMANOID,",
+            "name": "Attack Power Vs Humanoids"
+          },
+          "value": 33,
+          "is_equip_bonus": true,
+          "display": {
+            "display_string": "+33 Attack Power Vs Humanoids"
+          }
+        }
+      ],
+      "sell_price": {
+        "value": 71978,
+        "display_strings": {
+          "header": "Sell Price:",
+          "gold": "7",
+          "silver": "19",
+          "copper": "78"
+        }
+      },
+      "requirements": {
+        "level": {
+          "value": 58,
+          "display_string": "Requires Level 58"
+        }
+      },
+      "durability": {
+        "value": 100,
+        "display_string": "Durability 100 / 100"
+      }
+    },
+    {
+      "item": {
+        "id": 226881
+      },
+      "enchantments": [
+        {
+          "display_string": "Enchanted: Agility +7",
+          "source_item": {
+            "name": "Enchant Boots - Greater Agility",
+            "id": 273556
+          },
+          "enchantment_id": 1887,
+          "enchantment_slot": {
+            "id": 0,
+            "type": "PERMANENT"
+          }
+        }
+      ],
+      "slot": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "quantity": 1,
+      "context": 11,
+      "quality": {
+        "type": "EPIC",
+        "name": "Epic"
+      },
+      "name": "Beastmaster's Treads",
+      "item_class": {
+        "name": "Armor",
+        "id": 4
+      },
+      "item_subclass": {
+        "name": "Mail",
+        "id": 3
+      },
+      "inventory_type": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "binding": {
+        "type": "ON_ACQUIRE",
+        "name": "Binds when picked up"
+      },
+      "armor": {
+        "value": 266,
+        "display": {
+          "display_string": "266 Armor"
+        }
+      },
+      "stats": [
+        {
+          "type": {
+            "type": "INTELLECT",
+            "name": "Intellect"
+          },
+          "value": 7,
+          "display": {
+            "display_string": "+7 Intellect"
+          }
+        },
+        {
+          "type": {
+            "type": "AGILITY",
+            "name": "Agility"
+          },
+          "value": 24,
+          "display": {
+            "display_string": "+24 Agility"
+          }
+        },
+        {
+          "type": {
+            "type": "STAMINA",
+            "name": "Stamina"
+          },
+          "value": 13,
+          "display": {
+            "display_string": "+13 Stamina"
+          }
+        }
+      ],
+      "spells": [
+        {
+          "spell": {
+            "name": "Increased Pet Damage +3%",
+            "id": 27206
+          },
+          "description": "Equip: Increases damage dealt by your pet by 3%."
+        }
+      ],
+      "sell_price": {
+        "value": 30856,
+        "display_strings": {
+          "header": "Sell Price:",
+          "gold": "3",
+          "silver": "8",
+          "copper": "56"
+        }
+      },
+      "requirements": {
+        "playable_classes": {
+          "links": [
+            {
+              "name": "Hunter",
+              "id": 3
+            }
+          ],
+          "display_string": "Classes: Hunter"
+        }
+      },
+      "set": {
+        "item_set": {
+          "name": "Beastmaster Armor",
+          "id": 1669
+        },
+        "items": [
+          {
+            "item": {
+              "name": "Beastmaster's Treads",
+              "id": 226881
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Chest",
+              "id": 226904
+            }
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Gauntlets",
+              "id": 226883
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Helm",
+              "id": 226901
+            }
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Pants",
+              "id": 226882
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Mantle",
+              "id": 226884
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Belt",
+              "id": 226888
+            },
+            "is_equipped": true
+          },
+          {
+            "item": {
+              "name": "Beastmaster's Bindings",
+              "id": 226885
+            },
+            "is_equipped": true
+          }
+        ],
+        "effects": [
+          {
+            "display_string": "Set: +8 All Resistances.",
+            "required_count": 2,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: Restores 8 mana per 5 sec.",
+            "required_count": 3,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: Your melee and ranged autoattacks have a 5% chance to energize you for 200 mana.",
+            "required_count": 4,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: When struck in combat, has a 8% chance to remove a Root effect from yourself. Can only occur once every 60 sec.",
+            "required_count": 5,
+            "is_active": true
+          },
+          {
+            "display_string": "Set: +40 Attack Power.",
+            "required_count": 6,
+            "is_active": true
+          }
+        ],
+        "display_string": "Beastmaster Armor (6/8)"
+      },
+      "durability": {
+        "value": 70,
+        "display_string": "Durability 70 / 70"
+      }
+    }
+  ]
+}

@@ -215,7 +215,7 @@ export default async function ArmoryComparePage(props: { searchParams: Promise<S
   const ranksOf = (c: ArmoryCharacter | null) => (c ? armoryStore().rank(c.region, c.slug).then((r) => rankBadges(c, r)).catch(() => []) : Promise.resolve([]));
   const [ra, rb] = await Promise.all([ranksOf(a), ranksOf(b)]);
   const assets = await loadSiteAssets().catch(() => null);
-  const tips = await loadEquippedTips(assets, [...(a?.equipment ?? []), ...(b?.equipment ?? [])]);
+  const tips = await loadEquippedTips(assets, [...(a?.equipment ?? []), ...(b?.equipment ?? [])], undefined, true);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;
   const keep = a ?? b;
   const q = (first(s.q) ?? "").trim().slice(0, 40);

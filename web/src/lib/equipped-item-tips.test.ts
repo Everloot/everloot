@@ -67,3 +67,45 @@ test("no asset files or private bucket: no cards", async () => {
   expect((await loadEquippedTips(null, [{ itemId: 30, name: "Witchblade", quality: "EPIC" }], store())).size).toBe(0);
   expect((await loadEquippedTips(parseSiteManifest(siteManifest, BASE), [{ itemId: 30, name: "Witchblade", quality: "EPIC" }], null)).size).toBe(0);
 });
+
+// Beastmaster's Mantle as Blizzard's Forever API sent it on 2026-11-27, shortened to two pieces and two bonuses.
+const mantle = {
+  binding: "Binds when picked up", slot: "Shoulder", kind: "Mail", armor: 286, stats: ["+12 Intellect", "+13 Agility"],
+  bonus_stats: ["+14 Critical Strike"], effects: ["Equip: Increases damage dealt by your pet by 3%."],
+  set: {
+    name: "Beastmaster Armor",
+    pieces: [{ name: "Beastmaster's Mantle", equipped: true }, { name: "Beastmaster's Chest", equipped: false }],
+    bonuses: [{ text: "Set: +8 All Resistances.", count: 2, active: false }, { text: "Set: +40 Attack Power.", count: 6, active: false }],
+  },
+};
+
+test("QA round 5: on armory pages the gear card is built from the lines Blizzard sent: item level, armor, stats, Equip lines and set", async () => {
+  const assets = parseSiteManifest(siteManifest, BASE)!;
+  const tips = await loadEquippedTips(assets, [{ itemId: 30, name: "Beastmaster's Mantle", quality: "RARE", level: 65, tip: mantle }], store(), true);
+  expect(tips.get(30)).toMatchObject({
+    name: "Beastmaster's Mantle", quality: "Rare", icon: `${BASE}/icons/135661.webp`, partial: false, level: 65,
+    lines: [
+      "Item Level 65", "Binds when picked up", "Shoulder · Mail", "286 Armor", "+12 Intellect", "+13 Agility",
+      "Equip: +14 Critical Strike", "Equip: Increases damage dealt by your pet by 3%.",
+      "Beastmaster Armor (1/2)", "  Beastmaster's Mantle", "  Beastmaster's Chest", "(2) Set: +8 All Resistances.", "(6) Set: +40 Attack Power.",
+    ],
+    label: "From Blizzard's API · icon found in game files, unconfirmed · build 1.60.1.70450",
+  });
+  // The game files' own tooltip gives way to Blizzard's lines on an armory page, and stays everywhere else.
+  const withFiles = await loadEquippedTips(assets, [{ itemId: 9, name: "Linen Cloth", quality: "COMMON", level: 5, tip: mantle }], store(), true);
+  expect(withFiles.get(9)?.label).toMatch(/^From Blizzard's API/);
+  const elsewhere = await loadEquippedTips(assets, [{ itemId: 9, name: "Linen Cloth", quality: "COMMON", level: 5, tip: mantle }], store());
+  expect(elsewhere.get(9)?.label).not.toMatch(/Blizzard/);
+});
+
+test("an item with only an icon in the files shows the item level the armory read", async () => {
+  const tips = await loadEquippedTips(parseSiteManifest(siteManifest, BASE)!, [{ itemId: 35, name: "Bent Staff", quality: "COMMON", level: 12 }], store());
+  expect(tips.get(35)?.lines).toEqual(["Item Level 12", "Staves", "Two-Hand"]);
+});
+
+test("without the asset files Blizzard's lines still give an armory gear card, with no icon", async () => {
+  const tips = await loadEquippedTips(null, [{ itemId: 30, name: "Beastmaster's Mantle", quality: "RARE", level: 65, tip: mantle }], store(), true);
+  expect(tips.get(30)).toMatchObject({ icon: null, label: "From Blizzard's API", partial: false });
+  expect(tips.get(30)?.lines).toContain("286 Armor");
+  expect((await loadEquippedTips(null, [{ itemId: 30, name: "Beastmaster's Mantle", quality: "RARE", tip: mantle }], store())).size).toBe(0);
+});

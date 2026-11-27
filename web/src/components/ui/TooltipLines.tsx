@@ -1,8 +1,8 @@
 import { CoinText } from "./Coins";
 import { gameOrder, tipLine, type TipLine } from "@/lib/tip-line";
 
-/** A set's name over its pieces (lib/item-tooltip.ts), "Name (0/8)". */
-const SET_HEAD = / \(0\/\d+\)$/;
+/** A set's name over its pieces (lib/item-tooltip.ts), "Name (0/8)"; on an armory gear card the pieces worn, "Name (6/8)". */
+const SET_HEAD = / \(\d+\/\d+\)$/;
 /** The mark withReported puts after a number fewer than 3 installs reported. */
 const UNCONFIRMED_MARK = / (\(unconfirmed, seen by \d+ players?\))$/;
 

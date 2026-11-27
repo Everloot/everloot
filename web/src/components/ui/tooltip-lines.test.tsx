@@ -108,6 +108,12 @@ describe("item tooltip lines", () => {
     expect(tipLine("10 - 20 Fire Damage · Speed 1.80")).toEqual({ kind: "pair", left: "10 - 20 Fire Damage", right: "Speed 1.80" });
   });
 
+  test("a set heading with the pieces a character wears counted (an armory gear card) is yellow, with the game's gap above", () => {
+    expect(tipLine("Beastmaster Armor (6/8)")).toEqual({ kind: "yellow", text: "Beastmaster Armor (6/8)" });
+    const root = card(["286 Armor", "Beastmaster Armor (6/8)", "  Beastmaster's Mantle"]);
+    expect(row(root, "Beastmaster Armor").className).toBe("mt-2 text-tip-yellow");
+  });
+
   test("a spell card's cost and range, and cast time and cooldown, sit in two columns as the game draws them", () => {
     expect(tipLine("320 Mana · 30 yd range")).toEqual({ kind: "pair", left: "320 Mana", right: "30 yd range" });
     expect(tipLine("35 Rage · Melee Range")).toEqual({ kind: "pair", left: "35 Rage", right: "Melee Range" });

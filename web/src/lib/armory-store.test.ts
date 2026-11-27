@@ -109,6 +109,14 @@ describe("the Supabase store", () => {
     expect(c!.equipment).toEqual([{ slot: "HEAD", itemId: 16846, name: "Giantstalker's Helmet", level: 66, quality: "EPIC", inventoryType: "HEAD" }]);
   });
 
+  test("an item's tooltip lines come through; tooltip lines of another shape are dropped, the item kept", async () => {
+    const tip = { binding: "Binds when picked up", slot: "Head", kind: "Mail", armor: 286, stats: ["+13 Agility"] };
+    const item = stored.equipment[0];
+    const c = await fake([{ ...stored, equipment: [{ ...item, tip }, { ...item, slot: "NECK", tip: { stats: "broken" } }] }]).store.character("eu", "velkara-duskmantle");
+    expect(c!.equipment[0]!.tip).toEqual(tip);
+    expect(c!.equipment[1]).toEqual({ slot: "NECK", itemId: 16846, name: "Giantstalker's Helmet", level: 66, quality: "EPIC", inventoryType: "HEAD" });
+  });
+
   test("an answer of another shape is an error, never a page of undefined", async () => {
     const { name: _name, ...noName } = stored;
     for (const bad of [[noName], [{ ...stored, level: "sixty" }], [{ ...stored, equipment: [{ name: "no slot" }] }], [{ ...stored, fetched_at: null }], { rows: [] }, null]) {
