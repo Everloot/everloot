@@ -184,8 +184,7 @@ name is shown only when three installs report the same one; otherwise it is "Obj
 install's reports, labelled *reported by 1 player*, *verified by 2 players* or *confirmed by N players*
 at three or more distinct installs. Three remains the bar for confirmed. A drop source's name appears
 from one install's name report when every counted name report agrees exactly; disagreeing reports show
-no name, unless 3 distinct installs agree on one name under the usual name rule: the source then shows
-that confirmed name, as its own page does. Names carry their own reported, verified or confirmed tier, with confirmed names first.
+no name. Names carry their own reported, verified or confirmed tier, with confirmed names first.
 Recheck cutoffs still apply to rates and names. The trusted-install / Everloot's own install exception
 does not raise a tier: one own install is still reported. Only counts and tiers are public, never install
 ids. The site, drop API and bulk drop exports show these tiers; the Desktop App carries each rate's tier

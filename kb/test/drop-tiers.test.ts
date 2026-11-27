@@ -13,17 +13,10 @@ test.each([1, 2, 3, 4])("%i distinct installs set the tier without promoting con
   expect(publicDropRate(rate)).not.toHaveProperty("units");
 });
 
-test("drop names short of 3 agreeing installs require unanimity", () => {
-  const rows = ["fixture-a", "fixture-b"].map((installId) => ({ id: 7001, installId, label: "Fixture Source" }));
+test("drop names require unanimity even when a majority is confirmed", () => {
+  const rows = ["fixture-a", "fixture-b", "fixture-c"].map((installId) => ({ id: 7001, installId, label: "Fixture Source" }));
   expect(agreedLabelsById(rows.slice(0, 1), undefined, true).get(7001)).toEqual({ name: "Fixture Source", tier: "reported" });
   expect(agreedLabelsById([...rows, { id: 7001, installId: "fixture-d", label: "Fixture Other" }], undefined, true).has(7001)).toBe(false);
-});
-
-test("a drop source keeps the name 3 installs agree on when another install disagrees, as its own page shows it", () => {
-  const rows = ["fixture-a", "fixture-b", "fixture-c"].map((installId) => ({ id: 7001, installId, label: "Fixture Source" }));
-  const split = [...rows, { id: 7001, installId: "fixture-d", label: "Fixture Other" }];
-  expect(agreedLabelsById(split, undefined, true).get(7001)).toEqual({ name: "Fixture Source", tier: "confirmed" });
-  expect(agreedLabelsById(split, undefined, true).get(7001)?.name).toBe(agreedLabelsById(split).get(7001));
 });
 
 test("repeated own-install reports stay reported and confirmed names come first", () => {

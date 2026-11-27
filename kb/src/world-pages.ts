@@ -165,8 +165,7 @@ function agreedLabel(rows: (Timed & { label: string })[], since?: string | null)
 
 /**
  * `agreedLabel` for many ids in one pass: id -> the label 3 installs agree on, ids without one left out. `sinceOf`
- * gives an id's recheck cut-off. Drop names require unanimous counted reports from one install upward, unless 3
- * installs agree on one name, which is then confirmed.
+ * gives an id's recheck cut-off. Drop names require unanimous counted reports from one install upward.
  */
 export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf: ((id: number) => string | null) | undefined, publicDrops: true): Map<number, DropSourceName>;
 export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null, publicDrops?: false): Map<number, string>;
@@ -185,11 +184,6 @@ export function agreedLabelsById(rows: (Timed & { id: number; label: string })[]
       const names = new Set(named.map((r) => r.label));
       const reporters = new Set(named.map((r) => r.installId.trim())).size;
       if (names.size === 1 && reporters > 0) out.set(id, { name: named[0]!.label, tier: dropTier(reporters) });
-      else {
-        // A name 3 installs agree on is the source's name on every page, its own included; a dissenting install does not hide it.
-        const label = agreedLabel(list, since);
-        if (label) out.set(id, { name: label, tier: "confirmed" });
-      }
     } else {
       const label = agreedLabel(list, since);
       if (label) out.set(id, label);
