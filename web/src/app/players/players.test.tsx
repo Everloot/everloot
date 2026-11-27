@@ -137,12 +137,12 @@ describe("player directory", () => {
     expect(table).toContain('class="dt-meta"');
   });
 
-  test("a full page of 50 profiles stays light: under 760 bytes of markup a row (1,059 before)", async () => {
+  test("a full page of 50 profiles stays light: under 780 bytes of markup a row (1,059 before; the phone line now names the guild)", async () => {
     for (let i = 0; i < 50; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, name: "Quill", surname: `Venn${i}`, gearScore: i }));
     const html = await page({ sort: "level" });
     const body = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
     expect(body.match(/<tr /g)).toHaveLength(50);
-    expect(body.length / 50).toBeLessThan(760);
+    expect(body.length / 50).toBeLessThan(780);
   });
 
   test("the sort menu names the chosen order once", async () => {
@@ -359,5 +359,44 @@ describe("one list from the addon and the armory", () => {
     const html = await search("thr");
     expect(html).toContain(STORAGE_UNREACHABLE);
     expect(html).toContain('href="/characters/forever/forever-pioneer/thrallina"');
+  });
+});
+
+describe("QA round 1: the directory's races, labels and phone line", () => {
+  beforeEach(() => { on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); });
+  const page = async (params: Record<string, string> = {}) => {
+    const { default: Players } = await import("./page");
+    return renderToStaticMarkup(await Players({ searchParams: Promise.resolve(params) }));
+  };
+  const results = (html: string) => html.slice(html.indexOf('id="player-results"'), html.indexOf('id="players-recent"') >>> 0);
+
+  test("the race menu offers the two Skyborne races as Blizzard stores them, and each filter finds its characters", async () => {
+    armory.putCharacter(armoryCharacter({ slug: "gang-jubaster", name: "Gang", surname: "Jubaster", race: "Windshaper Skyborne", raceId: 96, class: "Rogue" }));
+    armory.putCharacter(armoryCharacter({ slug: "sora-vel", name: "Sora", surname: "Vel", race: "High Order Skyborne", raceId: 95, class: "Mage", faction: "Alliance" }));
+    const html = await page();
+    expect(html).toContain('href="/players?race=Windshaper+Skyborne"');
+    expect(html).toContain('href="/players?race=High+Order+Skyborne"');
+    expect(html).not.toContain('href="/players?race=Skyborne"');
+    const horde = results(await page({ race: "Windshaper Skyborne" }));
+    expect(horde).toContain('href="/armory/eu/gang-jubaster"');
+    expect(horde).not.toContain("sora-vel");
+    expect(results(await page({ race: "high order skyborne" }))).toContain('href="/armory/eu/sora-vel"');
+  });
+
+  test("a disbanded guild, no guild and unread gear say so in words", async () => {
+    armory.putCharacter(armoryCharacter({ slug: "old-oath", name: "Old", surname: "Oath", guildName: "DELETED", guildSlug: null }));
+    armory.putCharacter(armoryCharacter({ slug: "lone-wolf", name: "Lone", surname: "Wolf", guildName: null, guildSlug: null, itemLevel: null, gearScore: null }));
+    const html = results(await page());
+    expect(html).toContain("Guild disbanded");
+    expect(html).not.toContain(">DELETED<");
+    expect(html).toContain("No guild");
+    expect(html).not.toContain("None seen");
+    expect(html).toContain("Gear not read yet");
+    expect(html).not.toContain(">Not read<");
+  });
+
+  test("the phone line names the guild too", async () => {
+    armory.putCharacter(armoryCharacter());
+    expect(results(await page())).toMatch(/class="dt-meta">[^<]*Ember Wardens/);
   });
 });

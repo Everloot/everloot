@@ -7,7 +7,7 @@ import ItemTip from "@/components/game/ItemTip";
 import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
-import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, rankText, slotLabel, type ArmoryMetric } from "@/lib/armory";
+import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, rankable, rankText, slotLabel, type ArmoryMetric } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import type { PlayHistoryRankedKey } from "@kb/armory/details";
@@ -182,7 +182,8 @@ export function PlayHistoryView({ history, ranks = [] }: { history: NonNullable<
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {PLAY_HISTORY_METRICS.map((m) => {
         const value = history.ranked[HISTORY_COUNT[m]];
-        const rank = ranks.find((r) => r.metric === m);
+        // A count of 0 would only share the last place, so it shows without a rank.
+        const rank = rankable(value) ? ranks.find((r) => r.metric === m) : undefined;
         return <div key={m}>
           <dt className="text-meta text-muted">{ARMORY_BOARDS[m].title}</dt>
           <dd className="font-mono text-lg tabular-nums text-fg">{value === undefined ? <span className="text-fg-2">Not read</span> : metricValue(m, value)}</dd>

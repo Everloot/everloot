@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
-import { CENSUS_CLASSES, CENSUS_RACES } from "@kb/census";
+import { CENSUS_CLASSES } from "@kb/census";
 import {
-  ARMORY_HIDE_PATH, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryNameQuery, armoryOn,
+  ARMORY_HIDE_PATH, ARMORY_RACES, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryNameQuery, armoryOn,
   classTokenOfName, metricValue, regionLabel,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow, type ArmoryDirectoryRow } from "@/lib/armory-store";
+import { isDisbandedGuild } from "@/lib/armory-guilds";
 import {
   activeDirectoryFilters, levelBandOf, PLAYER_LEVEL_BANDS, PLAYER_SORTS, playerDirectoryQuery, playerDirectoryHref, type PlayerDirectoryQuery, type PlayerSearchParams,
 } from "@/lib/armory-directory";
@@ -46,6 +47,10 @@ type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
 // Numeric cells already set figures in mono (dt-num), so a day there is plain text.
 const day = (iso: string | undefined | null) => iso?.slice(0, 10) ?? "";
+/** A read character whose gear the crawler has not read yet. */
+const GEAR_NOT_READ = "Gear not read yet";
+/** The guild as words: Blizzard names a disbanded guild "DELETED". */
+const guildWords = (guild: string | null) => guild === null ? "No guild" : isDisbandedGuild(guild) ? "Guild disbanded" : guild;
 
 /**
  * The class icon and the name in its class colour, linking the character's one page (the armory's when it has one),
@@ -81,10 +86,10 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
     { key: "race", header: "Race", nowrap: true, cell: (r) => raceName(r.race) },
     {
       key: "guild", header: "Guild",
-      cell: (r) => r.guild === null ? muted("None seen") : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
+      cell: (r) => r.guild === null || isDisbandedGuild(r.guild) ? muted(guildWords(r.guild)) : guildHref && r.sources.includes("armory") ? <Link href={guildHref(r.guild)} className={link}>{r.guild}</Link> : r.guild,
     },
-    { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted("Not read") : metricValue("item-level", r.itemLevel) },
-    { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted("Not read") : metricValue("gear-score", r.gearScore) },
+    { key: "item", header: "Item level", numeric: true, sortable: true, armory: true, cell: (r) => r.itemLevel == null ? muted(GEAR_NOT_READ) : metricValue("item-level", r.itemLevel) },
+    { key: "gear", header: "Gear score", numeric: true, sortable: true, armory: true, cell: (r) => r.gearScore == null ? muted(GEAR_NOT_READ) : metricValue("gear-score", r.gearScore) },
     { key: "realm", header: "Realm", nowrap: true, cell: (r) => (r.region ? <><RegionChip region={r.region} /> {r.ruleset}</> : r.where) },
     { key: "seen", header: guildHref ? "Last read" : "Last seen", numeric: true, sortable: true, cell: (r) => day(r.fetchedAt ?? r.lastSeen) },
   ];
@@ -93,7 +98,7 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
 
 /** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${r.gearScore == null ? "" : ` · GS ${metricValue("gear-score", r.gearScore)}`}${r.itemLevel == null ? "" : ` · ilvl ${metricValue("item-level", r.itemLevel)}`}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -114,7 +119,8 @@ function filterControls(d: PlayerDirectoryQuery): FilterControl[] {
       type: "menu", key: "race", label: "Race",
       options: [
         { label: "All races", href: href({ race: null }), on: d.race === null, reset: true },
-        ...[...new Set(CENSUS_RACES.map((r) => r.name))].map((name) => ({ label: name, href: href({ race: name }), on: d.race === name })),
+        // The names the armory stores: Skyborne is two races, one a side, as /rankings/races counts it.
+        ...ARMORY_RACES.map((name) => ({ label: name, href: href({ race: name }), on: d.race === name })),
       ],
     },
     {

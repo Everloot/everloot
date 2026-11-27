@@ -159,3 +159,11 @@ test("the character page links Compare with… from its header", async () => {
   expect(out).toContain('href="/armory/compare?a=eu%2Fvelkara-duskmantle"');
   expect(out).toContain("Compare with…");
 });
+
+test("a count of 0 shows without a rank: it would only share the last place", async () => {
+  mem.putCharacter(armoryCharacter({ region: "us", slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, itemLevel: 60, gearScore: null, honorableKills: 0 }));
+  const out = await page({ a: VELKARA, b: TORVIN });
+  expect(out).toContain("US Normal · Item level #1 of 1");
+  expect(out).not.toContain("US Normal · Honorable kills");
+  expect(out).toContain("EU Normal · Honorable kills #1 of 1");
+});
