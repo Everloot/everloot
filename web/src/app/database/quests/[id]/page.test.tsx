@@ -244,7 +244,7 @@ test("the Warcraft Wiki blurb is its own full-width paragraph under a small head
   const facts = out.slice(out.indexOf('aria-label="Quick facts"'));
   expect(facts.slice(0, facts.indexOf("</section>"))).not.toContain(intro);
   // Its own block: a small heading, then the paragraph, after the quick facts and before the tabs.
-  expect(out).toMatch(new RegExp(`<section[^>]*data-quest-about[^>]*><h2[^>]*>${ABOUT.replace(/[()]/g, "\\$&")}</h2><p[^>]*>${intro}</p></section>`));
+  expect(out).toMatch(new RegExp(`<section[^>]*data-quest-about[^>]*><h2[^>]*>${ABOUT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</h2><p[^>]*>${intro}</p></section>`));
   expect(out.indexOf("data-quest-about")).toBeGreaterThan(out.indexOf(">Reported title</dt>"));
   expect(out.indexOf("data-quest-about")).toBeLessThan(out.indexOf('role="tablist"'));
   // Shown once: the Lore block keeps its source line and archive link, not the paragraph again.
