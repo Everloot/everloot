@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Tabs, TooltipFrame } from "@/components/ui";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadCatalog, parseSegment, titleDisplayName, titleFilesName, titleHref, titlePlacement, titleWithName } from "@/lib/completion-lists";
+import { loadCatalog, parseSegment, titleDisplayName, titleFilesName, titleHref, titleMergedInto, titlePlacement, titleWithName } from "@/lib/completion-lists";
 import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
@@ -50,6 +50,9 @@ export default async function TitlePage(props: Props) {
   const catalog = await loadCatalog();
   const entry = catalog?.titles.find((t) => t.titleId === id);
   if (catalog && !entry) notFound();
+  // A game-files row the list merged into a confirmed title (titleRows) is that title's page.
+  const into = catalog ? titleMergedInto(catalog.titles, id) : null;
+  if (into) permanentRedirect(titleHref(into.titleId, into.name));
   if (entry) {
     const canonical = titleHref(entry.titleId, entry.name);
     if (`/database/titles/${segment}` !== canonical) permanentRedirect(canonical);

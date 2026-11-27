@@ -20,7 +20,7 @@ import { currencyEntries, currencyHref, mountEntries, mountHref, petEntries, pet
 import { holidayEntries, holidayHref, petFamilyEntries, petFamilyHref } from "@/lib/world-events";
 import { loadSightings } from "@/lib/instances";
 import { loadListNames } from "@/lib/item-view";
-import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
+import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref, titleRows } from "@/lib/completion-lists";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
 import { hasConfirmed, hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
@@ -68,7 +68,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const instanceRoutes = [...instancePaths(seen), ...bossPaths(seen)];
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
   const catalog = await loadCatalog();
-  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
+  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...titleRows(catalog.titles).map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
   // Mount, companion pet and currency pages: one per entry the game files list, each with its facts. A toy's page is its item page.
   const collectibleRoutes = [
     ...(mountEntries() ?? []).map((m) => mountHref(m.id, m.name)), ...(petEntries() ?? []).map((p) => petHref(p.id, p.name)),

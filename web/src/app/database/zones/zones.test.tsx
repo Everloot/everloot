@@ -35,6 +35,13 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   loadSiteAssets: async () => art.assets,
 }));
 
+// The names the item lists read (lib/item-view): real unless a test hands some in.
+const listNames = vi.hoisted(() => ({ names: null as unknown }));
+vi.mock("@/lib/item-view", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/item-view")>();
+  return { ...real, loadListNames: async () => listNames.names ?? real.loadListNames() };
+});
+
 import ZonesPage, { generateMetadata as zonesMetadata } from "./page";
 import ZonePage, { generateMetadata } from "./[zone]/page";
 import { EntityRelations } from "@/components/EntityRelations";
@@ -49,7 +56,7 @@ const corpus = (records: unknown[]) => ({ uploads: 3, records, dataAsOf: "2026-1
 const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (zone: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ zone }), searchParams: Promise.resolve(search) });
 
-beforeEach(() => { store.loadCorpus.mockReset(); store.lootDown = false; art.assets = null; });
+beforeEach(() => { listNames.names = null; store.loadCorpus.mockReset(); store.lootDown = false; art.assets = null; });
 // The fixture wiki has a published zone page for Westfall; the committed one keeps it a draft, which gets no link.
 beforeAll(() => { vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../test/wiki", import.meta.url))); });
 afterAll(() => { vi.unstubAllEnvs(); });
@@ -190,6 +197,20 @@ test("a zone with items lists what 3 installs looted from its confirmed NPCs and
   expect(page).toContain("33.3%");
   expect(page).toContain("Observed frequency is the loot windows holding the item");
   expect(page).not.toContain("No item has an agreed drop");
+});
+
+test("the Items table names, colours and marks each item as its own page and the drop tables do", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([...three(100, "Guard Orin", 1436, 40, 50), ...installs.map((i) => loot(i, { npc: 100 }, [990002]))]));
+  // SYNTHETIC id 990002: named only by the names file's game file name, quality 2 (uncommon).
+  listNames.names = {
+    agreed: new Map(), named: { has: () => true }, degraded: false, unreachable: false,
+    matched: { version: "1", wiki: { name: "w", url: "u" }, names: new Map([[990002, { name: "Files Cloak", color: "#1eff00", quality: 2, wikiPage: null, source: "files" }]]) },
+    showsTip: () => true,
+  };
+  const page = await html(ZonePage(props("1436-westfall")));
+  // This file's next/link mock drops the class, so the quality colour is lib/item-look's own test; the name and mark are here.
+  expect(page).toMatch(/<a href="\/database\/items\/990002">Files Cloak<\/a><span data-badge="files"/);
+  expect(page).not.toContain(">Item 990002<");
 });
 
 test("a source fewer than 3 installs looted adds no item, and an unpinned source adds none either", async () => {
