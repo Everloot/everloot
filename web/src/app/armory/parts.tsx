@@ -18,11 +18,15 @@ export const link = "text-fg underline decoration-edge underline-offset-4 hover:
 export const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export const day = (iso: string | null) => (iso && Number.isFinite(Date.parse(iso)) ? new Date(iso).toISOString().slice(0, 10) : null);
 
-/** The credit line and the time of the newest read, on every armory page. */
-export function ArmoryCredit({ at }: { at: string | null | undefined }) {
+/**
+ * The credit line and the time of the newest read, on every armory page. `of` names what the time is the newest of,
+ * where it depends on the rows shown (a list whose rows change with its order).
+ */
+export function ArmoryCredit({ at, of }: { at: string | null | undefined; of?: string }) {
+  const line = at && of ? readLine(at).replace(/^Read /, `Newest read ${of}: `) : readLine(at ?? null);
   return (
     <p className="text-meta text-muted" data-armory-credit>
-      {BLIZZARD_CREDIT}. {at ? <time dateTime={at}>{readLine(at)}</time> : readLine(null)}.
+      {BLIZZARD_CREDIT}. {at ? <time dateTime={at}>{line}</time> : line}.
     </p>
   );
 }

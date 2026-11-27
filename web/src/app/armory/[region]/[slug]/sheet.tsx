@@ -21,6 +21,12 @@ const Pair = ({ label, children }: { label: string; children: ReactNode }) => (
 
 const RANKED_ITEM_LEVEL = "Ranked item level";
 
+/** What a fact's label means, on hover. Gear Score is Everloot's own number, not the GearScore addon's. */
+const DT_TITLE: Record<string, string> = {
+  [RANKED_ITEM_LEVEL]: ARMORY_BOARDS["item-level"].lede,
+  "Gear Score": "Everloot's weighted item level: each item level weighted by its slot's stat budget. Not the GearScore addon's number.",
+};
+
 /**
  * An item level or Gear Score of 0 reads as a dash, as /players shows it, not a 0 that looks like a missing read. While
  * something is worn (a level 1 character: most slots empty and counting 0) the dash says why on hover.
@@ -49,7 +55,7 @@ export function CharacterFacts({ character: c, lastRead, now }: { character: Arm
   // Counts in mono with tabular figures; the read age is words ("3 days ago"), so it is sans (docs/design/direction.md).
   return (
     <dl data-character-facts aria-label="At a glance" className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-card border border-line bg-panel px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
-      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted" {...(label === RANKED_ITEM_LEVEL ? { title: ARMORY_BOARDS["item-level"].lede } : {})}>{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
+      {items.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-meta text-muted" {...(DT_TITLE[label] ? { title: DT_TITLE[label] } : {})}>{label}</dt><dd className={`${label === "Last read" ? "" : "font-mono tabular-nums "}text-lg text-fg`}>{value}</dd></div>)}
     </dl>
   );
 }
@@ -120,15 +126,18 @@ export function SheetSummary({ character: c }: { character: ArmoryCharacter }) {
 
 /**
  * The character's dungeons and raids (components/progress/DungeonsAndRaids): synced boss kills per instance, below the
- * gear sheet so the sheet stays the first thing on the page. With no kill to list it is one muted line and the link.
+ * gear sheet so the sheet stays the first thing on the page. With no kill to list it is one muted line and the link;
+ * with nothing synced it is left out, as the Progress tab already says so.
  */
 export function DungeonRaidSlot({ data, href, character }: { data: DungeonsAndRaidsData; href: string; character?: ArmoryCharacter }) {
-  if (!data.synced || data.instances.length === 0) {
+  // Nothing synced: the Progress tab says so in one line, so the page does not say it twice.
+  if (!data.synced) return null;
+  if (data.instances.length === 0) {
     // Synced kills come from the Desktop App; Blizzard's play history counts kills on its own, so the line names its
     // source and, when Blizzard lists kills, says where, rather than reading as "this character killed nothing".
     const blizzard = character ? blizzardBossKillsLine(character) : null;
     return <p data-slot="dungeon-raid-progress" className="text-meta text-muted">
-      Dungeons &amp; raids: {data.synced ? "no boss kill is recorded in this character's synced history yet" : "no boss kills synced through the Everloot Desktop App for this character"}.{" "}
+      Dungeons &amp; raids: no boss kill is recorded in this character&apos;s synced history yet.{" "}
       {blizzard && <>{blizzard}{" "}</>}
       <a href={href} className={link}>Every instance</a>
     </p>;

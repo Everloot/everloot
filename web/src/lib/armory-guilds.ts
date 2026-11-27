@@ -129,9 +129,17 @@ export function armoryGuildHidden(hidden: ReadonlySet<string>, region: string, n
 export const DISBANDED_GUILD_NAME = "DELETED";
 export const isDisbandedGuild = (name: string) => name === DISBANDED_GUILD_NAME;
 
+/** Rows read per call while this page applies the minimum itself (the RPC's own cap), and how many calls at most. */
+export const MIN_READ_SCAN_BATCH = 100;
+export const MIN_READ_SCAN_CALLS = 5;
+
 export type GuildDirectory =
-  /** `minRead`: the minimum of members read the database applied, when one was asked for and it could. */
-  | { state: "ready"; rows: ArmoryGuildRow[]; total: number; minRead?: number }
+  /**
+   * `minRead`: the minimum of members read the database applied, when one was asked for and it could. `scanned`: the
+   * database could not, so this page applied it over the first `rows` guilds of the order; `complete` when that reached
+   * the end of the list, so `total` counts every guild that qualifies, not only those found in the rows read.
+   */
+  | { state: "ready"; rows: ArmoryGuildRow[]; total: number; minRead?: number; scanned?: { rows: number; complete: boolean } }
   /** The migration is not applied: the guilds whose name starts with the search, without counts. */
   | { state: "not-ready"; rows: ArmoryGuildRow[] }
   | { state: "unreachable" };
@@ -139,26 +147,44 @@ export type GuildDirectory =
 /**
  * One page of the directory. `hidden` is the guild hide list (null when it could not be read: then no guild is
  * listed, as /guilds lists none). A row it covers is dropped here too, so the development store, which knows no
- * hides, follows the same rule as the SQL.
+ * hides, follows the same rule as the SQL. With `scan`, a minimum the database cannot apply yet is applied here over
+ * the top of the order (/guilds); without it the rows come as the database gives them (the /rankings board).
  */
-export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null, minRead?: number): Promise<GuildDirectory> {
+export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null, minRead?: number, scan = false): Promise<GuildDirectory> {
   if (hidden === null) return { state: "unreachable" };
   const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !isDisbandedGuild(r.name) && !armoryGuildHidden(hidden, r.region, r.name));
   const store = armoryStore();
   try {
     const sort = GUILD_SORTS.find((s) => s.slug === d.sort)!.key;
-    const page = await store.guildDirectory({
-      prefix: d.prefix, region: d.region, rulesetId: d.ruleset, sort, limit: GUILD_DIRECTORY_PAGE, offset: (d.page - 1) * GUILD_DIRECTORY_PAGE,
-      ...(minRead === undefined ? {} : { minRead }),
-    });
+    const filter = { prefix: d.prefix, region: d.region, rulesetId: d.ruleset, sort };
+    const offset = (d.page - 1) * GUILD_DIRECTORY_PAGE;
+    const page = await store.guildDirectory({ ...filter, limit: GUILD_DIRECTORY_PAGE, offset, ...(minRead === undefined ? {} : { minRead }) });
     if (page) {
-      const rows = shown(page.rows);
-      const applied = page.minRead === undefined ? {} : { minRead: page.minRead };
+      let rows = shown(page.rows);
+      let total = page.total;
+      let extra: { minRead?: number; scanned?: { rows: number; complete: boolean } } = page.minRead === undefined ? {} : { minRead: page.minRead };
+      if (scan && minRead !== undefined && page.minRead === undefined) {
+        // The database cannot apply the minimum yet: read the order from the top in batches and keep the guilds that
+        // qualify, until this page and one guild past it are found or the list ends.
+        const kept: ArmoryGuildRow[] = [];
+        let read = 0;
+        let complete = false;
+        for (let call = 0; call < MIN_READ_SCAN_CALLS && kept.length <= offset + GUILD_DIRECTORY_PAGE; call++) {
+          const batch = await store.guildDirectory({ ...filter, limit: MIN_READ_SCAN_BATCH, offset: read });
+          if (!batch) break;
+          read += batch.rows.length;
+          kept.push(...shown(batch.rows).filter((r) => r.membersRead >= minRead));
+          if (batch.rows.length < MIN_READ_SCAN_BATCH || read >= batch.total) { complete = true; break; }
+        }
+        rows = kept.slice(offset, offset + GUILD_DIRECTORY_PAGE);
+        total = kept.length;
+        extra = { scanned: { rows: read, complete } };
+      }
       // A profile migration still awaiting application must not take the directory down.
       try {
         const recruiting = await guildProfileStore().recruiting(rows);
-        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total: page.total, ...applied };
-      } catch { return { state: "ready", rows, total: page.total, ...applied }; }
+        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total, ...extra };
+      } catch { return { state: "ready", rows, total, ...extra }; }
     }
     if (!d.prefix) return { state: "not-ready", rows: [] };
     // Before the migration: the name search the armory already has, filtered here, with no counts to sort by.

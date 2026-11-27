@@ -31,8 +31,18 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   reputations: notRead("reputations"),
   quests: notRead("completed quests"),
   history: notRead("play history"),
-  progress: "No boss kills synced through the Everloot Desktop App for this character yet.",
+  progress: "No boss kills synced yet. Kills come from the Everloot Desktop App.",
 };
+
+/**
+ * The instances a character's Progress tab lists. A map the files give no name or place ("Instance 3002") is left
+ * out, and so is a small map that shares a raid's name (map 2921, "Naxxramas" with one boss, beside raid 533), so the
+ * raid shows once under Raids. A row with a kill recorded always stays.
+ */
+export function shownProgress<R extends ProgressionMatrixProps["instances"][number]>(rows: readonly R[]): R[] {
+  const raids = new Set(rows.filter((r) => r.group === "Raids").map((r) => r.name));
+  return rows.filter((r) => ("killed" in r && (r.killed ?? 0) > 0) || (r.typeKnown && !(r.group !== "Raids" && raids.has(r.name))));
+}
 
 /** Blizzard's API gives no talents below level 10, where the game gives no talent points. */
 export const NO_TALENT_POINTS = "No talent points before level 10.";
@@ -73,12 +83,18 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
     case "reputations": return d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : <Empty id={id} />;
     case "quests": return d?.quests ? <QuestCount completed={d.quests.completed} /> : <Empty id={id} />;
     case "history": return d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} source /> : <Empty id={id} />;
-    case "progress": return <>
-      {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">
-        {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
-      </p>}
-      <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} notes="folded" />
-    </>;
+    case "progress": {
+      const progression = parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) };
+      const instances = shownProgress(progression.instances);
+      // With no kill at all: one line, the notes and the every-instance list closed, not 37 rows of "no data".
+      const empty = instances.every((r) => r.state === "no data");
+      return <>
+        {empty && <p className="py-3 text-sm text-fg-2">
+          {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
+        </p>}
+        <ProgressionMatrix {...progression} instances={instances} notes={empty ? "tucked" : "folded"} {...(empty ? { collapsed: `Every dungeon and raid (${instances.length})` } : {})} />
+      </>;
+    }
   }
 }
 

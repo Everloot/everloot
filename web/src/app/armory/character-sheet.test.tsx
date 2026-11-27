@@ -30,18 +30,17 @@ test("an item level of 0 while gear is worn shows a dash, not 0", () => {
   expect(renderToStaticMarkup(<SheetSummary character={c} />)).toMatch(/average item level<\/dt><dd[^>]*><span[^>]*>—</);
 });
 
-test("the boss-kill line names its source and points at Blizzard's counts instead of contradicting them", () => {
-  const line = renderToStaticMarkup(<DungeonRaidSlot data={noKills} href="#progress" character={kaz} />);
-  expect(line).not.toContain("no boss kills are synced for this character");
-  expect(line).toContain("no boss kills synced through the Everloot Desktop App");
+test("with nothing synced there is no boss-kill line above the tabs: the Progress tab says it once", () => {
+  expect(renderToStaticMarkup(<DungeonRaidSlot data={noKills} href="#progress" character={kaz} />)).toBe("");
+  // Synced with no kill yet keeps its one line, naming Blizzard's counts when it has them.
+  const line = renderToStaticMarkup(<DungeonRaidSlot data={{ ...noKills, synced: true }} href="#progress" character={kaz} />);
+  expect(line).toContain("no boss kill is recorded in this character&#x27;s synced history yet");
   expect(line).toContain("Blizzard&#x27;s API lists boss kills in Play history, read 2026-11-23");
-  // Without Blizzard's boss-kill counts the line stays one source.
-  expect(renderToStaticMarkup(<DungeonRaidSlot data={noKills} href="#progress" character={armoryCharacter()} />)).not.toContain("Play history");
 });
 
 test("the Progress tab's empty line names its source and says where Blizzard's kills are", () => {
   const html = renderToStaticMarkup(<>{characterPanel(kaz, "progress", {})}</>);
-  expect(html).toContain("No boss kills synced through the Everloot Desktop App for this character yet.");
+  expect(html).toContain("No boss kills synced yet. Kills come from the Everloot Desktop App.");
   expect(html).toContain("Blizzard&#x27;s API lists boss kills in Play history, read 2026-11-23");
 });
 
@@ -99,4 +98,9 @@ test("QA round 2: an empty item level and a Gear Score of 0 both read as a dash,
   const bare = renderToStaticMarkup(<CharacterFacts character={armoryCharacter({ level: 1, itemLevel: 0, gearScore: 0, equipment: [] })} lastRead={null} now={0} />);
   expect(bare).toMatch(/Ranked item level<\/dt><dd[^>]*>(?:<span[^>]*>)?—</);
   expect(bare).toMatch(/Gear Score<\/dt><dd[^>]*>(?:<span[^>]*>)?—</);
+});
+
+test("QA round 4: Gear Score on the character page says it is Everloot's weighted item level", () => {
+  const facts = renderToStaticMarkup(<CharacterFacts character={armoryCharacter()} lastRead={null} now={0} />);
+  expect(facts).toMatch(/title="Everloot&#x27;s weighted item level: [^"]*Not the GearScore addon&#x27;s number\.">Gear Score<\/dt>/);
 });

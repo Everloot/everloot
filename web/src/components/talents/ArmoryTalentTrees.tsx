@@ -59,7 +59,8 @@ export default function ArmoryTalentTrees({ catalog, ranks }: { catalog: TalentC
       partial: text.includes("[?]"),
       note: dropped ? AMOUNT_NOTE : null,
       lock: null,
-      label: `${assets.label} · build ${assets.version}`,
+      // The armory shows a character's own talents, so the database's "unconfirmed" label would read as doubt about them.
+      label: `From the game files (build ${assets.version})`,
     };
   }
 
