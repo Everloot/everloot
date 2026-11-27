@@ -159,6 +159,20 @@ const cachedWeek = unstable_cache(async (): Promise<HomeWeek> => {
   return censusWeek(stored.weeks);
 }, ["home-week"], { revalidate: KEEP_SECONDS });
 
+/**
+ * Seconds a landing page drawn with a failed read stays fresh. The build draws "/" with no storage settings, and that
+ * render is what OpenNext serves for the page's five minutes after a deploy; a cold instance whose read failed is the
+ * same. Next keeps a page for the shortest lifetime any kept read in it asks for, so asking for this one makes the next
+ * request after it draw the page again. A healthy render never asks, and keeps its five minutes.
+ */
+export const DEGRADED_REVALIDATE = 10;
+const brief = unstable_cache(async () => true, ["home-degraded"], { revalidate: DEGRADED_REVALIDATE });
+
+/** Keep this render only DEGRADED_REVALIDATE seconds. The lifetime is lowered before the read, so a failed read changes nothing. */
+export async function keepBriefly(): Promise<void> {
+  try { await brief(); } catch { /* the lifetime is already lowered */ }
+}
+
 export const loadHomeNewest = () => orNull(cachedNewest);
 /** Undefined while the guild pages are off: there is no ladder to show or link to. */
 export const loadHomeLadder = async (): Promise<HomeLadder | null | undefined> => (guildsOn() ? orNull(cachedLadder) : undefined);
