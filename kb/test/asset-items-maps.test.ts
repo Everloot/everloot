@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { buildItemSet, parseItemIds, shardOf, shardRecords, weaponDamageTable, ITEM_SHARD_SIZE } from "../src/assets/items.js";
 import { fitSize, overlayProblem, planMapArt, stitchPlan } from "../src/assets/map-art.js";
+import { hotfixTable, withHotfixes } from "../src/client-hotfixes.js";
 import type { Row, Rows } from "../src/talents/build-catalog.js";
 
 const t = (rows: Row[]): Rows => new Map(rows.map((r, i) => [typeof r.ID === "number" ? r.ID : i + 1, r]));
@@ -40,6 +41,39 @@ test("an item the Item table lists without a named ItemSparse row keeps its icon
   expect([...buildItemSet((n) => tables[n], new Set([700])).iconOnly]).toEqual([[700, 135661]]);
   const shards = shardRecords(set.records, new Map([[700, 135661]]));
   expect(shards.get(1)).toEqual({ 600: set.records.get(600), 700: { i: 135661 } });
+});
+
+test("an item the hotfix cache gives an ItemSparse row gets a whole record, not an icon alone", () => {
+  // 700 has no row in the file's ItemSparse; the client's hotfix cache holds one (client-hotfixes.ts).
+  const tables: Record<string, Rows> = {
+    ItemSparse: itemTables.ItemSparse,
+    [hotfixTable("ItemSparse")]: t([{ ID: 700, Display_lang: "Server Dagger", OverallQualityID: 2, ItemLevel: 50, RequiredLevel: 45, Bonding: 2, InventoryType: 13, ItemDelay: 1800 }]),
+    Item: t([...itemTables.Item.values(), { ID: 700, IconFileDataID: 135661, ClassID: 2, SubclassID: 15 }]),
+  };
+  const set = buildItemSet(withHotfixes((n) => tables[n]));
+  expect(set.records.get(700)).toMatchObject({ n: "Server Dagger", q: 2, l: 50, r: 45, b: 2, s: 13, c: 2, sc: 15, d: 1800 });
+  expect(set.iconOf.get(700)).toBe(135661);
+  expect(set.iconOnly.has(700)).toBe(false);
+});
+
+test("an Item row without an icon takes its base appearance's icon, as the client does; its own icon comes first", () => {
+  const tables: Record<string, Rows> = {
+    ItemSparse: itemTables.ItemSparse,
+    // 600 (named) and 703 (no ItemSparse row) have no icon of their own; 25 has one.
+    Item: t([...itemTables.Item.values(), { ID: 703, IconFileDataID: 0 }, { ID: 704, IconFileDataID: 0 }]),
+    ItemModifiedAppearance: t([
+      { ID: 1, ItemID: 600, ItemAppearanceModifierID: 1, ItemAppearanceID: 51, OrderIndex: 0 },
+      { ID: 2, ItemID: 600, ItemAppearanceModifierID: 0, ItemAppearanceID: 50, OrderIndex: 0 },
+      { ID: 3, ItemID: 703, ItemAppearanceModifierID: 0, ItemAppearanceID: 52, OrderIndex: 0 },
+      { ID: 4, ItemID: 25, ItemAppearanceModifierID: 0, ItemAppearanceID: 50, OrderIndex: 0 },
+      // 704's base appearance has no icon either: it gets none.
+      { ID: 5, ItemID: 704, ItemAppearanceModifierID: 0, ItemAppearanceID: 53, OrderIndex: 0 },
+    ]),
+    ItemAppearance: t([{ ID: 50, DefaultIconFileDataID: 132551 }, { ID: 51, DefaultIconFileDataID: 999 }, { ID: 52, DefaultIconFileDataID: 134298 }, { ID: 53, DefaultIconFileDataID: 0 }]),
+  };
+  const set = buildItemSet((n) => tables[n]);
+  expect([...set.iconOf]).toEqual([[25, 135274], [600, 132551]]);
+  expect([...set.iconOnly]).toEqual([[703, 134298]]);
 });
 
 test("a weapon records the damage inputs its table, level and quality give, and nothing is invented", () => {

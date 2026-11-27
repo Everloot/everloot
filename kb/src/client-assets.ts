@@ -20,6 +20,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { TableSource } from "./client-extract.js";
+import { withHotfixes } from "./client-hotfixes.js";
 import { readClientMeta, readClientRows, readClientTables } from "./client-snapshot.js";
 import {
   atlasPieces, blpSize, FACTION_ELEMENTS, LOGO_ELEMENTS, narrowCrop, planLoadingScreens, POI_ELEMENTS, RACE_ATLAS, RACE_SEXES, raceElement, racesInBuild,
@@ -299,11 +300,12 @@ export async function buildClientAssets(opts: { snapshotPath: string; outDir: st
   const meta = readClientMeta(opts.snapshotPath);
   const present = new Set(readClientTables(opts.snapshotPath));
   const cache = new Map<string, Rows>();
-  const get: TableReader = (table) => {
+  // A snapshot written by `client-hotfixes` adds the hotfix cache's ItemSparse rows for the items the file lacks.
+  const get: TableReader = withHotfixes((table) => {
     if (!present.has(table)) return undefined;
     if (!cache.has(table)) cache.set(table, readClientRows(opts.snapshotPath, table));
     return cache.get(table);
-  };
+  });
   const build: BuildStamp = { product: meta.product, buildId: meta.buildId, version: meta.version, buildConfig: meta.buildConfig, definitions: meta.definitions, extractedAt: meta.extractedAt };
   return buildAssetsFromTables({ get, build, outDir: opts.outDir, source: opts.source, convert: opts.convert, buffSpells: opts.buffSpells, relationSpells: opts.relationSpells, items: opts.items });
 }

@@ -470,6 +470,19 @@ level, required level, binding, sell price, weapon speed, stat kinds and flavour
   the name also carries the wiki's credit; where the two differ, the game files' name shows, as this build has it;
 - else the Warcraft Wiki dump's name, where only the wiki names the item.
 
+*Proposed 2026-11-27, in the pull request that adds it (the maintainer review):* for an item the current build's
+`ItemSparse` file has no row for, the game files also include the row the game client keeps in its hotfix cache
+(`_forever_/Cache/ADB/enUS/DBCache.bin`). Blizzard's server sends these rows as hotfixes to every client of the
+region, and the client shows them like the file's own rows. A maintainer reads the cache of an install on the same
+build with the same extraction library and the table's own file and layout (`npm run kb -- client-hotfixes`). Only
+that table's entries are read: the cache also holds key rows, which are never read, kept or used, and nothing is
+decrypted. A hotfix row is used only where the file has no row; a row the file has stays as the file has it. The
+cache's build and checksum are recorded beside the snapshot. These rows are treated like the file's own: the same
+name rule, tooltip facts and icon, the same quiet unconfirmed marker and build stamp, the same development-leftover
+and held-back rules, pages only. The name ledger marks each name read this way (`hotfix`). In build 1.60.1.71139 the
+cache held rows for 5,364 of the 12,606 items the file lacks: 2,235 of them were "Item N" before, and 3,129 had only
+the wiki's name, now with the game files' quality and tooltip facts beside it.
+
 The rules:
 
 - Each name says where it comes from in a tooltip on the name (and in words for screen readers; on a link, the
@@ -489,7 +502,7 @@ The rules:
   marker on the icon, whose tooltip says so, and prints no source line. The lists sort and filter by item level,
   required level and binding; an item whose facts are not shown matches none of those filters.
 - An item no source names keeps "Item N". The game server sends those names while the game runs, so they come
-  from the addon's uploads, after 3 installs agree. A category page where fewer than half the rows have a name
+  from the addon's uploads, after 3 installs agree, or from the hotfix cache once a maintainer's client holds them. A category page where fewer than half the rows have a name
   stays out of search.
 - Icons of items the files give only an icon for (added 2026-11-25, at Carlos's request that gear show its icon, not
   a question mark). Forever's `Item` table lists about 12,600 items in build 1.60.1.71091 whose `ItemSparse` row
@@ -499,7 +512,10 @@ The rules:
   public drop or a name from a source), and on a character's gear, which Blizzard's armory reports equipped and so
   is in the game. The gear's card there takes the name and quality from the armory, the icon from the files,
   and says so. No name, tooltip line, drop rate or price comes from this; an id no rule shows keeps "Item N" and the
-  question mark.
+  question mark. Where `Item.IconFileDataID` is 0, the icon is the item's base appearance's
+  (`ItemModifiedAppearance` with modifier 0, `ItemAppearance.DefaultIconFileDataID`), as the client draws it
+  (proposed 2026-11-27, in the pull request above; 1,577 of the 1,610 items without an icon of their own in 71139).
+  An item the hotfix cache gives a row for (above) is no longer an icon-only item.
 - Pages only. The data downloads, the API and the MCP server carry no item names and no tooltip facts for these
   items, as before; a test checks that their code does not read the names. The embeddable cards keep the
   three-install rule.

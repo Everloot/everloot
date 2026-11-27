@@ -62,6 +62,7 @@ import { clientSnapshotName, readClientMeta, readClientRows, writeClientSnapshot
 import { Curated, diffRaidBuffs, RaidBuffTable } from "./raid-buffs.js";
 import { parseItemIds } from "./assets/items.js";
 import { runItemNames } from "./item-names.js";
+import { runClientHotfixes } from "./client-hotfixes.js";
 import { runGameNames } from "./game-names.js";
 import { baselineNames, formatNameGaps, playerNames, runNameGaps } from "./name-gaps.js";
 import { parse as parseYaml } from "yaml";
@@ -160,6 +161,12 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     the exit is 1. Encrypted blocks are skipped, never decrypted. A build already extracted is skipped
     unless --refresh is given. Table layouts come from one pinned WoWDBDefs commit, recorded in the
     snapshot. Not for publication without review: see docs/DATA_POLICY.md)
+  client-hotfixes <snapshot.sqlite> --cache <DBCache.bin> --out <new snapshot.sqlite>
+    (reads ItemSparse of the snapshot's build from Blizzard's CDN with the game client's hotfix cache
+    (_forever_/Cache/ADB/enUS/DBCache.bin of an install of the same build) and writes a NEW snapshot: the input's
+    rows plus, in Hotfix.ItemSparse, the rows the cache holds for items the file has no row for. Prints how many
+    rows the cache adds, changes and removes and the file's encrypted sections. Only that table's cache entries
+    are read; nothing is decrypted. item-names and client-assets read the rows from the new snapshot)
   client-catalog <snapshot.sqlite> [--out data/catalog] [--list lists/raid-buffs.yaml]
     (writes <out>/<product>-<build>-<config>/talents/<class>.json, talents/index.json and raid-buffs.json
     from a snapshot, stamped with the build and labelled "found in game files, unconfirmed". See
@@ -623,6 +630,21 @@ async function main(): Promise<number> {
       for (const m of missing) (m.reason === NOT_IN_BUILD ? console.log : console.error)(`${m.table}: ${m.reason}`);
       console.log(`${product} ${build.version} -> ${out} (sha256 ${manifest.sha256.slice(0, 12)})`);
       return failed.length ? 1 : 0;
+    }
+    case "client-hotfixes": {
+      const cachePath = flags.get("cache"), outPath = flags.get("out");
+      if (!args[0] || !cachePath || !outPath) break;
+      const meta = readClientMeta(args[0]);
+      const { build, source } = await openCdn(meta.product);
+      // The cache's rows are read with the layouts the snapshot's own rows were read with.
+      await pinDefinitions(globalThis.fetch, meta.definitions ?? "master");
+      const manifest = await runClientHotfixes({ snapshotPath: args[0], cachePath, outPath, source, sourceBuildConfig: build.buildConfig });
+      for (const t of manifest.hotfixes.tables) {
+        console.log(`${t.table}: ${t.added} rows added for ids the file lacks; ${t.modified} file rows the cache changes and ${t.deleted} it removes (not applied); ${t.unreadable} unreadable`);
+        console.log(`${t.table}: ${t.encryptedSections} encrypted sections in the file, ${t.encryptedRecords} records (skipped, never decrypted)`);
+      }
+      console.log(`${meta.version} + hotfix cache (build ${manifest.hotfixes.cache.build}, sha256 ${manifest.hotfixes.cache.sha256.slice(0, 12)}) -> ${outPath} (sha256 ${manifest.sha256.slice(0, 12)})`);
+      return 0;
     }
     case "client-coverage": {
       if (!args[0]) break;

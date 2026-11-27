@@ -4,7 +4,8 @@
  * or overwritten, so a name a new build drops, or a wiki page that disagrees, stays on record.
  *
  * Sources, read here:
- * - The game files: `ItemSparse.Display_lang` and `OverallQualityID` of one build's snapshot.
+ * - The game files: `ItemSparse.Display_lang` and `OverallQualityID` of one build's snapshot, and for an item the
+ *   file has no ItemSparse row for, the row the client's hotfix cache holds (client-hotfixes.ts), marked `hotfix`.
  * - The Warcraft Wiki dump of 2023-11-13 (CC BY-SA 4.0), already in the knowledge base: the item id and
  *   name in each item page's infobox (`#data:itemtip`, `itembox`, `Infobox item`).
  * Players' names (3 installs, kb/src/item-page.ts) are not stored here: the site reads them live and they
@@ -19,6 +20,7 @@
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { withHotfixes } from "./client-hotfixes.js";
 import { readClientMeta, readClientRows } from "./client-snapshot.js";
 import { mayShowName } from "./item-name-rule.js";
 import type { TableReader } from "./talents/build-catalog.js";
@@ -27,7 +29,8 @@ export const LEDGER_SCHEMA = "everloot.item-name-ledger/1";
 export const SHOWN_SCHEMA = "everloot.item-names/1";
 export const WIKI_SOURCE_ID = "warcraft-wiki-2023";
 
-export interface FileName { build: string; name: string; quality: number }
+/** `hotfix`: the name is from the client's hotfix cache, for an item the build's ItemSparse file has no row for. */
+export interface FileName { build: string; name: string; quality: number; hotfix?: true }
 export interface WikiName { dump: string; name: string; page: string }
 export interface LedgerEntry { files: FileName[]; wiki: WikiName[] }
 export interface LedgerRun { at: string; build: string; wikiDump: string | null; added: { files: number; wiki: number } }
@@ -75,7 +78,7 @@ export function tierOf(entry: LedgerEntry | undefined, build: string): { tier: T
  */
 export function mergeLedger(
   ledger: Ledger,
-  run: { at: string; build: string; files: ReadonlyMap<number, { name: string; quality: number }>; wikiDump: string | null; wiki: ReadonlyMap<number, { name: string; page: string }[]> },
+  run: { at: string; build: string; files: ReadonlyMap<number, { name: string; quality: number; hotfix?: boolean }>; wikiDump: string | null; wiki: ReadonlyMap<number, { name: string; page: string }[]> },
 ): Ledger {
   const items: Record<string, LedgerEntry> = {};
   for (const [id, e] of Object.entries(ledger.items)) items[id] = { files: [...e.files], wiki: [...e.wiki] };
@@ -84,7 +87,7 @@ export function mergeLedger(
   for (const [id, f] of run.files) {
     const e = entry(id);
     if (e.files.some((x) => x.build === run.build && x.name === f.name && x.quality === f.quality)) continue;
-    e.files.push({ build: run.build, name: f.name, quality: f.quality });
+    e.files.push({ build: run.build, name: f.name, quality: f.quality, ...(f.hotfix ? { hotfix: true as const } : {}) });
     files += 1;
   }
   if (run.wikiDump) {
@@ -214,7 +217,11 @@ export function runItemNames(opts: { snapshotPath: string; kbPath: string; ledge
   if (!ids.length) throw new Error("the snapshot has no Item table; run `client-extract --refresh` first");
   const wiki = wikiNames(opts.kbPath);
   const before = existsSync(opts.ledgerPath) ? parseLedger(JSON.parse(readFileSync(opts.ledgerPath, "utf8"))) : emptyLedger();
-  const ledger = mergeLedger(before, { at: opts.at ?? new Date().toISOString(), build: meta.version, files: fileNames(get), wikiDump: wiki.dump, wiki: wiki.names });
+  // The file's names, then the hotfix cache's for the items the file has no ItemSparse row for (client-hotfixes.ts).
+  const inFile = fileNames(get);
+  const files = new Map<number, { name: string; quality: number; hotfix?: boolean }>(inFile);
+  for (const [id, f] of fileNames(withHotfixes(get))) if (!inFile.has(id)) files.set(id, { ...f, hotfix: true });
+  const ledger = mergeLedger(before, { at: opts.at ?? new Date().toISOString(), build: meta.version, files, wikiDump: wiki.dump, wiki: wiki.names });
   mkdirSync(dirname(opts.ledgerPath), { recursive: true });
   // Written beside the old file and then moved over it, so a failed write never leaves half a ledger.
   writeFileSync(`${opts.ledgerPath}.tmp`, `${JSON.stringify(ledger)}\n`);

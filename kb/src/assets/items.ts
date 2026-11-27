@@ -9,7 +9,10 @@
  *   RequiredLevel, Bonding, InventoryType, ItemDelay (ms), MaxCount (1 is "Unique"), SellPrice (copper),
  *   and the stat kinds of the item (StatModifier_bonusStat). StatPercentEditor is a share of a budget
  *   the client computes, not an amount, so no amount is recorded.
- * - Item: IconFileDataID, ClassID and SubclassID.
+ * - Item: IconFileDataID, ClassID and SubclassID. Where IconFileDataID is 0, the icon of the item's base appearance
+ *   (ItemModifiedAppearance with modifier 0, ItemAppearance.DefaultIconFileDataID), as the client shows it.
+ * - Rows the client's hotfix cache holds for items the ItemSparse file lacks, when the caller's reader adds them
+ *   (client-hotfixes.ts, `withHotfixes`): read like the file's own rows.
  * - The lines the game prints from ItemSparse ids: the set (ItemSet, ItemSet.Name_lang), the Unique-Equipped
  *   category (LimitCategory, ItemLimitCategory), who may use the item (AllowableClass with ChrClasses,
  *   AllowableRace with ChrRaces.PlayableRaceBit) and what it requires (RequiredSkill and RequiredSkillRank with
@@ -227,6 +230,27 @@ export interface ItemSet {
   iconOnly: Map<number, number>;
 }
 
+/**
+ * An item's icon as the client picks it: `Item.IconFileDataID`, else the icon of its base appearance (the
+ * ItemModifiedAppearance row with modifier 0, lowest OrderIndex, and that row's ItemAppearance.DefaultIconFileDataID).
+ * 0 when neither gives one.
+ */
+function iconPicker(get: TableReader): (id: number, item: Record<string, unknown> | undefined) => number {
+  const appearances = get("ItemAppearance");
+  const baseOf = new Map<number, Record<string, unknown>>();
+  for (const m of list(get("ItemModifiedAppearance"))) {
+    if (num(m.ItemAppearanceModifierID) !== 0) continue;
+    const id = num(m.ItemID), had = baseOf.get(id);
+    if (!had || num(m.OrderIndex) < num(had.OrderIndex)) baseOf.set(id, m);
+  }
+  return (id, item) => {
+    const own = item ? num(item.IconFileDataID) : 0;
+    if (own > 0) return own;
+    const base = baseOf.get(id);
+    return base ? num(appearances?.get(num(base.ItemAppearanceID))?.DefaultIconFileDataID) : 0;
+  };
+}
+
 /** A shard entry for an item the files give only an icon for (`ItemSet.iconOnly`). */
 export interface IconOnlyRecord { i: number }
 
@@ -246,6 +270,7 @@ export function buildItemSet(get: TableReader, only?: ReadonlySet<number>, descr
     return damage.get(table)!.get(level);
   };
   const at = lineTables(get);
+  const iconFor = iconPicker(get);
   for (const row of list(sparse)) {
     const id = num(row.ID);
     const name = text(row.Display_lang);
@@ -282,12 +307,12 @@ export function buildItemSet(get: TableReader, only?: ReadonlySet<number>, descr
     const stack = num(row.Stackable);
     if (stack > 1) record.ss = stack;
     records.set(id, record);
-    const icon = base ? num(base.IconFileDataID) : 0;
+    const icon = iconFor(id, base);
     if (icon > 0) iconOf.set(id, icon);
   }
   const iconOnly = new Map<number, number>();
   for (const row of list(item)) {
-    const id = num(row.ID), icon = num(row.IconFileDataID);
+    const id = num(row.ID), icon = iconFor(id, row);
     if (id > 0 && icon > 0 && !records.has(id) && (!only || only.has(id))) iconOnly.set(id, icon);
   }
   return { records, iconOf, iconOnly: new Map([...iconOnly].sort((a, b) => a[0] - b[0])) };

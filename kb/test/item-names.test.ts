@@ -8,6 +8,7 @@ import {
   WIKI_PAGE_PREFIX, type Ledger,
 } from "../src/item-names.js";
 import { mayShowName } from "../src/item-name-rule.js";
+import { hotfixTable } from "../src/client-hotfixes.js";
 
 const B1 = "1.60.1.70450", B2 = "1.60.1.70999";
 const page = (title: string) => `${WIKI_PAGE_PREFIX}${title}`;
@@ -141,4 +142,21 @@ test("a run adds both sources to the ledger and writes the shown names beside th
   const twice = runItemNames({ snapshotPath, kbPath, ledgerPath, outDir: join(dir, "assets"), at: "2026-10-20T00:00:00Z" });
   expect(twice.ledger.items).toEqual(ledger.items);
   expect(twice.ledger.runs).toHaveLength(2);
+});
+
+test("an item the file's ItemSparse lacks is named from the client's hotfix row, and the ledger says the name came from there", () => {
+  const { dir, snapshotPath, kbPath } = fixtures();
+  const snap = new Database(snapshotPath);
+  // 9999 is in Item only; the hotfix cache holds its row. 2589's hotfix row does not replace the file's own.
+  snap.prepare("INSERT INTO client_rows VALUES (?, ?, ?)").run(hotfixTable("ItemSparse"), 9999, JSON.stringify({ ID: 9999, Display_lang: "Vorpal Dagger", OverallQualityID: 2 }));
+  snap.prepare("INSERT INTO client_rows VALUES (?, ?, ?)").run(hotfixTable("ItemSparse"), 2589, JSON.stringify({ ID: 2589, Display_lang: "Other Cloth", OverallQualityID: 3 }));
+  snap.close();
+  const ledgerPath = join(dir, "ledger", "ledger.json");
+  const run = runItemNames({ snapshotPath, kbPath, ledgerPath, outDir: join(dir, "assets"), at: "2026-11-27T00:00:00Z" });
+  expect(run.counts).toEqual({ match: 1, mismatch: 1, files: 2, wiki: 0, none: 0 });
+  const shown = JSON.parse(readFileSync(run.shownPath, "utf8"));
+  expect(shown.names["9999"]).toEqual({ n: "Vorpal Dagger", q: 2 });
+  expect(shown.names["2589"]).toEqual({ n: "Linen Cloth", q: 1, w: "Linen_Cloth" });
+  expect(run.ledger.items["9999"]!.files).toEqual([{ build: B1, name: "Vorpal Dagger", quality: 2, hotfix: true }]);
+  expect(run.ledger.items["2589"]!.files).toEqual([{ build: B1, name: "Linen Cloth", quality: 1 }]);
 });

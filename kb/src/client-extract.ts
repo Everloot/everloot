@@ -4,6 +4,7 @@
  * decryption keys and no listfile (tables are found by their stable file data ids).
  */
 import { CASCClient, DBDParser, WDCReader } from "@rhyster/wow-casc-dbc";
+import { encryptedSections, onlyTable, splitHotfixes, type HotfixCache, type HotfixTableRead } from "./client-hotfixes.js";
 import { CLIENT_TABLES, type ExtractedTable } from "./client-snapshot.js";
 
 /** The extraction library and version, recorded in every manifest. Kept equal to kb's pinned dependency (tested). */
@@ -22,6 +23,11 @@ export interface TableSource {
   fileStatus?(fileDataID: number): FileStatus;
   /** The raw bytes of a non-table file (an icon, a texture). Encrypted blocks are left out and counted, never decrypted. Null: not in this build. */
   readFile?(fileDataID: number): Promise<FileRead | null>;
+  /**
+   * A table read with the client's hotfix cache: the rows the cache holds for ids the file lacks, and counts of the
+   * rest (client-hotfixes.ts). Only that table's cache entries reach the reader. Null: not in this build.
+   */
+  readHotfixes?(fileDataID: number, cache: HotfixCache): Promise<Omit<HotfixTableRead, "table" | "fileDataID"> | null>;
 }
 
 export interface FileRead {
@@ -140,6 +146,17 @@ export async function openCdn(product: string, region = "us"): Promise<{ build: 
         if (row) rows.set(id, row as Record<string, unknown>);
       }
       return { cKey: chosen.cKey, encryptedBlocks: result.blocks?.length ?? 0, rows };
+    },
+    async readHotfixes(fileDataID, cache) {
+      const keys = client.getContentKeysByFileDataID(fileDataID);
+      if (!keys?.length) return null;
+      const chosen = keys.find((k) => k.localeFlags & CASCClient.LocaleFlags.enUS) ?? keys[0];
+      const result = await client.getFileByContentKey(chosen.cKey, true);
+      // The table's hash sits at byte 152 of its header, where the reader reads it; only its entries are handed on.
+      const reader = new WDCReader(result.buffer, result.blocks ?? [], onlyTable(cache, result.buffer.readUInt32LE(152)));
+      const parser = await DBDParser.parse(reader);
+      const split = splitHotfixes(new Set(parser.getAllIDs()), reader.hotfixes, (id) => parser.getRowData(id) as Record<string, unknown> | undefined);
+      return { cKey: chosen.cKey, ...split, encrypted: encryptedSections(result.buffer) };
     },
   };
   return {
