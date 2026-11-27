@@ -232,16 +232,21 @@ export default async function InstancePage(props: Props) {
     { label: "Type", value: kindLabel(row.raid) },
     { label: "Level", value: levelLabel(row.level) ?? <span className="text-muted">–</span> },
     ...(players ? [{ label: "Players", value: <>{players}{filesNote("in the files, by difficulty")}</>, numeric: true }] : []),
-    ...(entrance ? [{ label: "Entrance", value: <>{placeCell(entrance)}{!row.confirmed.length && filesNote("in the files")}</> }] : []),
+    // An entrance is confirmed where 3 installs zoned in from the same outdoor map; installs that zoned in from
+    // different places are counted, so the files' entrance says why it is still unconfirmed.
+    ...(entrance ? [{ label: "Entrance", value: <>{placeCell(entrance)}{!row.confirmed.length && filesNote(unreachable || !row.reported ? "in the files"
+      : row.reported >= 3 ? `in the files; ${row.reported} installs zoned in, not yet 3 from the same place`
+      : `in the files; ${row.reported} of 3 installs zoned in`)}</> }] : []),
     // The difficulty 3 installs agree on, with the files' list beside it; with no agreement, the files' own names stand
     // as the value, labelled as theirs, rather than an unknown marker beside them.
     { label: "Difficulty", value: row.difficulty !== null
       ? <>{difficultyLabel(row.difficulty)}{row.difficulties.length > 0 && filesNote(`in the files, ${difficultyList(row.difficulties)}`)}</>
       : row.difficulties.length > 0 ? <>{difficultyList(row.difficulties)}{filesNote("from the game files")}</>
       : PLACEHOLDER },
-    { label: "Bosses reported", value: <>
-      {unreachable ? PLACEHOLDER : row.bosses.length}
-      {row.encounters.length > 0 && filesNote(`in the files, ${row.encounters.length}`)}
+    // The bosses 3 installs confirmed, out of the files' list when it holds them all.
+    { label: "Bosses confirmed", value: <>
+      {unreachable ? PLACEHOLDER : row.encounters.length >= row.bosses.length && row.encounters.length > 0 ? `${row.bosses.length} of ${row.encounters.length}` : row.bosses.length}
+      {row.encounters.length > 0 && filesNote(`the game files list ${row.encounters.length}`)}
     </> },
   ];
 

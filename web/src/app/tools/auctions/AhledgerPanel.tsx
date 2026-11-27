@@ -27,15 +27,15 @@ export function useAhledger<T>(url: string | null, field: string): Read<T> {
   return read.url === url ? read.value : { state: "loading" };
 }
 
-export function AhledgerPanel({ title, state, credit, controls, children }: {
-  title: string; state: Read<unknown>["state"]; credit?: AhledgerCredit; controls?: ReactNode; children: ReactNode;
+export function AhledgerPanel({ title, state, credit, controls, failed = "AH Ledger could not be read right now.", children }: {
+  title: string; state: Read<unknown>["state"]; credit?: AhledgerCredit; controls?: ReactNode; failed?: string; children: ReactNode;
 }) {
   const heading = useId();
   return <section aria-labelledby={heading} data-ahledger={state} className="space-y-3">
     <h2 id={heading} className="text-control font-medium text-fg">{title}</h2>
     {controls}
     {state === "loading" && <p role="status" className="text-meta text-fg-2">Reading AH Ledger…</p>}
-    {state === "failed" && <p role="status" className="text-meta text-fg-2">AH Ledger could not be read right now. Try again in a few minutes.</p>}
+    {state === "failed" && <p role="status" className="text-meta text-fg-2">{failed} Try again in a few minutes.</p>}
     {state === "ready" && children}
     <p className="text-meta text-fg-2"><a href={credit?.url ?? AHLEDGER_SITE} rel="noopener">Prices from AH Ledger</a></p>
   </section>;

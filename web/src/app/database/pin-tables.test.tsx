@@ -33,7 +33,7 @@ const records = [
 const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }) });
 const HEADER = '<span class="sr-only">Map link</span>';
-const LABEL = '>Show on the map<span class="sr-only">: Elwynn Forest at 40, 60</span></a>';
+const LABEL = 'aria-label="Show on the map: Elwynn Forest at 40, 60" class="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Show on the map</a>';
 
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-10T00:00:00.000Z" }));
 

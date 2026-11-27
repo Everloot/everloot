@@ -208,8 +208,12 @@ test("a category row shows a name the game files and the wiki agree on, in its q
   expect(page).toContain("color:#a335ee");
   // The source is in the link's hover card (/database/card), not a plain title that would double it.
   expect(page).not.toContain(`title="${NAME_TITLE.wiki}"`);
-  // The screen reader words follow the link: its anchor text is the name alone.
-  expect(page).toContain(`>Wiki name ${ids[0]}</a><span class="sr-only"> (name from the warcraft wiki)</span>`);
+  // A wiki name says so once, in a note above the table, not under every row (QA round 5: an epic list read
+  // "(name from the warcraft wiki)" on each line); the link's text stays the name alone.
+  expect(page).toContain(`>Wiki name ${ids[0]}</a>`);
+  expect(page).not.toContain("(name from the warcraft wiki)");
+  expect(page.match(/data-name-note[^>]*>[^<]*Warcraft Wiki/g)).toHaveLength(1);
+  expect(page.indexOf("data-name-note")).toBeLessThan(page.indexOf("<table"));
   expect(page).not.toMatch(/<a [^>]*>[^<]*<span class="sr-only">/);
   // Players' names keep first place and say so; every other row stays "Item N" with none.
   expect(page).toContain(`Agreed ${ids[1]}`);

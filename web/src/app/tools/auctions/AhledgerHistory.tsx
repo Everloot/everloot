@@ -62,7 +62,8 @@ export function HistoryChart({ series }: { series: AhledgerPoint[] }) {
 export default function AhledgerHistory({ itemId, defaultMarket }: { itemId: number; defaultMarket?: string }) {
   const [market, setMarket] = useAhledgerMarket(defaultMarket);
   const read = useAhledger<History>(market && `/api/ahledger/${market}/history?item=${itemId}`, "history");
-  return <AhledgerPanel title="AH Ledger price history" state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={market && <AhledgerMarketPicker market={market} onChange={setMarket} />}>
+  // AH Ledger's history endpoint can stop answering while its current prices still do (2026-11-27): say which part is down.
+  return <AhledgerPanel title="AH Ledger price history" failed="AH Ledger's price history is unavailable right now." state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={market && <AhledgerMarketPicker market={market} onChange={setMarket} />}>
     {read.state === "ready" && <>
       <p className="text-meta text-fg-2">AH Ledger scans for this market, separate from player-reported prices. The chart shows up to 30 days of available scans.</p>
       <HistoryChart series={read.data.series} />

@@ -24,8 +24,10 @@ test("the columns are the zone, the position, the installs and the map link, in 
   expect(cells(head)).toEqual(["Map", "Position", "Installs", '<span class="sr-only">Map link</span>']);
   expect(out).toContain('<span title="UiMap 1429">Elwynn Forest</span>');
   expect(out).toContain("40, 60");
-  // The words on screen start the link's name (WCAG 2.5.3, label in name); the place follows for screen readers.
-  expect(out).toContain('>Show on the map<span class="sr-only">: Elwynn Forest at 40, 60</span></a>');
+  // The words on screen start the link's name (WCAG 2.5.3, label in name); the place follows for screen readers, in
+  // the name only: a hidden span would read as a stray ": Elwynn Forest at 40, 60" line in copied or reader text.
+  expect(out).toMatch(/aria-label="Show on the map: Elwynn Forest at 40, 60"[^>]*>Show on the map<\/a>/);
+  expect(out).not.toContain('<span class="sr-only">: Elwynn');
   expect(out).not.toContain("aria-label=\"Show Elwynn");
   expect(out).toContain(">3</td>");
 });
@@ -34,7 +36,7 @@ test("a pin on a map the world map does not draw keeps its row and has no link",
   const out = html();
   expect(out).toContain('<span title="UiMap 999999">Map 999999</span>');
   expect(out).toContain("10, 20");
-  expect(out.match(/Show on the map/g)).toHaveLength(1);
+  expect(out.match(/>Show on the map<\/a>/g)).toHaveLength(1);
 });
 
 test("a page's own columns go before the shared ones", () => {
