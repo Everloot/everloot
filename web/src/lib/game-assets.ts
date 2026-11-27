@@ -386,28 +386,12 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
 export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; icons: Map<number, string>; unreachable: boolean; degraded: boolean; indexed: boolean }> {
   const out = new Map<number, ItemTip>();
   const result = { tips: out, icons: new Map<number, string>(), unreachable: false, degraded: false, indexed: false };
-  const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
-  const folder = assets ? buildFolder(assets.base) : null;
-  if (!assets || !store || !folder || !wanted.length) return result;
-  const read = await store.read(`${folder}/items.json`);
-  if (read === PRIVATE_UNREACHABLE) return { ...result, unreachable: true };
-  const index = ItemIndexSchema.safeParse(read);
-  if (!index.success || index.data.build.version !== assets.version) return result;
-  result.indexed = true;
-  const byShard = new Map<number, number[]>();
-  for (const id of wanted) {
-    const s = itemShard(id, index.data.shardSize);
-    byShard.set(s, [...(byShard.get(s) ?? []), id]);
-  }
-  await Promise.all([...byShard].map(async ([shard, ids]) => {
-    const file = index.data.shards[String(shard)]?.file;
-    if (!file) return;
-    const shardRead = await store.read(`${folder}/${file}`);
-    if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; return; }
-    const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
-    if (!body.success) { result.degraded = true; return; }
+  const read = await readItemShards(assets, ids, store);
+  if (!assets || !read) return result;
+  Object.assign(result, read.flags);
+  for (const { body, ids } of read.shards) {
     for (const id of ids) {
-      const raw = body.data[String(id)];
+      const raw = body[String(id)];
       if (raw === undefined) continue;
       const r = ItemRecordSchema.safeParse(raw);
       if (r.success) {
@@ -420,8 +404,92 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
       if (iconOnly.success) result.icons.set(id, itemIconUrl(assets.base, iconOnly.data.i));
       else result.degraded = true;
     }
-  }));
+  }
   return result;
+}
+
+/**
+ * What a file read from the private store checks to, worked out once per file as read: the store keeps the object it
+ * read (privateStoreFromEnv), so the next page reading the same version of the file looks nothing up again. A store that
+ * hands out a new object each time is checked each time.
+ */
+function checkedOnce<T>(memo: WeakMap<object, T>, raw: unknown, check: (raw: unknown) => T): T {
+  if (raw === null || typeof raw !== "object") return check(raw);
+  if (memo.has(raw)) return memo.get(raw)!;
+  const value = check(raw);
+  memo.set(raw, value);
+  return value;
+}
+const checkedIndexes = new WeakMap<object, z.infer<typeof ItemIndexSchema> | null>();
+const checkedShards = new WeakMap<object, Record<string, unknown> | null>();
+const ShardSchema = z.record(z.string(), z.unknown());
+const itemIndexOf = (raw: unknown) => checkedOnce(checkedIndexes, raw, (r) => { const index = ItemIndexSchema.safeParse(r); return index.success ? index.data : null; });
+const itemShardOf = (raw: unknown) => checkedOnce(checkedShards, raw, (r) => { const body = ShardSchema.safeParse(r); return body.success ? body.data : null; });
+
+/**
+ * The shards holding the given items, read as readItemTips reads them: nothing without the manifest, the private store
+ * and this build's index; a failed read marks `unreachable`, a listed shard that is not a shard `degraded`. Null when
+ * there is nothing to read.
+ */
+async function readItemShards(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null): Promise<{
+  flags: { unreachable: boolean; degraded: boolean; indexed: boolean }; shards: { body: Record<string, unknown>; ids: number[] }[];
+} | null> {
+  const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
+  const folder = assets ? buildFolder(assets.base) : null;
+  if (!assets || !store || !folder || !wanted.length) return null;
+  const flags = { unreachable: false, degraded: false, indexed: false };
+  const read = await store.read(`${folder}/items.json`);
+  if (read === PRIVATE_UNREACHABLE) return { flags: { ...flags, unreachable: true }, shards: [] };
+  const index = itemIndexOf(read);
+  if (!index || index.build.version !== assets.version) return { flags, shards: [] };
+  flags.indexed = true;
+  const byShard = new Map<number, number[]>();
+  for (const id of wanted) {
+    const s = itemShard(id, index.shardSize);
+    const list = byShard.get(s);
+    if (list) list.push(id);
+    else byShard.set(s, [id]);
+  }
+  const shards = await Promise.all([...byShard].map(async ([shard, ids]) => {
+    const file = index.shards[String(shard)]?.file;
+    if (!file) return null;
+    const shardRead = await store.read(`${folder}/${file}`);
+    if (shardRead === PRIVATE_UNREACHABLE) { flags.unreachable = true; return null; }
+    const body = itemShardOf(shardRead);
+    if (!body) { flags.degraded = true; return null; }
+    return { body, ids };
+  }));
+  return { flags, shards: shards.filter((s) => s !== null) };
+}
+
+/** An item's level, required level (0 for both: none) and bonding enum, as its tooltip gives them. */
+export interface ItemTipLevels { level: number; required: number; binding: number }
+// Each checked record's numbers (null: no tooltip), kept beside its checked shard, so a record is checked once per read.
+const shardLevels = new WeakMap<object, Map<number, ItemTipLevels | null>>();
+
+/**
+ * For the item lists' level and binding filters and sorts: the numbers `loadItemTips` gives for each of `ids` that has
+ * a tooltip, read the same way (the same shards, the same record check), without building the tooltips, and with each
+ * record checked once per read of its shard. Same caller rule as loadItemTips. Never throws.
+ */
+export async function loadItemLevels(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<Map<number, ItemTipLevels>> {
+  const out = new Map<number, ItemTipLevels>();
+  const read = await readItemShards(assets, ids, store);
+  for (const { body, ids } of read?.shards ?? []) {
+    let known = shardLevels.get(body);
+    if (!known) shardLevels.set(body, known = new Map());
+    for (const id of ids) {
+      let levels = known.get(id);
+      if (levels === undefined) {
+        const raw = body[String(id)];
+        const r = raw === undefined ? null : ItemRecordSchema.safeParse(raw);
+        levels = r?.success ? { level: r.data.l, required: r.data.r, binding: r.data.b } : null;
+        known.set(id, levels);
+      }
+      if (levels) out.set(id, levels);
+    }
+  }
+  return out;
 }
 
 /* ---------- Item names from the game files and the Warcraft Wiki ---------- */

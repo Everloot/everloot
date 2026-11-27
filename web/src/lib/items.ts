@@ -124,6 +124,15 @@ export function itemFacets(): Facets {
   return facets;
 }
 
+let skillsOf: Map<number, number[]> | null = null;
+/** The other way round from `itemFacets().bySkill`, made once: each item's professions, so a list counts them in one pass. */
+export function itemSkills(): Map<number, number[]> {
+  if (skillsOf) return skillsOf;
+  skillsOf = new Map();
+  for (const [skill, ids] of itemFacets().bySkill) for (const id of ids) skillsOf.set(id, [...(skillsOf.get(id) ?? []), skill]);
+  return skillsOf;
+}
+
 /* ---------- The list's query string ---------- */
 
 export const ITEM_SORTS = ["name", "ilvl", "req", "type", "slot", "seen", "id"] as const;
@@ -258,6 +267,11 @@ export interface ItemListContext {
   sources?: (id: number) => readonly SourceSlug[] | undefined;
   /** The tooltip facts a page may show for an item (item level, required level, binding); undefined when it shows none. */
   tip?: (id: number) => ItemLevels | undefined;
+  /**
+   * Each item's place in the default order, worked out once from the same `name` and `seen` (itemListIndex in
+   * item-view.ts): with it, the default order places the rows instead of comparing their names.
+   */
+  order?: { get(id: number): number | undefined; size: number };
 }
 
 /** What the item level, required level and binding filters read: 0 is "none" for both levels. */
@@ -289,9 +303,14 @@ export function matchItemNames(base: readonly ItemRow[], q: CategoryQuery, ctx: 
 
 /** Rows of a category (`base`) that pass every filter, in the query's order: a text's best matches first unless a sort was asked for. */
 export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(base, q, ctx)): ItemRow[] {
+  return byRank(sortItems(matchingItems(base, q, ctx, match), q.sort, ctx), match.ranked, Boolean(q.sort));
+}
+
+/** The rows of `base` that pass every filter, in `base`'s order: listItems before it sorts, for a page that only counts them. */
+export function matchingItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(base, q, ctx)): ItemRow[] {
   const text = q.q?.toLowerCase();
   const id = idOf(text);
-  const rows = base.filter((row) => {
+  return base.filter((row) => {
     const [itemId, , , inv, quality] = row;
     if (text && !(id !== null ? itemId === id : match.ranked!.has(row))) return false;
     // A development leftover stays out unless asked for, or looked up by its id.
@@ -307,7 +326,6 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
     if (q.bind && (!tip || BINDINGS.find((b) => b.slug === q.bind)?.value !== tip.binding)) return false;
     return matchesFacets(itemId, q);
   });
-  return byRank(sortItems(rows, q.sort, ctx), match.ranked, Boolean(q.sort));
 }
 
 /**
@@ -318,6 +336,8 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
  */
 export function sortItems(rows: ItemRow[], sort: CategoryQuery["sort"], ctx: ItemListContext = {}): ItemRow[] {
   if (!sort && ctx.name) {
+    const placed = ctx.order ? inOrder(rows, ctx.order) : null;
+    if (placed) return placed;
     const keyed = rows.map((row) => {
       const name = ctx.name!(row[0]);
       const seen = ctx.seen?.has(row[0]) ?? false;
@@ -344,4 +364,18 @@ export function sortItems(rows: ItemRow[], sort: CategoryQuery["sort"], ctx: Ite
     return c * dir || a.row[0] - b.row[0];
   });
   return keyed.map((x) => x.row);
+}
+
+/**
+ * `rows` placed by their positions in `order`, in one pass; null when a row has no position or two share one (the
+ * caller then sorts). The default order is total (ties go by id), so a subset keeps the order the whole list has.
+ */
+function inOrder(rows: readonly ItemRow[], order: NonNullable<ItemListContext["order"]>): ItemRow[] | null {
+  const slots: (ItemRow | undefined)[] = new Array(order.size);
+  for (const row of rows) {
+    const at = order.get(row[0]);
+    if (at === undefined || slots[at] !== undefined) return null;
+    slots[at] = row;
+  }
+  return slots.filter((row) => row !== undefined);
 }

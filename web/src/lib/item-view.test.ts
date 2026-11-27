@@ -19,7 +19,8 @@ vi.mock("./item-seen", () => ({ loadItemSeen: async (read?: unknown) => { reads.
 vi.mock("@kb/item-page", () => ({ agreedItemNames: (f: { names: { itemId: number; name: string }[] }) => new Map(f.names.map((n) => [n.itemId, n.name])) }));
 vi.mock("./game-assets", () => ({ PRIVATE_UNREACHABLE: Symbol.for("unreachable"), loadItemNames: async () => reads.names }));
 
-import { loadCardFacts, loadListNames, loadListSeen } from "./item-view";
+import { itemListIndex, loadCardFacts, loadListNames, loadListSeen } from "./item-view";
+import { CLIENT_TAXONOMY, developmentLeftovers, listItems, sortItems } from "./items";
 import { buildItemView, forgetItemView, ITEM_VIEW_KEY, loadItemView, parseItemView, writeItemView } from "./item-view-store";
 import { loadShownNames } from "./shown-item-names";
 import { uploadStore } from "./upload-store";
@@ -127,4 +128,43 @@ test("a hover card reads an item's reported numbers from the stored view; an ite
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
   expect((await loadCardFacts(20)).shown).toEqual([{ fact: "strength", value: 7, reporters: 3, build: "1.60.1.70862", lastSeen: null }]);
   expect(await loadCardFacts(10)).toEqual({ shown: [], contested: [], unreachable: false });
+});
+
+test("an item list's index of the names and seen items is worked out once per read of them, and again after a new read", async () => {
+  const view = await buildItemView(null, AT);
+  useCloud();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
+  const names = await loadListNames();
+  // Nothing was read again: the same names, so the next list page works nothing out again.
+  expect(await loadListNames()).toBe(names);
+  const seen = await loadListSeen();
+  const index = itemListIndex(names, seen);
+  expect(itemListIndex(await loadListNames(), await loadListSeen())).toBe(index);
+  // It holds what a page worked out on each view.
+  const name = (id: number) => names.agreed.get(id) ?? names.matched?.names.get(id)?.name;
+  expect([10, 20, 50, 60].map(index.name)).toEqual([10, 20, 50, 60].map(name));
+  expect(index.leftovers).toEqual(developmentLeftovers(CLIENT_TAXONOMY.items, name));
+  expect(index.unnamed).toEqual(new Set(CLIENT_TAXONOMY.items.filter((row) => !names.showsTip(row[0])).map((row) => row[0])));
+  const order = sortItems(CLIENT_TAXONOMY.items, undefined, { name, seen: seen.seen });
+  expect(order.every((row, i) => index.order.get(row[0]) === i)).toBe(true);
+  // A new read of the view (the cron wrote a new one): new names, a new index.
+  forgetItemView();
+  const again = await loadListNames();
+  expect(again).not.toBe(names);
+  expect(itemListIndex(again, await loadListSeen())).not.toBe(index);
+});
+
+test("a list in the index's order has the same rows in the same order as one sorted on the spot, for any filter", async () => {
+  // Names that tie, differ only in case, are development leftovers, or are missing; some items seen.
+  const words = ["Linen Cloth", "linen cloth", "Copper Bar", "Zeal", "[PH] Test Item", "Älven Ring", "Mace", undefined];
+  const rows = CLIENT_TAXONOMY.items;
+  const agreed = new Map(rows.filter((_, i) => i % 3 !== 2).map((row, i) => [row[0], words[(i * 7) % words.length]]).filter((e): e is [number, string] => e[1] !== undefined));
+  const names = { agreed, matched: null, degraded: false, unreachable: false, named: { has: (id: number) => agreed.has(id) }, showsTip: (id: number) => agreed.has(id) || id % 5 === 0 };
+  const seen = { seen: new Set(rows.filter((_, i) => i % 4 === 0).map((row) => row[0])), from: new Map(), unreachable: false };
+  const index = itemListIndex(names, seen);
+  const plain = { name: index.name, seen: seen.seen };
+  for (const q of [{ page: 1 }, { page: 1, dev: true }, { page: 1, quality: ["epic"] }, { page: 1, q: "linen" }, { page: 1, slot: ["chest"], seen: true }, { page: 1, sort: { key: "name" as const, desc: true } }]) {
+    const base = q.quality ? rows.filter((row) => row[1] === 4) : rows;
+    expect(listItems(base, q, { ...plain, order: index.order }), JSON.stringify(q)).toEqual(listItems(base, q, plain));
+  }
 });
