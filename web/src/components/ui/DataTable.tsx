@@ -191,7 +191,8 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
           </tbody>
         </table>
       </div>
-      {footer && <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-meta text-muted">{footer}</div>}
+      {/* Inset like the cells, so inside a padding="none" card the link does not touch the card's edge. */}
+      {footer && <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-meta text-muted">{footer}</div>}
     </div>
   );
 }

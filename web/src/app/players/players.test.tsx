@@ -173,7 +173,8 @@ describe("player directory", () => {
     const html = await page();
     const table = html.slice(html.indexOf('id="player-results"'));
     const arla = table.slice(table.indexOf("arla-quill"), table.indexOf("</tr>", table.indexOf("arla-quill")));
-    expect(arla).toContain("ilvl and GS 62");
+    // QA round 8: the phrase never breaks across lines on a phone.
+    expect(arla).toContain("ilvl and GS 62");
     expect(arla).not.toContain("GS 62 · ilvl 62");
     const velkara = table.slice(table.indexOf("velkara-duskmantle"), table.indexOf("</tr>", table.indexOf("velkara-duskmantle")));
     expect(velkara).toContain("ilvl 57.41 · GS 61.2");

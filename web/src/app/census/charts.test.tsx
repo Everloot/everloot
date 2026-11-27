@@ -31,3 +31,25 @@ test("an image failure leaves the class name visible", async () => {
   expect(div.querySelector("img")).toBeNull();
   expect(div.textContent).toBe("Hunter");
 });
+
+test("QA round 8: the daily chart draws at its own width, so on a phone its labels keep their size instead of shrinking with the picture", async () => {
+  const original = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class {
+    constructor(private fit: ResizeObserverCallback) {}
+    observe(el: Element) { this.fit([{ target: el, contentRect: { width: 358 } } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver); }
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  try {
+    const { div, root } = mount();
+    await act(() => root.render(<DailyChart days={[{ day: "2026-11-14", count: 300 }, { day: "2026-11-15", count: 120 }]} />));
+    const svg = div.querySelector("svg")!;
+    // One viewBox unit is one CSS pixel: a 12 px label stays 12 px at 390 as at 1440.
+    expect(svg.getAttribute("viewBox")).toBe("0 0 358 224");
+    expect(svg.getAttribute("width")).toBe("358");
+    const last = [...svg.querySelectorAll("text")].find((t) => t.textContent === "11-15")!;
+    expect(Number(last.getAttribute("x"))).toBeLessThanOrEqual(358 - 24);
+  } finally {
+    globalThis.ResizeObserver = original;
+  }
+});
