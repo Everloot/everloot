@@ -64,10 +64,10 @@ export function HeatCell({ label, classToken, count, max }: { label: string; cla
   return <span tabIndex={0} title={`${label}: ${number(count)}`} className="flex min-h-10 min-w-12 items-center justify-end rounded-control px-2 text-fg" style={{ backgroundColor }}>{number(count)}</span>;
 }
 
-/** The axis step: 1, 2 or 5 times a power of ten, whole, so the half-way label is a round count (2,000, not 1,947.5). */
+/** The axis step: a round, whole number at or above half the top count, so the half-way label is 1,500 or 2,000, never 1,947.5. */
 const axisStep = (half: number) => {
   const power = 10 ** Math.floor(Math.log10(half));
-  return Math.max(1, [1, 2, 5, 10].map((m) => m * power).find((step) => step >= half)!);
+  return Math.max(1, [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((m) => m * power).find((step) => step >= half && Number.isInteger(step))!);
 };
 
 /**
