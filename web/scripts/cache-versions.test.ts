@@ -52,6 +52,14 @@ function repo(): string {
   return root;
 }
 
+/**
+ * Tests that build scratch repositories run real git processes (six to init one, one per stamp): about 2 s alone, and
+ * far more while the full suite keeps every core busy, since each spawn waits its turn on Windows. Nothing here waits
+ * on a clock, so the limit is longer for these only, never for the pure ones.
+ */
+const GIT_TEST_MS = 60_000;
+const gitTest = (name: string, fn: () => void) => test(name, fn, GIT_TEST_MS);
+
 const VARS = { KNOWLEDGE_RELEASE_SHA256: "release1", EVERLOOT_PROFILES: "1", NEWS_DIR: "/bundle/repo/kb/news" };
 const stamp = (root: string, over: { vars?: Record<string, unknown>; env?: Record<string, string> } = {}) =>
   writeCacheVersions({ webDir: join(root, "web"), vars: over.vars ?? VARS, env: over.env ?? {} });
@@ -61,7 +69,7 @@ test("the template version covers the rendering source and leaves out the API, t
   for (const path of ["web/src/app/api/items/route.ts", "web/src/data/game-data/items.json", "web/src/data/addon-repos.ts", "web/src/test/setup.ts", "web/src/lib/items.test.ts", "web/src/lib/items.spec.tsx"]) expect(isTemplateFile(path), path).toBe(false);
 });
 
-test("an unrelated change keeps every version: an API route, a test, a document outside the inputs", () => {
+gitTest("an unrelated change keeps every version: an API route, a test, a document outside the inputs", () => {
   const root = repo();
   const before = stamp(root);
   put(root, "web/src/app/api/items/route.ts", "export const GET = () => 2; // a different API response");
@@ -72,7 +80,7 @@ test("an unrelated change keeps every version: an API route, a test, a document 
   expect(stamp(root)).toEqual(before);
 });
 
-test("a page, shared code, build config, dependency or protocol change starts a new template version and leaves the other versions", () => {
+gitTest("a page, shared code, build config, dependency or protocol change starts a new template version and leaves the other versions", () => {
   const root = repo();
   const before = stamp(root);
   const changes: [string, string][] = [
@@ -94,7 +102,7 @@ test("a page, shared code, build config, dependency or protocol change starts a 
   }
 });
 
-test("a game-data, knowledge or addon change starts only the version of the pages that read it", () => {
+gitTest("a game-data, knowledge or addon change starts only the version of the pages that read it", () => {
   const root = repo();
   const before = stamp(root);
   const cases: [string, string, "data" | "knowledge" | "addon"][] = [
@@ -115,7 +123,7 @@ test("a game-data, knowledge or addon change starts only the version of the page
   }
 });
 
-test("a new knowledge release starts the knowledge version, and a feature switch or public build value the template", () => {
+gitTest("a new knowledge release starts the knowledge version, and a feature switch or public build value the template", () => {
   const root = repo();
   const before = stamp(root);
   const release = stamp(root, { vars: { ...VARS, KNOWLEDGE_RELEASE_SHA256: "release2" } });
@@ -130,7 +138,7 @@ test("a new knowledge release starts the knowledge version, and a feature switch
   expect(stamp(root, { env: { CLOUDFLARE_API_TOKEN: "secret" } })).toEqual(before);
 });
 
-test("the versions describe the working tree that was built, not the last commit", () => {
+gitTest("the versions describe the working tree that was built, not the last commit", () => {
   const root = repo();
   const committed = stamp(root);
   put(root, "web/src/app/page.tsx", "export default () => 'uncommitted edit';");
@@ -153,7 +161,7 @@ test("the versions describe the working tree that was built, not the last commit
   expect(stamp(root).template).not.toBe(dirty.template);
 });
 
-test("the build's static files decide the template: a changed, renamed, added or removed file starts it, the build id folder does not", () => {
+gitTest("the build's static files decide the template: a changed, renamed, added or removed file starts it, the build id folder does not", () => {
   const root = repo();
   const before = stamp(root);
   const base = "web/.open-next/assets/_next/static";
@@ -176,7 +184,7 @@ test("the build's static files decide the template: a changed, renamed, added or
   expect(stamp(root).template).not.toBe(changed.template);
 });
 
-test("the versions are written next to the Worker entry, and a missing input stops the build instead of stamping a made-up one", () => {
+gitTest("the versions are written next to the Worker entry, and a missing input stops the build instead of stamping a made-up one", () => {
   const root = repo();
   const versions = stamp(root);
   const written = JSON.parse(readFileSync(join(root, "web/.open-next/cache-versions.json"), "utf8"));
@@ -215,7 +223,7 @@ test("an input list that is empty, or that git cannot give, fails closed", () =>
   expect(() => cacheVersions({ root: dir, staticAssets: "", knowledgeRelease: "r", list: () => ["a"] })).toThrow(/static assets/);
 });
 
-test("git's list holds tracked and untracked files, not ignored ones, and each version reads the real repository's files", () => {
+gitTest("git's list holds tracked and untracked files, not ignored ones, and each version reads the real repository's files", () => {
   const root = repo();
   put(root, "web/src/untracked.ts", "u");
   put(root, "web/.next/server/x.js", "ignored");

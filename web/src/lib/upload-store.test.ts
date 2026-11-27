@@ -739,18 +739,29 @@ describe("market rollup", () => {
     test("a read that never answers does not hold a page past its limit, nor the pages after it", async () => {
       let hang = true;
       let reads = 0;
-      const fn = (async () => { reads++; return hang ? new Promise<Response>(() => {}) : rollup(); }) as typeof fetch;
-      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketReadMs: 60 });
-      const t0 = Date.now();
-      const [first, second] = await Promise.all([store.loadMarket(), store.loadMarket()]);
-      expect(Date.now() - t0).toBeLessThan(1000);
-      expect(first).toEqual({ state: null, dataAsOf: null, unreachable: true });
-      expect(second).toEqual({ state: null, dataAsOf: null, unreachable: true });
-      expect(reads).toBe(1);
-      // The stuck read is dropped after its limit: the next page starts its own and gets the answer.
-      hang = false;
-      expect((await store.loadMarket()).state).toEqual(state);
-      expect(reads).toBe(2);
+      let stuck!: () => void;
+      const reached = new Promise<void>((resolve) => { stuck = resolve; });
+      const fn = (async () => { reads++; if (!hang) return rollup(); stuck(); return new Promise<Response>(() => {}); }) as typeof fetch;
+      // A fake clock: the limit passes only when the test moves it, so a busy machine (signing is real work) never
+      // lets it lapse early on the read that should answer, and the stuck read costs no real time.
+      vi.useFakeTimers();
+      try {
+        const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketReadMs: 60 });
+        const both = Promise.all([store.loadMarket(), store.loadMarket()]);
+        // Past the limit only once the read is really out (signing the request comes first), as a hung R2 call is.
+        await reached;
+        await vi.advanceTimersByTimeAsync(60);
+        const [first, second] = await both;
+        expect(first).toEqual({ state: null, dataAsOf: null, unreachable: true });
+        expect(second).toEqual({ state: null, dataAsOf: null, unreachable: true });
+        expect(reads).toBe(1);
+        // The stuck read is dropped after its limit: the next page starts its own and gets the answer.
+        hang = false;
+        expect((await store.loadMarket()).state).toEqual(state);
+        expect(reads).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
