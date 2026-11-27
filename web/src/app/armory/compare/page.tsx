@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import GameIcon from "@/components/game/GameIcon";
 import ItemTip from "@/components/game/ItemTip";

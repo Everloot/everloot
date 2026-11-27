@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useState } from "react";
 import { callbackUrl, DESKTOP_KEY_LABEL, sealForDesktop, type ConnectRequest } from "@/lib/desktop-connect";
 

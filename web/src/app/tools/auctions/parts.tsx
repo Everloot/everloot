@@ -1,5 +1,5 @@
 import { CoinText } from "@/components/ui/Coins";
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
 import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";

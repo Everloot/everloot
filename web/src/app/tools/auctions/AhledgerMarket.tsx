@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import Coins from "@/components/ui/Coins";
 import { DataTable, type Column } from "@/components/ui";
 import { ahledgerMarketLabel, type AhledgerDeal, type AhledgerEconomy } from "@/lib/ahledger";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import SpellTip from "@/components/game/SpellTip";
 import { splitMentions, type MentionIndex } from "@/lib/spell-mentions";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { CURRENT_VERSION } from "@/lib/game-version";
 import buildsFile from "../../../kb/changes/builds.json";
 

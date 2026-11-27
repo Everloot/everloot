@@ -3,7 +3,7 @@ import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
 import { agreedNpc, npcNameReporters, npcPage, npcTraits, vendorPage, type NpcPin, type NpcRank } from "@kb/world-pages";

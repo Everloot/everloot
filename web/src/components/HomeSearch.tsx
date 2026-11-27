@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { track } from "@/lib/analytics/track";
 import { SuggestField } from "./ui/SearchBar";
 

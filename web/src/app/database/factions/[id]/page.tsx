@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import LoreSection from "@/components/LoreSection";
 import { Tabs, TooltipFrame } from "@/components/ui";

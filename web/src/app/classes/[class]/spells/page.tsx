@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, PageHeader } from "@/components/ui";

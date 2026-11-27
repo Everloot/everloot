@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { agreedNpc, npcPage, vendorPage } from "@kb/world-pages";
 import { zoneByMapId, zoneHref } from "@/lib/zones";

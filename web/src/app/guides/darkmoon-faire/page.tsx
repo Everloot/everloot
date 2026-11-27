@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 import { DARKMOON, DARKMOON_HREF, DARKMOON_STATUS, darkmoonSearchHref } from "@/lib/darkmoon";

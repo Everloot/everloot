@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, GUILD_KILL_KINDS, LINK_KINDS, PLAYER_KINDS, RUN_RECORD_KINDS, type RecordKind } from "@everloot/protocol";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import GameIcon from "@/components/game/GameIcon";
 import ArmoryTalentTrees from "@/components/talents/ArmoryTalentTrees";
 import { armoryBuild, armoryCatalog } from "@/components/talents/armory-build";

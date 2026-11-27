@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { fieldLabel, type CoverageNeed, type FieldCell } from "@kb/coverage";
 import { Container, DataTable, DataTitle, agreementLabel, type SparseColumn } from "@/components/ui";
