@@ -229,3 +229,51 @@ test("a write-up filed under a regional copy shows on the announcement's page, w
   expect(html).toContain("<p>Name reservations are a week long. Three names per account.</p>");
   expect(html).toContain('"@type":"Article"');
 });
+// November 11, 12 and 25, as stored on 2026-11-27 (titles already the posts' own, as buildTimeline gives them).
+const kaivax = (id: string, region: "us" | "eu", n: number, at: string, title: string, excerpt: string, type: "hotfix" | "post" = "hotfix"): ChangeEntry => ({
+  id, type, game: "forever", at, title, url: `https://${region}.forums.blizzard.com/en/wow/t/h/${region === "us" ? 2403040 : 639885}/${n}`,
+  author: "Kaivax", role: "Community Manager", category: "WoW: Forever", source: "forum", region, topicId: region === "us" ? 2403040 : 639885, postNumber: n, startedThread: n === 1, excerpt,
+});
+const NOV12 = "WoW: Forever Hotfixes - November 12, 2026";
+const NOV11 = "WoW: Forever Hotfixes - November 11, 2026";
+const AV = "Alterac Valley Adjustments - November 25";
+const thread = [
+  kaivax("forum:31066214", "us", 567, "2026-11-25T23:04:33.000Z", AV, "With additional hotfixes that are now live, we have further increased reputation.", "post"),
+  { ...kaivax("forum:31062986", "us", 1, "2026-11-25T19:42:28.000Z", AV, "We’ve seen that players in Alterac Valley were frequently completing the battleground.", "post"), topicId: 2429074 },
+  kaivax("forum:eu:6497741", "eu", 8, "2026-11-12T19:10:54.868Z", NOV12, "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 19:45 CET today. Classes Shaman Weapon imbues and Weapon totems can now be used at the same time."),
+  kaivax("forum:30876030", "us", 9, "2026-11-12T19:10:52.697Z", NOV12, "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 10:45 a.m. PST today."),
+  kaivax("forum:eu:6495278", "eu", 7, "2026-11-12T00:50:13.708Z", NOV11, "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+  kaivax("forum:eu:6495276", "eu", 6, "2026-11-12T00:49:22.321Z", NOV11, "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on 18 November."),
+  kaivax("forum:30863849", "us", 8, "2026-11-12T00:48:47.076Z", NOV11, "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+  kaivax("forum:30863846", "us", 7, "2026-11-12T00:48:41.201Z", NOV11, "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on November 17."),
+];
+const NOV12_PAGE = "us-30876030-wow-forever-hotfixes-november-12-2026";
+
+test("a copy whose stored text stops early shows its twin's fuller text, labelled; Newer is never the same post on the other forum", async () => {
+  data.entries = thread;
+  try {
+    const html = await page(NOV12_PAGE);
+    expect(html).toContain("Shaman Weapon imbues and Weapon totems can now be used at the same time.");
+    expect(html).toMatch(/<figcaption[^>]*>Blizzard(&#x27;|')s words, an excerpt, from the EU forum copy: the US forum copy(&#x27;|')s stored text stops earlier\.<\/figcaption>/);
+    const nearby = html.slice(html.indexOf("data-nearby"), html.indexOf("<aside"));
+    expect(nearby).not.toContain(NOV12);
+    expect(nearby).not.toContain("eu-6497741");
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});
+
+test("Same day and More from list one row per title and day, saying how many posts it holds", async () => {
+  data.entries = thread;
+  try {
+    const html = await page(NOV12_PAGE);
+    const more = html.slice(html.indexOf('id="more-from"'), html.indexOf('id="same-day"'));
+    expect(more.match(new RegExp(AV, "g"))).toHaveLength(1);
+    expect(more).toMatch(new RegExp(`${AV}</a>(?:<[^>]*>)*\\s*·\\s*2 posts`));
+    const day = html.slice(html.indexOf('id="same-day"'));
+    expect(day.match(new RegExp(NOV11, "g"))).toHaveLength(1);
+    expect(day).toMatch(new RegExp(`${NOV11}</a>(?:<[^>]*>)*\\s*·\\s*2 posts`));
+  } finally {
+    data.entries = [sky, eu, post, build, older, euOnly];
+  }
+});

@@ -227,7 +227,7 @@ test("posts with a hero get card thumbnails, a featured card and the share image
   expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/new-one\/card.webp"[^>]*loading="eager"/);
   expect(hub).toMatch(/<img data-news-thumb[^>]*src="\/news\/heroes\/mid-one\/card.webp"[^>]*width="800" height="450"[^>]*loading="lazy"/);
   expect(hub.match(/data-news-thumb-placeholder/g)).toHaveLength(1);
-  expect(hub).toContain(">Forever</span>");
+  expect(hub).toContain(">WoW: Forever</span>");
   const { default: NewsArticle, generateMetadata } = await import("./[slug]/page");
   const page = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "new-one" }) }));
   expect(page).toMatch(/<img data-news-hero[^>]*src="\/news\/heroes\/new-one\/clean.webp" alt="The new art" width="1600" height="900"/);
@@ -260,10 +260,22 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   expect(hub).not.toContain("everloot.app</p>");
   // Dashed means unconfirmed; the chip says so to a screen reader too.
   expect(card("lead")).toMatch(/<span data-news-chip="true" title="Unconfirmed" class="[^"]*border-dashed border-edge">Datamine<span class="sr-only">, unconfirmed<\/span><\/span>/);
-  expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW forever<\/span>/);
+  expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW: Forever<\/span>/);
   expect(hub).not.toContain(">Wow forever<");
   // Everloot's post about a Blizzard post is not itself a blue post.
   expect(card("blue")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">About a blue post<\/span>/);
+});
+
+test("a post's tags read as words, not slugs: the game by its name, the same label once", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "news-tags-"));
+  writeFileSync(join(dir, "tagged.md"), ["---", "slug: tagged", "title: Tagged", "summary: A summary long enough to read as one.", "author: Everloot Team",
+    "published: 2026-10-23", "tags: [blue-post, forever, wow-forever, news-recap]", "status: published", "---", "", "Body."].join("\n"));
+  vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
+  const { default: NewsArticle } = await import("./[slug]/page");
+  const html = renderToStaticMarkup(await NewsArticle({ params: Promise.resolve({ slug: "tagged" }) }));
+  const tags = [...html.matchAll(/<span data-news-tag="true"[^>]*>([^<]*)<\/span>/g)].map((m) => m[1]);
+  expect(tags).toEqual(["About a blue post", "WoW: Forever", "News recap"]);
+  expect(html).not.toMatch(/>(?:blue-post|forever|wow-forever|news-recap)</);
 });
 
 test("news mounts no ads, including a CSS-hidden rail, with an AdSense client configured", async () => {

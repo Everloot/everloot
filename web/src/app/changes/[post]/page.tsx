@@ -5,7 +5,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
-import { GAME_LABEL, TYPE_LABEL, loadTimeline, loadWriteups, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
+import { GAME_LABEL, TYPE_LABEL, foldTitleDay, fullerCopy, loadTimeline, loadWriteups, postIdOfSegment, postPath, timelineDegraded, writeupFor, type BlueWriteup, type ChangeEntry } from "@/lib/changes";
 import { keepBrieflyIf } from "@/lib/degraded-render";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadSiteAssets, siteAssetsFailed } from "@/lib/game-assets";
@@ -87,12 +87,14 @@ function Parts({ parts, index }: { parts: Inline[]; index: MentionIndex }) {
   );
 }
 
+/** Up to RELATED rows, one per title and day: several replies under one title that day are one row saying how many. */
 function PostList({ id, title, entries, more }: { id: string; title: string; entries: ChangeEntry[]; more?: { href: string; label: string } }) {
-  if (entries.length === 0) return null;
+  const rows = foldTitleDay(entries).slice(0, RELATED);
+  if (rows.length === 0) return null;
   return (
     <section aria-labelledby={id} className="min-w-0">
       <SectionHeading id={id} action={more && <Link href={more.href} className={LINK}>{more.label}</Link>}>{title}</SectionHeading>
-      <Card><ChangeList entries={entries} /></Card>
+      <Card><ChangeList entries={rows.map((r) => r.entry)} posts={new Map(rows.map((r) => [r.entry.id, r.posts.length]))} /></Card>
     </section>
   );
 }
@@ -129,7 +131,9 @@ export default async function BluePostPage(props: Props) {
   // Spell tooltips need the asset files: a failed read is kept seconds too.
   const degraded = timelineDown || await keepBrieflyIf(siteAssetsFailed(assets));
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
-  const excerpt = clampExcerpt(entry.excerpt);
+  // A copy stored cut short (the US hotfix of November 12 stops after its first sentence) shows its twin's fuller text.
+  const fuller = fullerCopy(entry);
+  const excerpt = clampExcerpt((fuller ?? entry).excerpt);
   const day = entry.at.slice(0, 10);
   // Newest first, as the timeline lists them.
   const posts = all.filter((e) => e.game === entry.game && isPost(e)).sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
@@ -137,8 +141,8 @@ export default async function BluePostPage(props: Props) {
   const newer = at > 0 ? posts[at - 1] : null;
   const older = at >= 0 && at < posts.length - 1 ? posts[at + 1] : null;
   const others = posts.filter((e) => e.id !== entry.id);
-  const byAuthor = entry.author ? others.filter((e) => e.author === entry.author).slice(0, RELATED) : [];
-  const sameDay = others.filter((e) => e.at.slice(0, 10) === day).slice(0, RELATED);
+  const byAuthor = entry.author ? others.filter((e) => e.author === entry.author) : [];
+  const sameDay = others.filter((e) => e.at.slice(0, 10) === day);
   const authorHref = `/changes?${new URLSearchParams([...(entry.game === "classic" ? [["game", "classic"]] : []), ["author", entry.author ?? ""]]).toString()}`;
   const where = entry.source === "bluesky" ? "on Bluesky" : "on Blizzard's forums";
   const copies = entry.copies ?? [];
@@ -169,10 +173,12 @@ export default async function BluePostPage(props: Props) {
         {excerpt && (
           <Card as="section" aria-label="Blizzard's words">
             <figure data-excerpt className="border-l-2 border-blue-post pl-4">
-              <blockquote cite={entry.url ?? undefined} className="text-blue-post">
+              <blockquote cite={(fuller ?? entry).url ?? undefined} className="text-blue-post">
                 <p><WithSpells text={excerpt} index={index} /></p>
               </blockquote>
-              <figcaption className="mt-1 text-meta text-muted">Blizzard&apos;s words, an excerpt.</figcaption>
+              <figcaption className="mt-1 text-meta text-muted">
+                {`Blizzard's words, an excerpt${fuller ? `, from the ${sourceLabel(fuller)} copy: the ${sourceLabel(entry)} copy's stored text stops earlier` : ""}.`}
+              </figcaption>
             </figure>
           </Card>
         )}

@@ -208,6 +208,32 @@ export function sameAnnouncement(a: string, b: string): boolean {
   return announcementText(a) === announcementText(b);
 }
 
+const ANY_DATE = new RegExp(`\\b(?:(?:${MONTHS}) \\d{1,2}(?:, \\d{4})?|\\d{1,2} (?:${MONTHS})(?: \\d{4})?)\\b`, "gi");
+const ZONE = "(?:\\s*(?:pst|pdt|pt|mst|mdt|cst|cdt|est|edt|et|utc|gmt|bst|cet|cest)\\b)?";
+/** "10:45 a.m. PST", "19:45 CET", "3 p.m.": a clock time with its time zone. */
+const CLOCK = new RegExp(`\\b\\d{1,2}(?::\\d{2}(?:\\s*[ap]\\.?m\\b\\.?)?|\\s*[ap]\\.?m\\b\\.?)${ZONE}`, "gi");
+/** Text with its dates and clock times masked, and a cut-off ellipsis dropped: what stays the same between regions. */
+const bodyText = (s: string) => s.replace(ANY_DATE, "<date>").replace(CLOCK, "<time>").replace(/\s+/g, " ").trim().toLowerCase().replace(/\s*(?:\u2026|\.\.\.)$/, "");
+/** Shorter than this, a shared opening proves nothing. */
+const MIN_SHARED = 40;
+
+/**
+ * Two posts' texts that are one post written for two regions: the same words once dates and clock times are set
+ * aside ("10:45 a.m. PST" and "19:45 CET", "November 17" and "18 November", since Europe's maintenance is a day later),
+ * where one copy's stored text may stop earlier than the other's.
+ */
+export function sameBody(a: string, b: string): boolean {
+  const [x, y] = [bodyText(a), bodyText(b)].sort((p, q) => p.length - q.length);
+  if (!x) return false;
+  return x === y || (x.length >= MIN_SHARED && y.startsWith(x));
+}
+
+/** A copy of an announcement whose stored text runs past the announcement's own (cut short when it was stored), or null. */
+export function fullerCopy(e: ChangeEntry): ChangeEntry | null {
+  const own = bodyText(e.excerpt ?? "");
+  return (e.copies ?? []).find((c) => c.excerpt && bodyText(c.excerpt).length > own.length && sameBody(e.excerpt ?? "", c.excerpt)) ?? null;
+}
+
 /** US first, then the earliest, then by id: which copy of an announcement the timeline shows. */
 const primaryFirst = (a: ChangeEntry, b: ChangeEntry) =>
   Number((a.region ?? "us") !== "us") - Number((b.region ?? "us") !== "us") || a.at.localeCompare(b.at) || a.id.localeCompare(b.id);
@@ -217,7 +243,8 @@ const threadOf = (e: ChangeEntry) => (e.topicId === undefined ? e.id : `${e.regi
  * One entry per announcement. Blizzard posts the same news on the US and the EU forum, sometimes twice on
  * one forum, with the day worded per region. Forum posts of the same game and type, posted the same day
  * (UTC) under the same title, in different threads, are one announcement; a reply also needs the same
- * excerpt, since every reply in a thread carries the thread's title. The US copy, else the earliest, is
+ * text (sameBody: dates and clock times aside, one copy may be cut short), since every reply in a thread carries
+ * the thread's title. The US copy, else the earliest, is
  * the entry; the rest are its `copies`. A Blizzard News article of the same game, type and title within a day of a
  * forum announcement joins it as a copy too: the news card holds no text, and the forum post links it. Bluesky
  * posts, builds and news with no forum twin pass through.
@@ -238,7 +265,8 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
     const key = `${e.game}|${e.type}|${e.at.slice(0, 10)}|${announcementText(e.title)}`;
     const candidates = groups.get(key) ?? [];
     const group = candidates.find((g) => g.every((c) => threadOf(c) !== threadOf(e))
-      && ((g[0].startedThread !== false && e.startedThread !== false) || sameAnnouncement(g[0].excerpt ?? "", e.excerpt ?? "")));
+      && ((g[0].startedThread !== false && e.startedThread !== false) || sameAnnouncement(g[0].excerpt ?? "", e.excerpt ?? "")
+        || sameBody(g[0].excerpt ?? "", e.excerpt ?? "")));
     if (group) group.push(e);
     else groups.set(key, [...candidates, [e]]);
   }
@@ -259,6 +287,26 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
 export function forumRegions(e: ChangeEntry): BlueRegion[] {
   const posted = [e, ...(e.copies ?? [])].filter((c) => c.source === "forum").map((c) => c.region ?? "us");
   return (["us", "eu"] as const).filter((r) => posted.includes(r));
+}
+
+/** One row of a list: an announcement, and every different post made under its title that day (it first). */
+export interface TitleDayRow { entry: ChangeEntry; posts: ChangeEntry[] }
+
+/**
+ * One row per game, title and day (UTC), in the order the entries come. Blizzard posts several replies a day in a
+ * thread that all carry its title (the hotfixes, and the AV adjustments with a follow-up); after groupAnnouncements
+ * has folded each one's regional copies, they are still different posts that would read as repeats. The row is
+ * the first of them; `posts` holds them all. Builds are rows of their own.
+ */
+export function foldTitleDay(entries: readonly ChangeEntry[]): TitleDayRow[] {
+  const rows = new Map<string, TitleDayRow>();
+  for (const entry of entries) {
+    const key = entry.type === "build" ? entry.id : `${entry.game}|${entry.at.slice(0, 10)}|${entry.title}`;
+    const row = rows.get(key);
+    if (row) row.posts.push(entry);
+    else rows.set(key, { entry, posts: [entry] });
+  }
+  return [...rows.values()];
 }
 
 const FILTER_TYPES: Record<Exclude<ChangeFilter, "all">, ChangeType[]> = {

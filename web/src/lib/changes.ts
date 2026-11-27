@@ -4,13 +4,13 @@ import manualFile from "../../../kb/curated/manual-changes.json";
 import writeupsFile from "../../../kb/curated/blue-writeups.json";
 import type { BlueStore } from "@kb/blue-posts";
 import { writeupsById, type BlueWriteup } from "@kb/blue-writeups";
-import { buildTimeline, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "@kb/changes";
+import { buildTimeline, foldTitleDay, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "@kb/changes";
 import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
 import { keep } from "./kept";
 
 export {
-  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, manualEntries, parseFilter, postIdOfSegment,
-  postPath, renderFeed, type BlueThread, type ChangeEntry, type ChangeGame, type ChangeFilter,
+  CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, manualEntries, parseFilter, postIdOfSegment,
+  postPath, renderFeed, type BlueThread, type TitleDayRow, type ChangeEntry, type ChangeGame, type ChangeFilter,
 } from "@kb/changes";
 export type { BlueWriteup } from "@kb/blue-writeups";
 
@@ -51,18 +51,12 @@ export async function timelineDegraded(): Promise<boolean> {
 }
 
 /**
- * The newest `n` rows of a timeline (newest first), one per title per day (UTC): Blizzard sometimes posts twice under
- * one title in a day, and the folded timeline keeps both. The row is the newest of them; `posts` counts them all.
+ * The newest `n` rows of a timeline (newest first), one per title per day (UTC), as /changes and the post pages fold
+ * them (foldTitleDay): Blizzard sometimes posts twice under one title in a day, and the folded timeline keeps both.
+ * The row is the newest of them; `posts` counts them all.
  */
 export function oneRowPerTitleDay(entries: readonly ChangeEntry[], n: number): { entry: ChangeEntry; posts: number }[] {
-  const rows = new Map<string, { entry: ChangeEntry; posts: number }>();
-  for (const entry of entries) {
-    const key = `${entry.at.slice(0, 10)}|${entry.title}`;
-    const row = rows.get(key);
-    if (row) row.posts += 1;
-    else if (rows.size < n) rows.set(key, { entry, posts: 1 });
-  }
-  return [...rows.values()];
+  return foldTitleDay(entries).slice(0, n).map((row) => ({ entry: row.entry, posts: row.posts.length }));
 }
 
 /** For tests: forget the kept timeline. */

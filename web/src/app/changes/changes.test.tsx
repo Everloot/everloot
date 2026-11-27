@@ -102,7 +102,7 @@ test("one column of cards: date, type chip, title linked to the post's page on E
   expect(html).toContain('href="/changes/eu-2-wow-forever-hotfixes"');
   // The original is one click further, on the post's page.
   expect(html).not.toContain("forums.blizzard.com");
-  expect(html).toContain('<p data-excerpt="true" class="text-cell text-blue-post">A short excerpt. Second sentence.</p>');
+  expect(html).toContain('<p data-excerpt="true" class="text-cell text-fg">A short excerpt. Second sentence.</p>');
   expect(html).toMatch(/data-poster[^>]*>Linxy<\/span>[\s\S]*?>Community Manager<\/span>[\s\S]*?>US forum<\/span>/);
   expect(html).toMatch(/data-poster[^>]*>Kaivax<\/span>[\s\S]*?>Community Manager<\/span>[\s\S]*?>EU forum<\/span>/);
   expect(html).not.toContain("Classic realm move");
@@ -358,7 +358,9 @@ test("a blue post reads like Blizzard's blue tracker: blue poster and words, a B
     expect(c).toMatch(/<span data-badge="blizzard" class="[^"]*border-blue-post text-blue-post[^"]*">Blizzard<\/span>/);
     expect(c).toContain(`<span data-role="true" class="text-fg-2">${role}</span>`);
     expect(c).toMatch(new RegExp(`<span data-source-chip="true"><span data-badge="neutral"[^>]*>${where}</span></span>`));
-    expect(c).toMatch(/<p data-excerpt="true" class="text-cell text-blue-post">/);
+    // The words are body text: only the title reads as a link.
+    expect(c).toMatch(/<p data-excerpt="true" class="text-cell text-fg">/);
+    expect(c).not.toMatch(/data-excerpt="true" class="[^"]*text-blue-post/);
     // Still one link per card: the title.
     expect(c.match(/<a /g)).toHaveLength(1);
   }
@@ -373,6 +375,40 @@ test("a blue post reads like Blizzard's blue tracker: blue poster and words, a B
     for (const mark of ["data-badge=\"blizzard\"", "data-poster", "data-source-chip"]) expect(card(text)).not.toContain(mark);
   }
 });
+test("November 11 and 12: twins on both forums are one card, and two posts under one title that day are one card saying 2 posts", async () => {
+  const { buildTimeline } = await import("@/lib/changes");
+  const rolling = "WoW: Forever Hotfixes - November 25, 2026";
+  const euTitle = "WoW: Forever Hotfixes - November 23, 2026";
+  const reply = (id: string, region: "us" | "eu", n: number, postedAt: string, excerpt: string) => ({
+    id, source: "forum", region, url: `https://${region}.forums.blizzard.com/en/wow/t/wow-forever-hotfixes/${region === "us" ? 2403040 : 639885}/${n}`,
+    title: region === "us" ? rolling : euTitle, author: "Kaivax", role: "Community Manager", postedAt, category: "WoW: Forever", game: "forever", kind: "hotfix",
+    excerpt, topicId: region === "us" ? 2403040 : 639885, postNumber: n,
+  });
+  timeline.entries = buildTimeline([
+    reply("forum:eu:6497741", "eu", 8, "2026-11-12T19:10:54.868Z", "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 19:45 CET today. Classes Shaman Weapon imbues and Weapon totems can now be used at the same time."),
+    reply("forum:30876030", "us", 9, "2026-11-12T19:10:52.697Z", "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 10:45 a.m. PST today."),
+    reply("forum:eu:6495278", "eu", 7, "2026-11-12T00:50:13.708Z", "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+    reply("forum:eu:6495276", "eu", 6, "2026-11-12T00:49:22.321Z", "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on 18 November."),
+    reply("forum:30863849", "us", 8, "2026-11-12T00:48:47.076Z", "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed."),
+    reply("forum:30863846", "us", 7, "2026-11-12T00:48:41.201Z", "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on November 17."),
+  ], []);
+  const html = await page();
+  expect(rows(html)).toBe(2);
+  const nov12 = cards(html).find((c) => c.includes("November 12, 2026"))!;
+  expect(nov12).toContain("US · EU forum");
+  expect(nov12).toContain('href="/changes/us-30876030-wow-forever-hotfixes-november-12-2026"');
+  const nov11 = cards(html).find((c) => c.includes("November 11, 2026"))!;
+  expect(nov11.match(/>WoW: Forever Hotfixes - November 11, 2026<\/a>/g)).toHaveLength(1);
+  expect(nov11).toContain("US · EU forum");
+  expect(nov11).toMatch(/<span data-posts="true"[^>]*>2 posts<\/span>/);
+  // Both posts' words, and a link to each post's page.
+  expect(nov11).toContain("Feral Rend and Tear now works on Pounce Bleed.");
+  expect(nov11).toContain("Auction House changes");
+  expect(nov11).toContain('href="/changes/us-30863849-wow-forever-hotfixes-november-11-2026"');
+  expect(nov11).toContain('href="/changes/us-30863846-wow-forever-hotfixes-november-11-2026"');
+  expect(html.match(/data-change-row/g)).toHaveLength(2);
+});
+
 test("builds are plain cards without the blue edge", async () => {
   timeline.entries = [entries[0]];
   const html = await page();

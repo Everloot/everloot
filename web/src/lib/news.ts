@@ -172,3 +172,11 @@ export function relatedPosts(news: Map<string, NewsPost>, post: Pick<NewsPost, "
   for (const p of publishedPosts(news)) if (p.slug !== post.slug && !picked.includes(p)) picked.push(p);
   return picked.slice(0, count);
 }
+
+/** Tags whose words are not their slug's: the game by its name, and a post about a blue post never reads as one itself. */
+const TAG_LABEL: Record<string, string> = { "blue-post": "About a blue post", forever: "WoW: Forever", "wow-forever": "WoW: Forever", "wow-weekly": "WoW Weekly" };
+
+/** A post's tag as words: "news-recap" reads "News recap", "forever" reads "WoW: Forever". */
+export function tagLabel(tag: string): string {
+  return TAG_LABEL[tag] ?? (tag.charAt(0).toUpperCase() + tag.slice(1).replace(/-/g, " ")).replace(/\bwow\b/gi, "WoW");
+}

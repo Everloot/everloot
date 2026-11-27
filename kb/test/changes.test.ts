@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } from "../src/blue-posts.js";
-import { blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, renderFeed, sameAnnouncement, type BuildLike } from "../src/changes.js";
+import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, renderFeed, sameAnnouncement, sameBody, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
 import { postPath } from "../src/changes.js";
 
@@ -307,6 +307,61 @@ test("groupAnnouncements: the US and EU copies of one day's hotfixes and its Bli
   // The news card has no text of its own: it is folded into the forum post, which links it.
   expect(grouped[0].copies!.map((c) => c.id)).toEqual(["news:24315281"]);
   expect(forumRegions(grouped[0])).toEqual(["us"]);
+});
+
+// November 11 and 12, as stored on 2026-11-27: the replies Kaivax posted on both forums, worded per region.
+const twins = [
+  hotfix("forum:eu:6497741", "eu", 639885, 8, "2026-11-12T19:10:54.868Z", "WoW: Forever Hotfixes - November 23, 2026",
+    "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 19:45 CET today. Classes Shaman Weapon imbues and Weapon totems can now be used at the same time."),
+  // The US copy's stored text stops after its first sentence.
+  hotfix("forum:30876030", "us", 2403040, 9, "2026-11-12T19:10:52.697Z", rolling,
+    "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 10:45 a.m. PST today."),
+  hotfix("forum:eu:6495278", "eu", 639885, 7, "2026-11-12T00:50:13.708Z", "WoW: Forever Hotfixes - November 23, 2026",
+    "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed. Hunter Fixed an issue where Volley was activating procs."),
+  hotfix("forum:eu:6495276", "eu", 639885, 6, "2026-11-12T00:49:22.321Z", "WoW: Forever Hotfixes - November 23, 2026",
+    "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on 18 November. They will appear again in the hotfixes update thereafter."),
+  hotfix("forum:30863849", "us", 2403040, 8, "2026-11-12T00:48:47.076Z", rolling,
+    "November 11, 2026 Classes Druid Feral Rend and Tear now works on Pounce Bleed. Hunter Fixed an issue where Volley was activating procs."),
+  hotfix("forum:30863846", "us", 2403040, 7, "2026-11-12T00:48:41.201Z", rolling,
+    "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on November 17. They will appear again in the hotfixes update thereafter."),
+];
+
+test("sameBody: clock times, dates in either order and a copy cut short are the same text; other words are not", () => {
+  const [eu12, us12, , euAh, , usAh] = twins;
+  expect(sameBody(us12.excerpt, eu12.excerpt)).toBe(true);
+  expect(sameBody(eu12.excerpt, us12.excerpt)).toBe(true);
+  expect(sameBody(usAh.excerpt, euAh.excerpt)).toBe(true);
+  expect(sameBody("Realms are back up.", "Realms are back up. The queue is closed.")).toBe(false);
+  expect(sameBody(usAh.excerpt, us12.excerpt)).toBe(false);
+  expect(sameBody("", "")).toBe(false);
+});
+
+test("groupAnnouncements: replies posted on both forums are one entry even when the time zone or the date's wording differ", () => {
+  const grouped = groupAnnouncements(buildTimeline(twins, []));
+  expect(grouped.map((e) => [e.id, (e.copies ?? []).map((c) => c.id)])).toEqual([
+    ["forum:30876030", ["forum:eu:6497741"]],
+    ["forum:30863849", ["forum:eu:6495278"]],
+    ["forum:30863846", ["forum:eu:6495276"]],
+  ]);
+});
+
+test("fullerCopy: the copy whose text runs past this one's, or null", () => {
+  const [us12, , feral] = groupAnnouncements(buildTimeline(twins, []));
+  expect(fullerCopy(us12)?.id).toBe("forum:eu:6497741");
+  expect(fullerCopy(feral)).toBeNull();
+});
+
+test("foldTitleDay: different posts under one title on one day are one row, newest first, holding every post", () => {
+  const rows = foldTitleDay(groupAnnouncements(buildTimeline([...twins, ...hotfixes], [{ key: "b", product: "wowf", buildId: 1, version: "1.60.1.1", firstSeen: "2026-11-25T12:00:00Z" }])));
+  expect(rows.map((r) => [r.entry.title, r.posts.length])).toEqual([
+    ["WoW: Forever Hotfixes - November 25, 2026", 1],
+    ["WoW: Forever build 1.60.1.1", 1],
+    ["WoW: Forever Hotfixes - November 16, 2026", 1],
+    ["WoW: Forever Hotfixes - November 13, 2026", 1],
+    ["WoW: Forever Hotfixes - November 12, 2026", 1],
+    ["WoW: Forever Hotfixes - November 11, 2026", 2],
+  ]);
+  expect(rows.at(-1)!.posts.map((p) => p.id)).toEqual(["forum:30863849", "forum:30863846"]);
 });
 
 test("groupAnnouncements: a news article with no forum twin stays its own entry", () => {
