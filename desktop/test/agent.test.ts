@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
-import { answer, readProviderEntries, sourcesIn } from "../src/main/agent";
+import { answer, evidenceLines, NO_RECORDED_ANSWER, readProviderEntries, sourcesIn } from "../src/main/agent";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
@@ -57,6 +57,29 @@ test("with no provider the answer is the sourced hits themselves; no source mean
   const none = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "q", session: fakeSession([], "nothing here") });
   expect(none.text).toMatch(/No sourced answer/);
   expect(none.sources).toEqual([]);
+});
+
+/** answer_sources' live text for "Where is Hogger?" on 11/27: its note to AI clients first, then a lore page as context. */
+const HOGGER = [
+  "answer_sources has no permitted evidence for the requested location; discover the record with search_knowledge and read it with get_entity. Subject matches are context only.",
+  "Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it.",
+  "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Hogger: Hogger, chieftain of the Riverpaw pack, is a elite gnoll found atop his hill in southwestern Elwynn Forest.",
+  "  Source: https://warcraft.wiki.gg/wiki/Hogger (CC-BY-SA-4.0, as of 2023-11-13)",
+  "  More: https://everloot.app/lore/118664-hogger",
+  "Further reading (links only, nothing fetched): Wowhead https://example.test",
+].join("\n");
+/** Words only the tools' notes to a model use: a player's answer never holds them. */
+const TOOL_TEXT = /answer_sources|search_knowledge|get_entity|permitted evidence|context only|Tool error/;
+
+test("with no provider the player never sees answer_sources' note to AI clients, as on the site (#1609)", async () => {
+  const r = await answer({ mcp: { url: "u", token: null }, entries: [], history: [], question: "Where is Hogger?", session: fakeSession([], HOGGER) });
+  expect(r.text).not.toMatch(TOOL_TEXT);
+  expect(r.text.split("\n")[0]).toBe(NO_RECORDED_ANSWER);
+  expect(r.text).toContain("Hogger, chieftain of the Riverpaw pack");
+  // Only the notices meant for people stay on the first line: the some-words line and a respelling.
+  const piece = HOGGER.split("\n").slice(2, 5).join("\n");
+  expect(evidenceLines(`Read "thunderbluff" as "thunder bluff".\n${piece}`).split("\n")[0]).toBe('Read "thunderbluff" as "thunder bluff".');
+  expect(evidenceLines(`Use get_entity on this record.\n${piece}`)).toBe(evidenceLines(piece));
 });
 
 test("an OpenAI-compatible provider runs the same tool loop in that API's shape", async () => {
