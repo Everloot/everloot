@@ -382,7 +382,10 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
 
   const pickSlot = (index: number) => {
     if (suppressClick.current) return;
-    if (armed) { drop({ kind: "class", class: armed }, { kind: "slot", index }); return; }
+    // While placing, an empty slot takes the class; a filled one opens its picker, as the help text says, and placing
+    // stops (a drag still replaces a member).
+    if (armed && !slots[index]) { drop({ kind: "class", class: armed }, { kind: "slot", index }); return; }
+    if (armed) { setArmed(null); setMessage("Stopped placing."); setSelected(index); return; }
     setSelected(selected === index ? null : index);
   };
 
@@ -421,6 +424,9 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
     return { id: f.family.id, label: lacking.length < f.groups.length ? `${f.family.label} · ${lacking.join(" ")}` : f.family.label };
   });
   const debuffsCovered = cov.debuffs.filter((f) => f.raid === "covered").length;
+  // Debuffs not covered may still be possible with a talent, so the summary names the missing ones: they and the
+  // missing buffs add up to the Missing list.
+  const debuffsMissing = cov.debuffs.filter((f) => f.raid === "missing").length;
 
   const dragClass = drag ? (drag.source.kind === "class" ? drag.source.class : slots[drag.source.index]?.class ?? null) : null;
   const overSlot = drag?.over?.kind === "slot" ? drag.over.index : null;
@@ -505,7 +511,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
           <p className="text-cell-2 text-muted">
             {armed ? (
               <>
-                Placing <span className={`font-medium ${CLASS_TEXT[armed]}`}>{titleCase(armed)}</span>: pick a slot.{" "}
+                Placing <span className={`font-medium ${CLASS_TEXT[armed]}`}>{titleCase(armed)}</span>: pick an empty slot. Pick a filled slot to set its tree.{" "}
                 <button type="button" className="text-fg-2 underline underline-offset-2 hover:text-fg" onClick={() => { setArmed(null); setMessage("Stopped placing."); }}>
                   Stop
                 </button>
@@ -668,7 +674,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
             <span role="status" aria-live="polite">
               Buffs for the whole raid: {cov.summary.covered} of {cov.buffs.length} yes, {cov.summary.cast} by cast,{" "}
               {cov.summary.possible} if talented, {cov.summary.unknown} unknown reach, {cov.summary.missing} missing.
-              Debuffs: {debuffsCovered} of {cov.debuffs.length}.
+              Debuffs: {debuffsCovered} of {cov.debuffs.length}, {debuffsMissing} missing.
             </span>
           }
         >

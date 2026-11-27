@@ -13,14 +13,27 @@ const description = "Every Everloot tool for WoW: Forever: auction prices and gu
 
 export const metadata: Metadata = pageMetadata({ title: "WoW Forever Tools", description, path: "/tools" });
 
-/** Which game icon stands for each tool: a class, a profession, a faction crest or a map legend icon. The first
- *  the asset upload has is used; a tool with none, or one added to the group later, shows its initial. */
-type IconPick = { class: string } | { profession: string } | { faction: string } | { poi: keyof PoiIcons };
+/** Which game icon stands for each tool: a class, a profession, a faction crest, a map legend icon or a currency's icon,
+ *  each from the game files. The first the asset upload has is used; a tool with none, or one added to the group
+ *  later, shows its initial. */
+type IconPick = { class: string } | { profession: string } | { faction: string } | { poi: keyof PoiIcons } | { currency: number };
 const TOOL_ICONS: Record<string, IconPick[]> = {
+  "/census": [{ poi: "service" }],
+  "/rankings": [{ currency: 3468 }], // Rank Points
+  "/tools/guild-board": [{ poi: "dungeon" }],
+  "/guilds": [{ poi: "dungeon" }],
+  "/tools/auctions": [{ currency: 3402 }], // Merchant's Favor, a gold coin
+  "/tools/bags": [{ profession: "Tailoring" }],
+  "/tools/disenchanting": [{ profession: "Enchanting" }],
+  "/addons": [{ profession: "Engineering" }],
   "/tools/raid": [{ poi: "raid" }, { class: "paladin" }],
   "/tools/talents": [{ class: "mage" }],
   "/tools/professions": [{ profession: "Blacksmithing" }],
   "/tools/farming-routes": [{ poi: "herb" }, { profession: "Herbalism" }],
+  "/tools/legacy": [{ poi: "quest" }],
+  "/tools/gold-ledger": [{ currency: 3469 }], // Tarnished Undermine Real, a coin
+  "/tools/builds": [{ poi: "trainer" }],
+  "/tools/alts": [{ poi: "flight" }],
 };
 
 /** Each tool's icon URL, for the tools the asset upload has an icon for. */
@@ -31,7 +44,8 @@ function toolIcons(assets: SiteAssets | null): Map<string, string> {
   const url = (pick: IconPick) => ("class" in pick ? classes.find((c) => c.key === pick.class)?.icon
     : "profession" in pick ? professions.find((p) => p.key === pick.profession)?.icon
       : "faction" in pick ? factions.get(pick.faction)
-        : poi[pick.poi]);
+        : "poi" in pick ? poi[pick.poi]
+          : assets?.currencyIcons.get(pick.currency));
   const out = new Map<string, string>();
   for (const [href, picks] of Object.entries(TOOL_ICONS)) {
     const found = picks.map(url).find(Boolean);

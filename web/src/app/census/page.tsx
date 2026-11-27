@@ -45,10 +45,11 @@ type Row = { key: string; label: string; count: CensusCount; href?: string; fact
 
 /**
  * One slice: a row per group with its count and its share of `total` (the window's characters, or the filter's
- * count; no share column when that is hidden). A row with an `href` links to the census filtered to it. `byClass`: the rows are
+ * count; no share column when that is hidden). `of`: whose share it is, from the filter ("Troll"); absent, all characters
+ * in the window. A row with an `href` links to the census filtered to it. `byClass`: the rows are
  * classes, and each chart bar takes its class colour. The table keeps every published count and share.
  */
-function CountTable({ id, title, item, rows, total, byClass = false, icons = {} }: { id: string; title: string; item: string; rows: Row[]; total: number | null; byClass?: boolean; icons?: CensusIcons }) {
+function CountTable({ id, title, item, rows, total, of, byClass = false, icons = {} }: { id: string; title: string; item: string; rows: Row[]; total: number | null; of?: string; byClass?: boolean; icons?: CensusIcons }) {
   rows = [...rows].sort((a, b) => {
     if (item === "Race" && a.faction !== b.faction) return (a.faction ?? "").localeCompare(b.faction ?? "");
     return item === "Class" || item === "Race" ? (b.count ?? -1) - (a.count ?? -1) : 0;
@@ -63,7 +64,7 @@ function CountTable({ id, title, item, rows, total, byClass = false, icons = {} 
   if (total !== null) {
     columns.push({
       key: "share",
-      header: "Share",
+      header: of ? `Share of ${of} characters` : "Share",
       cell: (row) => row.count !== null && (
         <span className="font-mono tabular-nums">{percent(row.count, total)}</span>
       ),
@@ -73,7 +74,7 @@ function CountTable({ id, title, item, rows, total, byClass = false, icons = {} 
     <Card as="section" aria-labelledby={id}>
       <SectionHeading id={id}>{title}</SectionHeading>
       {item === "Faction" ? <Factions rows={rows} total={total} /> : <Bars title={title} rows={rows} byClass={byClass} icons={icons} />}
-      <DataTable caption={`${title}: characters and share of all characters in the window`} columns={columns} rows={rows} rowKey={(row) => row.key} />
+      <DataTable caption={`${title}: characters and share of ${of ? `all ${of} characters` : "all characters in the window"}`} columns={columns} rows={rows} rowKey={(row) => row.key} />
     </Card>
   );
 }
@@ -199,6 +200,7 @@ function Filtered({ view: v, window: w, icons }: { view: FilteredCensus; window:
           title={`${v.label}: ${BY_TITLE[b.by][0].toLowerCase()}`}
           item={BY_TITLE[b.by][1]}
           total={total}
+          of={v.label}
           icons={icons}
           rows={b.rows.map((r) => ({
             ...r,

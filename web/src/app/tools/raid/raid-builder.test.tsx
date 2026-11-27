@@ -287,3 +287,26 @@ test("a raid link still opens its raid", async () => {
   expect(label(6)).toMatch(/^Group 2, slot 2: Priest, /);
   expect(location.hash).toMatch(/^#raid=ELR1-10-/);
 });
+
+test("while placing, a filled slot opens its tree picker as the help text says, and placing stops; an empty slot still takes the class", async () => {
+  await render();
+  await click(tile("Paladin"));
+  await click(slot(0));
+  await click(tile("Mage"));
+  expect(container.textContent).toContain("Pick a filled slot to set its tree.");
+  await click(slot(0));
+  expect(label(0)).toBe("Group 1, slot 1: Paladin, any tree");
+  expect(container.querySelector('[role="group"][aria-label="Pick for group 1, slot 1"]')).not.toBeNull();
+  expect(tile("Mage").getAttribute("aria-pressed")).toBe("false");
+});
+
+test("the Missing count is the buffs and debuffs the summary calls missing, added up", async () => {
+  await render();
+  await dragTo(tile("Warrior"), slot(0));
+  const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
+  const buffs = Number(/(\d+) missing\.\s*Debuffs/.exec(note)?.[1]);
+  const debuffs = Number(/Debuffs: \d+ of \d+, (\d+) missing/.exec(note)?.[1]);
+  const header = Number(/Missing \((\d+)\)/.exec(container.querySelector("#raid-missing")!.textContent!)?.[1]);
+  expect(Number.isNaN(debuffs)).toBe(false);
+  expect(buffs + debuffs).toBe(header);
+});

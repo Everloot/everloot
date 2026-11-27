@@ -1,6 +1,7 @@
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
 import { Container, Disclosure, PageHeader, SectionHeading } from "@/components/ui";
+import { BANNER_CAPTION } from "@/components/ui/Banner";
 import RaidBuilder from "./RaidBuilder";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -101,6 +102,8 @@ export default async function RaidView({ initialCode, classContext }: { initialC
           </p>
         </Disclosure>
       </section>
+      {/* The banner's credit, at the end of the page rather than between the title and the lede. */}
+      {banner && assets && <p data-banner-credit className="mt-8 text-[10px] leading-none text-muted">{BANNER_CAPTION}</p>}
     </Container>
   );
 }

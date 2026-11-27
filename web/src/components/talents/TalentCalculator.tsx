@@ -458,7 +458,14 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
   if (assets && tipNode) {
     const rank = shownRanks[tipNode.id]?.rank ?? 0;
     const choice = tipNode.kind === "choice";
-    const entries = choice ? tipNode.entries : [entryAtRank(tipNode, rank)];
+    // The rank held (the first one before any point), and the one the next point buys.
+    const entries = choice ? tipNode.entries : [entryAtRank(tipNode, Math.max(0, rank - 1))];
+    const next = !choice && rank > 0 && rank < tipNode.maxRanks ? entryAtRank(tipNode, rank) : null;
+    // Every multi-rank talent keeps its per-rank amounts on a curve (TraitDefinitionEffectPoints -> Curve) we do not
+    // extract, so its text holds the spell's stored amounts and cannot change with rank. A tiered node's next entry is
+    // its own spell, with its own text.
+    const sameEntry = next !== null && next === entries[0];
+    const ranksInEntry = choice ? 1 : entries[0].maxRanks ?? tipNode.maxRanks;
     const verdict = canAdd(catalog, shownRanks, tipNode.id, shownAvailable);
     tipAnchor = choice ? `talent-${tipNode.id}-0` : `talent-${tipNode.id}`;
     tipContent = {
@@ -466,6 +473,8 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
       rank: `Rank ${rank}/${tipNode.maxRanks}`,
       text: entries.map((e) => assetOf(assets, e)?.text).filter(Boolean).join("\n\n") || null,
       partial: entries.some((e) => assetOf(assets, e)?.partial),
+      next: next === null ? null : sameEntry ? "its amount is not in the game files we read." : assetOf(assets, next)?.text ?? `${next.name}.`,
+      note: ranksInEntry > 1 ? "The amount for each rank is not in the game files we read, so the numbers above stay the same at every rank." : null,
       lock: verdict.ok || verdict.reason === "max-rank" ? null : refusalText(verdict.reason!, tipNode, catalog, shownRanks),
       label: `${assets.label} · build ${assets.version}`,
     };

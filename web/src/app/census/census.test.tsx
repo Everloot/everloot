@@ -198,6 +198,14 @@ test("filtered to a race: its count and share, then by class, and no day-by-day 
   expect(page).toMatch(/<a href="\/census\?race=troll"/);
 });
 
+test("a filtered split names its share after the filter, not all characters in the window", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await filtered({ race: "troll", window: "launch" });
+  expect(page).toContain("Troll: by class: characters and share of all Troll characters");
+  expect(page).toMatch(/<th[^>]*>(?:<[^>]*>)*Share of Troll characters/);
+  expect(page).not.toContain("share of all characters in the window");
+});
+
 test("a filter with no published total says so and lists the parts without a share; the ruleset says what it means", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const words = text(await filtered({ faction: "alliance", class: "hunter", ruleset: "forever" }));
