@@ -52,6 +52,15 @@ export function zoneFlightMasters(mapId: number, data: Pick<WorldMapData, "fligh
   return data.flightNodes.filter((n) => n.uiMapId === mapId).sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
 }
 
+/** The zone's flight masters with their spot on the zone map (0 to 100, as the pin tables print it); null where the files' point falls outside it. */
+export function zoneFlightPins(mapId: number, data: Pick<WorldMapData, "flightNodes" | "zones"> = WORLD_MAP) {
+  const zones = zoneTable(data);
+  return zoneFlightMasters(mapId, data).map((n) => {
+    const at = worldToZone(zones, mapId, { continentId: n.continentId, worldX: n.worldX, worldY: n.worldY });
+    return { ...n, at: at ? { x: Math.round(at.x * 1000) / 10, y: Math.round(at.y * 1000) / 10 } : null };
+  });
+}
+
 export function zoneByMapId(mapId: number, data: Pick<WorldMapData, "zones" | "continents"> = WORLD_MAP): ZoneSummary | undefined {
   return publicZones(data).find((z) => z.mapId === mapId);
 }

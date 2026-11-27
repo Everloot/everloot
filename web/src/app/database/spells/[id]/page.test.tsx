@@ -302,6 +302,40 @@ test("the Effect values tab gives each effect's value the way the talent tooltip
   expect(effects).toContain("2 sec");
 });
 
+test("a recipe's tabs name its items, count its reagents and link the profession that teaches it, with its skill ranks", async () => {
+  known([[3276, "Heavy Linen Bandage"]]);
+  shown.items = new Map([[2581, "Heavy Linen Bandage"], [2589, "Linen Cloth"]]);
+  const page = await render("3276");
+  const creates = panel(page, "creates");
+  expect(creates).toContain('href="/database/items/2581"');
+  expect(creates).toContain(">Heavy Linen Bandage<");
+  expect(creates).not.toContain("item 2581");
+  // The recipe file's count beside the reagent: two Linen Cloth.
+  const costs = panel(page, "costs");
+  expect(costs).toContain(">Linen Cloth<");
+  expect(costs).toMatch(/Count(?:<[^>]*>)*[\s\S]*?>2</);
+  // The skill line is a profession with a page: its name and link, and the ranks the files give.
+  const taught = panel(page, "taught-by");
+  expect(taught).toContain('href="/tools/professions/first-aid"');
+  expect(taught).toContain(">First Aid<");
+  expect(taught).not.toContain("profession 129");
+  expect(taught).toMatch(/Yellow(?:<[^>]*>)*[\s\S]*?>50</);
+  expect(taught).toMatch(/Grey(?:<[^>]*>)*[\s\S]*?>100</);
+  // An item the name rule does not show yet keeps its id, never a guessed name.
+  shown.items = new Map();
+  expect(panel(await render("3276"), "creates")).toContain("Item 2581");
+});
+
+test("in short, a spell that creates nothing says what the files do give, not that they say nothing", async () => {
+  known([[284, "Heroic Strike"], [439, "Healing Potion"]]);
+  const strike = await render("284");
+  expect(strike).not.toContain("The files say nothing about what it creates.");
+  expect(strike).toContain("The files list 9 ranks; this is rank 2.");
+  const potion = await render("439");
+  expect(potion).not.toContain("The files say nothing about what it creates.");
+  expect(potion).toContain("The files list 3 items that cast it.");
+});
+
 test("a spell the numbers file does not hold gets no invented tooltip lines", async () => {
   known([[1234, "Name Only"]]);
   const tip = box(await render("1234"));
