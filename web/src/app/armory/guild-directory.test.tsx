@@ -169,7 +169,7 @@ describe("the guild page summary", () => {
     expect(out).toContain("Level 60");
     expect(out).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
     expect(out).toMatch(/Members read<\/dt><dd[^>]*>2<\/dd>/);
-    expect(out).toMatch(/Level 60<\/dt><dd[^>]*>1<\/dd>/);
+    expect(out).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
     expect(out).toContain('data-population="classes"');
     expect(out).toContain("2 (66.7%)");
     expect(out).toContain("1 (33.3%)");
@@ -446,12 +446,6 @@ describe("the guild home", () => {
     for (const sort of ["level", "item-level", "last-login"]) expect(out).toContain(`href="/armory/eu/guilds/ember-wardens?class=hunter&amp;sort=${sort}&amp;dir=desc"`);
   });
 
-  test("the folded phone line is level and rank alone", async () => {
-    const out = roster(await html(pages.guild("eu", "ember-wardens")));
-    expect(out).toMatch(/class="dt-meta">Level 41 · Guild Master</);
-    expect(out).toMatch(/class="dt-meta">Level 60 · Rank 1</);
-  });
-
   test("a level spread strip sits above the roster, each band linking to the roster filtered to it", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     const strip = out.slice(out.indexOf("data-guild-levels"), out.indexOf('aria-labelledby="armory-roster"'));
@@ -482,5 +476,42 @@ describe("the guild home", () => {
     expect(out).toMatch(/2026-11-07[^<]*<span[^>]*><span class="font-sans">seen<\/span><\/span>/);
     vi.stubEnv("EVERLOOT_GUILDS", "");
     expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain("Ashka");
+  });
+});
+
+describe("QA round 1: rosters and the directory", () => {
+  test("a Skyborne member's race reads by name, not Unknown", async () => {
+    mem.putGuild(armoryGuild(), [
+      { characterSlug: "gang-jubaster", name: "Gang", surname: "Jubaster", level: 51, classId: 4, raceId: 96, rank: 3 },
+      { characterSlug: "sora-vel", name: "Sora", surname: "Vel", level: 60, classId: 8, raceId: 95, rank: 3 },
+    ]);
+    const out = rosterTable(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toContain("Windshaper Skyborne");
+    expect(out).toContain("High Order Skyborne");
+    expect(out).not.toContain("Unknown");
+  });
+
+  test("the phone line adds race, class and item level to level and rank", async () => {
+    const out = roster(await html(pages.guild("eu", "ember-wardens")));
+    expect(out).toMatch(/class="dt-meta">Level 60 · Troll Hunter · Rank 1 · ilvl 57.41</);
+    expect(out).toMatch(/class="dt-meta">Level 41 · Unknown Hunter · Guild Master</);
+  });
+
+  test("each Level 60 count says what it counts: characters read on /guilds, the Blizzard roster on the guild page", async () => {
+    const dir = await html(pages.directory());
+    expect(dir).toContain("Level 60 read");
+    expect(dir).toMatch(/Level 60 read counts the characters read at level 60/);
+    const guild = await html(pages.guild("eu", "ember-wardens"));
+    expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+  });
+
+  test("the average item level order ranks guilds with at least 10 members read, and says so", async () => {
+    const spy = vi.spyOn(mem, "guildDirectory");
+    const out = await html(pages.directory({ sort: "item-level" }));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ sort: "item_level", minRead: 10 }));
+    expect(out).toContain("Ranked by average item level: guilds with at least 10 members read.");
+    spy.mockClear();
+    await html(pages.directory());
+    expect(spy).toHaveBeenCalledWith(expect.not.objectContaining({ minRead: expect.anything() }));
   });
 });

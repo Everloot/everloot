@@ -56,6 +56,8 @@ test("an unknown class or race id reads Unknown, never a guess", () => {
   expect(classTokenOfId(null)).toBeNull();
   expect(raceOfId(8)).toBe("Troll");
   expect(raceOfId(10)).toBe("Unknown");
+  expect(raceOfId(95)).toBe("High Order Skyborne");
+  expect(raceOfId(96)).toBe("Windshaper Skyborne");
   expect(classTokenOfName("Hunter")).toBe("HUNTER");
   expect(slotLabel("MAIN_HAND")).toBe("Main hand");
   expect(slotLabel("WEIRD")).toBe("Unknown");

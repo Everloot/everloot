@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { armoryCharacter } from "@/lib/armory.fixture";
 import type { ItemTip } from "@/lib/game-assets";
-import { Equipment, ProfileDetailsView, readTimes } from "./profile";
+import { Equipment, PlayHistoryView, ProfileDetailsView, readTimes } from "./profile";
 
 const UNKNOWN = "https://assets.example.test/b/icons/134400.webp";
 const tip = (over: Partial<ItemTip> = {}): ItemTip => ({
@@ -107,4 +107,16 @@ test("a linked page's details show play history as its own section, and its read
 test("an empty play history adds no section", () => {
   const c = armoryCharacter({ details: { revision: 1, playHistory: { asOf: "2026-11-20T08:00:00.000Z", groups: [], ranked: {} } } });
   expect(renderToStaticMarkup(<ProfileDetailsView character={c} />)).not.toContain("armory-play-history");
+});
+
+test("a play-history count of 0 shows without a rank; a count above 0 keeps its rank", () => {
+  const html = renderToStaticMarkup(<PlayHistoryView
+    history={{ asOf: "2026-11-09T10:00:00.000Z", groups: [], ranked: { deaths: 0, quests: 12 } }}
+    ranks={[
+      { metric: "deaths", rank: 5705, of: 21422, tied: 15716, href: "/armory/rankings/deaths" },
+      { metric: "quests-completed", rank: 90, of: 15620, tied: 0, href: "/armory/rankings/quests-completed" },
+    ]}
+  />);
+  expect(html).not.toContain("/armory/rankings/deaths");
+  expect(html).toContain("#90 of 15,620");
 });
