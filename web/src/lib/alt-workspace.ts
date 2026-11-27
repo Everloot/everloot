@@ -46,7 +46,7 @@ export const nameKey = (name: string) => name.normalize("NFC").toLowerCase();
 /** One key per character: its name in any case, on its realm however the realm's spaces and hyphens are written
  *  ("Moon Guard", "moon-guard"), as the account reads a realm (linkRealmKey in lib/character-links.ts). */
 export const altKey = (name: string, realm: string) =>
-  `${nameKey(name)}\n${realm.normalize("NFC").toLowerCase().replace(/’/g, "'").replace(/[\s-]+/g, " ").trim()}`;
+  `${nameKey(name)}\n${realm.normalize("NFC").toLowerCase().replace(/\u2019/g, "'").replace(/[\s-]+/g, " ").trim()}`;
 
 /** "Thrall (Moon Guard)", or "Thrall" while its realm is not set. */
 export const altLabel = (alt: { name: string; realm: string | null }) => (alt.realm ? `${alt.name} (${alt.realm})` : alt.name);

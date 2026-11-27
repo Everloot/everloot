@@ -40,12 +40,12 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 export function cleanCommentBody(value: string): string {
   return value
     .replace(/\r\n?/g, "\n")
-    .replace(/[\u0000-\u0009\u000b-\u001f\u007f‪-‮⁦-⁩]/g, "")
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
-const cleanNote = (value: string) => value.replace(/[\u0000-\u001f\u007f‪-‮⁦-⁩]/g, "").trim();
+const cleanNote = (value: string) => value.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, "").trim();
 
 /** An entity id a page could have: a positive 32-bit integer. */
 export function parseEntityId(value: unknown): number | null {

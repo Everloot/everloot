@@ -37,7 +37,7 @@ const inlines = (b: Block): Inline[][] => (b.type === "quote" ? [b.inline] : pro
 /** Words of the post's own prose: paragraphs and lists, not headings or quotes. A token counts as one word. */
 export function postWords(blocks: Block[]): number {
   let n = 0;
-  for (const b of blocks) for (const i of prose(b)) n += (inlineText(i).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
+  for (const b of blocks) for (const i of prose(b)) n += (inlineText(i).match(/[\p{L}\p{N}][\p{L}\p{N}'\u2019-]*/gu) ?? []).length;
   return n;
 }
 

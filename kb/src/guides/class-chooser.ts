@@ -153,7 +153,7 @@ export interface ChooserFiles { roles: ChooserFile | null; chooser: ChooserFile 
 
 type LineOf = (path: readonly PropertyKey[]) => number;
 
-const normal = (source: string) => source.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+const normal = (source: string) => source.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n");
 
 /**
  * The line each field is written on: a key's own line, or a list item's. A field that is not written points at the

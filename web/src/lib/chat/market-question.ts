@@ -65,7 +65,7 @@ const WORTH_WORDS = "(?:worth|costs?|(?:sells?|goes?|going|selling) for|price|pr
 export function validRealmName(name: unknown): name is string {
   if (typeof name !== "string") return false;
   const realm = name.trim();
-  return realm.length >= 2 && realm.length <= 40 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(realm);
+  return realm.length >= 2 && realm.length <= 40 && /^[\p{L}\p{N}][\p{L}\p{N} '\u2019-]*$/u.test(realm);
 }
 
 /** Copper as gold, silver and copper, as the market tool writes it. */
@@ -100,7 +100,7 @@ function takeRealm(text: string): { rest: string; realm: string | null } {
   const tail = text.slice(at).replace(/^\s(?:on|in|at)\s+/i, "").replace(/^the\s+/i, "").replace(/^realm\s+/i, "").replace(/\s+(?:realm|server)$/i, "").trim();
   // "in the auction house" says where, not which realm: it is dropped and no realm is named.
   if (NOT_REALMS.has(tail.toLowerCase())) return { rest: text.slice(0, at), realm: null };
-  if (!tail || tail.length > 40 || tail.split(/\s+/).length > 5 || !/^[\p{L}\p{N}][\p{L}\p{N} '’;:,.-]*$/u.test(tail)) return { rest: text, realm: null };
+  if (!tail || tail.length > 40 || tail.split(/\s+/).length > 5 || !/^[\p{L}\p{N}][\p{L}\p{N} '\u2019;:,.-]*$/u.test(tail)) return { rest: text, realm: null };
   return { rest: text.slice(0, at), realm: tail };
 }
 
@@ -127,12 +127,12 @@ function takeItemRefs(text: string): { text: string; refs: ItemRef[] } {
 function subjectOf(raw: string, refs: ItemRef[]): MarketIntent["item"] | null {
   // The name keeps a leading article: the item resolver tries the whole name first (a real item can be "The ...")
   // and drops a conversational article itself only when no item has that name. `bare` only judges what was asked.
-  const s = raw.trim().replace(/^["“”\[]+|["“”\]]+$/g, "").trim().replace(/\s+item$/i, "").trim();
+  const s = raw.trim().replace(/^["\u201c\u201d\[]+|["\u201c\u201d\]]+$/g, "").trim().replace(/\s+item$/i, "").trim();
   const bare = s.replace(/^(?:the|a|an|some|one)\s+/i, "");
   if (bare === ITEM_MARK) return refs.length === 1 ? itemOf(refs[0].raw, refs[0].label) : null;
   if (!bare || bare.includes(ITEM_MARK) || s.length > MAX_SUBJECT || VAGUE.has(bare.toLowerCase()) || AUX.test(bare)) return null;
   if (/^\d+$/.test(bare)) return itemOf(bare);
-  return /^[\p{L}\p{N}][\p{L}\p{N} '’,.:()-]*$/u.test(s) ? { name: s } : null;
+  return /^[\p{L}\p{N}][\p{L}\p{N} '\u2019,.:()-]*$/u.test(s) ? { name: s } : null;
 }
 
 /**

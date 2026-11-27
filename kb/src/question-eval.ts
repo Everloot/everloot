@@ -73,7 +73,7 @@ export async function resolve(db: ReleaseSource, q: Question): Promise<Resolutio
 }
 
 /** Typographic apostrophes and quotes as the plain ones the game files use: a model writes "Zul’Farrak". */
-const plainQuotes = (s: string) => s.replace(/[‘’ʼ]/g, "'").replace(/[“”]/g, '"');
+const plainQuotes = (s: string) => s.replace(/[\u2018\u2019\u02bc]/g, "'").replace(/[\u201c\u201d]/g, '"');
 
 /**
  * A fact as a whole word or number in the text, any case, curly or straight apostrophes: "75" is not found in "175".

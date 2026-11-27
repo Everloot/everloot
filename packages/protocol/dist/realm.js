@@ -3,5 +3,5 @@ export function validRealm(name) {
     if (typeof name !== "string")
         return false;
     const realm = name.trim();
-    return realm.length >= 2 && realm.length <= 40 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(realm);
+    return realm.length >= 2 && realm.length <= 40 && /^[\p{L}\p{N}][\p{L}\p{N} '\u2019-]*$/u.test(realm);
 }

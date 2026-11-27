@@ -21,7 +21,7 @@ const clean = (s: string) => s.trim().toLowerCase();
  * A realm as an opt-out matches it, however it was spelled: the rule of public.link_realm_key (lower case, the curly
  * apostrophe as a straight one, any run of spaces and hyphens as one space). The opt-out form stores realms this way.
  */
-const realmKey = (s: string) => s.toLowerCase().replace(/’/g, "'").replace(/[\s-]+/g, " ").trim();
+const realmKey = (s: string) => s.toLowerCase().replace(/\u2019/g, "'").replace(/[\s-]+/g, " ").trim();
 
 /** Schema-valid names and install strings never confer authority. Grants are server-issued. */
 export function authorizeRecord(row: IntakeRecord, hashes: string[], state: PublicationState, now: Date): IntakeRecord | null {

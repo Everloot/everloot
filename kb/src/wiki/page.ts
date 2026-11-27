@@ -181,7 +181,7 @@ const LIST_ITEM = /^\s*(?:[-*+]|\d+\.)\s+/;
 
 /** Splits a page file into its front matter (parsed YAML) and body blocks. Throws when the front matter is missing or not YAML. */
 export function parsePage(source: string): ParsedPage {
-  const text = source.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const text = source.replace(/^\ufeff/, "").replace(/\r\n?/g, "\n");
   const fm = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
   if (!fm) throw new Error("the page must start with front matter between --- lines");
   const data = parseYaml(fm[1]) as unknown;

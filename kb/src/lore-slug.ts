@@ -7,7 +7,7 @@ import { catalogPath } from "./catalog-paths.js";
 
 /** Lowercase ASCII letters and digits joined by hyphens; accents stripped, everything else dropped. */
 export function slugify(name: string): string {
-  const ascii = name.normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  const ascii = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   const runs = ascii.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   return runs.join("-").slice(0, 80).replace(/-+$/, "");
 }
