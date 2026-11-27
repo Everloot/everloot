@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { GAME_DATA_CREDIT, SITE, TALENT_CLASSES } from "@everloot/protocol";
 import { CLIENT_LABEL } from "./edges.js";
 import { slugify } from "./lore-slug.js";
+import { worldToZone, type ZoneEntry } from "./world-coords.js";
 import { expandAliases } from "./name-aliases.js";
 import { allTerms, askingWord } from "./search.js";
 
@@ -111,10 +112,17 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
   const zoneName = new Map<number, string>();
   const continents = new Map<number, string>();
   for (const c of arr(map?.continents)) { const r = rec(c); const id = num(r?.id); const name = str(r?.name); if (id !== undefined && name) continents.set(id, name); }
+  // Each zone's rectangle in world yards, to give an entrance's spot on the zone map as the instance page does.
+  const zoneRects: ZoneEntry[] = [];
   for (const z of arr(map?.zones)) {
     const r = rec(z); const id = num(r?.uiMapId); const name = str(r?.name);
     if (id === undefined || !name) continue;
     zoneName.set(id, name);
+    const b = rec(r?.bounds); const continentId = num(r?.continentId);
+    const left = num(b?.left), top = num(b?.top), right = num(b?.right), bottom = num(b?.bottom);
+    if (continentId !== undefined && left !== undefined && top !== undefined && right !== undefined && bottom !== undefined) {
+      zoneRects.push({ mapId: id, name, continentId, bounds: { left, top, right, bottom } });
+    }
     const continent = continents.get(num(r?.continentId) ?? -1);
     facts.push({ kind: "zone", name, claim: `${name}: a zone${continent ? ` of ${continent}` : ""}, in the game files.`, url: `${SITE}/database/zones/${segment(id, name)}` });
   }
@@ -131,6 +139,11 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     if (min !== undefined && kind !== "instance") instances.push({ name, level: min, raid: kind === "raid" });
     const level = min !== undefined && max !== undefined ? (min === max ? `level ${min}` : `levels ${min} to ${max}`) : "";
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
+    // Where on the zone's map, on its 0 to 100 scale and to one decimal, as the instance page and the map pin show it.
+    const continentId = num(r?.continentId); const worldX = num(r?.worldX); const worldY = num(r?.worldY);
+    const at = zone && continentId !== undefined && worldX !== undefined && worldY !== undefined
+      ? worldToZone(zoneRects, num(r?.uiMapId)!, { continentId, worldX, worldY }) : null;
+    const spot = at ? ` at ${Math.round(at.x * 1000) / 10}, ${Math.round(at.y * 1000) / 10}` : "";
     const bosses = arr(encounters?.[String(id)]);
     const url = `${SITE}/database/instances/${segment(id, name)}`;
     // Encounter names in order (docs/DATA_POLICY.md, "Game-file facts in answers"), each once: the files repeat a boss
@@ -138,7 +151,7 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
     const names = [...new Set(bosses.map((b) => str(rec(b)?.name)).filter(Boolean))];
     facts.push({
       kind: "instance", name,
-      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}` : ""}${names.length ? `; the files name ${names.length} ${names.length === 1 ? "boss" : "bosses"}: ${names.join(", ")}` : ""}.`,
+      claim: `${name}: a ${kind}${level ? `, ${level}` : ""}${zone ? `, entered from ${zone}${spot}` : ""}${names.length ? `; the files name ${names.length} ${names.length === 1 ? "boss" : "bosses"}: ${names.join(", ")}` : ""}.`,
       url,
     });
     names.forEach((bossName, i) => {

@@ -268,10 +268,15 @@ export async function answerSources(
   const fromFiles = pieces.filter((e) => e.role === undefined).map(plain);
   const places = pieces.filter((e) => e.role === "place").map(plain);
   const named = observed.length + answers.length + fromFiles.length + gaps.length;
-  const fill = new Set(answers.length ? [] : [...curated, ...lore].sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate))).slice(0, Math.max(0, args.limit - named)));
+  // Once an observed or files fact answers what was asked of a name ("Where is the Deadmines entrance?": the files'
+  // entrance), wiki pages that only share the question's words (a kobold "found within the entrance section") stay out;
+  // a page the question names stays as context.
+  const answered = predicate !== null && [...observed, ...fromFiles].some((e) => claimAnswers(asked, e.claim, predicate));
+  const context = answered ? directLore : lore;
+  const fill = new Set(answers.length ? [] : [...curated, ...context].sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate))).slice(0, Math.max(0, args.limit - named)));
   const room = Math.max(0, args.limit - named - fill.size);
   const evidence = [
-    ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
+    ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...context.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
   ];
   if (predicate) evidence.sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate)));
   evidence.splice(args.limit);
