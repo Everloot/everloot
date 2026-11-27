@@ -255,25 +255,51 @@ test("a talent spell with no spell tooltip uses its talent's text and icon from 
   expect(page.split("data-entity-header")[1]?.split("</header>")[0]).toContain('src="https://a.test/icons/136048.webp"');
 });
 
-test("the Items tab lists only the items the name rule shows, with how each casts the spell", async () => {
+test("the Items tab names the items the name rule shows and lists the rest by id, with how each casts the spell", async () => {
   known([[430, "Drink"]]);
   shown.items = new Map([[159, "Refreshing Spring Water"]]);
   const items = panel(await render("430"), "items");
   expect(items).toContain('href="/database/items/159"');
   expect(items).toContain("Refreshing Spring Water");
   expect(items).toMatch(/>Use</);
-  // An item the rule does not show yet is left out, not listed by its id.
-  expect(items).not.toContain('href="/database/items/2071"');
-  expect(items).toContain("not shown yet");
+  // An item the rule does not name yet is listed by its id, as the Creates tab lists one, never by a guessed name.
+  expect(items).toContain('href="/database/items/2071"');
+  expect(items).toContain("Item 2071");
   // A development leftover is left out and counted, as the item set pages do.
   shown.items = new Map([[159, "Refreshing Spring Water"], [2071, "Deprecated Mountain Spring Water"]]);
   const leftover = panel(await render("430"), "items");
   expect(leftover).not.toContain('href="/database/items/2071"');
   expect(leftover).toContain("1 item the game files mark as a development item is left out.");
-  // With none shown, the tab says how many the files list and names none.
+  // With none named, the tab still lists them, by id.
   shown.items = new Map();
   const none = panel(await render("430"), "items");
-  expect(none).not.toContain('href="/database/items/');
+  expect(none).toContain('href="/database/items/159"');
+  expect(none).not.toContain("Refreshing Spring Water");
+});
+
+test("in short counts only the casting items the page lists: Brown Horse's one item is a development leftover", async () => {
+  known([[458, "Brown Horse"]]);
+  // Before the item has a name, it is listed by its id, and counted.
+  const unnamed = await render("458");
+  expect(unnamed).toContain("The files list 1 item that casts it.");
+  expect(panel(unnamed, "items")).toContain('href="/database/items/823"');
+  // The game files name it "Deprecated Horse Summoning (Mount)": left out of the tab, so in short does not claim it.
+  shown.items = new Map([[823, "Deprecated Horse Summoning (Mount)"]]);
+  const page = await render("458");
+  expect(page).not.toContain("item that casts it");
+  expect(page).not.toContain('href="/database/items/823"');
+});
+
+test("a recipe taught by a recipe item links that item in its Taught by tab", async () => {
+  known([[23652, "Blackguard"]]);
+  shown.items = new Map([[19211, "Plans: Blackguard"]]);
+  const taught = panel(await render("23652"), "taught-by");
+  expect(taught).toContain('href="/database/items/19211"');
+  expect(taught).toContain(">Plans: Blackguard<");
+  expect(taught).toContain('href="/tools/professions/blacksmithing"');
+  // Not named yet: the item by its id.
+  shown.items = new Map();
+  expect(panel(await render("23652"), "taught-by")).toContain("Item 19211");
 });
 
 test("a mount's spell links its mount, reads its cast time and lasts until cancelled", async () => {

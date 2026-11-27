@@ -57,9 +57,17 @@ export const SECTIONS = [
   { key: "spells", label: "Spells", types: ["spell"] },
 ] as const satisfies readonly { key: string; label: string; types: readonly Suggestion["type"][] }[];
 
-/** The rows grouped into their sections, empty ones left out, each keeping the order it arrived in. */
+/**
+ * The rows grouped into their sections, empty ones left out, each keeping the order it arrived in. Characters and guilds
+ * lead; the database sections follow the server's ranking, the section of the best row first (a zone named by the text
+ * above the items that only start with it).
+ */
 export function sectioned(rows: Suggestion[]): { key: string; label: string; rows: Suggestion[] }[] {
-  return SECTIONS.map((s) => ({ key: s.key, label: s.label, rows: rows.filter((r) => (s.types as readonly string[]).includes(r.type)) })).filter((s) => s.rows.length);
+  const people = new Set<string>(["characters", "guilds"]);
+  const first = (s: { rows: Suggestion[] }) => rows.indexOf(s.rows[0]!);
+  return SECTIONS.map((s) => ({ key: s.key, label: s.label, rows: rows.filter((r) => (s.types as readonly string[]).includes(r.type)) }))
+    .filter((s) => s.rows.length)
+    .sort((a, b) => Number(!people.has(a.key)) - Number(!people.has(b.key)) || (people.has(a.key) ? 0 : first(a) - first(b)));
 }
 
 /** The first row, in list order, whose name is the text: what Enter opens when no row is picked. */

@@ -25,7 +25,7 @@ test("relations are grouped and linked where a page exists; observed rows count 
   expect(html).toContain('href="/database/vendors/1250"');
   expect(html).toContain("4 installs, last seen 2026-10-09");
   expect(html).toContain("Created by");
-  expect(html).toContain("spell 2660");
+  expect(html).toContain('<a href="/database/spells/2660">spell 2660</a>');
   // The profession that teaches the spell, by the client's name, beside it; not a mark on every game-file row.
   expect(html).toContain("· Blacksmithing");
   expect(html).not.toContain("unconfirmed, build");
@@ -61,7 +61,8 @@ test("a relation target named from the name files: players first, a wiki title (
   expect(agreed).toContain(">Wanted: Hogger!</a>");
   expect(agreed).not.toContain("Warcraft Wiki");
   const spell = renderToStaticMarkup(<RelationTarget edge={client(2862, "created_by", "spell", 2660)} rel="created_by" client={edges} gameName={gameName} />);
-  expect(spell).toContain('title="From the game files, not yet confirmed by players">Rough Sharpening Stone</span>');
+  // The recipe's name links to its spell page (Created by: Rough Sharpening Stone -> /database/spells/2660).
+  expect(spell).toContain('<a href="/database/spells/2660">Rough Sharpening Stone</a>');
   expect(spell).toContain('data-badge="files"');
   expect(spell).toContain("· Blacksmithing");
   // No name from the files: "item set 1", linked to the set's page since the item set file lists it.

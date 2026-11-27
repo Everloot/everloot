@@ -29,6 +29,7 @@ import {
   SPELLS_BUILD, timeText, tooltipRows,
 } from "@/lib/spell-card";
 import { CLIENT_PROFESSIONS, professionHref, recipeBySpell, type RecipeView } from "@/lib/professions";
+import { teachingItemIds } from "@/lib/recipe-catalog";
 import { loadSpell } from "./load-spell";
 
 /**
@@ -72,9 +73,10 @@ function SpellTarget({ edge, item }: { edge: Edge; item: (id: number) => ItemLoo
 
 /**
  * A relation tab's columns: what, and the build. A recipe's reagents add the count the recipe file gives, and the
- * profession that teaches it the skill ranks the files give (a column only where the recipe has a value).
+ * profession that teaches it the recipe item that teaches it (client-recipe-items.json) and the skill ranks the files
+ * give (a column only where the recipe has a value).
  */
-function relationColumns(rel: Rel, recipe: RecipeView | undefined, item: (id: number) => ItemLook): Column<Edge>[] {
+function relationColumns(rel: Rel, recipe: RecipeView | undefined, item: (id: number) => ItemLook, teaching: readonly number[]): Column<Edge>[] {
   const rank = (n: number | null | undefined) => n ?? "—";
   const ranks = rel === "in_skill_line" && recipe ? ([["learn", "Needs"], ["yellow", "Yellow"], ["grey", "Grey"]] as const).filter(([k]) => recipe[k]) : [];
   return [
@@ -82,6 +84,10 @@ function relationColumns(rel: Rel, recipe: RecipeView | undefined, item: (id: nu
     ...(rel === "reagent_for" && recipe?.reagents.length
       ? [{ key: "count", header: "Count", numeric: true, cell: (e: Edge) => rank(recipe.reagents.find((r) => r.itemId === otherEnd(e).id)?.count) }]
       : []),
+    ...(rel === "in_skill_line" && teaching.length ? [{
+      key: "taught", header: "Recipe item",
+      cell: () => <span className="inline-flex flex-col gap-1">{teaching.map((id) => <EntityLink key={id} kind="item" id={id} name={item(id).name} icon={item(id).icon} />)}</span>,
+    }] : []),
     ...ranks.map(([k, header]) => ({ key: k, header, numeric: true, cell: () => rank(recipe![k]) })),
     { key: "build", header: "Build", cell: (e) => e.build ?? "—" },
   ];
@@ -167,19 +173,20 @@ export default async function SpellPage(props: Props) {
   const creates = rel("created_by");
   const costs = rel("reagent_for");
   const recipe = recipeBySpell(spellId);
-  // Items follow the item name rule, as on the item pages: one the rule does not show yet is counted, never listed.
+  // The recipe item that teaches the spell, where the files tie one to it (a profession's recipes only).
+  const teaching = rel("in_skill_line").length ? teachingItemIds([spellId]) : [];
+  // Items follow the item name rule, as on the item pages: one the rule does not name yet is listed by its id.
   const [shown, setNames] = await Promise.all([
-    uses.items.length || creates.length || costs.length ? loadShownNames() : null,
+    uses.items.length || creates.length || costs.length || teaching.length ? loadShownNames() : null,
     uses.sets.length ? loadItemSetNames(CLIENT_LAYER.build.version) : null,
   ]);
   const itemName = (item: number) => (shown ? shownItemName(item, shown.agreed, shown.matched?.names) : undefined);
-  const tipped = shown ? uses.items.filter((u) => shown.showsTip(u.item)) : [];
   // A development leftover stays out, as in the item lists and on the item set pages; the line under the table counts it.
-  const shownItems = tipped.filter((u) => !isDevelopmentItemName(itemName(u.item)?.name));
-  const leftovers = tipped.length - shownItems.length;
-  // Icons for the items the rule shows: those that cast the spell, and those it creates or costs.
-  const relationItems = [...creates, ...costs].map((e) => otherEnd(e)).filter((o) => o.kind === "item" && shown?.showsTip(o.id)).map((o) => o.id);
-  const iconIds = [...new Set([...shownItems.map((u) => u.item), ...relationItems])];
+  const shownItems = uses.items.filter((u) => !isDevelopmentItemName(itemName(u.item)?.name));
+  const leftovers = uses.items.length - shownItems.length;
+  // Icons for the items the rule shows: those that cast the spell, those it creates or costs, and the recipe item.
+  const relationItems = [...creates, ...costs].map((e) => otherEnd(e)).filter((o) => o.kind === "item").map((o) => o.id);
+  const iconIds = [...new Set([...shownItems.map((u) => u.item), ...relationItems, ...teaching])].filter((id) => shown?.showsTip(id));
   const itemTips = iconIds.length ? await loadItemTips(assets, iconIds) : new Map<number, { icon: string | null }>();
   const itemLook = (id: number): ItemLook => ({ name: itemName(id)?.name, icon: itemTips.get(id)?.icon });
   const spellName = (id: number) => spellNames?.names.get(id);
@@ -193,7 +200,8 @@ export default async function SpellPage(props: Props) {
     observed: creates.length
       ? `The files say it creates ${creates.length} ${creates.length === 1 ? "item" : "items"}${costs.length ? ` and costs ${costs.length} ${costs.length === 1 ? "reagent" : "reagents"}` : ""}.`
       : rank ? `The files list ${ranks.length} ranks; this is rank ${rank}.`
-      : uses.items.length ? `The files list ${uses.items.length} ${uses.items.length === 1 ? "item that casts" : "items that cast"} it.`
+      // Only the items the Items tab lists: a development leftover it leaves out is not claimed here.
+      : shownItems.length ? `The files list ${shownItems.length} ${shownItems.length === 1 ? "item that casts" : "items that cast"} it.`
       : "The files say nothing about what it creates.",
     // Spell names come from the game files' names (or their tooltips); a wiki name only when the files have none.
     nameFrom: fromWiki ? "wiki" : name ? "files" : "none",
@@ -207,12 +215,11 @@ export default async function SpellPage(props: Props) {
     if (!rows.length) return null;
     return {
       id, label, count: rows.length,
-      panel: <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns(r, recipe, itemLook)} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>,
+      panel: <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns(r, recipe, itemLook, teaching)} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>,
     };
   };
 
   const filesLine = <p className="mb-2 text-meta text-fg-2">From the game files, build {SPELLS_BUILD}; found in game files, unconfirmed.</p>;
-  const hidden = uses.items.length - tipped.length;
   type RankRow = { spell: number; rank: number };
   type ItemRow = { item: number; trigger: number };
   type SetRow = { set: number; pieces: number };
@@ -241,7 +248,6 @@ export default async function SpellPage(props: Props) {
           { key: "item", header: "Item", cell: (r: ItemRow) => <EntityLink kind="item" id={r.item} name={itemName(r.item)?.name} icon={itemTips.get(r.item)?.icon} /> },
           { key: "how", header: "Line", nowrap: true, cell: (r: ItemRow) => ITEM_TRIGGER[r.trigger] ?? "—" },
         ]} />}
-        {hidden > 0 && <p className="py-2 text-meta text-fg-2">{`${hidden} ${hidden === 1 ? "item" : "items"} the game files list ${hidden === 1 ? "is" : "are"} not shown yet: an item's page and its lines show once players report it or a source names it.`}</p>}
         {leftovers > 0 && <p className="py-2 text-meta text-fg-2">{`${leftovers} ${leftovers === 1 ? "item" : "items"} the game files mark as a development item ${leftovers === 1 ? "is" : "are"} left out.`}</p>}
       </>,
     } : null,

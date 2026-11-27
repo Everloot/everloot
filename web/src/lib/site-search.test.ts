@@ -330,7 +330,8 @@ test("suggestions: an exact id first, then exact, prefix and contains names acro
   mocks.names.npcs = new Map([[77, "Thrall"]]);
   const rows = await suggest("thrall");
   expect(rows).toHaveLength(8);
-  expect(rows.slice(0, 3).map((r) => [r.type, r.label])).toEqual([["item", "Thrall"], ["npc", "Thrall"], ["item", "Thrall's Cloak"]]);
+  // Of two exact names, the NPC (a place or person) comes before the item.
+  expect(rows.slice(0, 3).map((r) => [r.type, r.label])).toEqual([["npc", "Thrall"], ["item", "Thrall"], ["item", "Thrall's Cloak"]]);
   expect((await suggest("thrall", "npc")).map((r) => r.href)).toEqual(["/database/npcs/77"]);
   const byId = await suggest("2589", "item");
   expect(byId[0]).toEqual({ type: "item", id: 2589, label: "Item 2589", href: "/database/items/2589", quality: 1 });
@@ -369,8 +370,8 @@ test("suggestions: a dungeon's name, part of it or with the leading The, suggest
     const rows = await suggest(q);
     expect(rows.find((r) => r.type === "instance"), q).toEqual({ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" });
   }
-  // Ranked with the other names: a prefix item sits beside it, a contains-only item after; an exact name leads.
-  expect((await suggest("deadm")).map((r) => r.label)).toEqual(["Deadmines Map", "Deadmines", "Old Deadmines Key"]);
+  // Ranked with the other names: the dungeon leads a prefix item, a contains-only item comes after; an exact name leads.
+  expect((await suggest("deadm")).map((r) => r.label)).toEqual(["Deadmines", "Deadmines Map", "Old Deadmines Key"]);
   expect((await suggest("deadmines"))[0]).toMatchObject({ type: "instance" });
   // A scoped box keeps to its database type.
   expect((await suggest("deadm", "item")).some((r) => r.type === "instance")).toBe(false);
@@ -474,4 +475,70 @@ test("a boss's name finds its boss page, the note naming its instance", async ()
   expect(group.results[0]).toMatchObject({ label: "Oggleflint", href: "/database/bosses/2732-oggleflint", note: "Boss in Ragefire Chasm", exact: true });
   // Its encounter id finds it too.
   expect((await search("2732")).find((g) => g.type === "boss")?.results[0]).toMatchObject({ href: "/database/bosses/2732-oggleflint", exact: true });
+});
+
+test("a zone, dungeon or NPC whose name starts with the text leads the items, quests and spells that also start with it", async () => {
+  const { siteSearch, suggest } = await import("./site-search");
+  mocks.names.items = new Map([[203750, "Elwynn Treasure Map"], [1356, "Elwynn Commendation"]]);
+  mocks.names.quests = new Map([[9, "Elwynn Errands"]]);
+  const spells = new Map([[408793, "Elwynn - Dead Acolyte - Give Clues"]]);
+  const rows = await suggest("elwynn", undefined, mocks.names, { tolerant: true, spells });
+  expect(rows[0]).toMatchObject({ type: "zone", label: "Elwynn Forest" });
+  const types = (await siteSearch("elwynn", { spells })).map((g) => g.type);
+  expect(types.indexOf("zone")).toBeLessThan(types.indexOf("item"));
+  // An exact item name still leads a zone that only starts with it.
+  mocks.names.items = new Map([[5, "Westfall"]]);
+  expect((await suggest("westfall", undefined, mocks.names, { tolerant: true }))[0]).toMatchObject({ type: "zone" });
+  mocks.names.items = new Map([[5, "Elwynn"]]);
+  expect((await suggest("elwynn", undefined, mocks.names, { tolerant: true }))[0]).toMatchObject({ type: "item", label: "Elwynn" });
+});
+
+test("development leftovers stay out of search and suggestions, as the lists leave them out; their id still opens them", async () => {
+  const { siteSearch, suggest } = await import("./site-search");
+  mocks.names.items = new Map([[761, "Deprecated Elwynn Trout"], [203750, "Elwynn Treasure Map"], [1, "Monster - Mace"], [2, "Thrall's Mace"]]);
+  mocks.names.npcs = new Map([[3, "[DNT] Elwynn Test Dummy"]]);
+  const spells = new Map([[4, "[DNT] Soul of Enthralling"], [5, "Enthralling Shout"]]);
+  const labels = async (q: string) => [
+    ...(await suggest(q, undefined, mocks.names, { tolerant: true, spells })).map((r) => r.label),
+    ...(await siteSearch(q, { spells })).flatMap((g) => g.results.map((r) => r.label)),
+  ];
+  const elwynn = await labels("elwynn");
+  expect(elwynn).toContain("Elwynn Treasure Map");
+  expect(elwynn.some((l) => /Deprecated|\[DNT\]/.test(l))).toBe(false);
+  const mace = await labels("mace");
+  expect(mace).toContain("Thrall's Mace");
+  expect(mace).not.toContain("Monster - Mace");
+  const enthral = await labels("enthralling");
+  expect(enthral).toContain("Enthralling Shout");
+  expect(enthral).not.toContain("[DNT] Soul of Enthralling");
+  // A typed id is not a name: it opens the page, as the lists' id search does.
+  expect((await siteSearch("761")).find((g) => g.type === "item")!.results[0]).toMatchObject({ label: "Deprecated Elwynn Trout", exact: true });
+});
+
+test("spell suggestions say a spell's rank where the files give one, and same-named spells without one come once", async () => {
+  const { CLIENT_SPELLS } = await import("@/data/game-data/client-spells");
+  const { spellRanks } = await import("./spell-card");
+  const head = Object.entries(CLIENT_SPELLS.spells).find(([, s]) => s.supersedes)![1].supersedes!;
+  const chain = spellRanks(head);
+  expect(chain.length).toBeGreaterThan(1);
+  const { siteSearch, suggest } = await import("./site-search");
+  const spells = new Map<number, string>([[133, "Fireball"], [143, "Fireball"], [145, "Fireball"], ...chain.map((id) => [id, "Zzranked Spell"] as [number, string])]);
+  const fire = await suggest("fireball", undefined, mocks.names, { tolerant: true, spells });
+  expect(fire.filter((r) => r.type === "spell")).toEqual([{ type: "spell", id: 133, label: "Fireball", href: "/database/spells/133" }]);
+  const ranked = (await suggest("zzranked", undefined, mocks.names, { tolerant: true, spells })).filter((r) => r.type === "spell");
+  // Same name, different ranks: every one stays, each saying which.
+  expect(ranked).toHaveLength(Math.min(chain.length, 8));
+  for (const r of ranked) expect(r.note).toBe(`Rank ${chain.indexOf(r.id) + 1} · Spell ${r.id}`);
+  // /search lists every Fireball (each is its own page) and names the rank beside a ranked one.
+  expect((await siteSearch("fireball", { spells })).find((g) => g.type === "spell")!.results).toHaveLength(3);
+  expect((await siteSearch("zzranked", { spells })).find((g) => g.type === "spell")!.results[0].note).toMatch(/^Rank \d+ · id \d+$/);
+});
+
+test("the queries the empty search page suggests each find an exact page from the game files alone, with no player names", async () => {
+  const { SEARCH_EXAMPLES, siteSearch } = await import("./site-search");
+  expect(SEARCH_EXAMPLES).toHaveLength(4);
+  for (const q of SEARCH_EXAMPLES) {
+    const groups = await siteSearch(q);
+    expect(groups[0]?.results[0]?.exact, q).toBe(true);
+  }
 });
