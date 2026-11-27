@@ -59,6 +59,15 @@ describe("header account controls", () => {
     expect(container.querySelector('#site-navigation a[href="/addon"]')?.textContent).toBe("Get the addon");
   });
 
+  it("gives the bar's 32 px Download pill a 44 px touch area, signed in or out", async () => {
+    for (const body of [{ user: null }, { user }]) {
+      vi.stubGlobal("fetch", async () => Response.json(body));
+      await act(async () => root.render(<Header key={String(body.user)} />));
+      const download = Array.from(container.querySelectorAll<HTMLAnchorElement>('header a.btn[href="/addon"]')).find((a) => !a.closest("#site-navigation"))!;
+      expect(download.className).toMatch(/(?:^|\s)tap-44(?:\s|$)/);
+    }
+  });
+
   it("keeps the addon download in the mobile menu when signed in", async () => {
     vi.stubGlobal("fetch", async () => Response.json({ user }));
     await act(async () => root.render(<Header />));

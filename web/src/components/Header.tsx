@@ -115,6 +115,30 @@ const menuId = (label: string) => `${label.toLowerCase()}-menu`;
 const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-2 transition-colors focus-visible:outline-offset-[-2px]";
 const navState = (on: boolean) => (on ? "border-accent text-fg" : "border-transparent text-fg-2 hover:text-accent");
 const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-fg-2 hover:bg-canvas hover:text-accent";
+// The phone menu's links: the page you are on is drawn in `fg` with the accent bar at its left edge (the bar's 2 px
+// come out of the padding, so every label keeps one left edge).
+const phoneLink = (current: boolean) =>
+  `flex min-h-11 items-center rounded-control border-l-2 pl-2.5 pr-3 text-sm hover:bg-canvas hover:text-accent ${current ? "border-accent font-medium text-fg" : "border-transparent text-fg-2"}`;
+
+/** While the phone menu is open: everything outside the header is inert (no focus, hidden from screen readers) and
+ *  the page under the menu does not scroll. Returns the undo. */
+function holdPage(header: HTMLElement): () => void {
+  const made: Element[] = [];
+  for (let node: HTMLElement | null = header; node && node !== document.body; node = node.parentElement) {
+    for (const sibling of Array.from(node.parentElement?.children ?? [])) {
+      if (sibling === node || sibling.hasAttribute("inert") || /^(?:SCRIPT|STYLE|TEMPLATE)$/.test(sibling.tagName)) continue;
+      sibling.setAttribute("inert", "");
+      made.push(sibling);
+    }
+  }
+  const html = document.documentElement;
+  const overflow = html.style.overflow;
+  html.style.overflow = "hidden";
+  return () => {
+    for (const el of made) el.removeAttribute("inert");
+    html.style.overflow = overflow;
+  };
+}
 
 /** Below md, how many links a phone menu group shows before its More…. */
 const PHONE_LINKS = 3;
@@ -170,6 +194,23 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const search = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   const searchRow = useRef<HTMLInputElement>(null);
+  const header = useRef<HTMLElement>(null);
+
+  // The open phone menu covers the page, so it behaves as a modal: the page behind is inert and still, focus that
+  // gets outside the header comes back to Menu, and Escape closes it from anywhere, focus returning to Menu.
+  useEffect(() => {
+    if (!open || !header.current) return;
+    const release = holdPage(header.current);
+    const keep = (event: FocusEvent) => { if (!header.current?.contains(event.target as Node)) toggle.current?.focus(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); toggle.current?.focus(); } };
+    document.addEventListener("focusin", keep);
+    document.addEventListener("keydown", escape);
+    return () => {
+      release();
+      document.removeEventListener("focusin", keep);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
 
   useEffect(() => { if (searchOpen) searchRow.current?.focus(); }, [searchOpen]);
   // A new page closes the opened field and the menu: a suggestion picked in either is a client-side link, and the
@@ -248,10 +289,10 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-canvas" onKeyDown={(event) => {
+    <header ref={header} className="sticky top-0 z-40 border-b border-line bg-canvas" onKeyDown={(event) => {
       if (event.key !== "Escape") return;
       if (menu) { document.getElementById(`${menuId(menu)}-button`)?.focus(); setMenu(null); }
-      if (open) { setOpen(false); toggle.current?.focus(); }
+      // The open phone menu closes on the document's Escape (above), wherever focus is.
       if (searchOpen) { setSearchOpen(false); searchButton.current?.focus(); }
     }}>
       {/* The data column's width and gutters (globals.css), so the logo lines up with the data tables. */}
@@ -329,7 +370,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               from 1536 px. Below 1280 the menu panel shows both builds, and the footer shows them at every width. */}
           <GameVersionLabel className="hidden shrink-0 2xl:block" />
           <AccountControls savedBuilds={savedBuilds} profiles={profiles} accountSwitching={accountSwitching} />
-          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn btn-sm shrink-0 xl:hidden">
+          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn btn-sm tap-44 shrink-0 xl:hidden">
             {open ? "Close" : "Menu"}
           </button>
         </div>
@@ -376,7 +417,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                   <p className="mb-1 px-3 text-xs font-medium text-muted">{group.label}</p>
                   <ul id={`${menuId(group.label)}-phone`}>
                     {group.links.map((link, i) => (
-                      <li key={link.href} className={i < PHONE_LINKS || expanded ? undefined : "hidden md:block"}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
+                      <li key={link.href} className={i < PHONE_LINKS || expanded ? undefined : "hidden md:block"}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={phoneLink(place?.href === link.href)}>{link.label}</Link></li>
                     ))}
                     {rest.length > 0 && !expanded && (
                       <li className="md:hidden">

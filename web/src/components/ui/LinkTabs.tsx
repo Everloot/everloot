@@ -1,5 +1,6 @@
 import Link from "./PendingLink";
 import type { ReactNode } from "react";
+import ScrollRow from "./ScrollRow";
 import { TAB_SCROLL, TabCount, tabClass } from "./tab-style";
 
 export interface LinkTab {
@@ -19,8 +20,10 @@ export interface LinkTab {
 export default function LinkTabs({ label, tabs, aside }: { label: string; tabs: LinkTab[]; aside?: ReactNode }) {
   return (
     <div data-link-tabs className="flex min-w-0 flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-line">
-      {/* The list scrolls on a narrow screen, never the page. */}
-      <nav aria-label={label} className={`min-w-0 max-w-full ${TAB_SCROLL}`}>
+      {/* The list scrolls on a narrow screen, never the page; the current tab is kept in view and an arrow marks a
+          cut edge (ScrollRow). */}
+      <nav aria-label={label} className="min-w-0 max-w-full">
+        <ScrollRow className={TAB_SCROLL}>
         <ul className="flex">
           {tabs.map((tab) => (
             <li key={tab.href} className="shrink-0">
@@ -35,6 +38,7 @@ export default function LinkTabs({ label, tabs, aside }: { label: string; tabs: 
             </li>
           ))}
         </ul>
+        </ScrollRow>
       </nav>
       {aside && <div className="flex min-h-control-sm flex-wrap items-center gap-x-4 text-control text-fg-2 sm:min-h-control">{aside}</div>}
     </div>

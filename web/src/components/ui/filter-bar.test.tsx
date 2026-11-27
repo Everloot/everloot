@@ -261,3 +261,12 @@ test("the name box is a search landmark named for what it searches, apart from t
     expect.stringContaining('aria-label="Search items"'),
   ]);
 });
+
+test("a dropdown choice is a 44 px tap target on a phone and keeps the dense 32 px row from 640 px", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(`${process.cwd()}/src/app/globals.css`, "utf8").replace(/\r\n/g, "\n");
+  const rule = css.match(/\.fm-opt \{\n\s*@apply ([^;]*);/)![1].split(/\s+/);
+  expect(rule).toContain("min-h-11");
+  expect(rule).toContain("sm:min-h-8");
+  expect(rule).not.toContain("min-h-8");
+});
