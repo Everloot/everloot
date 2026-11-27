@@ -4,7 +4,7 @@ import type { ReportedLine } from "./item-names";
 import { itemSetHref } from "./item-sets";
 import { NAME_FROM, type ShownItemName } from "./items";
 import { splitWhy } from "./placeholder";
-import { PIECE } from "./tip-line";
+import { ARMOR, PAIR, PIECE, SLOT, WEAPON } from "./tip-line";
 
 /**
  * One item's tooltip as the hover card (/card/item/<id>) and the item page's box both draw it, so the two never drift:
@@ -86,6 +86,18 @@ function setLines(name: string, set: TooltipSet): { lines: string[]; links: Reco
   return { lines, links };
 }
 
+/**
+ * A worn item's slot line where no game file tooltip may be shown: the slot left and the weapon or armour kind right
+ * ("Main Hand · Sword"), with the words item-names.ts prints; the slot alone where the kind has none (a trinket).
+ */
+function gatedLines(category: ItemTooltipInput["category"]): string[] {
+  const slot = category?.slot ? SLOT[category.slot.inventoryType] : undefined;
+  const sub = category?.subclass?.id;
+  const kind = sub === undefined ? undefined : category?.class?.id === 2 ? WEAPON[sub] : category?.class?.id === 4 ? ARMOR[sub] : undefined;
+  if (slot) return [[slot, kind].filter(Boolean).join(PAIR)];
+  return [category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l));
+}
+
 const span = (counts: number[]) => {
   const lo = Math.min(...counts), hi = Math.max(...counts);
   return lo === hi ? String(lo) : `${lo}–${hi}`;
@@ -133,8 +145,9 @@ export function itemTooltip({ id, tip, name, category, namesQuality, icon, set, 
     }
     lines.push(...evidence.filter((line) => !details.has(line)));
   } else {
-    // No game file tooltip may be shown: the type and the slot from the client layer.
-    lines.push(...[category?.subclass?.name ?? category?.class?.label, category?.slot?.name].filter((l): l is string => Boolean(l)));
+    // No game file tooltip may be shown: the slot and the kind from the client layer, as the game's slot line; an item
+    // that is not worn keeps its type's name.
+    lines.push(...gatedLines(category));
   }
   // The quality colour only where a name is shown; "Item N" stays plain.
   const q = category?.quality?.id ?? namesQuality;

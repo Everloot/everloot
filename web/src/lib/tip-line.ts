@@ -54,7 +54,8 @@ const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|(?!\[\?\] ).+ \(0\/\d+\)|"
 const UNCONFIRMED = String.raw`(?: \(unconfirmed, seen by \d+ players?\))?`;
 const STAT = new RegExp(String.raw`^(?:[+-]\d+ [A-Z][A-Za-z ]*[a-z]|\d+ (?:Armor|Block)|\(\d+(?:\.\d)? damage per second\))${UNCONFIRMED}$`);
 const BONUS = /^\(\d+\) Set: /;
-const PRICE = /^(Sell Price:) (?:(\d+)g )?(?:(\d+)s )?(\d+)c$/;
+// The full form ("1g 0s 0c") and the game's, with a zero coin left out ("10s", "1g 1c"); at least one coin.
+const PRICE = /^(Sell Price:) (?=\d)(?:(\d+)g(?: |$))?(?:(\d+)s(?: |$))?(?:(\d+)c)?$/;
 
 const ITEM_LEVEL = /^Item Level \d+$/;
 
