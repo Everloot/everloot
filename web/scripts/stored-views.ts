@@ -5,9 +5,9 @@
  * (.github/workflows/stored-views.yml); docs/OPERATIONS.md, "The stored-views job", says how it is switched on.
  *
  * It reads and writes the same storage as the cron Worker, so it needs the same variables: R2_ACCOUNT_ID,
- * R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, the GAME_DATA_* reader,
- * NEXT_PUBLIC_GAME_ASSETS_URL and EVERLOOT_TRUSTED_INSTALLS. The switches (EVERLOOT_GUILDS, EVERLOOT_DATA_GUARD and the
- * rest) come from the cron Worker's own vars in wrangler.cron.jsonc, so the job builds exactly what the Worker would.
+ * R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, the GAME_DATA_* reader
+ * and EVERLOOT_TRUSTED_INSTALLS. The switches (EVERLOOT_GUILDS, EVERLOOT_DATA_GUARD and the rest) come from the cron
+ * Worker's own vars in wrangler.cron.jsonc, so the job builds exactly what the Worker would.
  *   npm run stored-views              # each view whose stamp is not the heartbeat's snapshot
  *   npm run stored-views -- --rebuild # every view
  * With EVERLOOT_SNAPSHOT at "job" in those vars it first folds new uploads into the corpus and the rollups and writes
@@ -18,17 +18,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { unstable_readConfig } from "wrangler";
 
-/**
- * The storage, and the game files the views name items from: the site's build has NEXT_PUBLIC_GAME_ASSETS_URL inlined,
- * the job reads it at run time. Without it the views held only the names players agree on (every other item "Item N").
- */
-export const REQUIRED = [
-  "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
-  "NEXT_PUBLIC_GAME_ASSETS_URL", "GAME_DATA_S3_ENDPOINT", "GAME_DATA_BUCKET", "GAME_DATA_ACCESS_KEY_ID", "GAME_DATA_SECRET_ACCESS_KEY",
-];
-
-/** The required variables `env` leaves unset or blank. */
-export const missingVars = (env: Record<string, string | undefined>) => REQUIRED.filter((key) => !env[key]?.trim());
+const REQUIRED = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
 /** The cron Worker's vars, minus its role switch and the bundle paths only a Worker has; a variable already set wins. */
 export function cronWorkerVars(vars: Record<string, unknown>, env: Record<string, string | undefined>): Record<string, string> {
@@ -43,7 +33,7 @@ export function cronWorkerVars(vars: Record<string, unknown>, env: Record<string
 async function main(): Promise<void> {
   const config = unstable_readConfig({ config: join(import.meta.dirname, "..", "wrangler.cron.jsonc") }, {});
   Object.assign(process.env, cronWorkerVars(config.vars as Record<string, unknown>, process.env));
-  const missing = missingVars(process.env);
+  const missing = REQUIRED.filter((key) => !process.env[key]?.trim());
   if (missing.length) throw new Error(`missing ${missing.join(", ")}`);
   // Imported after the vars are set: the stores read them when they load.
   const { runStoredViewsJob } = await import("../src/lib/stored-views-run");
