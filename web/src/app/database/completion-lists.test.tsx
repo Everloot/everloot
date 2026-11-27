@@ -163,6 +163,10 @@ test("profession specialisations group by their profession, each group and its n
     "47-blacksmithing-armorsmithing", "46-blacksmithing-weaponsmithing", "551-engineering-gnome", "550-engineering-goblin",
     "548-leatherworking-elemental", "549-leatherworking-tribal",
   ]);
+  // Under its heading a name drops the repeated profession; the full name stays as the hover title and for screen readers.
+  const armour = specs.split('href="/database/factions/47-blacksmithing-armorsmithing"')[1]!.split("</a>")[0]!;
+  expect(armour).toContain('title="Blacksmithing - Armorsmithing"');
+  expect(armour).toMatch(/<span aria-hidden="true">Armorsmithing<\/span><span class="sr-only">Blacksmithing - Armorsmithing<\/span>/);
 });
 
 test("an agreed faction shows as confirmed and keeps the rollup's header", async () => {

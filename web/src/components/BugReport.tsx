@@ -55,7 +55,9 @@ export default function BugReport() {
         aria-haspopup="dialog"
         title="Report a bug"
         data-report-pill
-        className="group fixed bottom-[var(--report-bottom)] left-4 z-40 hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel text-sm text-accent transition-colors hover:border-accent hover:bg-canvas hover:px-3 focus-visible:px-3 md:inline-flex"
+        // From md to 1599 px it sits in flow at the page end, in the footer's reserved bottom padding (globals.css): the
+        // data pages are 1440 px wide, so a floating pill covered rows there. From 1600 px it floats in the gutter (globals.css).
+        className="group fixed bottom-[var(--report-bottom)] left-4 z-40 hidden md:static md:-mt-[3.75rem] md:mb-4 md:ml-4 md:self-start min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel text-sm text-accent transition-colors hover:border-accent hover:bg-canvas hover:px-3 focus-visible:px-3 md:inline-flex"
         style={{ "--report-bottom": clearance } as React.CSSProperties}
         onClick={show}
       >

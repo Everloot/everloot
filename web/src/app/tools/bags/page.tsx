@@ -14,6 +14,7 @@ import { BAGS_BUILD, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades
 import { MARKET_RULE, formatCopper } from "@kb/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
+import { realmDisplayName } from "../auctions/RealmName";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";
 
 // The choices live in the query string, so the page is rendered for each request (the rollup is cached by the store).
@@ -63,7 +64,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const tips: Map<number, ItemTip> = ids.length ? (await itemArt(ids)).tips : new Map();
   const names = await auctionNames(ids, tips, stored?.names);
   const realmName = realm?.realm.name ?? null;
-  const where = house && realmName ? `the ${house} auction house on ${realmName}` : null;
+  const where = house && realmName ? `the ${house} auction house on ${realmDisplayName(realmName)}` : null;
 
   const bagLink = (row: MarketRow) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />;
   const sizeColumns: Column<SizeRow>[] = [
@@ -88,7 +89,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   } else if (!slug || !house) {
     body = <EmptyState message={realms.length ? "Pick a realm and an auction house to see what bags cost there." : "No realm has public prices yet: a realm shows here once 3 reporters scan the same item there."} />;
   } else if (!board) {
-    body = <EmptyState count={stored.agreement(slug, house)} message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
+    body = <EmptyState count={stored.agreement(slug, house)} message={`No public prices in the ${house} auction house on ${realmName ? realmDisplayName(realmName) : "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
   } else {
     body = (
       <div className="space-y-8">

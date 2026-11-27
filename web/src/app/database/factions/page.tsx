@@ -141,7 +141,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
                 <div key={profession}>
                   <h3 className="text-meta font-semibold text-fg">{profession}</h3>
                   <ul className="mt-1 grid gap-x-6 gap-y-1.5 text-cell sm:grid-cols-2 lg:grid-cols-3">
-                    {list.map((x) => <li key={x.factionId} className="min-w-0"><NameCell href={factionHref(x.factionId, x.name)}>{x.name}</NameCell></li>)}
+                    {list.map((x) => <li key={x.factionId} className="min-w-0"><NameCell href={factionHref(x.factionId, x.name)}><span title={x.name}><span aria-hidden="true">{x.name.replace(SPECIALISATION, "")}</span><span className="sr-only">{x.name}</span></span></NameCell></li>)}
                   </ul>
                 </div>
               ))}

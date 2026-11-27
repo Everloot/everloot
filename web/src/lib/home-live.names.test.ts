@@ -31,6 +31,7 @@ vi.mock("./game-assets", async (importOriginal) => ({
 
 import { loadHomeNewest } from "./home-live";
 
-test("the home and hub panels name a fact the way its page does, and keep #id only where the page has no name", async () => {
-  expect((await loadHomeNewest())?.map((f) => f.name)).toEqual(["Recipe: Root Tea", "Torn Fin Oracle", "Item #276916"]);
+test("the home and hub panels name a fact the way its page does, and leave out a fact its page has no name for", async () => {
+  // Item 276916 has no name anywhere: it stays on /database/recent and its own page, never in the showcase card.
+  expect((await loadHomeNewest())?.map((f) => f.name)).toEqual(["Recipe: Root Tea", "Torn Fin Oracle"]);
 });

@@ -106,6 +106,15 @@ test("the pill is hidden below md on every page, chat included, and sits bottom-
   }
 });
 
+test("the pill floats only where the widest pages leave a gutter; narrower, it sits in the footer's reserved end, over nothing", () => {
+  // Data pages are 1440 px wide, so at 1440 a floating pill covered table cells and footer lines as they scrolled under it.
+  const classes = trigger().className.split(" ");
+  expect(classes).toContain("md:static");
+  expect(classes).toContain("md:-mt-[3.75rem]"); // Inside the footer's 4.5rem bottom padding (globals.css).
+  const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+  expect(globals).toMatch(/@media \(min-width: 1600px\) \{\s*body > \[data-report-pill\] \{\s*position: fixed;\s*margin: 0;/);
+});
+
 test("from md the pill is a compact icon whose label shows only on hover or keyboard focus", () => {
   const label = trigger().querySelector("span")!;
   expect(label.textContent).toBe("Report a bug");

@@ -16,6 +16,7 @@ import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
 import { MARKET_RULE, formatCopper } from "@kb/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
+import { realmDisplayName } from "../auctions/RealmName";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";
 
 // The choices live in the query string, so the page is rendered for each request (the rollups are cached by the store).
@@ -66,7 +67,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
   const tips: Map<number, ItemTip> = ids.length ? (await itemArt(ids)).tips : new Map();
   const names: ItemNames = await auctionNames(ids, tips, stored?.names);
   const realmName = realm?.realm.name ?? null;
-  const where = house && realmName ? `the ${house} auction house on ${realmName}` : null;
+  const where = house && realmName ? `the ${house} auction house on ${realmDisplayName(realmName)}` : null;
   // A material links to its price on the chosen house, else to its database page.
   const materialHref = (id: number) => (board ? itemHref(board.realm, id) : itemPage(id));
   const material = (id: number) => <ItemLink id={id} href={materialHref(id)} tip={tips.get(id)} names={names} />;
@@ -126,7 +127,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
   } else if (!slug || !house) {
     prices = <EmptyState message={realms.length ? "Pick a realm and an auction house to see what each band is worth there, and which items are worth buying to disenchant." : "No realm has public prices yet: a realm shows here once 3 reporters scan the same item there."} />;
   } else if (!board) {
-    prices = <EmptyState message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
+    prices = <EmptyState message={`No public prices in the ${house} auction house on ${realmName ? realmDisplayName(realmName) : "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
   } else {
     prices = (
       <div className="space-y-8">
@@ -187,7 +188,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
         </p>
         <section aria-labelledby="disenchant-bands">
           <SectionHeading id="disenchant-bands" note={where && board ? `Average material value per disenchant in ${where}${anyFloor ? "; \"at least\" where a material has no price there" : ""}.`
-            : where ? `No ${house} prices yet on ${realmName}, so values are hidden. The chance of each material and how many come out at once.`
+            : where ? `No ${house} prices yet on ${realmDisplayName(realmName!)}, so values are hidden. The chance of each material and how many come out at once.`
             : "The chance of each material and how many come out at once."}>What each band gives</SectionHeading>
           {view.unreachable
             ? <Card><p className="text-fg-2" role="status">Disenchant results are unavailable right now. They are unrecorded, not zero.</p></Card>

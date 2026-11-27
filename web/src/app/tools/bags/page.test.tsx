@@ -138,3 +138,11 @@ test("the realm and house picker reads ?realm= and ?house= as the old form did, 
   // A house that is not one reads as none asked: the realm's busiest house.
   expect(text(await page({ realm: "forever", house: "Horde!" }))).toContain("Horde auction house on Forever");
 });
+
+test("a CAMWOW realm is named by its short name in the sentences, never the recorded code", async () => {
+  const camwow = scans([[smallBag, 1_000]], "Horde").map((r) => ({ ...r, realm: "CAMWOW US1 Realm 4 PvP" }));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), camwow, today), dataAsOf: today.toISOString() });
+  const html = await page({ realm: "camwow-us1-realm-4-pvp", house: "horde" });
+  expect(text(html)).toContain("in the Horde auction house on US1 · Realm 4 PvP");
+  expect(html).not.toContain("CAMWOW");
+});
