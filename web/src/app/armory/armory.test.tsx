@@ -225,6 +225,20 @@ describe("the character page", () => {
       expect(strip).toContain('title="Read 2026-11-09 10:00 UTC"');
     });
 
+    test("a visible line under the facts says what the item levels and Gear Score are, for phones that never hover", async () => {
+      mem.putCharacter(armoryCharacter({ averageItemLevel: 58 }));
+      const out = await html(pages.character("eu", "velkara-duskmantle"));
+      const note = out.slice(out.indexOf("data-facts-note"), out.indexOf("data-paper-doll"));
+      expect(out.indexOf("data-facts-note")).toBeGreaterThan(out.indexOf("data-character-facts"));
+      expect(note).toContain("Ranked item level uses Everloot&#x27;s 17-slot formula; Blizzard&#x27;s average item level counts what Blizzard counts.");
+      expect(note).toContain("Gear Score is Everloot&#x27;s weighted item level, not the GearScore addon&#x27;s number.");
+      mem.putCharacter(armoryCharacter({ gearScore: null, averageItemLevel: null }));
+      const bare = await html(pages.character("eu", "velkara-duskmantle"));
+      const line = bare.slice(bare.indexOf("data-facts-note"), bare.indexOf("data-paper-doll"));
+      expect(line).not.toContain("Gear Score is");
+      expect(line).not.toContain("Blizzard&#x27;s average");
+    });
+
     test("a fact the read did not bring is left out of the strip, never shown as 0", async () => {
       mem.putCharacter(armoryCharacter({ gearScore: null, honorableKills: null }));
       const out = await html(pages.character("eu", "velkara-duskmantle"));

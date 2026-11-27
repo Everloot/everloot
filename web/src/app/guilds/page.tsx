@@ -93,7 +93,7 @@ const muted = (text: string) => <span className="text-muted">{text}</span>;
 /** A guild needs this many members read before the average item level order ranks it: one geared character is no average. */
 const GUILD_ITEM_LEVEL_MIN_READ = 10;
 
-const LEVEL_60_READ_TIP = "Counted when each character was read; can exceed the roster's count.";
+const LEVEL_60_READ_TIP = "Level 60 read: characters we read at level 60. It can be higher than the guild page's count, because each character is counted as of its own read.";
 
 /** The directory's count columns, each the header link for its own order (highest first). */
 const SORT_OF_COLUMN: Record<string, GuildSortSlug> = { read: "members", il: "item-level", l60: "level-60" };
@@ -237,7 +237,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
           {dir && (dir.state === "unreachable" ? <Unreachable /> : (
             <section aria-labelledby="directory" className="space-y-3">
-              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. Level 60 read counts the characters read at level 60, each as of its own read, so it can differ from the guild page's roster members read and its level 60 roster count. A character who asked to be hidden is not counted.">
+              <SectionHeading id="directory" note={`Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}>
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <FilterBar

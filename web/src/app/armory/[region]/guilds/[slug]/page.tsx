@@ -113,11 +113,14 @@ interface Row { m: ArmoryMember; token: string | null; seen: string | null }
 const lastDay = (r: Row) => day(r.m.lastLogin ?? null) ?? r.seen;
 const fullName = (m: ArmoryMember) => [m.name, m.surname].filter(Boolean).join(" ");
 const byName = (a: Row, b: Row) => a.m.name.localeCompare(b.m.name) || a.m.surname.localeCompare(b.m.surname);
-/** The member's last-login bucket against now, or null when no login has been read. */
-function activityOf(m: ArmoryMember, now: number): Activity | null {
+/**
+ * The member's last-login bucket counted back from `asOf` (the roster read, so a roster read weeks ago does not read as
+ * a guild nobody logs into), or null when no login has been read.
+ */
+function activityOf(m: ArmoryMember, asOf: number): Activity | null {
   const at = m.lastLogin ? Date.parse(m.lastLogin) : NaN;
   if (!Number.isFinite(at)) return null;
-  const days = (now - at) / DAY_MS;
+  const days = (asOf - at) / DAY_MS;
   return days <= 7 ? "7d" : days <= 30 ? "30d" : "older";
 }
 
@@ -280,9 +283,10 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
   const rows: Row[] = roster.map((m) => ({ m, token: classTokenOfId(m.classId), seen: seen.get(m.name.toLowerCase()) ?? null }));
 
   const band = ROSTER_BANDS.find((b) => b.id === view.level);
-  const now = Date.now();
+  // Last logins count back from the day the roster was read; without that day, from now.
+  const asOf = Number.isFinite(Date.parse(g.fetchedAt)) ? Date.parse(g.fetchedAt) : Date.now();
   const filtered = rows.filter((r) => (!view.cls || r.token?.toLowerCase() === view.cls) && (!band || (r.m.level !== null && r.m.level >= band.min && r.m.level <= band.max))
-    && (!view.active || activityOf(r.m, now) === view.active));
+    && (!view.active || activityOf(r.m, asOf) === view.active));
   const sorted = sortRows(filtered, view.sort, view.dir);
   const pages = Math.max(1, Math.ceil(sorted.length / ROSTER_PAGE));
   const page = Math.min(view.page, pages);
@@ -297,7 +301,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
         <SummaryStrip guild={g} members={roster} summary={summary} activity={<>
           <LevelStrip members={roster} summary={summary} href={(level) => href({ level })} />
-          <ActivityStrip members={roster} now={now} href={(active) => href({ active })} />
+          <ActivityStrip members={roster} asOf={asOf} readDay={day(g.fetchedAt)} href={(active) => href({ active })} />
         </>} />
         <GuildProfile guild={g} profile={profileRead} />
         <TopItemLevels region={g.region} rows={rows} />
@@ -469,12 +473,12 @@ const ACTIVITY_ROWS: { key: Activity | null; label: string; colour: string }[] =
 ];
 
 /** Members by last login as one bar, then each bucket's count, linking the roster filtered to it (unknown has no filter). */
-function ActivityStrip({ members, now, href }: { members: readonly ArmoryMember[]; now: number; href: (active: Activity) => string }) {
+function ActivityStrip({ members, asOf, readDay, href }: { members: readonly ArmoryMember[]; asOf: number; readDay: string | null; href: (active: Activity) => string }) {
   if (members.length === 0) return null;
   const counts = new Map<Activity | null, number>();
-  for (const m of members) { const a = activityOf(m, now); counts.set(a, (counts.get(a) ?? 0) + 1); }
+  for (const m of members) { const a = activityOf(m, asOf); counts.set(a, (counts.get(a) ?? 0) + 1); }
   const rows = ACTIVITY_ROWS.map((r) => ({ label: r.label, colour: r.colour, count: counts.get(r.key) ?? 0, href: r.key ? href(r.key) : null }));
-  return <CountStrip kind="activity" title="Last login" total={members.length} rows={rows} />;
+  return <CountStrip kind="activity" title={readDay ? `Last login, as of the ${readDay} roster read` : "Last login"} total={members.length} rows={rows} />;
 }
 
 /** Members by level band as one bar, highest band first; each band with members links the roster filtered to it. */

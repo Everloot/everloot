@@ -307,6 +307,19 @@ describe("the guild activity strip", () => {
     expect(s).not.toMatch(/opacity|gradient/);
   });
 
+  test("buckets count back from the roster read, not from today, and say so", async () => {
+    // The roster was read 2026-11-09; weeks later the same logins still read as they did on the day of the read.
+    vi.setSystemTime(new Date("2026-12-20T11:00:00Z"));
+    mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, level: 44, itemLevel: 50, lastLogin: "2026-10-25T10:00:00.000Z" }));
+    const s = strip(await html(pages.guild("eu", "ember-wardens")));
+    expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*Last 7 days/);
+    expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*8 to 30 days/);
+    expect(s).toMatch(/>0<\/span>\s*(?:\s*<[^>]*>)*\s*Longer/);
+    expect(s).toContain("Last login, as of the 2026-11-09 roster read");
+    const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
+    expect(recent).toContain("Velkara Duskmantle</a>");
+  });
+
   test("?active filters the roster server-side and keeps the rest of the view; hidden members stay out", async () => {
     mem.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", class: "Warrior", classId: 1, level: 44, itemLevel: 50, lastLogin: "2026-08-01T10:00:00.000Z" }));
     const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
@@ -500,8 +513,8 @@ describe("QA round 1: rosters and the directory", () => {
   test("each Level 60 count says what it counts: characters read on /guilds, the Blizzard roster on the guild page", async () => {
     const dir = await html(pages.directory());
     expect(dir).toContain("Level 60 read");
-    expect(dir).toContain('title="Counted when each character was read; can exceed the roster&#x27;s count.">Level 60 read');
-    expect(dir).toMatch(/Level 60 read counts the characters read at level 60/);
+    // Said in the visible note, not only on hover: phones never hover.
+    expect(dir).toContain("Level 60 read: characters we read at level 60. It can be higher than the guild page&#x27;s count, because each character is counted as of its own read.");
     const guild = await html(pages.guild("eu", "ember-wardens"));
     expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
   });
@@ -541,7 +554,7 @@ describe("QA round 2: guild counts and the item level order", () => {
     // Velkara (60, 57.41) is the one member at 60 with an item level read.
     expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 \(1 read\)<\/dd>/);
     const dir = await html(pages.directory());
-    expect(dir).toMatch(/differ from the guild page&#x27;s roster members read/);
+    expect(dir).toMatch(/It can be higher than the guild page&#x27;s count, because each character is counted as of its own read/);
   });
 });
 

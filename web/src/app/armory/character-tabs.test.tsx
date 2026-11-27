@@ -54,7 +54,8 @@ test("Progress always holds the full catalogue and renders only the permitted hi
   const unknown = render();
   // Every instance but the two the files give no place of their own (unnamed 3002, the one-boss "Naxxramas" 2921).
   expect([...unknown.matchAll(/data-progression-instance=/g)]).toHaveLength(catalogue.length - 2);
-  expect(unknown).toContain("no data from this character");
+  // No kill at all: each instance is named once, not given its own "no data" row.
+  expect(unknown).not.toContain("no data from this character");
   const progress = characterTabs(full, { progression: {
     instances: characterProgression(catalogue, [{ instanceMapId: 33, encounterId: 2748, lastKillAt: at }]),
     links: { 33: "/database/instances/33-shadowfang-keep" },
@@ -133,6 +134,16 @@ test("QA round 4: with no kill at all Progress is one line, its notes and the in
   expect(html.indexOf("Kills come from linked characters")).toBeGreaterThan(firstDisclosure);
   expect(html).toMatch(/Every dungeon and raid \(\d+\)/);
   expect(html.indexOf("Every dungeon and raid")).toBeLessThan(html.indexOf("data-progression-instance="));
+});
+
+test("QA round 5: with no data for any instance the folded list names each instance once, with no per-row checklist or no data", () => {
+  const html = renderToStaticMarkup(<>{characterTabs(full, {}).find((t) => t.id === "progress")!.panel}</>);
+  const list = html.slice(html.indexOf("Every dungeon and raid"));
+  const rows = [...list.matchAll(/data-progression-instance=/g)].length;
+  expect(rows).toBeGreaterThan(30);
+  for (const repeated of ["Boss checklist", "no data from this character", ">no data<", "availability unavailable"]) expect(list).not.toContain(repeated);
+  expect(list).toContain(">Raids<");
+  expect(list.match(/>Naxxramas</g)).toHaveLength(1);
 });
 
 test("QA round 4: Progress leaves out the unnamed map and shows Naxxramas once, under Raids", () => {

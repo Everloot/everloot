@@ -28,6 +28,29 @@ const CLASS_BORDER: Record<string, string> = {
   mage: "border-class-mage", warlock: "border-class-warlock", druid: "border-class-druid",
 };
 
+/**
+ * The prerequisite lines of one tree, each pair of talents once and drawn down the tree (or left to right on one row),
+ * as the game draws them. The files can list a pair both ways (Beast Mastery's Intimidation and Bestial Wrath), which
+ * drew a second arrow pointing up; a line whose source sits lower is turned round, and a pair seen already is skipped.
+ */
+export function connectors(nodes: readonly TalentNode[]): { from: TalentNode; to: TalentNode }[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const seen = new Set<string>();
+  const out: { from: TalentNode; to: TalentNode }[] = [];
+  for (const n of nodes) {
+    for (const p of [...n.prereqs, ...(n.anyOf ?? [])]) {
+      const source = byId.get(p);
+      if (!source) continue;
+      const [from, to] = source.row > n.row ? [n, source] : [source, n];
+      const key = [from.id, to.id].sort((a, b) => a - b).join(":");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ from, to });
+    }
+  }
+  return out;
+}
+
 export type TipMode = "hover" | "focus" | "press";
 
 export interface TreeHandlers {
@@ -142,7 +165,6 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
   const height = rows * H + (rows - 1) * GAP;
   const left = (col: number) => LABEL + GAP + (col - 1) * (W + GAP);
   const top = (row: number) => (row - 1) * (H + GAP);
-  const byId = new Map(nodes.map((n) => [n.id, n]));
   const slug = catalog.classSlug;
   const gateOfRow = (row: number) => Math.min(...nodes.filter((n) => n.row === row).map((n) => n.unlock?.pointsInTree ?? 0));
 
@@ -155,20 +177,18 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
           </span>
         ))}
         <svg aria-hidden="true" className="absolute inset-0 pointer-events-none" width={LABEL + GAP + width} height={height}>
-          {nodes.flatMap((n) => [...n.prereqs, ...(n.anyOf ?? [])].map((p) => {
-            const from = byId.get(p);
-            if (!from) return null;
-            const met = rankOf(ranks, p) >= from.maxRanks;
+          {connectors(nodes).map(({ from, to: n }) => {
+            const met = rankOf(ranks, from.id) >= from.maxRanks;
             return (
               <line
-                key={`${p}-${n.id}`}
+                key={`${from.id}-${n.id}`}
                 x1={left(from.col) + W / 2} y1={top(from.row) + H / 2}
                 x2={left(n.col) + W / 2} y2={top(n.row) + H / 2}
                 stroke="currentColor" strokeWidth={met ? 3 : 2} strokeDasharray={met ? undefined : "4 4"}
                 className={met ? "text-fg-2" : "text-edge"}
               />
             );
-          }))}
+          })}
         </svg>
         {nodes.map((node) => {
           const rank = rankOf(ranks, node.id);
