@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ANSWER_BYTES, COVERAGE_PAGE, PLAN_ROWS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
 import { C, Cards, H2, H3, LinkCard, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";

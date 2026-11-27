@@ -1,6 +1,6 @@
 import ClientCoins from "./ClientCoins";
 import type { AuctionHouse } from "@everloot/protocol";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { QUALITIES } from "@kb/item-taxonomy";
 import { MARKET_RULE } from "@kb/market";

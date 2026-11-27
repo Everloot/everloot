@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { FocusEvent } from "react";
 import Card from "@/components/ui/Card";
 import GameIcon from "@/components/game/GameIcon";

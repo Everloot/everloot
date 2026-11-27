@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Card, SectionHeading } from "@/components/ui";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Fragment, type ReactNode } from "react";
 import { tokenKey, type TokenTarget } from "@/lib/wiki-names";
 import { wikiHref, type Block, type Inline, type WikiPage } from "@/lib/wiki";

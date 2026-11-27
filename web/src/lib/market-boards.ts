@@ -197,6 +197,9 @@ async function shownNames(ids: number[]): Promise<Map<number, { name: string | n
   const shown = await loadShownNames();
   // A degraded read would store "Item N" for names the pages can show; the pages build live until the next run.
   if (shown.degraded) throw new Error("item names unreachable");
+  // So would a run without the names file (no NEXT_PUBLIC_GAME_ASSETS_URL, or a file for another build): only the
+  // players' names would be stored, and the pages trust the file's nulls.
+  if (!shown.matched) throw new Error("item names file not read");
   const tips = ids.length ? await loadItemTips(await loadSiteAssets(), ids) : new Map();
   return new Map(ids.map((id) => [id, { name: shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))?.name ?? null, quality: tips.get(id)?.quality ?? null }]));
 }

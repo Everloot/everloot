@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import EntityLink from "@/components/EntityLink";
 import { EntityIcon } from "@/components/game/EntityIcon";

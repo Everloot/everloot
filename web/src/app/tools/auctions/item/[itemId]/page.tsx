@@ -1,6 +1,6 @@
 import Coins from "@/components/ui/Coins";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { MARKET_RULE } from "@kb/market";

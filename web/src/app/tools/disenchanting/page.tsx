@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { AuctionHouse } from "@everloot/protocol";
 import JsonLd from "@/components/JsonLd";
 import { CoinText } from "@/components/ui/Coins";

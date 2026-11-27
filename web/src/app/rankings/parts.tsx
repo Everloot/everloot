@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";

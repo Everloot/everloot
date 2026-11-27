@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { unstable_noStore as noStore } from "next/cache";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { Container, DataTitle } from "@/components/ui";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Badge, Card } from "@/components/ui";
 import DungeonsAndRaids from "@/components/progress/DungeonsAndRaids";
 import type { DungeonsAndRaidsData } from "@/lib/dungeon-clears";

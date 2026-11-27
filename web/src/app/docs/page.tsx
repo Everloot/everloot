@@ -4,7 +4,7 @@ import DocPage from "@/components/docs/DocPage";
 import { LegacyAnchors } from "@/components/docs/DocsClient";
 import { legacyAnchors } from "@/lib/docs/nav";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 
 export const metadata: Metadata = pageMetadata({
   title: "WoW Forever Docs: Addon, API and MCP Server",

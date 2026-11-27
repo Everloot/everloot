@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { COVERAGE_TYPES, type CoverageType, type ZoneCoverage } from "@kb/coverage";
 import { Container, DataTable, DataTitle, FilterBar, type SparseColumn } from "@/components/ui";

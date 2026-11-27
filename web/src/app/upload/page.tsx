@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { pageMetadata } from "@/lib/seo";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { REPO_URL } from "@/lib/source";

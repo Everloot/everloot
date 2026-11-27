@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { figureLabel, getFamily, type FamilyFact } from "@/data/families";
 import { Container, DataTable, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
