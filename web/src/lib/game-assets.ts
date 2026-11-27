@@ -4,7 +4,6 @@ import { CLASSES } from "@/design/tokens";
 import type { BuffTable } from "@/data/game-data/raid";
 import { withBagSlots } from "@/lib/bags";
 import { itemTipText, qualityColor } from "@/lib/item-names";
-import { timeRead } from "@/lib/server-timing";
 import { iconTable, type IconsById } from "@/lib/icon-table";
 import { ICON_CATEGORIES, type PoiIcons } from "@/lib/map-marks";
 import { assetPath, assetsBaseUrl, MANIFEST_SCHEMA } from "@/lib/talents/assets";
@@ -192,7 +191,6 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
   const pending = pendingSiteAssets.get(base);
   if (pending) return pending;
   const read = (async () => {
-    const done = timeRead("assets-manifest");
     try {
       const res = await fetcher(`${base}/manifest.json`, {
         headers: { accept: "application/json" }, next: { revalidate: REVALIDATE_SECONDS }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -203,8 +201,6 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
       return value;
     } catch {
       return null;
-    } finally {
-      done();
     }
   })().finally(() => { pendingSiteAssets.delete(base); });
   pendingSiteAssets.set(base, read);
@@ -277,16 +273,12 @@ export function privateStoreFromEnv(env: Record<string, string | undefined> = pr
     }
     const read: Promise<unknown | null> = (async () => {
       let value: unknown | null = null;
-      // Timed by file kind only (`items`, `item-names`): the build and shard numbers are left out.
-      const done = timeRead(`r2-${(path.split("/")[1] ?? path).replace(/\.json$/, "").replace(/-?\d+$/, "")}`);
       try {
         const signed = await client.sign(url, { method: "GET", headers: { accept: "application/json" } });
         const res = await (fetcher ?? fetch)(signed, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: "no-store" });
         value = res.ok ? await res.json() : res.status === 404 ? null : PRIVATE_UNREACHABLE;
       } catch {
         value = PRIVATE_UNREACHABLE;
-      } finally {
-        done();
       }
       if (parse && value !== null && value !== PRIVATE_UNREACHABLE) value = parse(value);
       kept.set(key, { at: Date.now(), value });
