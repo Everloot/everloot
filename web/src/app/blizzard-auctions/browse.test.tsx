@@ -87,7 +87,8 @@ test("browse is dynamic, noindex, has one layout-owned breadcrumb and only page 
   expect(trailFor("/blizzard-auctions")!.map((c) => c.path)).toEqual(["/", "/blizzard-auctions"]);
   const html = (await render()).documentElement.outerHTML;
   expect(html).not.toMatch(/BreadcrumbList|adsbygoogle|googlesyndication|posthog/);
-  const tools = readFileSync(new URL("../tools/auctions/page.tsx", import.meta.url), "utf8");
+  // The link sits in the all-realms page's links row, under the title (browse-view.tsx).
+  const tools = readFileSync(new URL("../tools/auctions/browse-view.tsx", import.meta.url), "utf8");
   expect(tools).toContain('href="/blizzard-auctions"');
   expect(tools).not.toMatch(/loadBlizzard|from ["'].*blizzard-auctions/);
 });

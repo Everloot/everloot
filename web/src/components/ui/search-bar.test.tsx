@@ -369,3 +369,11 @@ test("a box with a surface counts each search as that surface's event, never wit
   expect(capture).toHaveBeenCalledWith("search", { surface: "search-page" });
   expect(JSON.stringify(capture.mock.calls)).not.toContain("Thrall");
 });
+
+test("suggestion rows are 44 px tall on phones and 36 px from 640 px, the All results row too", async () => {
+  await type("tallrow");
+  await answer("tallrow", [suggestion(4, "Tallrow Map")]);
+  const links = [...container.querySelectorAll("[role=option] a")];
+  expect(links).toHaveLength(2);
+  for (const link of links) expect(link.className.split(" ")).toEqual(expect.arrayContaining(["h-11", "sm:h-9"]));
+});
