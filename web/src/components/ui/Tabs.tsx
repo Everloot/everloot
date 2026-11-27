@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import ScrollRow from "./ScrollRow";
 import { TAB_SCROLL, TabCount, filledTabs, tabClass } from "./tab-style";
 
 export interface TabItem {
@@ -50,16 +51,6 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
     return () => window.removeEventListener("hashchange", sync);
   }, [idsKey]);
 
-  // On a narrow screen the open tab can sit past the edge of the scrolling row: bring it into view, sideways only.
-  useEffect(() => {
-    const tab = refs.current[selected];
-    const list = tab?.parentElement;
-    if (!tab || !list || list.scrollWidth <= list.clientWidth) return;
-    const t = tab.getBoundingClientRect();
-    const l = list.getBoundingClientRect();
-    if (t.left < l.left || t.right > l.right) list.scrollLeft += t.left - l.left;
-  }, [selected]);
-
   function choose(id: string, focus = false) {
     setSelected(id);
     // replaceState, not location.hash: no jump to an element and no history entry per click.
@@ -91,7 +82,8 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
     <div data-tabs className={`${inFrame ? "" : "min-w-0"} ${className}`.trim() || undefined}>
       {/* The hairline sits outside the scrolling list, so a narrow screen scrolls the tabs and not the page. */}
       <div className="border-b border-line">
-      <div role="tablist" aria-label={label} className={`flex ${TAB_SCROLL} ${inFrame ? "px-2" : ""}`}>
+      {/* On a narrow screen the open tab is kept in view and an arrow marks a cut edge (ScrollRow). */}
+      <ScrollRow role="tablist" aria-label={label} watch={selected} surface={inFrame ? "bg-panel" : "bg-canvas"} className={`flex ${TAB_SCROLL} ${inFrame ? "px-2" : ""}`}>
         {tabs.map((tab) => {
           const on = tab.id === selected;
           return (
@@ -113,7 +105,7 @@ export default function Tabs({ label, tabs: all, empty, inFrame = false, classNa
             </button>
           );
         })}
-      </div>
+      </ScrollRow>
       </div>
       {tabs.map((tab) => (
         <div key={tab.id} id={panelId(tab.id)} role="tabpanel" aria-labelledby={tabId(tab.id)} tabIndex={0} hidden={tab.id !== selected} data-tab-panel={tab.id} className={inFrame ? undefined : "pt-2"}>

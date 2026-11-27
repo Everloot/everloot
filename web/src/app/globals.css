@@ -230,6 +230,16 @@ main p a, main .list-disc a {
   font-size: 13px;
   line-height: 20px;
 }
+/* A 44 px tall touch area on a control drawn smaller (the header's 32 px pills): an invisible box 6 px above and
+   below takes the tap, so the pill keeps its look and the row its height. */
+.tap-44 {
+  position: relative;
+}
+.tap-44::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
 /* A disabled primary button drops its fill: at half opacity the green read as a different olive colour. */
 .btn-primary:disabled,
 .btn-primary[aria-disabled="true"] {
@@ -282,9 +292,10 @@ main p a, main .list-disc a {
 .ci {
   @apply mr-1.5 inline-block h-4 w-4 shrink-0 rounded-sm border border-line bg-cover align-[-3px];
 }
-/* A choice in a FilterBar menu (components/ui/FilterBar.tsx) and its label. */
+/* A choice in a FilterBar menu (components/ui/FilterBar.tsx) and its label: a 44 px tap target on a phone, the dense
+   32 px row from 640 px. */
 .fm-opt {
-  @apply flex min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg;
+  @apply flex min-h-11 sm:min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg;
 }
 .fm-lbl {
   @apply min-w-0 flex-1 truncate;

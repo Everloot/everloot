@@ -87,12 +87,12 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
         <>
           <CreateMenu savedBuilds={savedBuilds} />
           <AvatarMenu name={name} initialShell={initialShell} profiles={profiles} savedBuilds={savedBuilds} accountSwitching={accountSwitching} signingOut={signingOut} onSignOut={signOut} />
-          <a href="/addon" className="btn btn-sm hidden min-[340px]:inline-flex shrink-0 whitespace-nowrap"><span className="sm:hidden"><span className="sr-only">Download</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg></span><span className="hidden sm:inline">Get the addon</span></a>
+          <a href="/addon" className="btn btn-sm tap-44 hidden min-[340px]:inline-flex shrink-0 whitespace-nowrap"><span className="sm:hidden"><span className="sr-only">Download</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg></span><span className="hidden sm:inline">Get the addon</span></a>
         </>
       ) : (
         <>
           <span className="hidden sm:inline-flex">{signIn}</span>
-          <a href="/addon" className="btn btn-primary btn-sm hidden min-[340px]:inline-flex shrink-0 whitespace-nowrap"><span className="sm:hidden">Download</span><span className="hidden sm:inline">Get the addon</span></a>
+          <a href="/addon" className="btn btn-primary btn-sm tap-44 hidden min-[340px]:inline-flex shrink-0 whitespace-nowrap"><span className="sm:hidden">Download</span><span className="hidden sm:inline">Get the addon</span></a>
         </>
       )}
       {alert}
