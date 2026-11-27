@@ -329,6 +329,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: on phones the footer links and the search suggestions take a full 44 px tap, words in number columns ("Not read", "unrecorded") are set in the text face, and the Auction House page opens on its title (#1600).
+- Site: item lists with level, required-level or binding filters, and the default order, use far less server time per view; pages are unchanged (#1601).
+- Site: a fresh server instance now starts at about half its former memory (55 MB instead of 105 MB), so heavy pages are less likely to land on a newly started one (#1602).
+- Site: armory character and guild pages no longer send a Server-Timing header (#1603).
+- Site: profession pages send the shopping list its path and recipe items as ids and numbers, with each item name once; tailoring's page is 46 kB lighter (#1604).
+- Site: item lists start faster on a fresh server: the names file is checked without a schema library, and later pages no longer sort the category for their search-index tag; pages are unchanged (#1605).
 - Site: item tooltips leave zero coins out of the sell price, show the slot and kind on one line for items without game file stats, and space a set's name and bonuses as the game does (#1596).
 - Site: on a phone the menu keeps focus and the page still, closes on Escape from anywhere and marks the page you are on; tab rows keep the open tab in view and show an arrow when there are more tabs; filter choices are 44 px tap targets (#1598).
 - Site: spell pages, the spell list, class spell lists and item Use lines show each spell's icon (Heroic Strike and Healing Potion had none) (#1592).
