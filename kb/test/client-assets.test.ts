@@ -98,6 +98,41 @@ test("icons, tooltips and frame pieces come out with counts, and encrypted or mi
   expect(FRAME_ELEMENTS.filter((e) => !manifest.missingFrames.includes(e))).toEqual(["talents-node-circle-green"]);
 });
 
+test("a multi-rank talent gets its text at every rank from its curves, and only where every rank is in them", async () => {
+  // Talent 1 has two ranks on a curve with a point at each; talent 2's curve stops at rank 1, so it gets none.
+  const ranked: Record<string, Rows> = {
+    ...tables,
+    TraitNodeEntry: t([1, 2, 3].map((n) => ({ ID: 10 + n, TraitDefinitionID: 100 + n, MaxRanks: n === 3 ? 1 : 2 }))),
+    TraitDefinitionEffectPoints: t([
+      { ID: 1, TraitDefinitionID: 101, EffectIndex: 0, OperationType: 0, CurveID: 7 },
+      { ID: 2, TraitDefinitionID: 102, EffectIndex: 0, OperationType: 0, CurveID: 8 },
+    ]),
+    Curve: t([{ ID: 7, Type: 0, Flags: 0 }, { ID: 8, Type: 0, Flags: 0 }]),
+    CurvePoint: t([
+      { ID: 1, CurveID: 7, OrderIndex: 0, Pos: [1, 13], PosPreSquish: [0, 0] },
+      { ID: 2, CurveID: 7, OrderIndex: 1, Pos: [2, 25], PosPreSquish: [0, 0] },
+      { ID: 3, CurveID: 8, OrderIndex: 0, Pos: [1, 2], PosPreSquish: [0, 0] },
+    ]),
+  };
+  const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
+  const { manifest, dir } = await buildAssetsFromTables({ get: (n) => ranked[n], build, outDir, source: source([]), convert: fakeConvert });
+  expect(AssetManifest.parse(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")))).toEqual(manifest);
+  // The stored text stays as it was; the ranks are beside it.
+  expect(manifest.spells["101"].description).toEqual({ text: "Deals 25 damage for 10 sec.", unresolved: [] });
+  expect(manifest.spells["101"].ranks).toEqual([
+    { text: "Deals 13 damage for 10 sec.", unresolved: [] },
+    { text: "Deals 25 damage for 10 sec.", unresolved: [] },
+  ]);
+  expect(manifest.spells["102"].ranks).toBeUndefined();
+  expect(manifest.spells["103"].ranks).toBeUndefined();
+  expect(manifest.counts).toMatchObject({ talentRanks: 1, talentRanksUnknown: 1 });
+
+  // A snapshot read before Curve and CurvePoint were extracted gives no ranks, and says none were found.
+  const { manifest: older } = await buildAssetsFromTables({ get: (n) => (n === "Curve" || n === "CurvePoint" ? undefined : ranked[n]), build, outDir, source: source([]), convert: fakeConvert });
+  expect(older.spells["101"].ranks).toBeUndefined();
+  expect(older.counts).toMatchObject({ talentRanks: 0, talentRanksUnknown: 2 });
+});
+
 test("a build that serves nothing for a file leaves it out and says so", async () => {
   const outDir = mkdtempSync(join(tmpdir(), "everloot-assets-"));
   const src: TableSource = { async read() { return null; }, fileStatus: () => "present", async readFile() { return { cKey: "k", buffer: Buffer.alloc(1), encryptedBlocks: 2 } } };

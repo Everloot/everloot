@@ -1,4 +1,4 @@
-import type { Ranks, TalentCatalog, TalentNode } from "./types";
+import type { Ranks, TalentCatalog, TalentEntry, TalentNode } from "./types";
 
 // Point rules. Pure functions over a catalog and a Ranks map; nothing here knows about React.
 //
@@ -75,6 +75,18 @@ export function entryAtRank(node: TalentNode, rank: number) {
     if (rank < bought) return entry;
   }
   return node.entries[node.entries.length - 1];
+}
+
+/** The entry a node's `rank`-th point (counted from 1) is in, and that point's rank within the entry. */
+export function entryRankAt(node: TalentNode, rank: number): { entry: TalentEntry; rank: number } {
+  if (node.kind !== "tiered") return { entry: node.entries[0], rank };
+  let before = 0;
+  for (const entry of node.entries.slice(0, -1)) {
+    const ranks = entry.maxRanks ?? 1;
+    if (rank <= before + ranks) return { entry, rank: rank - before };
+    before += ranks;
+  }
+  return { entry: node.entries[node.entries.length - 1], rank: rank - before };
 }
 
 function gateMet(catalog: TalentCatalog, node: TalentNode, ranks: Ranks): boolean {

@@ -171,3 +171,48 @@ test("the tooltip follows the rank: a talent's own rank, a Next rank line, and a
   expect(tip()).toContain("Text of Tier one.");
   expect(tip()).toMatch(/Next rank:\s*Text of Tier two\./);
 });
+
+test("with each rank's text in the files: the held rank's amount, the next rank's amount, and no note", async () => {
+  // Talent 11 (five ranks) and the tiered node's second entry (two ranks) have their text at every rank.
+  const at = (name: string, n: number) => Array.from({ length: n }, (_, i) => ({ text: `${name} gives ${(i + 1) * 3}%.`, unresolved: [] }));
+  const ranked = {
+    ...manifest,
+    spells: { ...manifest.spells, "110": { ...manifest.spells["110"], ranks: at("Talent 11", 5) }, "531": { ...manifest.spells["531"], ranks: at("Tier two", 2) } },
+  };
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(ranked)));
+  await render();
+  const tip = () => tooltip()?.textContent ?? "";
+  const focus = (id: number) => act(async () => { node(id).blur(); node(id).focus(); });
+  const describedAs = (id: number) => document.getElementById(node(id).getAttribute("aria-describedby")!)?.textContent;
+
+  // Before the first point the tooltip shows rank 1, as the game does; no Next rank line and no note.
+  await focus(11);
+  expect(tip()).toContain("Rank 0/5");
+  expect(tip()).toContain("Talent 11 gives 3%.");
+  expect(tip()).not.toContain("Next rank:");
+  expect(tip()).not.toContain("not in the game files");
+  for (let i = 0; i < 2; i++) await act(async () => { node(11).click(); });
+  await focus(11);
+  expect(tip()).toContain("Rank 2/5");
+  expect(tip()).toMatch(/^Talent 11Rank 2\/5Talent 11 gives 6%\./);
+  expect(tip()).toMatch(/Next rank:\s*Talent 11 gives 9%\./);
+  expect(tip()).not.toContain("not in the game files");
+  // A screen reader hears the held rank's text too.
+  expect(describedAs(11)).toBe("Talent 11. Talent 11 gives 6%.");
+  for (let i = 0; i < 3; i++) await act(async () => { node(11).click(); });
+  await focus(11);
+  expect(tip()).toContain("Talent 11 gives 15%.");
+  expect(tip()).not.toContain("Next rank:");
+
+  // The tiered node: its first entry has no ranks in the files (one rank, its own text); the second entry's ranks
+  // count from its own first rank.
+  await act(async () => { node(53).click(); });
+  await focus(53);
+  expect(tip()).toMatch(/Next rank:\s*Tier two gives 3%\./);
+  await act(async () => { node(53).click(); });
+  await focus(53);
+  expect(tip()).toContain("Tier two gives 3%.");
+  expect(tip()).toMatch(/Next rank:\s*Tier two gives 6%\./);
+  expect(tip()).not.toContain("not in the game files");
+});

@@ -40,6 +40,15 @@ test("a good manifest becomes icon URLs under the folder, tooltip text and frame
   expect(hasNodeFrames(a)).toBe(true);
 });
 
+test("a talent's text at each rank is read when the manifest has it, and a manifest without it still reads", () => {
+  const ranks = [{ text: "Deals 13 damage.", unresolved: [] }, { text: "Deals [?] damage.", unresolved: ["$q9"] }];
+  const a = parseManifest({ ...manifest, spells: { ...manifest.spells, "101": { ...manifest.spells["101"], ranks } } }, BASE)!;
+  expect(a.spells.get(101)?.ranks).toEqual([{ text: "Deals 13 damage.", partial: false }, { text: "Deals [?] damage.", partial: true }]);
+  expect(a.spells.get(102)?.ranks).toBeUndefined();
+  // The manifest live before the ranks were extracted.
+  expect(parseManifest(manifest, BASE)!.spells.get(101)?.ranks).toBeUndefined();
+});
+
 test("a manifest without the node frames still gives icons and tooltips, but not the frame look", () => {
   const a = parseManifest({ ...manifest, frames: {} }, BASE)!;
   expect(a.spells.size).toBe(3);

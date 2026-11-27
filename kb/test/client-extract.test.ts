@@ -78,6 +78,11 @@ test("the talent and spell effect tables are read by the file data ids WoWDBDefs
   });
 });
 
+test("the curve tables behind talent amounts per rank are read by the file data ids the build serves them under", () => {
+  // Read from build 71139 on 2026-11-27: Curve 20329 rows, CurvePoint 43168 rows.
+  expect(CLIENT_TABLES).toMatchObject({ TraitDefinitionEffectPoints: 4536895, Curve: 892585, CurvePoint: 892586 });
+});
+
 test("the coverage tables are read by the file data ids the WoWDBDefs manifest lists for them", () => {
   // manifest.json at WoWDBDefs b9a63096cdd9, field db2FileDataID.
   expect(CLIENT_TABLES).toMatchObject({
