@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_LINE, MY_BUILDS_REFUSAL } from "../saved-builds";
 import {
-  ACCOUNT_TOOL, answer, answerFree, answerOrigin, evidenceLines, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
+  ACCOUNT_TOOL, answer, answerFree, answerOrigin, evidenceLines, callTool, CHAT_TOOLS, FREE_BUDGET, FREE_FALLBACK, FREE_PROVIDER, FREE_TOOLS, loadTools, marketReply, MODEL_STOPPED, NO_RECORDED_ANSWER, NO_SOURCED_ANSWER, pagesIn, readOpenAiStream, searchOnly, signedIn,
   SMALL_TALK_REPLY, smallTalk, asksForRanking, RANKING_NOTE, sourceLink, sourcesIn, SYSTEM, testKey, TOOL_POLICY, UNSOURCED, type ToolDef,
 } from "./agent";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
@@ -43,6 +43,44 @@ test("a visitor sees answer_sources' labelled pieces and their links, not the no
   // The note to AI clients about archive lore is for a model, not for the visitor reading the pieces.
   const note = "Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it.";
   expect(evidenceLines(`${note}\n${EVIDENCE}`)).toBe(evidenceLines(EVIDENCE));
+});
+
+/** answer_sources' live text for "Where is Hogger?" on 11/27: its note to AI clients first, then a lore page as context. */
+const HOGGER = [
+  "answer_sources has no permitted evidence for the requested location; discover the record with search_knowledge and read it with get_entity. Subject matches are context only.",
+  "Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it.",
+  "- [lore (Warcraft Wiki 2023, may differ in WoW: Forever)] Hogger: Hogger, chieftain of the Riverpaw pack, is a elite gnoll found atop his hill in southwestern Elwynn Forest.",
+  "  Source: https://warcraft.wiki.gg/wiki/Hogger (CC-BY-SA-4.0, as of 2023-11-13)",
+  "  More: https://everloot.app/lore/118664-hogger",
+  "Further reading (links only, nothing fetched): Wowhead https://example.test",
+].join("\n");
+/** Words only the tools' notes to a model use: a visitor's answer never holds them. */
+const TOOL_TEXT = /answer_sources|search_knowledge|get_entity|permitted evidence|context only|Tool error/;
+
+test("a visitor never sees answer_sources' note to AI clients: a question it cannot answer says so plainly, then the context", () => {
+  const shown = evidenceLines(HOGGER);
+  expect(shown).not.toMatch(TOOL_TEXT);
+  expect(shown.split("\n")[0]).toBe(NO_RECORDED_ANSWER);
+  expect(shown).toContain("Hogger, chieftain of the Riverpaw pack");
+  // Only the visitor notices answer_sources opens with stay on the first line: the some-words line and a respelling.
+  expect(evidenceLines(`Read "thunderbluff" as "thunder bluff".\n${EVIDENCE}`).split("\n")[0]).toBe('Read "thunderbluff" as "thunder bluff".');
+  expect(evidenceLines(`Use get_entity on this record.\n${EVIDENCE}`)).toBe(evidenceLines(EVIDENCE));
+});
+
+test("Where is Hogger? without a key: the lookup's tool notes and errors never reach the answer", async () => {
+  const calls: string[] = [];
+  const tools = vi.fn(async (url: string) => {
+    calls.push(url);
+    return new Response(JSON.stringify({ text: HOGGER }), { status: 200 });
+  }) as unknown as typeof fetch;
+  const r = await searchOnly("Where is Hogger?", tools);
+  expect(calls).toEqual(["/api/tools/answer_sources?question=Where+is+Hogger%3F&limit=3"]);
+  expect(r.text).not.toMatch(TOOL_TEXT);
+  expect(r.text.startsWith(NO_RECORDED_ANSWER)).toBe(true);
+  expect(r.pages).toEqual(["https://everloot.app/lore/118664-hogger"]);
+  // A failed lookup is the plain no-answer line, never the error.
+  const failed = vi.fn(async () => new Response(JSON.stringify({ error: "D1_ERROR: too many terms in compound SELECT" }), { status: 500 }));
+  expect((await searchOnly("Where is Hogger?", failed as never)).text).toBe(NO_SOURCED_ANSWER);
 });
 
 test("sources are the distinct Source lines in order", () => {
@@ -208,6 +246,18 @@ test("a provider that fails after the tools answered gives what they found, not 
   expect(r.text).toContain("Leeroy Jenkins is a valiant human paladin.");
   expect(r).toMatchObject({ steps: [{ tool: "search_knowledge" }], sources: [expect.stringContaining("Leeroy_Jenkins")] });
   expect(answerOrigin(r)).toEqual({ everloot: true, model: false });
+});
+
+test("when the model stops after answer_sources, what it found is shown without the tool's notes to the model", async () => {
+  let turns = 0;
+  const send = vi.fn(async () => turns++ === 0
+    ? sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", type: "function", function: { name: "answer_sources", arguments: "{\"question\":\"Where is Hogger?\"}" } }] } }] }])
+    : new Response(JSON.stringify({ error: { message: "upstream relay failed" } }), { status: 502 }));
+  const tools = vi.fn(async () => new Response(JSON.stringify({ text: HOGGER }), { status: 200 })) as unknown as typeof fetch;
+  const r = await answer({ provider: chatProvider("openrouter")!, model: "m", key: "k", history: [], question: "Where is Hogger?", tools: TOOLS, send: send as never, site: tools });
+  expect(r.text).toContain(MODEL_STOPPED);
+  expect(r.text).toContain("Hogger, chieftain of the Riverpaw pack");
+  expect(r.text).not.toMatch(TOOL_TEXT);
 });
 
 test("a failure before any lookup is still thrown, and a 5xx is retried once only", async () => {
