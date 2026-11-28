@@ -298,8 +298,10 @@ export async function loadSightings(): Promise<ZoneSightings & { unreachable: bo
  * (instance-facts-store.ts), else from the whole aggregate set. Null when neither can be read.
  */
 export async function loadInstanceFactsStoredFirst(): Promise<StoredInstanceFacts | null> {
-  const stored = await loadStoredInstanceFacts();
-  if (stored) return stored;
+  return (await loadStoredInstanceFacts()) ?? aggregateInstanceFacts();
+}
+
+async function aggregateInstanceFacts(): Promise<StoredInstanceFacts | null> {
   const facts = await loadInstanceFacts().catch(() => null);
   return facts && !facts.unreachable ? { dataAsOf: facts.dataAsOf, instances: { entrances: facts.entrances, encounters: facts.encounters } } : null;
 }
@@ -307,9 +309,11 @@ export async function loadInstanceFactsStoredFirst(): Promise<StoredInstanceFact
 /**
  * `loadSightings` without the treasures and object names, for the pages that list only instances and bosses (the
  * boss and instance pages and their share images): with the stored file they skip parsing the 10 MB aggregate set.
+ * `fromAggregates`: the page parses that set anyway (the instance page, for its quests and loot), so the facts come
+ * from it; holding the stored file too would only add heap.
  */
-export async function loadInstanceSightings(): Promise<ZoneSightings & { unreachable: boolean }> {
-  const facts = await loadInstanceFactsStoredFirst();
+export async function loadInstanceSightings({ fromAggregates = false } = {}): Promise<ZoneSightings & { unreachable: boolean }> {
+  const facts = fromAggregates ? await aggregateInstanceFacts() : await loadInstanceFactsStoredFirst();
   if (!facts) return { unreachable: true };
   const asOf = facts.dataAsOf && Number.isFinite(Date.parse(facts.dataAsOf)) ? new Date(facts.dataAsOf) : undefined;
   return { instances: facts.instances, ...(asOf ? { asOf } : {}), unreachable: false };

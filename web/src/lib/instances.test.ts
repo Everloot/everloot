@@ -310,4 +310,12 @@ describe("loadInstanceSightings", () => {
     vi.mocked(loadInstanceFacts).mockResolvedValue({ entrances: [], encounters: [], sightings: [], unreachable: true, dataAsOf: null });
     expect(await loadInstanceSightings()).toEqual({ unreachable: true });
   });
+  test("a page that reads the aggregate set anyway takes the facts from it, not from a second file", async () => {
+    vi.mocked(loadStoredInstanceFacts).mockClear(); vi.mocked(loadItemFacts).mockClear();
+    vi.mocked(loadStoredInstanceFacts).mockResolvedValue({ dataAsOf: null, instances: { entrances: [], encounters: [] } });
+    vi.mocked(loadInstanceFacts).mockResolvedValue({ entrances: [entrance], encounters: [], sightings: [], unreachable: false, dataAsOf: null });
+    expect(await loadInstanceSightings({ fromAggregates: true })).toEqual({ instances: { entrances: [entrance], encounters: [] }, unreachable: false });
+    expect(loadStoredInstanceFacts).not.toHaveBeenCalled();
+    expect(loadItemFacts).not.toHaveBeenCalled();
+  });
 });

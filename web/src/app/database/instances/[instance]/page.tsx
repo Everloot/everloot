@@ -51,7 +51,8 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean; asOf?: Date } | null> {
   const id = parseInstanceSegment(segment);
   if (id === null) return null;
-  const seen = await loadInstanceSightings();
+  // The page reads the aggregate set for its quests anyway (loadWorldFacts below): one file, not two.
+  const seen = await loadInstanceSightings({ fromAggregates: true });
   const row = instanceRows(seen.unreachable ? {} : seen).get(id);
   return row ? { row, unreachable: seen.unreachable, asOf: seen.unreachable ? undefined : seen.asOf } : null;
 }
