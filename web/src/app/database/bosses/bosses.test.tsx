@@ -78,6 +78,10 @@ test("a boss 3 installs report: kills, installs, the creature linked, its loot t
   // The addon's count, so it does not read as the linked characters' kills the Kills tab lists.
   expect(text(html)).toMatch(/\|Kills reported by the addon\|3\|/);
   expect(text(html)).toMatch(/\|Last seen\|Nov 4, 2026\|/);
+  // QA round 14: the installs that agree sit beside the kill count in one row, not as a label of their own that the
+  // two-column facts list can leave at the top of the next column.
+  expect(html).toMatch(/<dt[^>]*>Kills reported by the addon<\/dt><dd[^>]*>(?:<[^>]*>)*3(?:<[^>]*>)*\s*<span[^>]*data-agreement="3"/);
+  expect(html).not.toMatch(/<dt[^>]*>Installs<\/dt>/);
   expect(html).toContain('href="/database/npcs/11517"');
   const loot = panel(html, "loot");
   expect(loot).toContain('href="/database/items/14149"');

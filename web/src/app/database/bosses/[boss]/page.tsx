@@ -115,11 +115,11 @@ export default async function BossPage(props: Props) {
     { label: "Difficulty", value: difficulty },
     ...(level !== null ? [{ label: "Level", value: level, numeric: true }] : []),
     // The addon's count from every install, apart from the linked characters' kills the Kills tab lists.
-    { label: "Kills reported by the addon", value: unreachable ? PLACEHOLDER : known(reported ? reported.kills.toLocaleString("en-US") : null, boss.row.reported), numeric: Boolean(reported) },
-    ...(reported ? [
-      { label: "Installs", value: <AgreementMeter count={reported.reporters} /> },
-      { label: "Last seen", value: utcDay(reported.lastSeen) ?? PLACEHOLDER, numeric: true },
-    ] : []),
+    // The installs that agree sit beside the count, so the two-column list never strands them under a label of their own.
+    { label: "Kills reported by the addon", value: unreachable ? PLACEHOLDER : reported
+      ? <span className="inline-flex items-center gap-2"><span>{reported.kills.toLocaleString("en-US")}</span><AgreementMeter count={reported.reporters} /></span>
+      : known(null, boss.row.reported), numeric: Boolean(reported) },
+    ...(reported ? [{ label: "Last seen", value: utcDay(reported.lastSeen) ?? PLACEHOLDER, numeric: true }] : []),
     { label: npcIds.length === 1 ? "Creature" : "Creatures", value: npcIds.length ? <span>{npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}{creature(id)}</span>)}</span> : unreachable ? PLACEHOLDER : known(null, boss.row.reported) },
     { label: "Encounter ID", value: boss.id, numeric: true },
   ];
