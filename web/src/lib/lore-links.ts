@@ -252,3 +252,29 @@ export async function loreForShownItem(
   const match = await loreForEntity("item", shown.name);
   return match !== null && match !== UNAVAILABLE && match.sourceId !== WIKI_SOURCE ? null : match;
 }
+
+const wikiQuestTitles = new WeakMap<object, Map<number, string>>();
+
+/**
+ * The lore page of a quest by the title its page shows, as `loreForShownItem` does for items: players' title under
+ * the shared rule; a Warcraft Wiki title only when the wiki gives it to this quest alone and no quest players named
+ * carries it.
+ */
+export async function loreForShownQuest(
+  id: number,
+  shown: { name: string; source: "players" | "wiki" } | null,
+  wikiTitles: ReadonlyMap<number, { name: string }> | null | undefined,
+  sets?: LinkNames,
+): Promise<LoreMatch | null | Unavailable> {
+  if (!shown) return null;
+  if (shown.source === "players") return loreFor("quest", id, shown.name, sets);
+  if (!wikiTitles) return null;
+  const names = sets ?? await loadLinkNames("quest");
+  if (!names.quests) return UNAVAILABLE;
+  let titles = wikiQuestTitles.get(wikiTitles);
+  if (!titles) wikiQuestTitles.set(wikiTitles, titles = new Map([...wikiTitles].map(([qid, n]) => [qid, n.name])));
+  const wiki = matchName(titles, shown.name);
+  if (matchName(names.quests, shown.name).kind !== "missing" || wiki.kind !== "unique" || wiki.id !== id) return null;
+  const match = await loreForEntity("quest", shown.name);
+  return match !== null && match !== UNAVAILABLE && match.sourceId !== WIKI_SOURCE ? null : match;
+}
