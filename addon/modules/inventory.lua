@@ -12,6 +12,7 @@ E.Inventory = I
 local MAX_CHARACTERS, MAX_SLOTS, MAX_MAIL, MAX_ATTACHMENTS = 50, 200, 100, 16
 local MAX_COUNT, MAX_ID = 2147483647, 2000000000
 local bankOpen, mailOpen = false, false
+local copyFrame
 
 local function whole(n, lo, hi)
   return type(n) == "number" and n == math.floor(n) and n >= lo and n <= hi
@@ -92,6 +93,61 @@ local function readBank()
   return containers(bags, true)
 end
 
+-- Explicit, read-only copy. The code contains no character, realm, names, mail or time.
+function I.BagCheckCode(location)
+  if not EverlootDB or EverlootDB.inventoryCapture ~= true then return nil, "Enable Local inventory snapshots first." end
+  if location ~= "bags" and location ~= "bank" then return nil, "Use /everloot bagcheck bags or /everloot bagcheck bank." end
+  if location == "bank" and not bankOpen then return nil, "Open your bank first, then run /everloot bagcheck bank." end
+  local items
+  if location == "bank" then items = readBank() else items = readBags() end
+  if not items then return nil, "This inventory could not be read. Try again once it has loaded." end
+  local ids = {}
+  for id in pairs(items) do ids[#ids + 1] = id end
+  if #ids == 0 then return nil, "No items were found in this inventory." end
+  if #ids > 400 then return nil, "This inventory has more than 400 distinct items." end
+  table.sort(ids)
+  local lines = { "EVERLOOT-INVENTORY-1" }
+  for _, id in ipairs(ids) do lines[#lines + 1] = string.format("%d %d", id, items[id]) end
+  return table.concat(lines, "\n"), nil, #lines
+end
+
+function I.OpenBagCheck(location)
+  local code, reason, length = I.BagCheckCode(location)
+  if not code then print("Everloot: " .. reason); return end
+  if not copyFrame then
+    local frame = CreateFrame("Frame", "EverlootBagCheck", UIParent, "BasicFrameTemplateWithInset")
+    frame:SetSize(390, 236)
+    frame:SetPoint("CENTER")
+    frame:SetFrameStrata("DIALOG")
+    frame:SetClampedToScreen(true)
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", 12, -8)
+    title:SetText("Everloot Inventory Value")
+    local label = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("TOPLEFT", 16, -33)
+    label:SetText("Press Ctrl+C, then paste at everloot.app/tools/bags/value")
+    local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 16, -58)
+    scroll:SetPoint("BOTTOMRIGHT", -35, 16)
+    local box = CreateFrame("EditBox", nil, scroll)
+    box:SetFontObject(GameFontHighlightSmall)
+    box:SetWidth(320)
+    box:SetMultiLine(true)
+    box:SetAutoFocus(false)
+    box:SetScript("OnEscapePressed", function() frame:Hide() end)
+    scroll:SetScrollChild(box)
+    frame:SetScript("OnHide", function() box:ClearFocus(); box:SetText("") end)
+    frame.copyBox, frame.scroll = box, scroll
+    copyFrame = frame
+  end
+  copyFrame.copyBox:SetHeight(math.max(160, length * 14))
+  copyFrame.copyBox:SetText(code)
+  copyFrame:Show()
+  copyFrame.scroll:SetVerticalScroll(0)
+  copyFrame.copyBox:SetFocus()
+  copyFrame.copyBox:HighlightText()
+end
+
 local function readMail()
   if not mailOpen then return nil end
   local ok, count, total = call(GetInboxNumItems)
@@ -120,6 +176,7 @@ local function readMail()
 end
 
 function I.Withdraw()
+  if copyFrame then copyFrame:Hide() end
   if EverlootDB then EverlootDB.inventory = nil end
 end
 

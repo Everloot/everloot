@@ -155,6 +155,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
 | `/everloot where [item link\|item id\|NPC name]` | Lists drops, vendors and NPC locations from your own saved sightings only. Shift-click an item link, give its id, or an exact NPC name (case-insensitive). Counts are recorded loot windows, not item quantities or drop rates. |
 | `/everloot price [item]` | Prints the price of an item from the files already in the game: shift-click the item into the command, or give its id. |
+| `/everloot bagcheck [bags\|bank]` | Copies item IDs and quantities on request with Local inventory snapshots enabled. Open the bank to copy bank contents. Paste the code at `everloot.app/tools/bags/value`. |
 | `/everloot gph [start\|pause\|stop\|reset\|show\|hide\|cut on\|off\|history]` | Gold per hour: start, pause or stop a session, reset it, show or hide its window, take the 5% auction cut or not, or list the last five. The sessions stay in your file. |
 | `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |
 | `/everloot completion [on\|off]` | The completion tracker, on in a new install; older installs keep their choice; bare reads now, off deletes every row it wrote. |

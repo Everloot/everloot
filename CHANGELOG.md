@@ -321,6 +321,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
 - Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
 - Site: auction and recipe links keep the chosen market. Compare Blackwater prices, value a bag or bank, filter dungeons by level, and save or share a Legacy plan.
+- Addon: use `/everloot bagcheck` to copy counts from your bags or open bank into the Inventory Value tool when Local inventory snapshots is enabled.
 
 ### Changed
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
