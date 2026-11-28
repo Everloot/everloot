@@ -79,6 +79,7 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/", "/ops/:path*", "/api/ops/:path*",
+    "/tools/auctions/activity", "/beta/tools/auctions/activity", "/ptr/tools/auctions/activity",
     "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
     "/armory/:path*", "/beta/armory/:path*", "/ptr/armory/:path*",
     "/players/:path*", "/beta/players/:path*", "/ptr/players/:path*",

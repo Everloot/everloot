@@ -100,6 +100,7 @@ export default async function RankingsHub(props: { searchParams?: Promise<Search
                     Share of each week&apos;s characters by class
                   </SectionHeading>
                   <StackedWeeks
+                    noun="Class"
                     weeks={weeks}
                     series={classes.series}
                     hidden={classes.rows.some((r) => r.count === null)}

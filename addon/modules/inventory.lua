@@ -6,6 +6,7 @@
 -- auctions, account bank or network access. At most 50 characters, 200 slots per bag, 100 loaded mails
 -- and 16 attachments per mail. Exceeding a cap preserves the previous dated snapshot, never partial stock.
 -- Ordinary bag/open-bank/open-mail APIs only. Opened bank/mail still need an in-game check before release.
+-- I.CurrentBags() is separate from capture: a read of the bags now for recipe-plan shortfalls, never stored.
 local E = Everloot
 local I = {}
 E.Inventory = I
@@ -172,6 +173,19 @@ local function readMail()
     -- A header can arrive before its item links/counts are cached. That is unavailable, never empty.
     if found ~= (attached or 0) then return nil end
   end
+  return items
+end
+
+--- This character's bags now, for a recipe plan's shortfall: counts by item ID (a fresh table), or nil and why
+--- ("no bag API", "bags unreadable"). An ephemeral read: it saves nothing, needs no capture consent and never turns
+--- capture on. Only the backpack and equipped bags: the bank, mail and other characters are never counted.
+function I.CurrentBags()
+  local api = C_Container
+  if not ((api and type(api.GetContainerNumSlots) == "function") or type(GetContainerNumSlots) == "function") then
+    return nil, "no bag API"
+  end
+  local items = readBags()
+  if not items then return nil, "bags unreadable" end
   return items
 end
 

@@ -218,7 +218,7 @@ test("the titles asked for are the titles used", async () => {
   expect((await routes.find(([p]) => p === "/map/kalimdor")![1]()).metadata.title).toBe("WoW Forever Map: Kalimdor");
   expect((await routes.find(([p]) => p === "/addons")![1]()).metadata.title).toBe("WoW Forever Addons");
   expect((await routes.find(([p]) => p === "/changes")![1]()).metadata.title).toBe("WoW Forever Patch Notes and Blizzard Posts");
-  expect((await routes.find(([p]) => p === "/tools/professions")![1]()).metadata.title).toBe("WoW Forever Profession Hubs");
+  expect((await routes.find(([p]) => p === "/tools/professions")![1]()).metadata.title).toBe("WoW Forever Profession Guides");
   const { generateMetadata } = await import("./tools/talents/[class]/page");
   expect((await generateMetadata({ params: Promise.resolve({ class: "hunter" }) })).title).toBe("WoW Forever Hunter Talent Calculator");
 });

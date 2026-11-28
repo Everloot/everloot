@@ -156,6 +156,36 @@ const rows = (body: unknown, key: string): unknown[] => {
 export interface AhledgerPoint { t: string; min: number | null; median: number | null; p25: number | null; p75: number | null }
 export interface AhledgerHistory { median7d: number | null; median30d: number | null; salesPerDay: number | null; windowDays: number | null; series: AhledgerPoint[] }
 
+export interface AhledgerTiming {
+  itemName: string | null;
+  asOf: string | null;
+  buy: number | null;
+  sell: number | null;
+  confidence: "settled" | "provisional" | null;
+  hours: { hour: number; listings: number; days: number }[];
+}
+
+/** AH Ledger's timing windows describe scan prices. Keep coverage along with every hourly listing observation. */
+export function listingTiming(body: unknown, itemId: number): AhledgerTiming {
+  const result = record(body), item = record(result.item), summary = record(result.summary);
+  if (item.id !== itemId) throw new Error("Wrong AH Ledger item.");
+  const hourOf = (h: unknown) => typeof h === "number" && Number.isInteger(h) && h >= 0 && h < 24 ? h : null;
+  const hours = rows(body, "hours").flatMap(raw => {
+    const p = record(raw), hour = hourOf(p.hour), days = id(p.days), listings = num(p.listings);
+    return hour !== null && days !== null && days <= 28 && listings !== null && listings >= 0
+      ? [{ hour, listings, days }] : [];
+  }).sort((a, b) => a.hour - b.hour);
+  const confidence = summary.confidence === "settled" || summary.confidence === "provisional" ? summary.confidence : null;
+  return {
+    itemName: text(item.name)?.trim().slice(0, 100) || null,
+    asOf: date(result.pricesAsOf),
+    buy: confidence ? hourOf(record(summary.bestBuy).startUtc) : null,
+    sell: confidence ? hourOf(record(summary.bestSell).startUtc) : null,
+    confidence,
+    hours,
+  };
+}
+
 export function priceHistory(body: unknown): AhledgerHistory {
   const latest = record(record(body).latest), sales = record(record(body).sales);
   const series = rows(body, "series").flatMap((raw) => {

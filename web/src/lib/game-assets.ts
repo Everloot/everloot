@@ -346,6 +346,8 @@ export interface ItemTip {
   level: number;
   required: number;
   binding: number;
+  /** Positive vendor sell value from ItemSparse, in copper. */
+  vendorSellCopper?: number;
 }
 
 /** With `itemId`, a container's tooltip also gets its "14 Slot Bag" line from the game files' bag table (lib/bags.ts). */
@@ -354,7 +356,7 @@ export function itemTip(r: ItemRecord, assets: Pick<SiteAssets, "base" | "versio
   const text = itemId === undefined ? tip : { ...tip, lines: withBagSlots(tip.lines, itemId) };
   return {
     ...text, color: qualityColor(r.q), icon: r.i ? itemIconUrl(assets.base, r.i) : null, label: `${assets.label} · build ${assets.version}`,
-    level: r.l, required: r.r, binding: r.b,
+    level: r.l, required: r.r, binding: r.b, ...(r.sp > 0 ? { vendorSellCopper: r.sp } : {}),
   };
 }
 

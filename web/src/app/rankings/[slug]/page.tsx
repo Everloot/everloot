@@ -12,7 +12,7 @@ import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { CENSUS_CLASSES, FACTIONS } from "@kb/census";
 import CensusRoundingNote from "@/components/CensusRoundingNote";
-import { HowItCounts, OneWeek, RankTable, RankingRail, StartState, WeeklyChart, weekLabel } from "../parts";
+import { HowItCounts, OneWeek, RANK_NOUN, RankTable, RankingRail, StartState, WeeklyChart, weekLabel } from "../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +97,7 @@ export default async function RankingPage({ params, searchParams }: Props) {
                   aside={<span className="text-meta text-muted">{weekLabel(week)}</span>}
                 />
                 {view.weeksWithNumbers >= 2 ? (
-                  <WeeklyChart weeks={weeks} series={view.series} title={`${def.title}: share of each week's characters, top ${view.series.length}`} />
+                  <WeeklyChart noun={RANK_NOUN[def.slug]} weeks={weeks} series={view.series} title={`${def.title}: share of each week's characters, top ${view.series.length}`} />
                 ) : (
                   <OneWeek />
                 )}
@@ -106,6 +106,7 @@ export default async function RankingPage({ params, searchParams }: Props) {
                 ) : (
                   <div>
                     <RankTable
+                      noun={RANK_NOUN[def.slug]}
                       rows={view.rows}
                       caption={`${def.title}, ${weekLabel(week)}`}
                       showChange={view.previous !== null}

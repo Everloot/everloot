@@ -20,6 +20,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, Facts, ItemLink, RealmName, count } from "../../parts";
 import { RealmHousePicker } from "../../RealmHousePicker";
+import { realmDisplayName } from "../../RealmName";
 
 type Search = Record<string, string | string[] | undefined>;
 type Props = { params: Promise<{ realm: string }>; searchParams?: Promise<Search> };
@@ -54,18 +55,20 @@ async function load(slug: string, search: Search) {
   const shown = house ?? (stored ? busiestHouseOf(stored, slug) : null);
   const board = stored && shown ? findBoard(stored.boards(shown), slug) : null;
   const realmName = stored ? findBoard(stored.boards(null), slug)?.realm.name ?? null : null;
-  return { now, market, stored, house, shown, board, realmName: realmName ?? slugWords(slug) };
+  const name = realmName ?? slugWords(slug);
+  // Sentences, captions and the trail name a realm as its heading shows it ("US1 · Realm 4 PvP"), not by its recorded code.
+  return { now, market, stored, house, shown, board, realmName: name, realmLabel: realmDisplayName(name) };
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const slug = slugParam((await props.params).realm);
   if (!slug) return { robots: { index: false, follow: true } };
-  const { now, house, shown, board, realmName } = await load(slug, (await props.searchParams) ?? {});
+  const { now, house, shown, board, realmLabel } = await load(slug, (await props.searchParams) ?? {});
   const changes = board ? weeklyChanges(board, now) : null;
-  const where = shown ? `the ${shown} auction house on ${realmName}` : realmName;
+  const where = shown ? `the ${shown} auction house on ${realmLabel}` : realmLabel;
   return {
     ...pageMetadata({
-      title: `WoW Forever ${realmName} Market Changes This Week`,
+      title: `WoW Forever ${realmLabel} Market Changes This Week`,
       description: `What rose and fell this week in ${where} in WoW: Forever: each item's market value a week apart, units listed, reporters, and the items with no comparison yet, from scans players upload.`,
       path: changesHref({ slug }),
     }),
@@ -84,9 +87,9 @@ export default async function MarketChangesPage(props: Props) {
   if (!slug) notFound();
   const search = (await props.searchParams) ?? {};
   if (decodeURIComponent(raw) !== slug) permanentRedirect(changesHref({ slug }, houseParam(one(search.house) || undefined) ?? null));
-  const { now, market, stored, shown, board, realmName } = await load(slug, search);
+  const { now, market, stored, shown, board, realmName, realmLabel } = await load(slug, search);
   const path = changesHref({ slug });
-  const trail: Crumb[] = [...trailFor(AH_PATH)!, { name: realmName, path: realmHref({ slug }) }, { name: "Market changes", path }];
+  const trail: Crumb[] = [...trailFor(AH_PATH)!, { name: realmLabel, path: realmHref({ slug }) }, { name: "Market changes", path }];
   const changes = board ? weeklyChanges(board, now) : null;
   const newest = board ? newestScanDay(board.rows) : null;
 
@@ -101,7 +104,7 @@ export default async function MarketChangesPage(props: Props) {
   const counts = stored ? houseCounts(stored.boards, now, slug) : undefined;
   const pickHref = (realm: string | null, h: AuctionHouse | null) => changesHref({ slug: realm ?? slug }, h);
   const item = (c: { row: Compared["row"] }) => <ItemLink id={c.row.value.itemId} href={itemHref(c.row.realm, c.row.value.itemId, c.row.house)} tip={tips.get(c.row.value.itemId)} names={names} />;
-  const scope = board && shown ? `${realmName}, ${shown} auction house` : realmName;
+  const scope = board && shown ? `${realmLabel}, ${shown} auction house` : realmLabel;
 
   const compared = (noun: string, up: boolean): Column<Compared>[] => [
     { key: "item", header: "Item", cell: item },
@@ -157,7 +160,7 @@ export default async function MarketChangesPage(props: Props) {
   if (!stored) {
     body = <Card><p className="text-fg-2" role="status">The stored market boards are unavailable right now, so this week&apos;s changes are unrecorded, not zero. The page never rebuilds them from the rollup; try again after the next snapshot.</p></Card>;
   } else if (!board || !changes || !shown) {
-    body = <EmptyState count={stored.agreement(slug, shown)} message={`No public prices in ${shown ? `the ${shown} auction house on ` : ""}${realmName} yet: a price shows once ${AGREEMENT_NEEDED} players scan the same item there.`} />;
+    body = <EmptyState count={stored.agreement(slug, shown)} message={`No public prices in ${shown ? `the ${shown} auction house on ` : ""}${realmLabel} yet: a price shows once ${AGREEMENT_NEEDED} players scan the same item there.`} />;
   } else {
     body = (
       <div className="space-y-8">
@@ -213,7 +216,7 @@ export default async function MarketChangesPage(props: Props) {
           )}
         />
         <p className="mb-3 flex flex-wrap gap-x-4 text-sm">
-          <Link href={shown ? `${realmHref({ slug })}?house=${houseSlug(shown)}` : realmHref({ slug })} className={link}>Browse prices on {realmName}</Link>
+          <Link href={shown ? `${realmHref({ slug })}?house=${houseSlug(shown)}` : realmHref({ slug })} className={link}>Browse prices on {realmLabel}</Link>
           {report && changes?.endDay && <Link href={report} className={link}>Daily report for {changes.endDay}</Link>}
         </p>
         {stored && (

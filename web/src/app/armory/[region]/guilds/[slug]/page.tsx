@@ -301,7 +301,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
     <Container width="data">
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
-        <SummaryStrip guild={g} members={roster} summary={summary} classHref={(cls) => href({ cls })} activity={<>
+        <SummaryStrip guild={g} members={roster} summary={summary} classHref={(cls) => `${href({ cls })}#armory-roster`} activity={<>
           <LevelStrip members={roster} summary={summary} href={(level) => href({ level })} />
           <ActivityStrip members={roster} asOf={asOf} readDay={utcDay(g.fetchedAt)} href={(active) => href({ active })} />
         </>} />

@@ -278,8 +278,10 @@ test("the top five by item level link to the members, highest first, and leave o
 test("each class in the class bar links to the roster filtered to that class", async () => {
   const out = await html(pages.guild("eu", "ember-wardens"));
   const bar = out.slice(out.indexOf("data-class-bar"), out.indexOf('aria-labelledby="guild-top"'));
-  expect(bar).toMatch(/<a href="\/armory\/eu\/guilds\/ember-wardens\?class=hunter"[^>]*>(?:<[^>]*>)*Hunter(?:<[^>]*>)*\s*(?:<!-- -->)?(?:<[^>]*>)*2</);
-  expect(bar).toContain('href="/armory/eu/guilds/ember-wardens?class=warrior"');
+  // QA round 16: the link lands on the roster, so the filtered rows are in view.
+  expect(bar).toMatch(/<a href="\/armory\/eu\/guilds\/ember-wardens\?class=hunter#armory-roster"[^>]*>(?:<[^>]*>)*Hunter(?:<[^>]*>)*\s*(?:<!-- -->)?(?:<[^>]*>)*2</);
+  expect(bar).toContain('href="/armory/eu/guilds/ember-wardens?class=warrior#armory-roster"');
+  expect(out).toContain('id="armory-roster"');
   // The filtered roster keeps only that class.
   const table = rosterTable(await html(pages.guild("eu", "ember-wardens", { class: "warrior" })));
   expect(table).toContain("Torvin Ashbrook");

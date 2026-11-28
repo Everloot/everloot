@@ -125,4 +125,40 @@ event('BAG_UPDATE_DELAYED'); event('BANKFRAME_OPENED'); event('MAIL_SHOW')
 assert(EverlootDB.inventory==nil, 'off never recaptures')
 assert(next(EverlootDB.records)==nil, 'inventory never enters public records')
 ''')
+
+# Task 6: Inventory.CurrentBags() is an ephemeral read of this character's bags for recipe-plan shortfalls. It needs no
+# capture consent because it saves nothing, never turns capture on, and never counts the bank, mail or other characters.
+lua.execute('''
+local I = Everloot.Inventory
+assert(type(I.CurrentBags) == 'function', 'Inventory.CurrentBags exists')
+assert(EverlootDB.inventoryCapture ~= true and EverlootDB.inventory == nil, 'consent is off')
+C_Container.GetContainerNumSlots = function(b) return slots[b] or 0 end
+slots = { [0]=2, [1]=1, [-1]=2 }
+contents = { [0] = { {itemID=2589, stackCount=3}, {itemID=2589, stackCount=4} }, [1] = { {itemID=2592, stackCount=1} },
+  [-1] = {{itemID=2592,stackCount=5}} }
+event('BANKFRAME_OPENED'); event('MAIL_SHOW')
+local counts, why = I.CurrentBags()
+assert(counts and why == nil and counts[2589]==7 and counts[2592]==1, 'bag stacks summed; the open bank and mail are not counted')
+assert(EverlootDB.inventory == nil and EverlootDB.inventoryCapture ~= true, 'an ephemeral read saves nothing and enables nothing')
+counts[2589] = 99
+assert(I.CurrentBags()[2589] == 7, 'each read is a fresh table')
+event('BANKFRAME_CLOSED'); event('MAIL_CLOSED')
+contents[0] = { {itemID=2589, stackCount='unreadable'} }
+local none, reason = I.CurrentBags()
+assert(none == nil and reason == 'bags unreadable', tostring(reason))
+local secretSlot = {}
+contents[0] = { secretSlot }; issecretvalue = function(v) return v == secretSlot end
+none, reason = I.CurrentBags()
+assert(none == nil and reason == 'bags unreadable', 'a secret slot is unreadable, never empty')
+issecretvalue = nil
+contents[0] = {}
+local saved = C_Container
+C_Container = nil
+none, reason = I.CurrentBags()
+assert(none == nil and reason == 'no bag API', tostring(reason))
+C_Container = saved
+counts = I.CurrentBags()
+assert(counts and counts[2592] == 1 and counts[2589] == nil, 'an empty backpack slot list is empty, not unknown')
+assert(EverlootDB.inventory == nil, 'still nothing saved')
+''')
 print('inventory contract: PASS')

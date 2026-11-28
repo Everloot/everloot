@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+
+- Site: Auction House Activity opens your Everloot sales ledger locally for the same cycles and links from profession recipes and auction item pages. Market timing by item shows AH Ledger asking-price windows and scan coverage.
+- Site: all Forever professions have leveling or gathering guides. Crafting guides plan recipes, training stops and a copyable shopping list for your skill range, with optional auction prices. Gathering guides show sourced trainers, zones and materials.
 - Site: guild pages link each class count to the roster filtered by class, show the spread of item levels read, and say when rank names are not public; /guilds shows active region and ruleset filters as chips on a phone; the raid planner has a shorter banner and suggests the class that would bring the most missing buffs and debuffs; talent trees say what the next locked row needs, show a tree's role where a class's trees differ, and explain what Save does (#1687).
 - Site: quest pages list items that name them as a reward and show the wiki blurb for wiki-titled quests; object pages link their gathering profession and give items per loot window; exploration achievements link their zone and each place; repeated names in the object and item lists say their zone, item level or ID; same-icon rows show the shared icon and drop "Depricated" leftovers (#1689).
 - Site: item pages list item level, required level and binding beside the tooltip, link the quests that reward the item and the items its recipe takes, and move "Same icon" below the other relations; realm price charts scale to the trimmed days with a labelled axis and hover values and name the realm as the site shows it; item lists on a phone show active filters as removable chips (#1678).
@@ -324,6 +327,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: use `/everloot bagcheck` to copy counts from your bags or open bank into the Inventory Value tool when Local inventory snapshots is enabled.
 
 ### Changed
+
+- Site: profession plans update as you change skill, remember your Auction House, and put the recipe catalog and market analysis on a separate Reference view.
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
 - Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.
@@ -335,6 +340,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: realm item price pages load again instead of erroring (they read `?house=` while built as kept pages); a test stops any page from doing both (#1693).
+- Site: realm price pages name a CAMWOW realm as their heading does; a zone's quest table with no agreed NPC is captioned as reported quests; the talent hint reads "Next row: 5 more points in Balance"; rankings tables name their first column Class, Race or Faction; guild class links land on the roster; /guilds shows the newest read day on a phone; an object's items per loot window says stacks are counted (#1694).
 - Site: the guild directory's date column is "Newest read", the latest read of the roster or any member, and its note says why it can be newer than the guild page's Roster read (#1685).
 - Site: chart tables under "Show as a table" no longer hide their first row under the header; the realm price line leaves trimmed days off the line, breaks across gaps and shows its tooltip beside the day; dates and chart ticks on the home, guild, changes and rankings pages use the site's day form ("Nov 9"); a zone's Quests tab leaves out an all-unrecorded Giver or Turn-in column and reads on a phone; the upload preview names record kinds, realm price tables name the realm as shown, an NPC with a partly reported name says how many installs reported it, and the raid planner's buff counts add up to their total (#1688).
 - Site: NPC and quest Level menus have a 61+ bracket so their counts add up; the item page's Auction House box says each price's scan day and when community scans are paused; rankings weeks, auction item pages, AH Ledger history, boss pages and /changes write days as "Nov 20, 2026"; home search suggestions span the field and button and show long names whole; a slot-filtered item category's heading names the slot; the guild gear tooltip is one sentence; quest-chain ledes, boss kill facts and the guild last-login note read naturally (#1680).
@@ -825,6 +832,32 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - Refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
+
+## [0.3.33] - 2026-11-28
+
+Release channel: Alpha
+
+### Added
+
+- Compare crafting returns inside your profession window: compact profit tags, an Everloot list with profit sorting and filtering, and a shared AH/vendor destination. Open a recipe's Details for material costs, price sources, batch returns and training payback when its exact recipe is known.
+- Plan whole crafting batches with **Buy all** or **Cheapest**. Everloot uses your character's observed learned recipes, rounds intermediate crafts to whole batches and counts shared materials once. Cooldown routes require the matching profession window; ordinary routes use a labelled assumption from matching-build client files.
+- Use **Add materials** to preview and save a character's recipe plans. The Auction House shopping page keeps these apart from manual lists, subtracts only that character's current bags and searches one needed item per press. Saving a recipe again replaces its count; zero removes it. Other characters' plans show full needs without using their bags.
+- Completed own full scans provide local material depth, 14 days of daily prices, a seven-day baseline and a material break-even price in Details. Partial scans and outside-addon prices do not enter this history.
+- Optional Auctionator and TSM price sources, with explicit unavailable states and an optional Everloot fallback. Their prices stay in memory and are never uploaded. Neither adapter has been verified on Forever; Everloot remains the default.
+
+### Changed
+
+- The website's profession recipe cards compare batch returns and allowed catalog make steps, accept counts you type, and copy shareable plans. Select a realm and auction house for prices and Everloot's separate profit ranking. These catalog routes are not checked against a character; vendor-sale estimates remain unavailable on the website.
+- Recipe shopping uses market value rather than the cheapest listing. Missing market values, unknown outputs and incomplete inputs stay unpriced instead of becoming confident profit claims.
+- Merchant prices count toward crafting costs only after this character sees a single-item, money-only offer. Old raw vendor offers cannot prove a unit price. Revisit merchants on each character after updating; verified unit prices expire after 14 days or a client-build change.
+
+### Compatibility and verification
+
+- For WoW: Forever 1.60.1 / interface 16001. Existing manual shopping lists and public upload records retain their format. Learned recipes, plans, bag counts used for a preview, merchant unit prices and market history are local; optional-source prices are not saved.
+- This exact release ZIP has **not been checked in the live game**. In-game layout, recipe selection, trainer spell identity, cooldown API behavior, persistence and coexistence still need player checks. Automated contracts and a real-browser website journey passed; those do not establish live-client compatibility.
+- Open each profession to capture this character's recipes. Bags only: bank, mail and alt inventory are excluded. Recorder-only mode suppresses Everloot's profession decorations. No buying, posting, crafting or training is automated.
+- The cheapest route is a bounded comparison, not a promise of a global optimum or live offers. Client files contain unreadable blocks and omit server changes; source assumptions and missing prices are shown. Large scan items may take longer to process. Archive acceptance steps are in `docs/2026-11-27-profession-profit-acceptance.md`.
+- GitHub publication, the website download, CurseForge approval and the Discord announcement can become available at different times. Use the exact version shown by `/everloot version` when reporting a problem.
 
 ## [0.3.31] - 2026-11-26
 

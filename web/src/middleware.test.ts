@@ -10,11 +10,20 @@ afterEach(() => { vi.unstubAllEnvs(); });
 test("middleware covers the home rewrite, private operations and the ad-free pages under every version prefix", () => {
   expect(config.matcher).toEqual([
     "/", "/ops/:path*", "/api/ops/:path*",
+    "/tools/auctions/activity", "/beta/tools/auctions/activity", "/ptr/tools/auctions/activity",
     "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
     "/armory/:path*", "/beta/armory/:path*", "/ptr/armory/:path*",
     "/players/:path*", "/beta/players/:path*", "/ptr/players/:path*",
     "/guilds/:path*", "/beta/guilds/:path*", "/ptr/guilds/:path*",
   ]);
+});
+
+test("the local sales report loads on a fresh protected document", () => {
+  const url = "https://everloot.app/tools/auctions/activity?item=2589";
+  const prefetch = middleware(new NextRequest(url, { headers: { "sec-fetch-dest": "empty" } }));
+  expect(prefetch.headers.get("CDN-Cache-Control")).toBe("no-store");
+  const page = middleware(new NextRequest(url, { headers: { "sec-fetch-dest": "document" } }));
+  expect(page.headers.get("x-middleware-next")).toBe("1");
 });
 
 test("a client-side move or prefetch to an ad-free page gets no page, only an uncached answer that makes the router load a document", async () => {

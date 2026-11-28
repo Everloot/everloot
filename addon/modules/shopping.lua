@@ -2,12 +2,19 @@
 -- will pay per unit. Saved in this install's file only (EverlootDB.shopping), never uploaded, and capped so the file
 -- stays small. The Everloot tab at the auction house (modules/auctiontab.lua) shows the active list and searches one
 -- item per press; the Professions tab's what-to-buy list adds a recipe's reagents. Wanted counts are the player's own
--- numbers: bags and banks are not read.
+-- numbers. Recipe plans are a separate source and read current bags ephemerally; banks are not counted.
 --
 -- A search is one browse query, the call the price scan's fallback already makes (C_AuctionHouse.SendBrowseQuery),
 -- sent only from the player's press, only when the client says its throttled message system is ready, and never while
 -- a price scan or an earlier search is waiting. Its first page of results gives the lowest buyout and how many are
 -- listed. Nothing here posts, bids or buys.
+--
+-- A second search source, chosen by the player and never merged with the lists: the character recipe plans
+-- (crafting_plan.lua). S.PlanView() works the plan out now, with the owner's own bags counted once for this character
+-- only; Search needed searches the next needed item through the same one-item search. Each search remembers the
+-- context it was sent in (character, realm, house, source and, for plans, the owner and plan revision): a reply that
+-- arrives after any of them changed is ignored, and the query it answers still blocks the next one until that reply,
+-- a failure or the timeout. Reopening the house does not release an unanswered query early.
 
 local E = Everloot
 local S = {}
@@ -22,9 +29,14 @@ S.WAIT = 10             -- seconds a search waits for its results before the pla
 S.DEFAULT_NAME = "Shopping"
 S.CAPS = "Up to 10 lists of 50 items each, kept in this install's saved file only."
 
-local found = {}   -- [itemId] = { min, quantity, at } or { none = true, at }: this session's searches, never saved
-local pending      -- { itemId, name, at } while a search waits for its results
+local found = {}   -- [itemId] = { min, quantity, at, realm, house } or { none = true, ... }: this session's, never saved
+local pending      -- { itemId, name, at, token, stale?, closed? } while a search waits for its results
+local sequence     -- { token, done = { [itemId] = true } }: the items Search needed already searched
+local viewCache    -- { key, at, plan }: the last plan view, worked out again when anything it depends on changes
 S.message = nil    -- what the last search said, for the panel
+S.source = "manual" -- what the shopping page shows and searches: 'manual' (the lists) or 'plan' (recipe plans)
+S.planOwner = nil  -- whose recipe plans the page shows; this character unless the player picked another
+S.VIEW_SECONDS = 30 -- the longest a plan view is reused while nothing it depends on changes (prices can)
 
 local function readable(v)
   if E.Readable then return E.Readable(v) end
@@ -294,11 +306,46 @@ local function say(text)
   return text
 end
 
---- This session's search result for one item: { min, quantity, at } or { none = true, at }, or nil.
-function S.Found(itemId) return found[itemId] end
+--- This session's search result for one item in this house: { min, quantity, at } or { none = true, at }, or nil.
+function S.Found(itemId)
+  local f = found[itemId]
+  if f and f.realm == E.CurrentRealm() and f.house == (E.MarketHouse and E:MarketHouse() or nil) then return f end
+end
 
---- True while a search waits for its results.
-function S.Pending() return pending ~= nil end
+--- True while a search for the current context waits for its results.
+function S.Pending() return pending ~= nil and not pending.stale end
+
+--- An unanswered query still occupies the browse channel after its screen closes or its context changes.
+function S.Waiting() return pending ~= nil and time() - pending.at < S.WAIT end
+
+--- What a search's reply must still match to be shown: character, realm, house, source and, for recipe plans, whose
+--- plan and its revision.
+function S.Token()
+  local CP = E.CraftingPlan
+  local parts = { tostring(E.CharacterKey and E.CharacterKey() or nil), tostring(E.CurrentRealm()),
+    tostring(E.MarketHouse and E:MarketHouse() or nil), S.source, tostring(S.contextRevision or 0) }
+  if S.source == "plan" then
+    parts[#parts + 1] = tostring(S.planOwner)
+    parts[#parts + 1] = tostring(CP and CP.revision)
+  end
+  return table.concat(parts, "|")
+end
+
+--- A plan or source change: queued plan searches start over and a plan's Buy context is cleared. An outstanding query
+--- is not released: its reply is ignored when it comes (S.Token no longer matches).
+function S.Invalidate(why)
+  S.contextRevision = (S.contextRevision or 0) + 1
+  sequence, viewCache = nil, nil
+  if S.OnInvalidate then pcall(S.OnInvalidate, why) end
+end
+
+--- Shows and searches the manual lists ('manual') or the recipe plans ('plan').
+function S.SetSource(source)
+  source = source == "plan" and "plan" or "manual"
+  if source == S.source then return end
+  S.source = source
+  S.Invalidate("source")
+end
 
 --- Searches the auction house for one item, from the player's press: at most one browse query, sent only when the
 --- house is open, no price scan or earlier search is waiting and the client's throttle is ready. Returns true when it
@@ -317,7 +364,7 @@ function S.Search(itemId, saved)
   end
   local name = S.ItemName(itemId, saved)
   if not name then return false, say("The client has not loaded that item yet: press Search again in a moment.") end
-  pending = { itemId = itemId, name = name, at = time() }
+  pending = { itemId = itemId, name = name, at = time(), token = S.Token() }
   if not pcall(C_AuctionHouse.SendBrowseQuery, { searchString = name, sorts = {} }) then
     pending = nil
     return false, say("The search could not be sent. Try again.")
@@ -335,22 +382,34 @@ end
 local function readResults()
   local s = pending
   pending = nil
+  -- A reply for a search sent in another context (an edited plan, another source, character or house) is not shown.
+  if s.stale or s.token ~= S.Token() then
+    say("Ignored a late reply for " .. S.Shown(s.name) .. ": the list, character or house changed since that search.")
+    return
+  end
+  local where = { realm = E.CurrentRealm(), house = E.MarketHouse and E:MarketHouse() or nil }
   local ok, results = pcall(C_AuctionHouse.GetBrowseResults)
   results = ok and readable(results)
-  local min, quantity = nil, 0
+  local min, quantity, matched = nil, 0, false
   for _, r in ipairs(type(results) == "table" and results or {}) do
     local key = type(readable(r)) == "table" and readable(r.itemKey)
     if type(key) == "table" and number(key.itemID) == s.itemId then
+      matched = true
       local price, count = number(r.minPrice), number(r.totalQuantity)
       if price and price >= 1 and (not min or price < min) then min = price end
       if count then quantity = quantity + count end
     end
   end
+  if type(results) ~= "table" or (#results > 0 and not matched) then
+    pending = s
+    say("The reply contains different items or could not be read: still waiting for " .. S.Shown(s.name) .. ".")
+    return
+  end
   if min then
-    found[s.itemId] = { min = min, quantity = quantity, at = time() }
+    found[s.itemId] = { min = min, quantity = quantity, at = time(), realm = where.realm, house = where.house }
     say(S.Shown(s.name) .. ": lowest " .. E.Coins(min) .. " each, " .. quantity .. " listed.")
   else
-    found[s.itemId] = { none = true, at = time() }
+    found[s.itemId] = { none = true, at = time(), realm = where.realm, house = where.house }
     local more = type(C_AuctionHouse.HasFullBrowseResults) == "function"
       and readable(select(2, pcall(C_AuctionHouse.HasFullBrowseResults))) == false
     say(S.Shown(s.name) .. (more and ": not in the first page of results. The Buy tab shows them all." or ": none listed with a buyout."))
@@ -360,10 +419,97 @@ end
 --- Clears a search the house never answered, so the next press can send another. The panel calls it every second.
 function S.Tick()
   if pending and time() - pending.at >= S.WAIT then
-    say("No answer from the auction house for " .. S.Shown(pending.name) .. ": press Search again.")
+    if not pending.stale then say("No answer from the auction house for " .. S.Shown(pending.name) .. ": press Search again.") end
     pending = nil
     return true
   end
+end
+
+-- Recipe plans -------------------------------------------------------------------------------------------------
+
+local function planContext()
+  local realm, house = E.CurrentRealm(), E.MarketHouse and E:MarketHouse() or nil
+  local U = E.Window
+  if U and U.CraftContext then return (U.CraftContext(realm, house)) end
+  if E.Crafting and E.Crafting.Context then return E.Crafting.Context(realm, house, { scan = true }) end
+end
+
+local function bagSignature(bags)
+  if not bags.counts then return "none:" .. tostring(bags.reason) end
+  local ids = {}
+  for id, n in pairs(bags.counts) do ids[#ids + 1] = id .. ":" .. n end
+  table.sort(ids)
+  return table.concat(ids, ",")
+end
+
+--- The characters whose plans the page can show, this character first (CraftingPlan.Owners).
+function S.PlanOwners()
+  local CP = E.CraftingPlan
+  return CP and CP.Owners and CP.Owners() or {}
+end
+
+--- Shows the next (step 1) or previous (step -1) character's plans.
+function S.CycleOwner(step)
+  local owners = S.PlanOwners()
+  if #owners == 0 then return end
+  local at = 1
+  for i, key in ipairs(owners) do if key == S.planOwner then at = i end end
+  S.planOwner = owners[(at - 1 + step) % #owners + 1]
+  S.Invalidate("owner")
+end
+
+--- The shown character's recipe plans worked out now (CraftingPlan.Preview), or nil without the planner. This
+--- character's bags are read each time and never saved; another character's plan is its full requirement.
+function S.PlanView(fresh)
+  local CP = E.CraftingPlan
+  if not (CP and CP.Preview) then return nil end
+  local current = E.CharacterKey and E.CharacterKey() or nil
+  local listed = false
+  for _, key in ipairs(S.PlanOwners()) do if key == S.planOwner then listed = true end end
+  if not listed then S.planOwner = current end
+  local owner = S.planOwner
+  local bags = {}
+  if owner ~= nil and owner == current then
+    local inventory = E.Inventory
+    if inventory and inventory.CurrentBags then bags.counts, bags.reason = inventory.CurrentBags()
+    else bags.reason = "no inventory module" end
+  end
+  -- The price source choice is part of the key: choosing another source never shows a route priced by the last one.
+  local CS = E.CraftingSources
+  local sourceName, sourceFallback = "everloot", false
+  if CS then sourceName, sourceFallback = CS.Choice() end
+  local key = table.concat({ tostring(owner), tostring(current), tostring(CP.revision), tostring(E.CurrentRealm()),
+    tostring(E.MarketHouse and E:MarketHouse() or nil), bagSignature(bags), sourceName, tostring(sourceFallback) }, "|")
+  if not fresh and viewCache and viewCache.key == key and time() - viewCache.at < S.VIEW_SECONDS then return viewCache.plan end
+  local context = planContext()
+  local plan = CP.Preview(owner, context, { bags = bags })
+  if type(plan) == "table" and context then plan.priceSource = context.priceSource end
+  viewCache = { key = key, at = time(), plan = plan }
+  return plan
+end
+
+--- The next item Search needed should search for in a plan view: a row still needed, not over the 50-item limit and
+--- not searched yet since the plan, source, character or house last changed. nil and why when there is none.
+function S.NextNeeded(plan)
+  if not plan then return nil, "Recipe plans are not available in this load." end
+  if not plan.searchable then return nil, plan.searchWhy end
+  local token = S.Token()
+  if not sequence or sequence.token ~= token then sequence = { token = token, done = {} } end
+  local needed = 0
+  for _, r in ipairs(plan.rows) do
+    if r.need > 0 and not r.omitted then
+      needed = needed + 1
+      if not sequence.done[r.id] then return r end
+    end
+  end
+  sequence = nil
+  if needed == 0 then return nil, "Nothing to search: the counted bags cover every listed item." end
+  return nil, "Every needed item has been searched. Press Search needed again to start over."
+end
+
+--- Marks an item as searched in the current Search needed sequence.
+function S.Searched(itemId)
+  if sequence and sequence.token == S.Token() then sequence.done[itemId] = true end
 end
 
 local function onEvent(_, event, arg1)
@@ -373,10 +519,23 @@ local function onEvent(_, event, arg1)
     if arg1 == "Everloot" and type(EverlootDB) == "table" and EverlootDB.shopping ~= nil then S.DB() end
     return
   end
-  if event == "AUCTION_HOUSE_CLOSED" then pending = nil; return end
+  if event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_CLOSE" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED"
+    or event == "TRADE_SKILL_LIST_UPDATE" or event == "NEW_RECIPE_LEARNED" then
+    S.Invalidate("profession")
+    if S.OnChange then pcall(S.OnChange) end
+    return
+  end
+  -- A closed house cancels the search for the player, but its query still blocks until answered or timed out.
+  if event == "AUCTION_HOUSE_CLOSED" then
+    if pending then pending.stale, pending.closed = true, true end
+    sequence = nil
+    return
+  end
   if not pending then return end
   if event == "AUCTION_HOUSE_BROWSE_FAILURE" then
-    say("The auction house refused the search for " .. S.Shown(pending.name) .. ": try again in a moment.")
+    if not pending.stale then
+      say("The auction house refused the search for " .. S.Shown(pending.name) .. ": try again in a moment.")
+    end
     pending = nil
   elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" then
     if not pcall(readResults) then pending = nil; say("The search results could not be read.") end
@@ -387,7 +546,8 @@ local function onEvent(_, event, arg1)
 end
 
 S.frame = CreateFrame("Frame")
-for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_FAILURE", "AUCTION_HOUSE_CLOSED" }) do
+for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_FAILURE", "AUCTION_HOUSE_CLOSED",
+  "TRADE_SKILL_SHOW", "TRADE_SKILL_CLOSE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED" }) do
   pcall(S.frame.RegisterEvent, S.frame, event)
 end
 S.frame:SetScript("OnEvent", onEvent)

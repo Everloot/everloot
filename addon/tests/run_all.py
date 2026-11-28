@@ -12,7 +12,7 @@ TESTS = [
     "disenchant_contract.py",
     "event_identity.py", "collection_contract.py", "map_positions_contract.py", "loot_types_contract.py",
     "item_facts_contract.py", "auction_contract.py", "auction_fallback_contract.py", "gold_contract.py",
-    "ask_contract.py", "recipes_contract.py", "addons_contract.py", "mapbounds_contract.py", "market_contract.py",
+    "ask_contract.py", "recipes_contract.py", "crafting_plan_contract.py", "addons_contract.py", "mapbounds_contract.py", "market_contract.py",
     "drops_contract.py", "scan_prompt_contract.py", "auction_tab_contract.py", "options_contract.py",
     "gph_contract.py", "talents_contract.py", "plan_contract.py", "raid_contract.py", "completion_contract.py",
     "census_contract.py", "players_contract.py", "player_progress_contract.py", "link_contract.py", "conveniences_contract.py",
@@ -20,7 +20,7 @@ TESTS = [
     "ui_window_contract.py", "answers_contract.py", "pulls_contract.py",
     "drawer_contract.py", "owned_contract.py", "guild_contract.py",
     "inventory_contract.py", "roster_contract.py", "ledger_contract.py", "view_gold_contract.py", "view_collection_contract.py", "collection_tree_contract.py",
-    "view_professions_contract.py", "native_crafting_contract.py", "event_isolation_contract.py", "repeat_events_contract.py",
+    "view_professions_contract.py", "native_crafting_contract.py", "crafting_contract.py", "crafting_history_contract.py", "crafting_sources_contract.py", "crafting_integration_contract.py", "event_isolation_contract.py", "repeat_events_contract.py",
     "instances_contract.py", "commands_contract.py", "retired_kinds_contract.py", "where_contract.py", "tooltip_history_contract.py", "shopping_contract.py",
     "sellcheck_contract.py", "flight_contract.py", "wealth_contract.py",
 ]

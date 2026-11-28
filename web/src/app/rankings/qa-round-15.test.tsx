@@ -24,7 +24,7 @@ test("QA round 15: a chart's \"Show as a table\" header is not sticky inside the
   const html = renderToStaticMarkup(
     <>
       <WeeklyTotals points={weeks.map((w, i) => ({ week: w, count: [18_040, 27_140, 16_415][i] }))} />
-      <StackedWeeks title="Share of each week's characters by class" weeks={weeks} series={[{ key: "mage", label: "Mage", classToken: "MAGE", points: [0.5, 0.4, 0.45] }]} />
+      <StackedWeeks noun="Class" title="Share of each week's characters by class" weeks={weeks} series={[{ key: "mage", label: "Mage", classToken: "MAGE", points: [0.5, 0.4, 0.45] }]} />
     </>,
   );
   document.body.innerHTML = html;
@@ -46,7 +46,7 @@ test("QA round 15: the weekly charts' x-axis and the shares table name a week No
   const html = renderToStaticMarkup(
     <>
       <WeeklyTotals points={weeks.map((w, i) => ({ week: w, count: [18_040, 27_140, 16_415][i] }))} />
-      <StackedWeeks title="Share of each week's characters by class" weeks={weeks} series={[{ key: "mage", label: "Mage", classToken: "MAGE", points: [0.5, 0.4, 0.45] }]} />
+      <StackedWeeks noun="Class" title="Share of each week's characters by class" weeks={weeks} series={[{ key: "mage", label: "Mage", classToken: "MAGE", points: [0.5, 0.4, 0.45] }]} />
     </>,
   );
   expect(html).toContain(">Nov 9</text>");

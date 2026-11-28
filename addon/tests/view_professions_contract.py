@@ -183,6 +183,57 @@ end
 p.nav.scripts.OnClick()
 assert(not t.page.shown and p.blocks[1].shown and p.nav.text == 'Ranks and trainers' and not U.failed)
 """)
+# Task 7: a trainer row's hover estimates its profit and training payback from the recorded recipe spell ID and the
+# schematic the client can read for it, priced like every other estimate. Same-name recipes stay separate rows, each
+# with its own spell; an item ID is never used as the spell; a row without a spell ID makes no claim.
+PAYBACK_RECORDS = """{
+  trainer_seen = {
+    { profession = 'Mining', recipe = 'Smelt Bronze', requiredRank = 120, costCopper = 1001, trainerNpcId = 1234, spellId = 3001 },
+    { profession = 'Mining', recipe = 'Smelt Bronze', requiredRank = 120, costCopper = 1001, trainerNpcId = 1234, spellId = 3002 },
+    { profession = 'Mining', recipe = 'Smelt Bronze', requiredRank = 120, costCopper = 1001, trainerNpcId = 1234 },
+    { profession = 'Mining', recipe = 'Smelt Brass', requiredRank = 121, costCopper = 1001, trainerNpcId = 1234, productItemId = 3001 },
+  },
+}"""
+PAYBACK_API = API + """
+GameTooltip = { lines = {} }
+function GameTooltip:SetOwner(owner) self.owner, self.lines = owner, {} end
+function GameTooltip:IsOwned(owner) return self.owner == owner end
+function GameTooltip:AddLine(text) table.insert(self.lines, text) end
+function GameTooltip:Show() self.shown = true end
+function GameTooltip:Hide() self.shown = false; self.owner = nil end
+local function slot(id) return { required = true, dataSlotType = 1, reagentType = 1, quantityRequired = 1, reagents = { { itemID = id } } } end
+schematics = {
+  [3001] = { recipeID = 3001, outputItemID = 12, quantityMin = 1, quantityMax = 1, reagentSlotSchematics = { slot(11) } },
+  [3002] = { recipeID = 3002, outputItemID = 12, quantityMin = 1, quantityMax = 1, reagentSlotSchematics = { slot(13) } },
+}
+C_TradeSkillUI = { GetRecipeSchematic = function(id, recraft) return schematics[id] end }
+"""
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {PAYBACK_RECORDS}, roster = {ROSTER} }}", PAYBACK_API)
+# The schematic reader the trainer estimate shares with the profession window loads after this view, as in the TOC.
+lua.execute((root / "modules" / "native_crafting.lua").read_text(encoding="utf-8"))
+lua.execute("""
+local prices = { [11] = 450, [12] = 1000, [13] = 950 }
+function Everloot:CommunityPrice(realm, id) if prices[id] then return { market = prices[id], day = '2026-10-30' } end end
+function Everloot:PriceFile(realm) return { status = 'ready', house = 'Alliance', asOf = '2026-10-30' } end
+local U = Everloot.Window
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.nav.scripts.OnClick()
+local r = p.trainers.sections[1].rows
+local function hover(line) line.scripts.OnEnter(line); return table.concat(GameTooltip.lines, '\\n') end
+assert(r[1].recipe.text == 'Smelt Bronze' and r[2].recipe.text == 'Smelt Bronze' and r[3].recipe.text == 'Smelt Brass',
+  'two same-name recipes with their own spell IDs are two rows; the name-only copy is not a third')
+assert(not r[4].shown, tostring(r[4].recipe.text))
+local said = hover(r[1])
+assert(said:find('Repays ' .. U.Money(1001) .. ' training after 3 profitable crafts', 1, true), said)
+said = hover(r[2])
+assert(said:find('No payback', 1, true) and not said:find('Repays', 1, true), 'the other spell breaks even: ' .. said)
+said = hover(r[3])
+assert(said:find('No payback estimate', 1, true) and not said:find('Repays', 1, true), 'an item ID is not a recipe spell: ' .. said)
+r[3].scripts.OnLeave(r[3])
+assert(not GameTooltip.shown and not U.failed)
+""")
+
 # Five professions: two rows each, the rest counted in the heading, every section above the footer.
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}",
             TRAINER_API + "GetProfessions = function() return 1, 4, 5, 1, 4 end\n")
@@ -273,6 +324,14 @@ CRAFT_RECORDS = """{
     { vendorNpcId = 2, items = { { itemId = 2678, priceCopper = 10 }, { itemId = 6889, priceCopper = 0 } } },
   },
 }"""
+# The public vendor rows above are offers, not unit prices; this install's merchant windows proved these lowest unit
+# prices for one item with no extra cost, as this character, now, on this build (openworld.lua keeps them beside the
+# records, never in them; window_world's unitEvidence writes them).
+UNITS = "{ [2678] = 10, [2770] = 30, [159] = 25 }"
+# What each crafting recipe makes, as this install recorded it from the profession window (recipeOutput): a stored row
+# has a sale only with a recorded output, never an assumed one.
+CRAFT_OUTPUTS = ("[11] = { itemId = 2680, minimum = 1, maximum = 1 }, [12] = { itemId = 6888, minimum = 1, maximum = 1 }, "
+                 "[13] = { itemId = 5525, minimum = 1, maximum = 1 }, [14] = { itemId = 12791, minimum = 1, maximum = 1 }")
 # itemId,market,min,historical,quantity,day,reporters. Mild Spices sells at a vendor for less than its market value;
 # Copper Ore's vendor price is higher than its market value; Herb Baked Egg (6888) has no price.
 PRICE_ROWS = ";".join([
@@ -288,8 +347,9 @@ def price_file(as_of: str) -> str:
 
 
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, "
-            "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 } } }",
+            "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 }, " + CRAFT_OUTPUTS + " } }",
             API + price_file("2026-10-29T06:00:00Z"), extra=("modules/sellcheck.lua",))
+lua.execute("unitEvidence(" + UNITS + ")")
 lua.execute("""
 local U, E = Everloot.Window, Everloot
 local M = U.MoneyShort
@@ -364,6 +424,7 @@ for i = 1, 5 do assert(not c.rows[i].cost.text:find('^0') and c.rows[i].cost.tex
 -- What to buy for the first row by default.
 local b = c.buy
 assert(b.title.text == 'What to buy: 1 × Smelt Copper', b.title.text)
+assert(not b.route.shown, 'without the planner there is no route choice')
 assert(b.lines[1].shown and b.lines[1].text == '1 × Copper Ore · ' .. M(20) .. ' each · ' .. M(20), b.lines[1].text)
 assert(not b.lines[2].shown and b.total.text == 'Total: ' .. M(20), b.total.text)
 assert(not b.up.shown and not b.down.shown, 'one reagent needs no paging')
@@ -386,7 +447,7 @@ assert(b.title.text == 'What to buy: 11 × Spiced Wolf Meat', b.title.text)
 assert(b.lines[1].text == '11 × Wolf Meat · ' .. M(50) .. ' each · ' .. M(550), b.lines[1].text)
 assert(b.lines[2].text == '11 × Mild Spices · ' .. M(10) .. ' each (vendor) · ' .. M(110), b.lines[2].text)
 assert(b.total.text == 'Total: ' .. M(660), b.total.text)
-assert(b.output.text == 'Output unknown · sale estimate assumes 1 item per craft', b.output.text)
+assert(b.output.text == 'Makes 1 item per craft · ' .. U.Money(60) .. ' materials per item', b.output.text)
 assert(b.math.text == 'Sale: ' .. U.Money(495) .. ' - 5% AH cut: ' .. U.Money(25)
   .. ' - materials: ' .. U.Money(660) .. ' = ' .. U.Money(-190) .. ' profit', b.math.text)
 assert(c.rows[2].name.color[2] == U.COLORS.accent[2] and c.rows[1].name.color[2] == U.COLORS.text[2])
@@ -407,6 +468,20 @@ assert(b.total.text == 'Total unknown: 1 reagent unpriced · the priced ones ' .
 assert(b.math.text == 'Profit unknown: missing material prices.', b.math.text)
 c.rows[5].scripts.OnClick()
 assert(b.total.text == 'Total unknown: 2 reagents unpriced', b.total.text)
+-- Without a recorded output a stored row keeps its material cost but has no sale: one item is never assumed.
+local chosen = c.rows[5].name.text
+EverlootDB.recipeOutput[11] = nil
+U.RefreshCrafting()
+local wolf
+for i = 1, 6 do if c.rows[i].shown and c.rows[i].name.text == 'Spiced Wolf Meat' then wolf = c.rows[i] end end
+assert(wolf and wolf.cost.text == M(60) and wolf.value.text == M(45) and wolf.profit.text == '-', wolf and wolf.profit.text)
+wolf.scripts.OnClick()
+assert(b.output.text == 'Output unknown · no sale estimate until the profession window shows what it makes', b.output.text)
+assert(b.total.text == 'Total: ' .. M(120), b.total.text)
+assert(b.math.text == 'Profit unknown: recipe yield unavailable.', b.math.text)
+EverlootDB.recipeOutput[11] = { itemId = 2680, minimum = 1, maximum = 1 }
+U.RefreshCrafting()
+for i = 1, 6 do if c.rows[i].shown and c.rows[i].name.text == chosen then c.rows[i].scripts.OnClick() end end
 
 -- Sort by name, then only the profitable ones; the chosen recipe keeps its what-to-buy list while filtered out.
 c.sortButton.scripts.OnClick()
@@ -438,7 +513,8 @@ assert(U.view == 'professions' and p.craft.page.shown and not p.blocks[1].shown)
 """)
 
 # Without a price file only vendor prices count; an old file says so in the warning red.
-lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS} }}", API)
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, recipeOutput = {{ {CRAFT_OUTPUTS} }} }}", API)
+lua.execute("unitEvidence(" + UNITS + ")")
 lua.execute("""
 local U = Everloot.Window
 assert(U.Open('professions') == true)
@@ -453,7 +529,8 @@ assert(names['Spiced Wolf Meat'].cost.text == '1 unpriced')
 assert(names['Smelt Copper'].cost.text == U.MoneyShort(30) and names['Smelt Copper'].value.text == 'no price')
 assert(not U.failed)
 """)
-lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS} }}", API + price_file("2026-10-20T06:00:00Z"))
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, recipeOutput = {{ {CRAFT_OUTPUTS} }} }}", API + price_file("2026-10-20T06:00:00Z"))
+lua.execute("unitEvidence(" + UNITS + ")")
 lua.execute("""
 local U = Everloot.Window
 assert(U.Open('professions') == true)
@@ -473,10 +550,11 @@ AMBIGUOUS_RECORDS = CRAFT_RECORDS.replace("{ itemId = 2770, name = 'Copper Ore' 
                                           " { itemId = 2672, name = 'Wolf Meat' },")
 assert AMBIGUOUS_RECORDS != CRAFT_RECORDS
 AMBIGUOUS_ROWS = PRICE_ROWS + ";99001,50,45,55,10,2026-10-29,3"
-lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {AMBIGUOUS_RECORDS} }}",
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {AMBIGUOUS_RECORDS}, recipeOutput = {{ {CRAFT_OUTPUTS} }} }}",
             API + price_file("2026-10-29T06:00:00Z").replace(PRICE_ROWS, AMBIGUOUS_ROWS).replace(
                 str(zlib.adler32(PRICE_ROWS.encode())), str(zlib.adler32(AMBIGUOUS_ROWS.encode())))
             + "GetItemInfo = function(name) if name == 'Copper Ore' then return name, '|Hitem:2770::|h[Copper Ore]|h' end end\n")
+lua.execute("unitEvidence(" + UNITS + ")")
 lua.execute("""
 local U = Everloot.Window
 local M = U.MoneyShort
@@ -508,7 +586,9 @@ SEVEN_RECORDS = CRAFT_RECORDS.replace("  recipe_observed = {\n", "  recipe_obser
     .replace("{ vendorNpcId = 1, items = { ", "{ vendorNpcId = 1, items = { "
              + ", ".join(f"{{ itemId = {3000 + i}, priceCopper = {i} }}" for i in range(1, 8)) + ", ", 1)
 assert SEVEN_RECORDS.count("Ore 7") == 2 and "itemId = 3007, priceCopper = 7" in SEVEN_RECORDS
-lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {SEVEN_RECORDS} }}", API + price_file("2026-10-29T06:00:00Z"))
+SEVEN_UNITS = UNITS.replace("{ ", "{ " + ", ".join(f"[{3000 + i}] = {i}" for i in range(1, 8)) + ", ", 1)
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {SEVEN_RECORDS}, recipeOutput = {{ [30] = {{ itemId = 2840, minimum = 1, maximum = 1 }}, {CRAFT_OUTPUTS} }} }}", API + price_file("2026-10-29T06:00:00Z"))
+lua.execute("unitEvidence(" + SEVEN_UNITS + ")")
 lua.execute("""
 local U = Everloot.Window
 local M = U.MoneyShort
@@ -590,9 +670,13 @@ CHANGE_FILE = ("EverlootPricesDB = { realms = { ['forever|alliance'] = { data = 
 
 
 def change_world(records=CHANGE_RECORDS, prices=CHANGE_FILE):
+    # Glimmerdust's 10c vendor offer was one item for money alone: this install keeps it as a unit price. The profession
+    # window recorded that one craft makes one Glimmerdust shape.
     world = fresh("{ installId = 'abcd-1234', toggles = {}, records = " + records
+                  + ", recipeOutput = { [990101] = { itemId = 990102, minimum = 1, maximum = 1 } }"
                   + ", houseScans = { Forever = { Alliance = { scanId = 'latest', at = 1793350800 } } } }",
                   CHANGE_API + prices)
+    world.execute("unitEvidence({ [990103] = 10 })")
     world.execute("assert(Everloot.Window.Open('professions')); EverlootWindow.professions.toggle.scripts.OnClick(); "
                   "r = EverlootWindow.professions.craft.rows[1]; assert(not Everloot.Window.failed)")
     return world
@@ -601,9 +685,14 @@ def change_world(records=CHANGE_RECORDS, prices=CHANGE_FILE):
 lua = change_world()
 lua.execute(r"""
 assert(r.cost.text == Everloot.Window.MoneyShort(20))
-assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == '+' .. Everloot.Window.MoneyShort(122))
+-- One quote policy with the native window: this house's scan from today (130c, after the community day) beats the
+-- price file's 150c: 130c less the 5% cut is 123c, less 20c of materials.
+assert(r.value.text == Everloot.Window.MoneyShort(130) and r.profit.text == '+' .. Everloot.Window.MoneyShort(103),
+  r.value.text .. ' / ' .. r.profit.text)
+assert(EverlootWindow.professions.craft.age.text:find('^Your Alliance scan: 1 h ago', 1), EverlootWindow.professions.craft.age.text)
 r.scripts.OnEnter(r)
 local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('Item value: ' .. Everloot.Window.Money(130) .. ' each (your Alliance scan)', 1, true), said)
 assert(said:find('Min buyout: +20.0%', 1, true), said)
 assert(said:find('Units listed: -8', 1, true), said)
 assert(said:find('over the last 3 h', 1, true) and said:find('4 h ago', 1, true), said)
@@ -642,7 +731,23 @@ r.scripts.OnEnter(r)
 local said = table.concat(GameTooltip.lines, '|')
 assert(said:find('— vs 60-day median', 1, true), said)
 assert(said:find('26.1% swing', 1, true), said)
-assert(r.value.text == 'no price', 'scan estimates do not replace the price file value')
+-- Without a price file, the fresh scan of this house still prices the item, and says it is the scan.
+assert(r.value.text == Everloot.Window.MoneyShort(130) and said:find('(your Alliance scan)', 1, true),
+  'the page uses the same fresh same-house scan as the native window')
+""")
+# A fresh scan while the price file is still being checked: the page keeps asking, then shows the file's day.
+lua = change_world()
+lua.execute(r"""
+local c = EverlootWindow.professions.craft
+local file = Everloot.PriceFile
+Everloot.PriceFile = function(self, realm) return { status = 'verifying' } end
+timers = {}
+Everloot.Window.Open('professions')
+assert(c.age.text:find('^Your Alliance scan: 1 h ago', 1) and c.age.text:find('Checking the price file...', 1, true), c.age.text)
+assert(#timers > 0, 'a scan line does not stop the page from asking again while the file is checked')
+Everloot.PriceFile = file
+drain()
+assert(not c.age.text:find('Checking', 1, true) and c.age.text:find('Alliance AH prices', 1, true), c.age.text)
 """)
 lua = change_world(CHANGE_RECORDS.replace("house = 'Alliance', scanId = 'older'", "house = 'Neutral', scanId = 'older'"), '')
 lua.execute("""
@@ -698,3 +803,152 @@ assert(table.concat(GameTooltip.lines, '|'):find('No own scan of this house yet.
 assert(r.change.text == '' and not r.bars[1].shown and not Everloot.Window.failed)
 """)
 print('Professions market changes: three scans, multipart completeness, long intervals and sparse prices PASS')
+
+# A destination changed outside this view redraws it, and delayed sell prices fill in without another click.
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, "
+            "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 }, " + CRAFT_OUTPUTS + " } }",
+            API + price_file("2026-10-29T06:00:00Z"), extra=("modules/sellcheck.lua",))
+lua.execute("unitEvidence(" + UNITS + ")")
+lua.execute("""
+local E, U = Everloot, Everloot.Window
+U.OpenCrafting()
+local c = EverlootWindow.professions.craft
+local sells = {}
+C_Item = C_Item or {}
+C_Item.GetItemInfo = function(id)
+  if id == 2840 and not sells[id] then return end
+  return 'Item '..id, 'link', 1, 10, 1, 'Trade Goods', 'Metal', 20, '', 1, sells[id] or 0
+end
+E.Options.SetCraftDestination('vendor')
+assert(c.destButton.text == 'Sell: vendor' and c.head.value.text == 'Vendor price',
+  'external destination changes refresh the visible professions page')
+local function copper()
+  for _, line in ipairs(c.rows) do if line.row and line.row.id == 10 then return line end end
+end
+assert(copper() and copper().value.text == 'checking' and #timers > 0, 'pending vendor value schedules a redraw')
+sells[2840] = 60
+drain()
+assert(copper().value.text == U.MoneyShort(60), 'loaded vendor price appears without a user click')
+assert(U.CraftComparison(copper().row, 'vendor', 3):find('3 crafts', 1, true), 'comparison states its craft count')
+E.Options.SetCraftDestination('ah')
+assert(c.destButton.text == 'Sell: AH' and c.head.value.text == 'Item value', 'AH switch also redraws externally')
+sells[2840] = nil
+U.RefreshCrafting()
+assert(#timers > 0, 'the secondary vendor comparison also refreshes while AH is selected')
+sells[2840] = 60
+drain()
+assert(not U.failed)
+""")
+print('Professions destinations: cross-surface refresh and delayed vendor prices PASS')
+
+# Route choice on the Crafting costs page: buy every reagent, or the cheapest route with this character's own recipes,
+# for the selected count. The real default: the generated client cooldown data at a matching build, no injected
+# evidence. Recipe 2963 (covered, no cooldown recorded) makes two Wolf Meat from one Small Egg (30c) here.
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, "
+            "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 }, " + CRAFT_OUTPUTS + " } }",
+            API + price_file("2026-10-29T06:00:00Z") + "GetBuildInfo = function() return '1.60.1', '71139' end\n",
+            extra=("modules/sellcheck.lua", "modules/shopping.lua", "modules/recipe_cooldown_data.lua",
+                   "modules/crafting_plan.lua"))
+lua.execute("unitEvidence(" + UNITS + ")")
+lua.execute(f"ME = '{ME}'")
+lua.execute("""
+local U, E = Everloot.Window, Everloot
+local M, Money = U.MoneyShort, U.Money
+local function proven(recipeId)
+  EverlootDB.craftingKnown = { [ME] = { [185] = { complete = false, recipes = { [recipeId] = { recipeId = recipeId,
+    learned = true, itemId = 2672, minimum = 2, maximum = 2, reagents = { { itemId = 6889, count = 1 } },
+    cooldownReturned = false, cooldownCheckedAt = time() - 60 } } } } }
+end
+proven(2963)
+assert(E.CharacterKey() == ME)
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.toggle.scripts.OnClick()
+local c, b = p.craft, p.craft.buy
+c.rows[2].scripts.OnClick()
+assert(b.title.text == 'What to buy: 1 × Spiced Wolf Meat', b.title.text)
+assert(b.route.shown and b.route.text == 'Route: buy all', 'the route choice shows with the planner loaded')
+assert(b.route.point[2] + b.route.width <= b.receipt.point[2] and b.details.point[2] + b.details.width <= b.route.point[2],
+  'the route button sits between Cost details and the receipt')
+assert(b.lines[1].text == '1 × Wolf Meat · ' .. M(50) .. ' each · ' .. M(50), 'buy all is unchanged: ' .. b.lines[1].text)
+b.route.scripts.OnClick()
+assert(b.route.text == 'Route: cheapest', b.route.text)
+assert(b.lines[1].text == 'Make 1 × Wolf Meat: 1 craft', b.lines[1].text)
+assert(b.lines[2].text == '1 × Mild Spices · ' .. M(10) .. ' each (vendor) · ' .. M(10), b.lines[2].text)
+assert(b.lines[3].text == '1 × Small Egg · ' .. M(30) .. ' each · ' .. M(30), b.lines[3].text)
+assert(b.total.text == 'Total: ' .. M(40) .. ' · buying all: ' .. M(60), b.total.text)
+b.details.scripts.OnClick()
+assert(b.math.text == 'Sale: ' .. Money(45) .. ' - 5% AH cut: ' .. Money(3) .. ' - materials: ' .. Money(40) .. ' = '
+  .. Money(2) .. ' profit for 1 craft', b.math.text)
+assert(b.alt.text == 'Left over: 1 × Wolf Meat · Assumes: no cooldown recorded in client data, build 1.60.1.71139', b.alt.text)
+b.details.scripts.OnClick()
+-- The route's hover says what the client data can and cannot show; it never says unlimited.
+GameTooltip = { lines = {}, SetOwner = function(self) self.lines = {} end,
+  AddLine = function(self, s) self.lines[#self.lines + 1] = s end,
+  Show = function(self) self.shown = true end, Hide = function(self) self.shown = false end }
+b.route.scripts.OnEnter(b.route)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('No cooldown recorded in client data, build 1.60.1.71139', 1, true)
+  and said:find('could not be read', 1, true) and said:find('server changes', 1, true) and not said:lower():find('unlimited'), said)
+b.route.scripts.OnLeave()
+-- Three crafts: two crafts make four Wolf Meat for three. 135c sale, 7c cut, 90c materials.
+b.steps[2].scripts.OnClick(); b.steps[2].scripts.OnClick()
+assert(c.count == 3 and b.lines[1].text == 'Make 3 × Wolf Meat: 2 crafts', b.lines[1].text)
+assert(b.total.text == 'Total: ' .. M(90) .. ' · buying all: ' .. M(180), b.total.text)
+assert(b.plan.cost == 90 and b.plan.steps[1].recipeId == 2963 and b.plan.steps[1].crafts == 2)
+b.details.scripts.OnClick()
+assert(b.math.text == 'Sale: ' .. Money(135) .. ' - 5% AH cut: ' .. Money(7) .. ' - materials: ' .. Money(90) .. ' = '
+  .. Money(38) .. ' profit for 3 crafts', b.math.text)
+b.details.scripts.OnClick()
+-- The list's per-craft row is untouched by the selected count's route.
+assert(c.rows[2].cost.text == M(60) and c.rows[2].profit.text == M(-18), c.rows[2].profit.text)
+-- A complete route goes to the shopping list as bought, for every craft.
+b.add.scripts.OnClick()
+assert(b.receipt.text:find('^Added 2 reagents'), b.receipt.text)
+-- Another build: the data does not count, the route buys everything and says why.
+GetBuildInfo = function() return '1.60.2', '72000' end
+U.Views.professions.refresh(EverlootWindow)
+assert(b.total.text == 'Total: ' .. M(180), b.total.text)
+assert(b.alt.text == 'Recipes not used: no cooldown evidence (data for another build)', b.alt.text)
+GetBuildInfo = function() return '1.60.1', '71139' end
+-- A recorded cooldown (Mooncloth's recipe ID) needs a current read in its own open window: none on this page.
+proven(18560)
+U.Views.professions.refresh(EverlootWindow)
+assert(b.total.text == 'Total: ' .. M(180), b.total.text)
+assert(b.alt.text == 'Recipes not used: cooldown not ready now (no current read)', b.alt.text)
+-- An incomplete route is not added; the receipt says why (Clam Meat has no known item ID).
+proven(2963)
+c.rows[4].scripts.OnClick()
+assert(b.title.text:find('Boiled Clams', 1, true) and b.plan and not b.plan.complete, b.title.text)
+b.add.scripts.OnClick()
+assert(b.receipt.text == "Not added: this route is incomplete (the recipe's reagents are not all known).", b.receipt.text)
+-- A route over the 50-item limit is not added either: item 51 is never dropped silently.
+c.rows[2].scripts.OnClick()
+b.plan = { complete = false, unpriced = {}, limits = {}, cost = 51, purchases = {}, omitted = { { id = 1050, item = 'Item 1050', count = 1 } } }
+b.add.scripts.OnClick()
+assert(b.receipt.text == 'Not added: this route is incomplete (1 item over the 50-item limit).', b.receipt.text)
+-- Back to buying all.
+c.rows[2].scripts.OnClick()
+b.route.scripts.OnClick()
+assert(b.route.text == 'Route: buy all' and b.plan == nil and b.lines[1].text == '3 × Wolf Meat · ' .. M(50) .. ' each · '
+  .. M(150), b.lines[1].text)
+assert(not U.failed)
+""")
+# Plan notes explain every exclusion, cycles included.
+lua.execute("""
+local note = Everloot.Window.PlanNote({ decisions = {}, leftovers = {}, limits = {},
+  exclusions = { { recipeId = 211, itemId = 115, reason = 'cycle' } } })
+assert(note == 'Recipes not used: recipe loops back to its own product', note)
+-- A cooldown root that cannot be read says why, not only the zero (the Crafting costs page has no open window).
+note = Everloot.Window.PlanNote({ decisions = {}, leftovers = {}, exclusions = {},
+  limits = { { kind = 'cooldown', recipeId = 18560, crafts = 1, capacity = 0, reason = 'cooldown', detail = 'profession window closed' } } })
+assert(note == 'Cooldown allows 0 now (profession window closed)', note)
+local U = Everloot.Window
+local b = EverlootWindow.professions.craft.buy
+b.plan = { complete = false, unpriced = {}, omitted = {}, cost = 40,
+  limits = { { kind = 'cooldown', recipeId = 18560, crafts = 1, capacity = 0, reason = 'cooldown', detail = 'profession window closed' } } }
+b.add.scripts.OnClick()
+assert(b.receipt.text == "Not added: this route is incomplete (the recipe's cooldown allows 0 now: profession window closed).",
+  b.receipt.text)
+""")
+print('Professions route choice: buy all or the cheapest route for the selected count PASS')
