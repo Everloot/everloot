@@ -44,3 +44,20 @@ test("profile header distinguishes zero clears from unknown history", () => {
   expect(unknown).toContain("No dungeon history synced");
   expect(unknown).not.toContain('role="progressbar"');
 });
+
+test("QA round 10: an open instance players have not agreed on says so in its one badge, not open beside a separate unconfirmed mark", () => {
+  const open = progressionCatalogue({ entrances: [{ instanceMapId: 34 } as never], encounters: [] });
+  const stockade = open.find((r) => r.id === 34)!;
+  const row = (r: typeof stockade) => {
+    const html = renderToStaticMarkup(<ProgressionMatrix instances={characterProgression([r], null)} notes={false} />);
+    return html;
+  };
+  const unconfirmed = row({ ...stockade, unconfirmed: true });
+  expect(unconfirmed).toMatch(/data-badge="neutral"[^>]*>open · instance unconfirmed</);
+  expect(unconfirmed).not.toContain('data-badge="files"');
+  const agreed = row({ ...stockade, unconfirmed: false });
+  expect(agreed).toMatch(/data-badge="neutral"[^>]*>open</);
+  expect(agreed).not.toContain("instance unconfirmed");
+  const world = open.find((r) => r.group === "World bosses")!;
+  expect(row(world)).toMatch(/data-badge="neutral"[^>]*>not seen open yet · boss unconfirmed</);
+});

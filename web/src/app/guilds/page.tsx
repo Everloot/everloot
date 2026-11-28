@@ -237,7 +237,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
           {dir && (dir.state === "unreachable" ? <Unreachable /> : (
             <section aria-labelledby="directory" className="space-y-3">
-              <SectionHeading id="directory" note={`Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}>
+              <SectionHeading id="directory" note={`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}>
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <FilterBar
