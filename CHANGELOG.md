@@ -321,7 +321,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
 - Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
 - Site: auction and recipe links keep the chosen market. Compare Blackwater prices, value a bag or bank, filter dungeons by level, and save or share a Legacy plan.
-- Addon: A movable tracker below the minimap lists individual profession cooldowns across your characters. Open a profession window to discover more recipes, and click the tracker to see the other timers.
 
 ### Changed
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
@@ -825,6 +824,18 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - Refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
+
+## [0.3.32] - 2026-11-28
+
+A compact tracker below the minimap shows individual profession cooldowns across the characters you play on this installation.
+
+### Added
+
+- Click the tracker to expand active timers. It shows each observed recipe separately, including different transmutes. Open a profession window on a character to discover additional cooldown recipes.
+- Drag the tracker to move it. Use Tracker in Everloot's Professions view to show or hide it. Timers, position and visibility are saved locally.
+- Includes the native recipe cost and profit improvements in 0.3.31, with price sources and recent same-house listing details.
+
+Works with WoW: Forever 1.60.1. Live verification of this exact archive is pending.
 
 ## [0.3.31] - 2026-11-26
 

@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.31. Select a recipe in WoW: Forever's Professions window for its materials cost and estimated profit. Details shows reagent quotes, price sources and age, and listing activity when a recent same-house scan includes the finished item. Exact release archive live verification is pending.
+**Status:** 0.3.32. Click the tracker below the minimap to see individual profession cooldowns across your characters. Select a recipe in WoW: Forever's Professions window for its materials cost and estimated profit. Details shows reagent quotes, price sources and age, and listing activity when a recent same-house scan includes the finished item. Exact release archive live verification is pending.
 
 ## Run it
 
