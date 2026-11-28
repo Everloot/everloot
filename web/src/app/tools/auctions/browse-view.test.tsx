@@ -186,3 +186,16 @@ test("current prices, the community report and AH Ledger deals are discoverable 
   expect(tools).toContain('href="/tools/auctions/report"');
   expect(tools).toContain('href="#market-deals"');
 });
+
+test("a CAMWOW realm page names the realm as its heading does in the table caption, the trail and the metadata", async () => {
+  const records = scans(dayAgo(0), [[2589, 200, 205]]).map((r) => ({ ...r, realm: "CAMWOW US1 Realm 4 PvP" }));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), records, today), dataAsOf: today.toISOString() });
+  const { default: RealmPage, generateMetadata } = await import("./[realm]/page");
+  const props = { params: Promise.resolve({ realm: "camwow-us1-realm-4-pvp" }), searchParams: Promise.resolve({}) };
+  const html = renderToStaticMarkup(await RealmPage(props));
+  expect(html).toContain("US1 · Realm 4 PvP, each auction house apart: 1 price");
+  expect(html).not.toContain("CAMWOW");
+  const meta = await generateMetadata(props);
+  expect(meta.title).toBe("WoW Forever US1 · Realm 4 PvP Auction House Prices");
+  expect(String(meta.description)).toContain("prices on US1 · Realm 4 PvP in WoW: Forever");
+});
