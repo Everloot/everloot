@@ -622,17 +622,17 @@ test("a realm and house in the link rank the profession on the server, labelled 
   const ranked = html.slice(html.indexOf('data-ranked="2329"'));
   expect(ranked).toContain("3s 91c");
   expect(ranked).toContain("84c");
-  expect(html).toContain('href="/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&amp;house=horde&amp;recipe=2329&amp;size=200#recipe-shopping"');
+  expect(html).toContain('href="/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&amp;house=horde&amp;view=reference&amp;recipe=2329&amp;size=200#recipe-shopping"');
   // The table's rows and items are byte for byte what they are with no market selected; only its link template
   // carries the realm and house on to a recipe's plan.
   const rowsOnly = (json: string) => { const { planHref, ...rest } = JSON.parse(json) as { planHref: string }; return { planHref, rest: JSON.stringify(rest) }; };
   const picked = rowsOnly(await tableProps(search)), plain = rowsOnly(await tableProps({ size: "200" }));
   expect(picked.rest).toBe(plain.rest);
-  expect(picked.planHref).toBe("/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&house=horde&recipe=RECIPEID&size=200#recipe-shopping");
+  expect(picked.planHref).toBe("/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&house=horde&view=reference&recipe=RECIPEID&size=200#recipe-shopping");
   // The neutral house takes 15%: 425 less 84 is 341.
   const neutral = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Neutral", ELIXIR), new Date());
   store.loadMarket.mockResolvedValue({ state: neutral, dataAsOf: null });
-  const n = await render("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "neutral" });
+  const n = await renderReference("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "neutral" });
   expect(n).toContain("after the 15% auction cut");
   expect(n.slice(n.indexOf('data-ranked="2329"'))).toContain("3s 41c");
 });
@@ -641,16 +641,16 @@ test("an unknown realm, a missing half or a repeated key ranks nothing, says why
   store.loadCorpus.mockResolvedValue(empty);
   const state = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Horde", ELIXIR), new Date());
   store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
-  const nowhere = await render("alchemy", { realm: "not-a-realm", house: "horde" });
+  const nowhere = await renderReference("alchemy", { realm: "not-a-realm", house: "horde" });
   expect(nowhere).not.toContain("data-ranked=");
   expect(nowhere).toContain("No Everloot market data for that realm");
-  const half = await render("alchemy", { realm: "camwow-us1-realm-2-pvp" });
+  const half = await renderReference("alchemy", { realm: "camwow-us1-realm-2-pvp" });
   expect(half).not.toContain("data-ranked=");
   expect(half).toContain("Pick an auction house");
-  expect(half).toContain('href="/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&amp;house=neutral#profit-ranking"');
-  const twice = renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ realm: "camwow-us1-realm-2-pvp", house: ["horde", "alliance"] }) }));
+  expect(half).toContain('href="/tools/professions/alchemy?view=reference&amp;realm=camwow-us1-realm-2-pvp&amp;house=neutral#profit-ranking"');
+  const twice = renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ view: "reference", realm: "camwow-us1-realm-2-pvp", house: ["horde", "alliance"] }) }));
   expect(twice).not.toContain("data-ranked=");
-  const elves = await render("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "elves" });
+  const elves = await renderReference("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "elves" });
   expect(elves).not.toContain("data-ranked=");
 });
 

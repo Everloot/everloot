@@ -20,6 +20,7 @@ const recipes: ProfessionGuideRecipe[] = [{
 async function guide(initialRealm = "", initialHouse = "") {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   replace.mockClear();
+  window.localStorage.clear();
   window.history.replaceState(null, "", "/tools/professions/alchemy?recipe=2329");
   const fetcher = vi.fn(async (input: string) => Response.json(input.includes("items=")
     ? { ok: true, items: [[11, 100, 30, 100, 12, "2026-11-28", 3, null, 0, null]] }
@@ -36,13 +37,12 @@ async function guide(initialRealm = "", initialHouse = "") {
 test("the leveling guide writes a market link the recipe card reads without errors", async () => {
   const ui = await guide();
   try {
-    await act(async () => [...ui.host.querySelectorAll("button")].find(b => b.textContent === "Load auction prices")!.click());
     for (const [label, value] of [["Realm", "Forever PvP"], ["Auction house", "Horde"]]) {
       const select = [...ui.host.querySelectorAll("label")].find(l => l.textContent?.startsWith(label))!.querySelector("select")!;
       await act(async () => { select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
     }
-    await act(async () => { ui.host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
-    const url = new URL(replace.mock.calls.at(-1)![0], window.location.origin);
+    const url = new URL(window.location.href);
+    expect(replace).not.toHaveBeenCalled();
     const parsed = parseCraftShare(Object.fromEntries(url.searchParams));
     expect(parsed.issues).toEqual([]);
     expect(parsed.state).toMatchObject({ recipe: 2329, realm: "forever-pvp", house: "Horde" });
