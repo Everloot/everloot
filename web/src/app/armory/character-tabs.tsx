@@ -3,7 +3,7 @@ import Link from "@/components/Link";
 import { Disclosure, Facts, type Fact, type TabItem } from "@/components/ui";
 import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
-import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
+import ProgressionMatrix, { shownProgress, type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
 import { characterProgression, PROGRESSION_GROUPS, progressionCatalogue } from "@kb/progression";
 import { Achievements, blizzardBossKillsLine, NO_ACHIEVEMENTS, PlayHistoryView, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
 
@@ -34,16 +34,6 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   history: notRead("play history"),
   progress: "No boss kills synced yet. Kills come from the Everloot Desktop App.",
 };
-
-/**
- * The instances a character's Progress tab lists. A map the files give no name or place ("Instance 3002") is left
- * out, and so is a small map that shares a raid's name (map 2921, "Naxxramas" with one boss, beside raid 533), so the
- * raid shows once under Raids. A row with a kill recorded always stays.
- */
-export function shownProgress<R extends ProgressionMatrixProps["instances"][number]>(rows: readonly R[]): R[] {
-  const raids = new Set(rows.filter((r) => r.group === "Raids").map((r) => r.name));
-  return rows.filter((r) => ("killed" in r && (r.killed ?? 0) > 0) || (r.typeKnown && !(r.group !== "Raids" && raids.has(r.name))));
-}
 
 /** Blizzard's API gives no talents below level 10, where the game gives no talent points. */
 export const NO_TALENT_POINTS = "No talent points before level 10.";
@@ -97,7 +87,7 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
           {EMPTY_TAB.progress}{blizzardBossKillsLine(c) && <> {blizzardBossKillsLine(c)}</>}
         </p>
         <ProgressionMatrix {...progression} instances={[]} notes="tucked" />
-        <Disclosure as="h3" summary={`Every dungeon and raid (${instances.length})`} wide>
+        <Disclosure as="h3" summary={`Every dungeon, raid and world boss (${instances.length})`} wide>
           <div className="space-y-4">
             {PROGRESSION_GROUPS.map((group) => {
               const rows = instances.filter((r) => r.group === group);

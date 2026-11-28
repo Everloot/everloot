@@ -555,6 +555,8 @@ describe("QA round 2: guild counts and the item level order", () => {
     expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 <span class="whitespace-nowrap">\(1 read\)<\/span><\/dd>/);
     const dir = await html(pages.directory());
     expect(dir).toMatch(/It can be higher than the guild page&#x27;s count, because each character is counted as of its own read/);
+    // QA round 10: 928 here, 931 on the guild page: the two count members differently, and the note says how.
+    expect(dir).toMatch(/the guild page counts the members of its last roster read instead, so the two can differ by a few/);
   });
 });
 
