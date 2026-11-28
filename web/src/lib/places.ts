@@ -1,6 +1,7 @@
 import { zoneTable, worldToZone } from "@kb/world-coords";
 import { CLIENT_PLACES } from "@/data/game-data/client-places";
 import { WORLD_MAP } from "./world-map";
+import { publicZones, type ZoneSummary } from "./zones";
 
 // The named places inside a zone, from the game files: its subzones, and the points of interest the world map labels,
 // each at its spot on the zone map. Labelled found in game files, unconfirmed. Only zones the map draws are asked
@@ -28,4 +29,25 @@ export function zonePlaces(uiMapId: number): ZonePlaces | null {
   }
   pois.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
   return { subzones, pois, build: file.build.version };
+}
+
+/**
+ * The released zone whose game-file places name most of the given names (an exploration achievement's criteria), and
+ * which of the names it holds; null unless more than half of the names are that one zone's places and no other zone
+ * holds as many. Matched by exact name only: nothing guessed from a title.
+ */
+export function zoneNamingPlaces(names: readonly string[]): { zone: ZoneSummary; places: Set<string> } | null {
+  if (!names.length) return null;
+  const wanted = new Set(names.map((n) => n.trim().toLowerCase()));
+  const held = new Map<number, Set<string>>();
+  for (const place of [...CLIENT_PLACES.subzones, ...CLIENT_PLACES.pois]) {
+    const key = place.name.trim().toLowerCase();
+    if (place.uiMapId === undefined || !wanted.has(key)) continue;
+    held.set(place.uiMapId, (held.get(place.uiMapId) ?? new Set()).add(key));
+  }
+  const ranked = [...held].sort((a, b) => b[1].size - a[1].size);
+  const [best, next] = ranked;
+  if (!best || best[1].size * 2 <= wanted.size || (next && next[1].size === best[1].size)) return null;
+  const zone = publicZones().find((z) => z.mapId === best[0]);
+  return zone ? { zone, places: best[1] } : null;
 }
