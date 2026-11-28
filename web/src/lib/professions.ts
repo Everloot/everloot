@@ -1,5 +1,6 @@
 import { CLIENT_RECIPES } from "@/data/game-data/client-recipes";
 import { slugify } from "@kb/item-taxonomy";
+import type { RecipeOutput } from "@kb/client-recipes";
 
 /**
  * The professions and their recipes as the game files list them (data/game-data/client-recipes.json), shaped for
@@ -17,6 +18,12 @@ export interface RecipeView {
   yellow: number | null;
   grey: number | null;
   reagents: { itemId: number; count: number }[];
+  /**
+   * What one craft makes, from the same build's create-item effect: `minimum`/`maximum` null when the files give no
+   * fixed quantity (unavailable, never one), `cooldownMs` null when they record no cooldown (not proof of none).
+   * Absent for a recipe that makes nothing or whose output the files do not pin to one effect.
+   */
+  output?: RecipeOutput;
 }
 
 export interface ProfessionInfo {
@@ -32,14 +39,19 @@ export interface ProfessionInfo {
 const ORDER = ["Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining", "Skinning", "Tailoring", "Cooking", "First Aid", "Fishing"];
 const rank = (name: string) => { const i = ORDER.indexOf(name); return i < 0 ? ORDER.length : i; };
 const orNull = (n: number) => (n > 0 ? n : null);
+const OUTPUTS = CLIENT_RECIPES.outputs ?? {};
 
 export const CLIENT_PROFESSIONS: ProfessionInfo[] = CLIENT_RECIPES.professions
   .map((p) => ({
     id: p.id, name: p.name, slug: slugify(p.name), otherSpells: p.otherSpells,
-    recipes: p.recipes.map(([spellId, item, learn, yellow, grey, reagents]) => ({
-      spellId, itemId: orNull(item), learn: learn > 1 ? learn : null, yellow: orNull(yellow), grey: orNull(grey),
-      reagents: reagents.map(([itemId, count]) => ({ itemId, count })),
-    })),
+    recipes: p.recipes.map(([spellId, item, learn, yellow, grey, reagents]) => {
+      const output = OUTPUTS[spellId];
+      return {
+        spellId, itemId: orNull(item), learn: learn > 1 ? learn : null, yellow: orNull(yellow), grey: orNull(grey),
+        reagents: reagents.map(([itemId, count]) => ({ itemId, count })),
+        ...(output && item > 0 && output.itemId === item ? { output } : {}),
+      };
+    }),
   }))
   .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 

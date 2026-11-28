@@ -197,7 +197,10 @@ for case in main:
             assert actual.count("sellCheck") == 1
             # Flight timing is independent of pull recording.
             assert actual.count("flight") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck", "flight"}]
+            # So is the per-character profit display in the profession window.
+            assert actual.count("nativeCrafting") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck", "flight",
+                                                           "nativeCrafting"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.

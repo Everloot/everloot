@@ -43,7 +43,12 @@ import { GATHERING_GUIDE_SLUGS } from "@/lib/gathering-guide";
 import type { GuideDisenchants } from "@/lib/profession-guide-prices";
 import RecipeTables, { type RecipeItem, type RecipeRow } from "../recipe-table";
 import RecipeShopping from "../recipe-shopping";
+import ProfitRanking from "../profit-ranking";
 import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
+import { marketPrices } from "@kb/market";
+import { trainingCostBySpell } from "@kb/recipe-thresholds";
+import { HOUSE_CUT, catalogTree, parseCraftShare, professionRanking, quotesFromPriceRows, utcToday } from "@/lib/crafting-profit";
+import { catalogProducers, planCardCatalog } from "@/lib/crafting-catalog";
 import GatheringGuide from "./gathering/guide";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +84,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 
 const plural = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min === null ? `≤${r.max}` : r.max === null ? `${r.min}+` : r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`);
+
+/** Rows of the Everloot profit ranking shown: the best estimates, the rest counted. */
+const RANKED_ROWS = 25;
 
 /** AH Ledger has a market per faction: the Alliance and Horde houses, never the neutral one. */
 const LEDGER_HOUSES: readonly AuctionHouse[] = ["Alliance", "Horde"];
@@ -161,14 +169,20 @@ export default async function ProfessionPage(props: Props) {
   if (level === null) notFound();
 
   const ledger = isAhledgerProfession(p.name);
+  // The plan a link carries (recipe, crafts, realm, house, destination, route, makes, owned counts), field by field.
+  const shareRead = parseCraftShare(searchParams);
+  const share = shareRead.state;
   const sources = { view: loadProfessions(), assets: loadSiteAssets(), names: loadListNames() };
   const [view, assets, shown, spellNames, market, gatheringGuide] = await Promise.all([
     sources.view, sources.assets, sources.names, loadSpellNames(CLIENT_LAYER.build.version),
-    ledger ? uploadStore.loadMarket() : Promise.resolve(null),
+    ledger || share.realm ? uploadStore.loadMarket() : Promise.resolve(null),
     gathering ? GatheringGuide({ profession: p, searchParams, embedded: true, sources }) : null,
   ]);
+  // The selected recipe's catalog makes: producers of its materials in any profession, within the planner's bounds.
+  const chosen = share.recipe !== null ? p.recipes.find((r) => r.spellId === share.recipe && r.reagents.length > 0) : undefined;
+  const tree = chosen ? catalogTree(chosen.reagents, catalogProducers(), chosen.spellId) : null; // names for the card's items
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
-  const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
+  const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId)), ...(tree?.items ?? [])])].filter(shown.showsTip);
   const ledgerAt = ledger ? ledgerMarket(searchParams, path, market?.state ?? null) : null;
   const [tips, crafting]: [Map<number, ItemTip>, CraftingRead | null] = await Promise.all([
     loadItemTips(ids.length ? assets : null, ids),
@@ -221,16 +235,33 @@ export default async function ProfessionPage(props: Props) {
       }));
     }
   }
-  const selectedRecipe = catalog.find(r => String(r.spellId) === searchParams.recipe && r.reagents.length > 0);
-  const outputItem = selectedRecipe && p.recipes.find(r => r.spellId === selectedRecipe.spellId)?.itemId;
-  const recipeMarket = realmHouseParams(searchParams);
-  const requestedCrafts = Number(searchParams.crafts);
-  const crafts = Number.isInteger(requestedCrafts) && requestedCrafts >= 1 && requestedCrafts <= 999 ? requestedCrafts : 1;
+  const selectedRecipe = chosen ? catalog.find(r => r.spellId === chosen.spellId) : undefined;
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
   // The recipe table, filtered and paged here: the page carries only the rows it shows (`?page=&size=&q=&min=&max=`).
   const listQuery = recipeListQuery(searchParams);
-  const planHref = (id: string) => recipeListHref(path, { ...searchParams, recipe: id, crafts: undefined },
+  // Another recipe's plan keeps the market, destination and route, not this plan's makes and counts.
+  const planHref = (id: string) => recipeListHref(path, { ...searchParams, recipe: id, crafts: undefined, make: undefined, have: undefined },
     listQuery, { page: listQuery.page }).replace(/#prof-recipes$/, "#recipe-shopping");
+
+  // The market the link names: a realm with Everloot market data and a house. Only then is anything ranked, on the
+  // server, from the stored market (no browser request per item); a missing half or an unknown realm ranks nothing.
+  const marketState = market?.state ?? null;
+  const board = share.realm && marketState ? findBoard(realmBoards(marketState, new Date()), share.realm) : null;
+  const scoped = board && share.house ? { realm: board.realm.slug, realmName: board.realm.name, house: share.house } : null;
+  const today = utcToday();
+  const ranking = scoped && marketState ? (() => {
+    const priceIds = recipeItemIds(p.recipes);
+    const rows = marketPrices(marketState, scoped.realmName, new Date(), priceIds.length, scoped.house, priceIds, true).items;
+    return professionRanking(p.recipes, quotesFromPriceRows(rows), { house: scoped.house, today, name: (id) => spellName(id) ?? `Spell ${id}` });
+  })() : null;
+  // The selected recipe's card: the link's state, its catalog makes and, by exact spell ID only, a training cost.
+  // The card's catalog stays within its props budget; a cut list is said on the card.
+  const cardPlan = chosen ? planCardCatalog(chosen, (id) => spellName(id) ?? `Spell ${id}`, (id) => names.get(id)?.name ?? `Item ${id}`) : null;
+  const planItems = cardPlan ? [...new Set([...chosen!.reagents.map((g) => g.itemId), ...cardPlan.catalog.flatMap((r) => [r.itemId, ...r.reagents.map(([i]) => i)])])] : [];
+  const offers = chosen && !view.unreachable ? planItems.filter((id) => view.facts.vendorPricesById?.has(id)) : [];
+  // A valid realm reaches the card even before a house is picked; ranking needs both.
+  const cardMarket = board ? { realm: board.realm.slug, realmName: board.realm.name, house: share.house } : null;
+  const training = chosen && !view.unreachable ? trainingCostBySpell(view.facts.trainers ?? []).get(chosen.spellId) ?? null : null;
   const listed = recipePage(filterRecipeViews(recipeGroups(p.recipes).flatMap((g) => g.recipes), catalog, listQuery), listQuery);
   const listHere = (change: Parameters<typeof recipeListHref>[3]) => recipeListHref(path, searchParams, listQuery, change);
   const teaching = new Map(catalog.map((r) => [r.spellId, r.recipeItems]));
@@ -352,6 +383,28 @@ export default async function ProfessionPage(props: Props) {
           </div>
         )}
 
+        {ranking && scoped ? (
+          <ProfitRanking
+            profession={p.name} realmName={scoped.realmName} house={scoped.house} cutPercent={HOUSE_CUT[scoped.house]} summary={ranking.summary}
+            rows={ranking.rows.slice(0, RANKED_ROWS).map((e) => ({
+              id: e.id, name: e.name, href: planHref(String(e.id)), profit: e.profit!, margin: e.margin, cost: e.cost!, value: e.value!, stale: e.stale,
+              cooldown: (p.recipes.find((r) => r.spellId === e.id)?.output?.cooldownMs ?? null) !== null,
+            }))}
+          />
+        ) : Boolean(share.realm || share.house || shareRead.issues.some((i) => i.field === "realm" || i.field === "house")) && (
+          <section id="profit-ranking" aria-labelledby="profit-ranking-heading" className="scroll-mt-24 space-y-2">
+            <SectionHeading id="profit-ranking-heading" as="h2">Everloot profit estimates</SectionHeading>
+            {shareRead.issues.filter((i) => i.field === "realm" || i.field === "house").map((i) => <p key={i.field} className="text-meta text-fg-2">{i.message}</p>)}
+            {share.realm && !marketState && <p className="text-meta text-fg-2">Market values are unavailable right now, so nothing is ranked. They are unrecorded, not zero.</p>}
+            {share.realm && marketState && !board && <p className="text-meta text-fg-2">No Everloot market data for that realm, so nothing is ranked. Pick a realm in a recipe&apos;s plan or on the Auction House pages.</p>}
+            {board && !share.house && <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-2">
+              <span>Pick an auction house to rank every {p.name} recipe on {board.realm.name}:</span>
+              {(["Alliance", "Horde", "Neutral"] as const).map((h) => <Link key={h} href={realmHouseHref(path, searchParams, board.realm.slug, h, "#profit-ranking")} prefetch={false} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{h}</Link>)}
+            </p>}
+            {!share.realm && share.house && <p className="text-meta text-fg-2">Pick a realm to rank every {p.name} recipe: choose one in a recipe&apos;s plan with Load auction prices.</p>}
+          </section>
+        )}
+
         <section id="prof-recipes" aria-labelledby="prof-recipes-heading" className="scroll-mt-24 space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes-heading" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>
           <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
@@ -359,9 +412,9 @@ export default async function ProfessionPage(props: Props) {
             Found in game files, unconfirmed, build {RECIPES_BUILD}. Grouped by the skill where a recipe turns yellow.
             {p.otherSpells > 0 && ` ${plural(p.otherSpells, "other spell")} on the ${p.name} line make and cost nothing and are not listed.`}
           </p>
-          {selectedRecipe && <RecipeShopping key={`${selectedRecipe.spellId}:${recipeMarket.realm}:${recipeMarket.house}`} recipe={selectedRecipe} initialCrafts={crafts}
-            outputItem={outputItem ?? undefined}
-            initialMarket={recipeMarket.realm && recipeMarket.house ? { realm: recipeMarket.realm, house: recipeMarket.house } : undefined} />}
+          {selectedRecipe && <RecipeShopping key={JSON.stringify(share)} recipe={selectedRecipe} outputItem={chosen?.itemId || undefined} initial={share} issues={shareRead.issues.map((i) => i.message)}
+            market={cardMarket} catalog={cardPlan?.catalog ?? []} itemNames={cardPlan?.itemNames ?? {}} vendorOffers={offers} training={training} rankingShown={Boolean(ranking)}
+            catalogTruncated={cardPlan?.truncated ?? false} rootCooldownMs={chosen?.output?.cooldownMs ?? null} />}
           {groups.length > 0 && (
             <FilterBar
               label={`${p.name} recipe filters`}

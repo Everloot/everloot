@@ -724,4 +724,42 @@ checkLayout()
 checkScroll()
 """)
 
+# --- Task 6: the shopping page's recipe-plan source, on a client without the browse search ---
+PLANNED = ["core.lua", "modules/auctions.lua", "modules/inventory.lua", "modules/crafting_plan.lua", "modules/prices.lua",
+           "modules/shopping.lua", "modules/auctiontab.lua", "modules/window.lua", "modules/crafting.lua"]
+lua = fresh(PLANNED, """
+UnitGUID = function(unit) if unit == 'player' then return 'Player-1-0000000A' end end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 30 end
+UnitName = function() return 'Alpha' end
+NUM_BAG_SLOTS = 4
+C_Container = { GetContainerNumSlots = function(b) return b == 0 and 16 or 0 end, GetContainerItemInfo = function() end }
+""")
+lua.execute("""
+openHouse()
+showPanel()
+local E, T, S, CP = Everloot, Everloot.AuctionTab, Everloot.Shopping, Everloot.CraftingPlan
+T.SetMode('shop')
+local shop = T.panel.shop
+assert(shop.sourceButton.shown and shop.sourceButton.text == 'Source: manual list')
+shop.sourceButton.scripts.OnClick()
+assert(S.source == 'plan' and shop.empty.shown and shop.empty.text:find('Add materials', 1, true), shop.empty.text)
+assert(not shop.itemBox.shown and not shop.wantBox.shown and not shop.maxBox.shown and not shop.deleteButton.shown)
+shop.needButton.scripts.OnClick()
+assert(S.message:find('No recipe plan', 1, true), S.message)
+assert(CP.ReplaceKnown(E.CharacterKey(), 197, { { recipeId = 3001, learned = true, itemId = 2996, minimum = 1, maximum = 1,
+  reagents = { { itemId = 2589, count = 2 } } } }, false))
+assert(CP.Put(E.CharacterKey(), 197, 3001, 2).ok)
+T.Refresh()
+assert(shop.rows[1].shown and shop.rows[1].name.text == 'Linen Cloth' and shop.rows[1].want.text == '4', tostring(shop.rows[1].want.text))
+shop.needButton.scripts.OnClick()
+assert(S.message == 'This client has no auction house search.', S.message)
+-- The page's controls stay inside it and do not overlap.
+local right = shop.sourceButton.points.TOPLEFT[3] + shop.sourceButton:GetWidth()
+assert(right <= 752, 'the source button fits the page: ' .. right)
+assert(shop.needButton.points.TOPLEFT[3] >= shop.routeButton.points.TOPLEFT[3] + shop.routeButton:GetWidth(), 'Route then Search needed')
+shop.sourceButton.scripts.OnClick()
+assert(S.source == 'manual' and shop.itemBox.shown and shop.deleteButton.shown and not shop.needButton.shown)
+""")
+
 print("Lua 5.1 auction tab: scans on for a new install with a one-time notice, tab after Blizzard's tabs with a template fallback, click-only scan, cooldown and saved state, Save scan reload; native fonts and gold heading; price lookup rows from the tooltip's lines aligned label to value, fallback text, scope and stale words, missing, checking and checksum states, narrow and long results scrolled above the footer; shift-click; hidden by Blizzard tabs and on close")

@@ -790,4 +790,76 @@ assert(EverlootDB.tooltip == 'full' and mode.text == 'Full', 'next click selects
 assert(EverlootDB.tooltipMarket == nil and EverlootDB.tooltipSources == nil, 'the individual switches keep their values')
 """)
 
+# Profit in the profession window: one switch per character, live. While CraftProfit is loaded a character that never
+# chose starts off; an explicit choice wins over that; the Everloot window off (Collect data only) wins over both.
+lua = fresh(SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+guid = 'Player-1-0000AAAA'
+UnitGUID = function() return guid end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 30 end
+local row
+for _, r in ipairs(O.ROWS) do if r.key == 'nativeCrafting' then row = r end end
+assert(row and row.group == 'helpers' and row.live, 'a live switch on the Helpers page')
+assert(row.text:find('CraftProfit', 1, true) and row.text:find('This character only', 1, true)
+  and row.text:find('Collect data only', 1, true), row.text)
+assert(O.IsOn(row) and O.NativeCrafting() == true and select(2, O.NativeCrafting()) == 'default')
+C_AddOns = { IsAddOnLoaded = function(name) return name == 'CraftProfit' end }
+assert(not O.IsOn(row) and O.NativeCrafting() == false and select(2, O.NativeCrafting()) == 'craftprofit',
+  'CraftProfit loaded: off until this character chooses')
+local box
+for _, b in ipairs(O.Boxes()) do if b.row.key == 'nativeCrafting' then box = b end end
+O.Refresh()
+assert(box and not box.checked, 'the switch shows the detection default')
+box.checked = true
+box.scripts.OnClick(box)
+assert(O.IsOn(row) and box.checked and O.NativeCrafting() == true and select(2, O.NativeCrafting()) == 'chosen',
+  'the explicit choice wins over detection')
+assert(not O.changed, 'applies at once, without a reload')
+-- "Turn off here" in the profession window updates an open Options page.
+O.SetNativeCrafting(false)
+assert(not box.checked, 'the switch follows a choice made in the profession window')
+O.SetNativeCrafting(true)
+assert(box.checked)
+assert(type(EverlootDB.nativeCrafting) == 'table' and not tostring(next(EverlootDB.nativeCrafting)):find('Player', 1, true),
+  'saved under the opaque character key, never the GUID')
+guid = 'Player-1-0000BBBB'
+assert(not O.IsOn(row) and select(2, O.NativeCrafting()) == 'craftprofit', 'another character keeps its own default')
+guid = 'Player-1-0000AAAA'
+EverlootDB.toggles.window = false
+assert(O.NativeCrafting() == false and select(2, O.NativeCrafting()) == 'recorder', 'Collect data only wins')
+assert(O.IsOn(row), "the switch still shows the character's own choice")
+EverlootDB.toggles.window = nil
+box.checked = false
+box.scripts.OnClick(box)
+assert(EverlootDB.nativeCrafting[Everloot.CharacterKey()] == false and select(2, O.NativeCrafting()) == 'chosen')
+C_AddOns = nil
+assert(not O.IsOn(row) and O.NativeCrafting() == false, 'an explicit off stays off without CraftProfit')
+""")
+
+# The crafting price source (crafting_sources.lua): Everloot, and nothing saved, while that module is not loaded; then
+# only the source name and the fallback switch are saved, and the button text says both.
+lua = fresh(SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+assert(O.CraftSource() == 'everloot' and select(2, O.CraftSource()) == false and O.CraftSourceText() == 'Prices: Everloot')
+O.SetCraftSource('tsm', true)
+assert(EverlootDB.craftSource == nil and O.CraftSource() == 'everloot', 'nothing saved without the price sources module')
+""")
+lua.execute((root / "modules" / "crafting_sources.lua").read_text(encoding="utf-8"))
+lua.execute("""
+local O = Everloot.Options
+O.SetCraftSource('tsm', true)
+assert(O.CraftSource() == 'tsm' and select(2, O.CraftSource()) == true and O.CraftSourceText() == 'Prices: TSM, else Everloot')
+local n = 0
+for k in pairs(EverlootDB.craftSource) do n = n + 1; assert(k == 'name' or k == 'fallback', k) end
+assert(n == 2 and EverlootDB.craftSource.name == 'tsm' and EverlootDB.craftSource.fallback == true)
+assert(O.NextCraftSource() == 'everloot' and O.CraftSourceText() == 'Prices: Everloot', 'after TSM with fallback: Everloot')
+O.SetCraftSource('auctionator', false)
+assert(O.CraftSourceText() == 'Prices: Auctionator')
+EverlootDB.craftSource = { name = 'CraftProfit', fallback = true }
+assert(O.CraftSource() == 'everloot' and select(2, O.CraftSource()) == false, 'an unknown saved source reads as Everloot')
+""")
+
 print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; native headings/fonts on both Options APIs, complete fallback on a refused child; Reload now; the feature chooser (Everything, Collect data only, Choose myself) asked once per install before player names, and again by /everloot setup; player names asked once, after the loading screen and out of combat")

@@ -845,18 +845,22 @@ local function encounterEnd(encounterId, name, difficulty, size, success, units)
   })
 end
 
---- A merchant slot's price and stock. Older clients have GetMerchantItemInfo; Forever's merchant window reads
---- C_MerchantFrame.GetItemInfo, which returns them as fields.
+--- A merchant slot's price and stock, and whether that price buys exactly one item for money alone. Older clients
+--- have GetMerchantItemInfo; Forever's merchant window reads C_MerchantFrame.GetItemInfo, which returns them as
+--- fields. Its MerchantItemInfo also has stackCount (the items one purchase gives; the window divides the price by
+--- it) and hasExtendedCost (a currency or item cost besides the money): only stackCount 1 and hasExtendedCost false,
+--- both read, make the price a unit price. The older reader proves nothing about either.
 local function merchantPrice(index)
   if GetMerchantItemInfo then
     local ok, _, _, price, _, stock = pcall(GetMerchantItemInfo, index)
-    if ok then return price, stock end
+    if ok then return price, stock, false end
     return nil
   end
   local ok, info = pcall(C_MerchantFrame.GetItemInfo, index)
   info = ok and E.Readable(info)
   if type(info) ~= "table" then return nil end
-  return E.Readable(info.price), E.Readable(info.numAvailable)
+  local single = E.Readable(info.stackCount) == 1 and E.Readable(info.hasExtendedCost) == false
+  return E.Readable(info.price), E.Readable(info.numAvailable), single
 end
 
 local function vendorCapture()
@@ -867,12 +871,32 @@ local function vendorCapture()
   local okCount, count = pcall(GetMerchantNumItems)
   if not okCount or type(count) ~= "number" or count < 1 then return end
   local items = {}
+  -- Unit prices stay on this computer, beside the records and never in them (crafting.lua quotes them): per
+  -- character (a reputation discount is that character's), the latest price a merchant asked for exactly one of an
+  -- item with no other cost, when it was seen and on which client build. A character or build the client does not
+  -- give records none. A price kept without an owner (an earlier unreleased layout) is dropped, never adopted.
+  local units = type(EverlootDB.vendorUnitPrices) == "table" and EverlootDB.vendorUnitPrices or {}
+  EverlootDB.vendorUnitPrices = units
+  for k in pairs(units) do if type(k) ~= "string" then units[k] = nil end end
+  local key = E.CharacterKey and E.CharacterKey()
+  local build, now = EverlootDB.clientBuild, time()
+  local mine
+  if type(key) == "string" and type(build) == "string" then
+    mine = type(units[key]) == "table" and units[key] or {}
+    units[key] = mine
+    -- Only this character's evidence from this build and the last 14 days is worth keeping.
+    for id, entry in pairs(mine) do
+      if type(entry) ~= "table" or entry.build ~= build or type(entry.at) ~= "number" or entry.at > now
+        or now - entry.at > 14 * 86400 then mine[id] = nil end
+    end
+  end
   for i = 1, math.min(count, 200) do
     local okLink, link = pcall(GetMerchantItemLink, i)
     local itemId = okLink and type(link) == "string" and tonumber(link:match("item:(%d+)"))
     if itemId then
-      local price, stock = merchantPrice(i)
+      local price, stock, single = merchantPrice(i)
       if type(price) == "number" and price >= 0 and price == math.floor(price) then
+        if mine and single and price > 0 then mine[itemId] = { copper = price, at = now, build = build } end
         local row = { itemId = itemId, priceCopper = price }
         if type(stock) == "number" and stock > 0 and stock == math.floor(stock) then
           row.limitedStock = stock

@@ -11,6 +11,7 @@ import { planProfessionGuide, type GuideMode, type GuideStep } from "@kb/profess
 import { formatCopper } from "@kb/profession-path";
 import { GuideMarketControls, useGuideMarket } from "./leveling-guide-market";
 import { SELECT_CLASS } from "./controls";
+import { realmSlugOf } from "@/lib/crafting-profit";
 
 const MODES = {
   materials: "Material cost",
@@ -174,9 +175,9 @@ export default function LevelingGuide({
     url.searchParams.set("to", String(end));
     if (mode !== "materials") url.searchParams.set("mode", mode);
     else url.searchParams.delete("mode");
-    if (market.realm) url.searchParams.set("realm", market.realm);
+    if (market.realm) url.searchParams.set("realm", realmSlugOf(market.realm));
     else url.searchParams.delete("realm");
-    if (market.house) url.searchParams.set("house", market.house);
+    if (market.house) url.searchParams.set("house", market.house.toLowerCase());
     else url.searchParams.delete("house");
     if (modeled) url.searchParams.delete("estimate");
     else url.searchParams.set("estimate", "0");

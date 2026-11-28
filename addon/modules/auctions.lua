@@ -372,6 +372,26 @@ local function pruneScans(realm)
   EverlootDB.records.auction_snapshot = kept
 end
 
+--- This completed full scan into the crafting history (crafting_history.lua): only a named realm and house, only the
+--- items this character's proven recipes use or make, a few items a frame after the scan reported, like the read.
+--- The history commits on its last step, so a newer scan, an error or a reload leaves the earlier history as it was.
+local function recordHistory(s)
+  local H = E.CraftingHistory
+  if (s.incomplete or 0) > 0 then return end -- Missing listings cannot establish full depth or an empty item.
+  if not (H and s.realm and s.house and C_Timer and C_Timer.After) then return end
+  local ok, job = pcall(E.CraftingHistory.Start, s.realm, s.house, s.historyAt or s.startedAt, s.byItem)
+  if not ok or not job then return end
+  local function step()
+    local done, finished = pcall(E.CraftingHistory.Step, job, H.CHUNK)
+    if not done or not finished then
+      if done then C_Timer.After(0, step) end
+      return
+    end
+    if job.committed and E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting) end
+  end
+  C_Timer.After(0, step)
+end
+
 local function finish()
   local s = scan
   scan = nil
@@ -411,6 +431,7 @@ local function finish()
     EverlootDB.houseScans[s.realm][s.house] = { scanId = scanId, at = s.startedAt }
   end
   pruneScans(s.realm)
+  recordHistory(s)
   -- The names the rows carried, by realm, so the tab finds an item the client has not loaded by its name. Not a
   -- record: nothing uploads them, and a later scan adds to them.
   local names = EverlootDB.scanNames and EverlootDB.scanNames[s.realm] or {}
@@ -481,8 +502,11 @@ function E:StartScan()
   local realm = E.LiveRealm()
   local character = not realm and E.CharacterKey() or nil
   if not (realm or character) then return say("the game did not identify this character. Try again after entering the world.") end
+  local history = E.CraftingHistory
+  local historyAt = history and history.Clock and history.Clock() or nil
   local started = {
     realm = realm, character = character, startedAt = time(), at = date("!%Y-%m-%dT%H:%M:%SZ"), waiting = true,
+    historyAt = historyAt,
     faction = playerFaction(), house = E.auctionHouseKind,
     byItem = {}, names = {}, retry = {}, skipped = 0, incomplete = 0, next = 1, total = 0, retryNext = 1,
     previousScanAt = EverlootDB.lastScanAt,

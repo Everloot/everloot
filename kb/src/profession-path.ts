@@ -441,6 +441,38 @@ export function agreeVendorPricesByItem(records: unknown[]): Map<number, number>
 }
 
 /**
+ * Agreed NPC vendor purchase price per item ID, for estimates that join on item identity. The same agreement as
+ * agreeVendorPrices (WORLD_AGREEMENT distinct installs on one itemId and priceCopper, the lowest agreed price per
+ * item), but keyed by the ID, so items sharing a name never share a price, and only positive copper counts: a
+ * zero-price row is not a purchase price. This is what vendors charge, never what they pay for an item.
+ */
+export function agreeVendorPricesById(records: unknown[]): Map<number, number> {
+  const groups = new Map<string, { itemId: number; priceCopper: number; installs: Set<string> }>();
+  for (const raw of records) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.installId !== "string" || !row.installId.trim()) continue;
+    if (row.kind !== "vendor" || typeof row.vendorNpcId !== "number" || !Array.isArray(row.items)) continue;
+    for (const rawItem of row.items) {
+      if (!rawItem || typeof rawItem !== "object") continue;
+      const { itemId, priceCopper } = rawItem as { itemId?: unknown; priceCopper?: unknown };
+      if (!Number.isSafeInteger(itemId) || (itemId as number) < 1 || !Number.isSafeInteger(priceCopper) || (priceCopper as number) < 1) continue;
+      const key = `${itemId as number}|${priceCopper as number}`;
+      const group = groups.get(key) ?? { itemId: itemId as number, priceCopper: priceCopper as number, installs: new Set<string>() };
+      group.installs.add(row.installId.trim());
+      groups.set(key, group);
+    }
+  }
+  const out = new Map<number, number>();
+  for (const group of groups.values()) {
+    if (group.installs.size < WORLD_AGREEMENT) continue;
+    const prev = out.get(group.itemId);
+    if (prev === undefined || group.priceCopper < prev) out.set(group.itemId, group.priceCopper);
+  }
+  return out;
+}
+
+/**
  * Per-unit auction scans as price reports. Recipes name reagents, scans carry item IDs, so the
  * name is the one most installs' clients reported for that ID. Latest scan per install, any realm.
  */

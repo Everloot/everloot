@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FullPriceRow } from "@kb/market";
 import { SELECT_CLASS } from "./controls";
+import { realmSlugOf } from "@/lib/crafting-profit";
 
 const PER_REQUEST = 100;
 type Markets = Record<string, string[]>;
@@ -18,10 +19,13 @@ async function readJson<T>(params: URLSearchParams, signal: AbortSignal): Promis
 export function useGuideMarket(ids: readonly number[], initial: { realm: string; house: string }) {
   const [wantMarkets, setWantMarkets] = useState(Boolean(initial.realm));
   const [revision, setRevision] = useState(0);
-  const [realm, setRealm] = useState(initial.realm);
-  const [house, setHouse] = useState(initial.house);
+  const [realmInput, setRealm] = useState(initial.realm);
+  const [houseInput, setHouse] = useState(initial.house);
   const [catalog, setCatalog] = useState<{ revision: number; markets: Markets | null }>();
   const markets = catalog?.revision === revision ? catalog.markets : undefined;
+  const matches = Object.keys(markets ?? {}).filter(name => realmSlugOf(name) === realmSlugOf(realmInput));
+  const realm = markets?.[realmInput] ? realmInput : matches.length === 1 ? matches[0]! : realmInput;
+  const house = markets?.[realm]?.find(name => name.toLowerCase() === houseInput.toLowerCase()) ?? houseInput;
   const itemKey = ids.join(",");
   const scope = JSON.stringify([realm, house, itemKey, revision]);
   const [loaded, setLoaded] = useState<{ scope: string; market: GuideMarket }>();

@@ -6,6 +6,9 @@
 -- The panel uses the game's fonts, gold headings and standard controls.
 -- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
 -- item's wanted count, max price and market value. Open in Buy uses Blizzard's exact-name search when supported.
+-- Its Source button switches the page between the manual lists and the character recipe plans: what each plan still
+-- needs after this character's bags, its full need, and Search needed, one needed item per press. Another
+-- character's plan is shown in full and is never searched.
 
 local E = Everloot
 local T = {}
@@ -39,6 +42,11 @@ local SHOP_COLUMNS = { { "name", 0, 156 }, { "want", 160, 38 }, { "max", 203, 67
 local MODE_WIDTH = 94
 local SHOP_HELP = "Item: a name, an id or shift-click. Want: how many. Max each: like 1g 50s, blank for no limit."
 local SHOP_EMPTY = "Nothing on this list yet. Add an item above, or a recipe's reagents from the Professions tab of the Everloot window."
+local PLAN_EMPTY = "No recipe plan for this character yet. In the profession window, choose a craft count and press Add materials."
+local PLAN_UNKNOWN = "Nothing to list: the planned recipes' reagents are not all known."
+local SOURCE_MANUAL, SOURCE_PLAN = "Source: manual list", "Source: recipe plans"
+local MANUAL_HEADS = { want = "Want", max = "Max each", decision = "Market vs cap" }
+local PLAN_HEADS = { want = "Need", max = "Without bags", decision = "In bags" }
 local FALLBACK_COLORS = { text = { 1, 1, 1, 1 }, muted = { 0.788, 0.765, 0.69, 1 }, accent = { 0.612, 0.941, 0.227, 1 } }
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 
@@ -312,11 +320,20 @@ end
 
 local function openInBuy(item)
   local S, house = E.Shopping, T.house
+  if item.plan then
+    local plan, current = S.PlanView(true), nil
+    if not plan or not plan.searchable then return say(plan and plan.searchWhy or "Recipe plans are not available.") end
+    for _, row in ipairs(plan.rows) do
+      if row.id == item.itemId and row.need > 0 and not row.omitted then current = row; break end
+    end
+    if not current then return say("That item is no longer needed by this plan.") end
+    item = { itemId = current.id, name = current.item, want = current.need, plan = true, counted = plan.coverage.counted }
+  end
   local mode, filter = nativeBuy(house)
-  if not mode then return S.Search(item.itemId, item.name) end
+  if not mode then return (S.Search(item.itemId, item.name)) end
   if not E.auctionHouseOpen then return say("Open the auction house first.") end
   local ready, canSend = pcall(C_AuctionHouse.IsThrottledMessageSystemReady)
-  if E:Scanning() or S.Pending() or not ready or E.Readable(canSend) ~= true then
+  if E:Scanning() or (S.Waiting and S.Waiting() or S.Pending()) or not ready or E.Readable(canSend) ~= true then
     return say("The auction house is busy. Try again when it finishes.")
   end
   local name = S.ItemName(item.itemId, item.name)
@@ -333,8 +350,12 @@ local function openInBuy(item)
   local cap = item.max and ("Max " .. S.Money(item.max) .. " each") or "no price cap"
   local market = S.Market(item.itemId)
   local estimate = market and ("  ·  Market " .. S.Money(market.market) .. " (" .. S.Age(market.day) .. ")") or ""
-  T.buyContext:SetText("Want " .. item.want .. "  ·  " .. cap .. "  ·  " .. S.Shown(name) .. estimate)
+  local want = item.plan and ("Need " .. item.want .. "  ·  recipe plan, " .. (item.counted and "bags counted" or "bags not counted"))
+    or ("Want " .. item.want)
+  T.buyContext:SetText(want .. "  ·  " .. cap .. "  ·  " .. S.Shown(name) .. estimate)
+  T.buyContext.plan = item.plan or nil
   T.buyContext:Show()
+  return true
 end
 
 -- Adds what the three boxes say to the active list, or updates the item when it is already there.
@@ -396,6 +417,120 @@ local function drawShopRow(line, item)
   end
 end
 
+-- One recipe-plan row: what to buy now, what the plan needs without bags, the market value, what a search found and
+-- how many are in this character's bags. Plan rows are changed from the profession window, so they have no remove.
+local function drawPlanRow(line, row, plan)
+  local S = E.Shopping
+  line.item = { itemId = row.id, name = row.item, want = row.need, plan = true, counted = plan.coverage.counted }
+  line.name:SetText(S.Shown(S.ItemName(row.id, row.item) or row.item))
+  line.name:SetTextColor(unpack(tone("text")))
+  line.want:SetText(tostring(row.need))
+  line.max:SetText(tostring(row.full))
+  line.max:SetTextColor(unpack(tone("muted")))
+  local market = S.Market(row.id)
+  if market then
+    local age, stale = S.Age(market.day)
+    line.market:SetText(S.Money(market.market) .. " · " .. age)
+    line.market:SetTextColor(unpack(stale and WARN or tone("text")))
+  else
+    line.market:SetText("no price")
+    line.market:SetTextColor(unpack(tone("muted")))
+  end
+  local f = S.Found(row.id)
+  line.found:SetText(f and f.min and (S.Money(f.min) .. " ×" .. f.quantity) or (f and "none" or "-"))
+  line.found:SetTextColor(unpack(tone(f and f.min and "accent" or "muted")))
+  line.decision:SetText(row.omitted and "not listed" or (row.have and tostring(row.have) or "-"))
+  line.decision:SetTextColor(unpack(row.omitted and WARN or tone("muted")))
+end
+
+-- What the plan's needs count and leave out, in one line under the controls.
+local function coverageLine(plan)
+  local said
+  if not plan.own then
+    said = "Another character's plan: its full needs. This character's bags are not counted and search is off."
+  elseif plan.coverage.counted then
+    said = "Bags counted now; bank, mail and other characters are not counted."
+  else
+    said = "Bags could not be read (" .. tostring(plan.coverage.reason) .. "): full needs shown."
+  end
+  local gaps = {}
+  if #plan.omitted > 0 then gaps[#gaps + 1] = #plan.omitted .. " over the 50-item limit not listed for search" end
+  if #plan.unresolved > 0 then gaps[#gaps + 1] = #plan.unresolved .. " recipe(s) with reagents not all known" end
+  if #plan.unpriced > 0 then gaps[#gaps + 1] = #plan.unpriced .. " unpriced" end
+  for _, l in ipairs(plan.limits) do
+    if l.kind == "cooldown" then
+      gaps[#gaps + 1] = "a cooldown allows " .. l.capacity .. " now" .. (l.detail and (" (" .. l.detail .. ")") or "")
+    end
+  end
+  if plan.rejected then gaps[#gaps + 1] = "cannot be worked out (" .. tostring(plan.rejected) .. ")" end
+  if #gaps > 0 then said = said .. " Partial: " .. table.concat(gaps, ", ") .. "." end
+  -- A make step that relies on build-scoped cooldown data says so, as on the Crafting costs page.
+  if plan.basis then said = said .. " Assumes: " .. plan.basis:sub(1, 1):lower() .. plan.basis:sub(2) .. "." end
+  -- A route priced by another addon says so; the Market column is still Everloot's price file.
+  local CS = E.CraftingSources
+  local short = CS and CS.Short(plan.priceSource)
+  if short then said = said .. " Route prices: " .. short .. "; the Market column is Everloot's price file." end
+  return said
+end
+
+local function planName(plan)
+  if plan.name then return plan.name end
+  if plan.own and UnitName then
+    local ok, name = pcall(UnitName, "player")
+    name = ok and E.Readable(name) or nil
+    if type(name) == "string" and name ~= "" then return name end
+  end
+  return "Another character"
+end
+
+-- The page's controls for one source: the manual list's boxes and list buttons, or the plan's Route and Search needed.
+local function showSource(shop, plan)
+  for _, part in ipairs({ shop.nameBox, shop.newButton, shop.renameButton, shop.deleteButton, shop.itemBox,
+    shop.wantBox, shop.maxBox, shop.addButton }) do
+    if plan then part:Hide() else part:Show() end
+  end
+  for _, part in ipairs({ shop.routeButton, shop.needButton }) do
+    if plan then part:Show() else part:Hide() end
+  end
+  local heads = plan and PLAN_HEADS or MANUAL_HEADS
+  for key, text in pairs(heads) do shop.head[key]:SetText(text) end
+  shop.sourceButton:SetText(plan and SOURCE_PLAN or SOURCE_MANUAL)
+end
+
+local function refreshPlan(shop, opensBuy)
+  local S = E.Shopping
+  local plan = S.PlanView()
+  showSource(shop, true)
+  if not plan then
+    shop.listName:SetText("Recipe plans")
+    shop.help:SetText("Recipe plans are not available in this load.")
+    for _, line in ipairs(shop.rows) do line.item = nil; line:Hide() end
+    shop.empty:SetText(PLAN_EMPTY); shop.empty:Show(); shop.up:Hide(); shop.down:Hide()
+    return
+  end
+  shop.listName:SetText(planName(plan) .. "  |cffc9c3b0" .. (plan.own and "this character" or "view only") .. "|r")
+  shop.help:SetText(coverageLine(plan))
+  shop.routeButton:SetText(plan.strategy == "cheapest" and "Route: cheapest" or "Route: buy all")
+  local rows = plan.rows
+  shop.offset = math.min(shop.offset, math.floor(math.max(#rows - 1, 0) / SHOP_ROWS) * SHOP_ROWS)
+  for i, line in ipairs(shop.rows) do
+    local row = rows[shop.offset + i]
+    if row then
+      drawPlanRow(line, row, plan)
+      if opensBuy then line.found:Hide() else line.found:Show() end
+      line.search:SetText(opensBuy and "Open in Buy" or "Search")
+      line.search:SetWidth(opensBuy and 88 or 60)
+      if plan.searchable and not row.omitted then line.search:Show() else line.search:Hide() end
+      line.remove:Hide()
+      line:Show()
+    else line.item = nil; line:Hide() end
+  end
+  shop.empty:SetText(#plan.entries == 0 and PLAN_EMPTY or PLAN_UNKNOWN)
+  if #rows == 0 then shop.empty:Show() else shop.empty:Hide() end
+  if shop.offset > 0 then shop.up:Show() else shop.up:Hide() end
+  if shop.offset + SHOP_ROWS < #rows then shop.down:Show() else shop.down:Hide() end
+end
+
 --- Draws the shopping page from the saved lists: the active list's name, the file's age, a page of items, the last
 --- thing a search or a button said, and the caps.
 function T.RefreshShop()
@@ -408,9 +543,14 @@ function T.RefreshShop()
   local fileLine, warn = S.FileLine()
   shop.file:SetText(fileLine)
   shop.file:SetTextColor(unpack(warn and WARN or tone("muted")))
-  local items = list and list.items or {}
   local opensBuy = nativeBuy(T.house) ~= nil
   shop.head.found:SetShown(not opensBuy)
+  shop.message:SetText(S.message or "")
+  if S.source == "plan" then return refreshPlan(shop, opensBuy) end
+  showSource(shop, false)
+  shop.help:SetText(SHOP_HELP)
+  shop.empty:SetText(SHOP_EMPTY)
+  local items = list and list.items or {}
   shop.offset = math.min(shop.offset, math.floor(math.max(#items - 1, 0) / SHOP_ROWS) * SHOP_ROWS)
   for i, line in ipairs(shop.rows) do
     local item = items[shop.offset + i]
@@ -419,6 +559,7 @@ function T.RefreshShop()
       if opensBuy then line.found:Hide() else line.found:Show() end
       line.search:SetText(opensBuy and "Open in Buy" or "Search")
       line.search:SetWidth(opensBuy and 88 or 60)
+      line.search:Show(); line.remove:Show()
       line:Show()
     else line.item = nil; line:Hide() end
   end
@@ -440,14 +581,44 @@ local function buildShop(panel)
   page:Hide()
   shop.page = page
 
-  local prev = shopButton(page, "<", 24, function() S.Select(select(2, S.Active()) - 1) end)
+  local prev = shopButton(page, "<", 24, function()
+    if S.source == "plan" then S.CycleOwner(-1); shop.offset = 0 else S.Select(select(2, S.Active()) - 1) end
+  end)
   prev:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
   shop.listName = words(page, "GameFontNormal")
   shop.listName:SetPoint("TOPLEFT", page, "TOPLEFT", 30, -4)
   shop.listName:SetWidth(176)
   if shop.listName.SetWordWrap then shop.listName:SetWordWrap(false) end
-  local nextButton = shopButton(page, ">", 24, function() S.Select(select(2, S.Active()) + 1) end)
+  local nextButton = shopButton(page, ">", 24, function()
+    if S.source == "plan" then S.CycleOwner(1); shop.offset = 0 else S.Select(select(2, S.Active()) + 1) end
+  end)
   nextButton:SetPoint("TOPLEFT", page, "TOPLEFT", 210, 0)
+  shop.prevOwner, shop.nextOwner = prev, nextButton
+  -- The source: the manual lists or the character recipe plans; each is searched on its own, never merged.
+  shop.sourceButton = shopButton(page, SOURCE_MANUAL, 120, function()
+    S.SetSource(S.source == "plan" and "manual" or "plan")
+    shop.offset = 0
+  end)
+  shop.sourceButton:SetPoint("TOPLEFT", page, "TOPLEFT", 620, 0)
+  -- Plans only: the saved route for this character's plans, and a search of the next item still needed.
+  shop.routeButton = shopButton(page, "Route: buy all", 130, function()
+    local CP, plan = E.CraftingPlan, S.PlanView()
+    if not (CP and plan) then return end
+    if not plan.own then return say("Only " .. planName(plan) .. " can change this plan's route.") end
+    CP.SetStrategy(plan.owner, plan.strategy == "cheapest" and "buy" or "cheapest")
+  end)
+  shop.routeButton:SetPoint("TOPLEFT", page, "TOPLEFT", 252, 0)
+  shop.needButton = shopButton(page, "Search needed", 120, function()
+    local plan = S.PlanView(true)
+    local row, why = S.NextNeeded(plan)
+    if not row then return say(why) end
+    if openInBuy({ itemId = row.id, name = row.item, want = row.need, plan = true,
+        counted = plan and plan.coverage.counted }) then
+      S.Searched(row.id)
+    end
+  end)
+  shop.needButton:SetPoint("TOPLEFT", page, "TOPLEFT", 390, 0)
+  shop.routeButton:Hide(); shop.needButton:Hide()
   shop.nameBox = shopBox(page, 130, 252, 0)
   if shop.nameBox.SetMaxLetters then shop.nameBox:SetMaxLetters(S.MAX_NAME) end
   shop.newButton = shopButton(page, "New list", 76, function()
@@ -513,18 +684,19 @@ local function buildShop(panel)
     -- A click on the row puts the item in the boxes, to change its numbers with Add or update.
     line:SetScript("OnClick", function()
       local item = line.item
-      if not item then return end
+      if not item or item.plan then return end
       shop.itemBox:SetText(S.ItemName(item.itemId, item.name) or tostring(item.itemId))
       shop.wantBox:SetText(tostring(item.want))
       shop.maxBox:SetText(item.max and E.Coins(item.max) or "")
     end)
     -- The row's buttons are its children, so they hide with it.
     line.search = shopButton(line, "Search", 88, function()
-      if line.item then openInBuy(line.item) end
+      local item = line.item
+      if item and openInBuy(item) and item.plan then S.Searched(item.itemId) end
     end)
     line.search:SetPoint("RIGHT", line, "LEFT", 660, 0)
     line.remove = shopButton(line, "x", 22, function()
-      if line.item and S.Remove(line.item.itemId) then say("Removed " .. S.Shown(S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
+      if line.item and not line.item.plan and S.Remove(line.item.itemId) then say("Removed " .. S.Shown(S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
     end)
     line.remove:SetPoint("LEFT", line, "LEFT", 664, 0)
     shop.rows[i] = line
@@ -545,6 +717,11 @@ local function buildShop(panel)
   shop.empty:SetText(SHOP_EMPTY)
   panel.shop = shop
   S.OnChange = T.RefreshShop
+  -- A plan or source change clears a plan's Buy context: its need may no longer be right.
+  S.OnInvalidate = function()
+    if T.buyContext and T.buyContext.plan then T.buyContext.plan = nil; T.buyContext:Hide() end
+    if T.panel and T.panel.mode == "shop" then T.RefreshShop() end
+  end
 end
 
 --- Shows the price lookup ("lookup") or the shopping lists ("shop"); each hides what the other shows.

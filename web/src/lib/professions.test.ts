@@ -20,6 +20,7 @@ test("a recipe keeps the files' item, reagents and ranks; MinSkillLineRank shows
   expect(alchemy.recipes.find((r) => r.spellId === 2329)).toEqual({
     spellId: 2329, itemId: 2454, learn: null, yellow: 55, grey: 95,
     reagents: [{ itemId: 2449, count: 1 }, { itemId: 765, count: 1 }, { itemId: 3371, count: 1 }],
+    output: { itemId: 2454, minimum: 1, maximum: 1, cooldownMs: null },
   });
   expect(professionByName(" first aid ")?.slug).toBe("first-aid");
   expect(professionBySlug("riding")).toBeUndefined();
@@ -62,5 +63,20 @@ test("every profession page's description fits a search result (160 characters)"
   for (const p of CLIENT_PROFESSIONS) {
     const m = await generateMetadata({ params: Promise.resolve({ profession: p.slug }) });
     expect(String(m.description).length, p.slug).toBeLessThanOrEqual(160);
+  }
+});
+
+test("a recipe view carries the files' output item, quantity and recorded cooldown from the same build", () => {
+  const all = CLIENT_PROFESSIONS.flatMap((p) => p.recipes);
+  const by = (spellId: number) => all.find((r) => r.spellId === spellId);
+  expect(by(3920)?.output).toEqual({ itemId: 8067, minimum: 200, maximum: 200, cooldownMs: null });
+  expect(by(2963)?.output).toEqual({ itemId: 2996, minimum: 1, maximum: 1, cooldownMs: null });
+  expect(by(18560)?.output).toEqual({ itemId: 14342, minimum: 1, maximum: 1, cooldownMs: 342000000 });
+  // A random yield is unavailable, never one.
+  expect(by(3931)?.output).toEqual({ itemId: 4365, minimum: null, maximum: null, cooldownMs: null });
+  // Every output is the item the recipe makes; a recipe that makes nothing has none.
+  for (const r of all) {
+    if (r.output) expect(r.output.itemId, String(r.spellId)).toBe(r.itemId);
+    if (r.itemId === null) expect(r.output, String(r.spellId)).toBeUndefined();
   }
 });

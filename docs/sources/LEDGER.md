@@ -59,6 +59,16 @@ as names, ids and the listed fields, each labelled found in game files, unconfir
 descriptions and criteria text stay on pages.* This applies to the Blizzard game files row above and to the Legacy
 perk catalog named in it. See [`docs/DATA_POLICY.md`](../DATA_POLICY.md), "Game-file facts in answers".
 
+Profession-profit amendment, authorized 2026-11-27–28: the already owned Forever 1.60.1.71139 snapshot supplies fixed
+recipe output counts and recorded cooldown/category facts to the website and addon. The exact hash, extractor,
+coverage and unreadable blocks are recorded in [the output receipt](../2026-11-28-client-recipe-outputs-receipt.md)
+and `addon/modules/recipe_cooldown_data.lua`. No keys, listfiles or decryption were used. Missing cooldown rows are
+labelled assumptions, never confirmation that server-side limits do not exist.
+
+Optional installed Auctionator/TSM prices are local runtime inputs only: documented read APIs, selected by the player,
+memory-only quotes, unknown age and realm/house scope, and no upload, history or public-data writer. Only the source
+choice and fallback preference are saved. The interfaces and support limits are documented in `addon/README.md`.
+
 ## Link only
 
 The site links to these and stores nothing from them: [warcraft.wiki.gg](https://warcraft.wiki.gg)
@@ -91,6 +101,8 @@ Open-source projects read as references, none of their code in this repository:
 | [simulationcraft/simc](https://github.com/simulationcraft/simc) | GPL-3.0 (addon: Unlicense) | Nothing yet; a possible separate process once its `forever` branch sims |
 | [Marlamin/wow.tools.local](https://github.com/Marlamin/wow.tools.local) | MIT | Nothing; noted as a local tool, never an importer |
 | [alcaras/forever-ref](https://github.com/alcaras/forever-ref) | None published | Nothing; an example of a wago.tools consumer |
+| Auctionator's author-supplied `Source/API/v1/README.md`, shipped with retail v327 | Public API documentation read as an interface reference; no addon implementation copied | Guarded `GetAuctionPriceByItemID` adapter only. The current [v354 repository](https://github.com/TheMouseNest/Auctionator) was unavailable; Forever compatibility is unverified |
+| [Archived official TSM addon API](https://web.archive.org/web/20251203084633id_/http://api.tradeskillmaster.com/addon/), generated 2022-12-21 | API signatures read as reference; no addon implementation copied | Guarded price-source validation, item conversion and custom-price reads. Live documentation failed TLS verification and was not bypassed; this archived version does not establish current Forever support |
 
 ## Infrastructure and placeholders, not data sources
 

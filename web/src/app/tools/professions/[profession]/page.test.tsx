@@ -547,3 +547,180 @@ test("the AH Ledger margins are read once on the server for the chosen market an
   await render("alchemy", { realm: "nowhere" });
   expect(ledger.read).not.toHaveBeenCalled();
 });
+
+// Task 13: Everloot's own profit estimates, server-computed only for a validated realm and house in the link.
+const alchemyScans = (realm: string, house: string, prices: [number, number][]) => ["install-a", "install-b", "install-c"].map((installId) => ({
+  kind: "auction_snapshot", installId, eventId: `${installId}:${realm}:${house}:rank`, capturedAt: new Date().toISOString(), realm,
+  scanId: `${installId}-${realm}-${house}-rank`, part: 1, parts: 1, items: prices.map(([id, copper]) => [id, 1, 40, copper, copper]), house,
+}));
+// Elixir of Minor Strength (2329): Earthroot 2449, Silverleaf 765 and Empty Vial 3371 make one 2454.
+const ELIXIR: [number, number][] = [[2449, 50], [765, 30], [3371, 4], [2454, 500]];
+const tableProps = async (search: Record<string, string>) => {
+  const { default: RecipeTables } = await import("../recipe-table");
+  const element = await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve(search) });
+  const found: unknown[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === RecipeTables) found.push(el.props);
+    walk(el.props.children);
+  };
+  walk(element);
+  return JSON.stringify(found[0]);
+};
+
+test("with no realm and house nothing is ranked and the recipe rows carry no estimate data", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const html = await render("alchemy", { size: "200" });
+  expect(html).not.toContain("data-profit-ranking");
+  expect(html).not.toContain("Everloot profit estimates");
+  const props = await tableProps({ size: "200" });
+  expect(props).not.toMatch(/"(profit|margin|output|quote|yield)"/);
+  // A profession AH Ledger lacks reads no market without a realm and house.
+  store.loadMarket.mockClear();
+  await render("fishing");
+  expect(store.loadMarket).not.toHaveBeenCalled();
+});
+
+test("a realm and house in the link rank the profession on the server, labelled apart from AH Ledger, with unchanged rows", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const state = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Horde", ELIXIR), new Date());
+  store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
+  const search = { realm: "camwow-us1-realm-2-pvp", house: "horde", size: "200" };
+  const html = await render("alchemy", search);
+  expect(html).toContain('data-profit-ranking="horde"');
+  expect(html).toContain("Everloot profit estimates: CAMWOW US1 Realm 2 PvP, Horde");
+  expect(html).toContain("after the 5% auction cut");
+  expect(html).toContain("Separate from AH");
+  expect(html).not.toMatch(/data-profit-ranking[\s\S]*sales per day:/i);
+  // 500 less the 5% cut is 475; materials 84: 391 a craft.
+  const ranked = html.slice(html.indexOf('data-ranked="2329"'));
+  expect(ranked).toContain("3s 91c");
+  expect(ranked).toContain("84c");
+  expect(html).toContain('href="/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&amp;house=horde&amp;recipe=2329&amp;size=200#recipe-shopping"');
+  // The table's rows and items are byte for byte what they are with no market selected; only its link template
+  // carries the realm and house on to a recipe's plan.
+  const rowsOnly = (json: string) => { const { planHref, ...rest } = JSON.parse(json) as { planHref: string }; return { planHref, rest: JSON.stringify(rest) }; };
+  const picked = rowsOnly(await tableProps(search)), plain = rowsOnly(await tableProps({ size: "200" }));
+  expect(picked.rest).toBe(plain.rest);
+  expect(picked.planHref).toBe("/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&house=horde&recipe=RECIPEID&size=200#recipe-shopping");
+  // The neutral house takes 15%: 425 less 84 is 341.
+  const neutral = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Neutral", ELIXIR), new Date());
+  store.loadMarket.mockResolvedValue({ state: neutral, dataAsOf: null });
+  const n = await render("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "neutral" });
+  expect(n).toContain("after the 15% auction cut");
+  expect(n.slice(n.indexOf('data-ranked="2329"'))).toContain("3s 41c");
+});
+
+test("an unknown realm, a missing half or a repeated key ranks nothing, says why and still renders the page", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const state = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Horde", ELIXIR), new Date());
+  store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
+  const nowhere = await render("alchemy", { realm: "not-a-realm", house: "horde" });
+  expect(nowhere).not.toContain("data-ranked=");
+  expect(nowhere).toContain("No Everloot market data for that realm");
+  const half = await render("alchemy", { realm: "camwow-us1-realm-2-pvp" });
+  expect(half).not.toContain("data-ranked=");
+  expect(half).toContain("Pick an auction house");
+  expect(half).toContain('href="/tools/professions/alchemy?realm=camwow-us1-realm-2-pvp&amp;house=neutral#profit-ranking"');
+  const twice = renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ realm: "camwow-us1-realm-2-pvp", house: ["horde", "alliance"] }) }));
+  expect(twice).not.toContain("data-ranked=");
+  const elves = await render("alchemy", { realm: "camwow-us1-realm-2-pvp", house: "elves" });
+  expect(elves).not.toContain("data-ranked=");
+});
+
+test("a selected recipe's card gets its link state, a bounded catalog of makes and nothing private", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const { default: RecipeShopping } = await import("../recipe-shopping");
+  const element = await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ recipe: "2329", crafts: "12", strategy: "cheapest", have: "2449:3,2449:4" }) });
+  const found: Record<string, unknown>[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === RecipeShopping) found.push(el.props as Record<string, unknown>);
+    walk(el.props.children);
+  };
+  walk(element);
+  expect(found).toHaveLength(1);
+  const props = found[0];
+  expect(props.initial).toMatchObject({ recipe: 2329, crafts: 12, strategy: "cheapest", have: [] });
+  expect(props.issues).toEqual(["The owned counts in the link were ignored: an item is listed twice."]);
+  expect(props.market).toBeNull();
+  expect(Array.isArray(props.catalog)).toBe(true);
+  const json = JSON.stringify(props);
+  expect(json.length).toBeLessThan(40_000);
+  expect(json).not.toMatch(/installId|character|SavedVariables|auctionator|tsm/i);
+  const html = await render("alchemy", { recipe: "2329", crafts: "12" });
+  expect(html).toContain('value="12"');
+  expect(await render("alchemy", { recipe: "2329", crafts: "10000" })).toContain('value="1"');
+});
+test("the selected card's props stay within 40 KiB for the real catalog's largest plan trees, and a cut catalog says so", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const { planCardCatalog } = await import("@/lib/crafting-catalog");
+  const { CLIENT_PROFESSIONS } = await import("@/lib/professions");
+  // Every recipe that takes materials, with pessimistic 60-character names: the largest catalogs the card can get.
+  const long = (id: number) => `${"Very Long Item Name ".repeat(3)}${id}`;
+  const sized = CLIENT_PROFESSIONS.flatMap((p) => p.recipes.filter((r) => r.reagents.length).map((r) => {
+    const data = planCardCatalog(r, (id) => long(id), long);
+    return { profession: p.slug, spellId: r.spellId, bytes: JSON.stringify(data).length, truncated: data.truncated };
+  })).sort((a, b) => b.bytes - a.bytes);
+  expect(sized.length).toBeGreaterThan(1000);
+  for (const s of sized.slice(0, 5)) expect(s.bytes, `${s.profession} ${s.spellId}`).toBeLessThan(34 * 1024);
+  // The page's real card props for the largest trees, in full.
+  const { default: RecipeShopping } = await import("../recipe-shopping");
+  for (const worst of sized.slice(0, 3)) {
+    const element = await ProfessionPage({ params: Promise.resolve({ profession: worst.profession }), searchParams: Promise.resolve({ recipe: String(worst.spellId), crafts: "9999", strategy: "cheapest" }) });
+    const found: Record<string, unknown>[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== "object" || !("props" in node)) return;
+      const el = node as { type: unknown; props: { children?: unknown } };
+      if (el.type === RecipeShopping) found.push(el.props as Record<string, unknown>);
+      walk(el.props.children);
+    };
+    walk(element);
+    expect(found, `${worst.profession} ${worst.spellId}`).toHaveLength(1);
+    expect(JSON.stringify(found[0]).length, `${worst.profession} ${worst.spellId}`).toBeLessThan(40 * 1024);
+    if (found[0].catalogTruncated) {
+      expect(renderToStaticMarkup(element)).toContain("Only part of the catalog is listed");
+    }
+  }
+});
+
+test("a valid realm without a house reaches the card, which keeps it; ranking stays off", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const state = foldMarket(emptyMarket(), alchemyScans("CAMWOW US1 Realm 2 PvP", "Horde", ELIXIR), new Date());
+  store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
+  const { default: RecipeShopping } = await import("../recipe-shopping");
+  const element = await ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({ recipe: "2329", realm: "camwow-us1-realm-2-pvp" }) });
+  const found: Record<string, unknown>[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === RecipeShopping) found.push(el.props as Record<string, unknown>);
+    walk(el.props.children);
+  };
+  walk(element);
+  expect(found[0].market).toEqual({ realm: "camwow-us1-realm-2-pvp", realmName: "CAMWOW US1 Realm 2 PvP", house: null });
+  expect(renderToStaticMarkup(element)).not.toContain("data-ranked=");
+});
+
+test("the selected recipe's recorded cooldown reaches the card", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const { default: RecipeShopping } = await import("../recipe-shopping");
+  // Mooncloth (18560) records a 342,000,000 ms cooldown in the files.
+  const element = await ProfessionPage({ params: Promise.resolve({ profession: "tailoring" }), searchParams: Promise.resolve({ recipe: "18560" }) });
+  const found: Record<string, unknown>[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object" || !("props" in node)) return;
+    const el = node as { type: unknown; props: { children?: unknown } };
+    if (el.type === RecipeShopping) found.push(el.props as Record<string, unknown>);
+    walk(el.props.children);
+  };
+  walk(element);
+  expect(found[0].rootCooldownMs).toBe(342_000_000);
+});

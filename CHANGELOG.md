@@ -830,6 +830,32 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 
+## [0.3.33] - 2026-11-28
+
+Release channel: Alpha
+
+### Added
+
+- Compare crafting returns inside your profession window: compact profit tags, an Everloot list with profit sorting and filtering, and a shared AH/vendor destination. Open a recipe's Details for material costs, price sources, batch returns and training payback when its exact recipe is known.
+- Plan whole crafting batches with **Buy all** or **Cheapest**. Everloot uses your character's observed learned recipes, rounds intermediate crafts to whole batches and counts shared materials once. Cooldown routes require the matching profession window; ordinary routes use a labelled assumption from matching-build client files.
+- Use **Add materials** to preview and save a character's recipe plans. The Auction House shopping page keeps these apart from manual lists, subtracts only that character's current bags and searches one needed item per press. Saving a recipe again replaces its count; zero removes it. Other characters' plans show full needs without using their bags.
+- Completed own full scans provide local material depth, 14 days of daily prices, a seven-day baseline and a material break-even price in Details. Partial scans and outside-addon prices do not enter this history.
+- Optional Auctionator and TSM price sources, with explicit unavailable states and an optional Everloot fallback. Their prices stay in memory and are never uploaded. Neither adapter has been verified on Forever; Everloot remains the default.
+
+### Changed
+
+- The website's profession recipe cards compare batch returns and allowed catalog make steps, accept counts you type, and copy shareable plans. Select a realm and auction house for prices and Everloot's separate profit ranking. These catalog routes are not checked against a character; vendor-sale estimates remain unavailable on the website.
+- Recipe shopping uses market value rather than the cheapest listing. Missing market values, unknown outputs and incomplete inputs stay unpriced instead of becoming confident profit claims.
+- Merchant prices count toward crafting costs only after this character sees a single-item, money-only offer. Old raw vendor offers cannot prove a unit price. Revisit merchants on each character after updating; verified unit prices expire after 14 days or a client-build change.
+
+### Compatibility and verification
+
+- For WoW: Forever 1.60.1 / interface 16001. Existing manual shopping lists and public upload records retain their format. Learned recipes, plans, bag counts used for a preview, merchant unit prices and market history are local; optional-source prices are not saved.
+- This exact release ZIP has **not been checked in the live game**. In-game layout, recipe selection, trainer spell identity, cooldown API behavior, persistence and coexistence still need player checks. Automated contracts and a real-browser website journey passed; those do not establish live-client compatibility.
+- Open each profession to capture this character's recipes. Bags only: bank, mail and alt inventory are excluded. Recorder-only mode suppresses Everloot's profession decorations. No buying, posting, crafting or training is automated.
+- The cheapest route is a bounded comparison, not a promise of a global optimum or live offers. Client files contain unreadable blocks and omit server changes; source assumptions and missing prices are shown. Large scan items may take longer to process. Archive acceptance steps are in `docs/2026-11-27-profession-profit-acceptance.md`.
+- GitHub publication, the website download, CurseForge approval and the Discord announcement can become available at different times. Use the exact version shown by `/everloot version` when reporting a problem.
+
 ## [0.3.31] - 2026-11-26
 
 Select a recipe in WoW: Forever's Professions window to see its materials cost and estimated profit per craft. Open Details for reagent quotes, expected output and the auction-house cut.
