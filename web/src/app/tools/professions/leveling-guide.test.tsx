@@ -5,9 +5,6 @@ import { expect, test, vi } from "vitest";
 import LevelingGuide from "./leveling-guide";
 import type { ProfessionGuideRecipe } from "@/lib/profession-guide-data";
 
-const replace = vi.hoisted(() => vi.fn());
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
-
 const recipes: ProfessionGuideRecipe[] = [{
   id: 10, name: "Practice Potion", reagents: [{ itemId: 11, count: 2 }],
   windows: [{ fromSkill: 1, toSkill: 3, points: 1, chance: 1, evidence: "observed" }],
@@ -15,12 +12,14 @@ const recipes: ProfessionGuideRecipe[] = [{
   source: { kind: "trainer", npcIds: [12], provider: "everloot" },
 }];
 
-test("shows a usable route and shopping list with unknown prices, then replans and makes evidence gaps visible", async () => {
+test("updates the route and shareable URL as skill changes while keeping the last valid plan during editing", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  const fetcher = vi.fn();
+  const fetcher = vi.fn(async () => ({ ok: true, json: async () => ({ houses: {} }) }));
   vi.stubGlobal("fetch", fetcher);
   const host = document.createElement("div");
+  document.body.append(host);
   const root = createRoot(host);
+  window.history.replaceState(null, "", "/tools/professions/alchemy?class=mage#prof-path");
   try {
     await act(async () => root.render(<LevelingGuide profession="Alchemy" recipes={recipes}
       items={{ 11: { name: "Peacebloom" } }} from={1} to={3} />));
@@ -28,20 +27,29 @@ test("shows a usable route and shopping list with unknown prices, then replans a
     expect(host.textContent).toContain("4 × Peacebloom");
     expect(host.textContent).toContain("Copy shopping list");
     expect(host.textContent).not.toContain("Copy for Everloot");
-    expect(host.textContent).toContain("15c");
+    expect(host.textContent).not.toContain("Plan route");
+    expect(host.querySelector('a[href="/database/npcs/12"]')).toBeNull();
+    const details = [...host.querySelectorAll("details")].find(node => node.textContent === "Recipe details")!;
+    await act(async () => { details.open = true; details.dispatchEvent(new Event("toggle")); });
     expect(host.querySelector('a[href="/database/npcs/12"]')).not.toBeNull();
-    expect(fetcher).not.toHaveBeenCalled();
     const goal = host.querySelector<HTMLInputElement>('input[name="to"]')!;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(goal, "5");
+    const edit = async (value: string) => act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(goal, value);
       goal.dispatchEvent(new Event("input", { bubbles: true }));
-      goal.form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
+    await edit("");
+    expect(host.textContent).toContain("Skill 1–3");
+    expect(host.textContent).toContain("Enter whole skills");
+    await edit("5");
     expect(host.textContent).toContain("3–5");
     expect(host.textContent).toContain("Recipe evidence missing");
-    expect(replace).toHaveBeenCalledWith(expect.stringMatching(/\?from=1&to=5$/), { scroll: false });
+    expect(window.location.search).toBe("?class=mage&from=1&to=5");
+    expect(window.location.hash).toBe("#prof-path");
+    expect(fetcher).toHaveBeenCalledTimes(1);
   } finally {
     await act(async () => root.unmount());
+    host.remove();
+    window.history.replaceState(null, "", "/");
     vi.unstubAllGlobals();
   }
 });
@@ -70,7 +78,7 @@ test("switches faction prices, labels stale quotes, and copies the current mater
   };
   try {
     await act(async () => root.render(<LevelingGuide profession="Alchemy" recipes={recipes} items={{ 11: { name: "Peacebloom" } }} from={1} to={3} />));
-    await act(async () => button("Load auction prices").click());
+    expect(host.textContent).not.toContain("Load auction prices");
     await change("Realm", "Forever PvP");
     await change("Auction house", "Alliance");
     expect(host.textContent).toContain("1s 20c");
@@ -83,6 +91,8 @@ test("switches faction prices, labels stale quotes, and copies the current mater
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("4 × Peacebloom · 2s 80c"));
   } finally {
     await act(async () => root.unmount());
+    window.localStorage.clear();
+    window.history.replaceState(null, "", "/");
     Reflect.deleteProperty(navigator, "clipboard");
     vi.unstubAllGlobals();
   }

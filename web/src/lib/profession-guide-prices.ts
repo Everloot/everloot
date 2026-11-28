@@ -47,24 +47,24 @@ function total(rows: readonly Material[], unit: (item: number) => number | null)
 /** Missing input prices, yields and return quotes stay unknown. A no-item enchant has no resale credit. */
 export function priceGuideRecipe(
   recipe: QuoteInputs,
-  market: ReadonlyMap<number, number>,
+  quotes: { buy: ReadonlyMap<number, number>; resale: ReadonlyMap<number, number> },
   vendor: VendorPrices,
   house: string | null,
   disenchants?: readonly Material[],
 ) {
-  const materials = total(recipe.reagents, (id) => guideBuyPrice(id, market, vendor));
+  const materials = total(recipe.reagents, (id) => guideBuyPrice(id, quotes.buy, vendor));
   if (materials === null) return { materials, vendor: null, auction: null, disenchant: null };
   if (!recipe.output) return { materials, vendor: materials, auction: materials, disenchant: materials };
   const { itemId, minimum, maximum, vendorSellCopper } = recipe.output;
   if (minimum === null || maximum === null) return { materials, vendor: null, auction: null, disenchant: null };
   const averageYield = (minimum + maximum) / 2;
   const net = (price: number | null, cut = 0) => price === null ? null : materials - Math.round(price * averageYield * (1 - cut));
-  const outputQuote = market.get(itemId) ?? null;
-  const shards = disenchants?.length ? total(disenchants, (id) => market.get(id) ?? null) : null;
+  const vendorNet = net(vendorSellCopper ?? null);
+  const shards = disenchants ? total(disenchants, (id) => quotes.resale.get(id) ?? null) : null;
   return {
     materials,
-    vendor: net(vendorSellCopper ?? null),
-    auction: net(outputQuote, auctionCut(house)),
-    disenchant: net(shards, auctionCut(house)),
+    vendor: vendorNet,
+    auction: net(quotes.resale.get(itemId) ?? null, auctionCut(house)),
+    disenchant: shards === 0 ? vendorNet : net(shards, auctionCut(house)),
   };
 }

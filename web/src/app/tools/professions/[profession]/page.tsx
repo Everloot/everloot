@@ -3,7 +3,7 @@ import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../../auctio
 import type { AuctionHouse } from "@everloot/protocol";
 import { ahledgerMarket, craftingAsOf, craftingMargins, isAhledgerMarket, isAhledgerProfession } from "@/lib/ahledger";
 import { readAhledgerPage } from "@/lib/ahledger-proxy";
-import { busiestHouse, findBoard, realmBoards } from "@/lib/auction-house";
+import { busiestHouse, findBoard, realmBoards, realmSlug } from "@/lib/auction-house";
 import { realmRegion, realmRuleset } from "@/lib/realms";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -14,12 +14,12 @@ import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
 import { Badge, Card, Container, Contribute, Disclosure, EmptyState, FilterBar, PageHeader, QUALITY_TEXT, ResultStrip, SectionHeading, qualityOf } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
+import { classContextParams, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
-import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, SKILL_BRACKETS, type RecipeView } from "@/lib/professions";
+import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, SKILL_BRACKETS, type ProfessionInfo, type RecipeView } from "@/lib/professions";
 import { filterRecipeViews, RECIPE_PAGE_SIZES, recipeListHref, recipeListQuery, recipePage, recipeSearchKeep } from "@/lib/recipe-list";
 import { pageMetadata } from "@/lib/seo";
 import { loadListNames } from "@/lib/item-view";
@@ -43,6 +43,7 @@ import { GATHERING_GUIDE_SLUGS } from "@/lib/gathering-guide";
 import type { GuideDisenchants } from "@/lib/profession-guide-prices";
 import RecipeTables, { type RecipeItem, type RecipeRow } from "../recipe-table";
 import RecipeShopping from "../recipe-shopping";
+import ProfessionViewTabs from "../profession-view-tabs";
 import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
 import GatheringGuide from "./gathering/guide";
 
@@ -59,6 +60,26 @@ function skill(value: string, fallback: number): number {
 }
 
 const GUIDE_MODES = new Set<string>(["materials", "vendor", "auction", "disenchant"]);
+const REFERENCE_PARAMS = [
+  "recipe", "crafts", "q", "min", "max", "size", "page", "mobs",
+  "market", "sort", "skill_min", "skill_max", "min_sales", "priced", "craft_size", "craft_page",
+] as const;
+const REFERENCE_ANCHORS = [
+  "#prof-recipes", "#recipe-shopping", "#ahledger-margins", "#gather", "#prof-ranges", "#prof-help", "#prof-contribute",
+] as const;
+
+function queryString(search: Search): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    if (value !== undefined) for (const entry of Array.isArray(value) ? value : [value]) query.append(key, entry);
+  }
+  return query.toString();
+}
+
+/** The planner accepts a display name, while the reference pickers address a realm by slug. */
+function referenceMarketParams(search: Search) {
+  return realmHouseParams({ realm: realmSlug(one(search.realm)), house: one(search.house).toLowerCase() });
+}
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const p = professionBySegment((await props.params).profession);
@@ -90,7 +111,7 @@ const LEDGER_HOUSES: readonly AuctionHouse[] = ["Alliance", "Horde"];
  * names the market, else the AH Ledger panels' default, PvE Alliance in the US.
  */
 function ledgerMarket(search: Search, path: string, state: Parameters<typeof realmBoards>[0] | null) {
-  const { realm, house: asked } = realmHouseParams(search);
+  const { realm, house: asked } = referenceMarketParams(search);
   const legacy = realm ? null : one(search.market);
   const shared = legacy && isAhledgerMarket(legacy) ? legacy : null;
   const realms = state ? realmBoards(state, new Date()).filter((b) => {
@@ -128,33 +149,108 @@ async function readCrafting(market: string | null, profession: string): Promise<
   return read.ok ? { ok: true, ...read.value, credit: read.credit } : { ok: false };
 }
 
+async function CraftingPlanner({ profession: p, search }: { profession: ProfessionInfo; search: Search }) {
+  const path = professionHref(p.slug);
+  const read = parseClassContext(search);
+  const context = read.ok ? read.context : null;
+  const to = Math.max(2, skill(one(search.to), 300));
+  const from = Math.min(skill(one(search.from), 1), to - 1);
+  const modeParam = one(search.mode);
+  const mode = GUIDE_MODES.has(modeParam) ? modeParam as GuideMode : undefined;
+  const realm = one(search.realm), house = one(search.house);
+  const modeled = one(search.estimate) !== "0";
+  const [view, assets, shown, spellNames] = await Promise.all([
+    loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
+  ]);
+  const guide = buildProfessionGuideData(p, view.facts, id => spellNames?.names.get(id));
+  const guideItemIds = new Set(guide.recipes.flatMap(recipe => [
+    ...recipe.reagents.map(reagent => reagent.itemId),
+    ...(recipe.toolIds ?? []),
+    ...(recipe.unlockReagents?.map(reagent => reagent.itemId) ?? []),
+    ...("teachingItemIds" in recipe.source ? recipe.source.teachingItemIds : []),
+  ]));
+  const outputIds = new Set(guide.recipes.flatMap(recipe => recipe.output ? [recipe.output.itemId] : []));
+  for (const { source } of guide.rankStops) {
+    if (source?.kind === "book") guideItemIds.add(source.itemId);
+    if (source?.kind === "quest") for (const { itemId } of source.requirements) guideItemIds.add(itemId);
+  }
+  // Only the materials the planner can use and its eligible outputs need tooltip names or vendor resale prices.
+  const tipIds = [...new Set([...guideItemIds, ...outputIds])].filter(shown.showsTip);
+  const [tips, disenchant] = await Promise.all([
+    loadItemTips(assets, tipIds),
+    outputIds.size ? loadDisenchant(view.corpus) : null,
+  ]);
+  const items = Object.fromEntries([...guideItemIds].flatMap(id => {
+    const name = shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))?.name;
+    return name ? [[id, { name }]] : [];
+  }));
+  const recipes = guide.recipes.map(recipe => {
+    const output = recipe.output;
+    const vendorSellCopper = output ? tips.get(output.itemId)?.vendorSellCopper : undefined;
+    return output && vendorSellCopper !== undefined ? { ...recipe, output: { ...output, vendorSellCopper } } : recipe;
+  });
+  let disenchants: GuideDisenchants | undefined;
+  if (disenchant && !disenchant.unreachable) {
+    const yields = new Map(disenchant.yields.filter(row => row.state === "rated").map(row => [row.band.id, row.rows]));
+    disenchants = Object.fromEntries([...outputIds].flatMap(itemId => {
+      const match = disenchant.placer.place(itemId);
+      if (match.kind === "no-disenchant") return [[itemId, []]];
+      const materials = match.kind === "band" ? yields.get(match.band.id) : null;
+      return materials ? [[itemId, materials.map(row => ({ itemId: row.materialId, count: row.perDisenchant }))]] : [];
+    }));
+  }
+  const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([key, value]) => [key, value.icon]));
+  const icon = icons.get(p.name.toLowerCase());
+  return (
+    <Container width="data">
+      <EdgeDegraded when={view.unreachable === true} />
+      <PageHeader trail={trailFor(path)!} title={`${p.name} profession guide`} icon={icon ? <GameIcon src={icon} size={40} /> : undefined} />
+      <ClassContextChip read={read} here={withoutClassContext(path, search)} className="-mt-2 mb-6" />
+      <div className="space-y-4">
+        <ProfessionViewTabs path={path} reference={false} initialQuery={queryString(search)} referenceParams={REFERENCE_PARAMS} referenceAnchors={REFERENCE_ANCHORS}
+          professions={CLIENT_PROFESSIONS.map(profession => ({ path: withClassContext(professionHref(profession.slug), context), label: profession.name }))} />
+        <LevelingGuide
+          key={JSON.stringify([p.slug, from, to, mode, realm, house, modeled])}
+          profession={p.name} recipes={recipes} items={items} from={from} to={to} initialMode={mode}
+          contextFields={context ? classContextParams(context) : undefined}
+          initialRealm={realm} initialHouse={house} initialModeled={modeled}
+          vendor={guide.vendorBuyCopper} vendorNpcs={guide.vendorNpcIds} disenchants={disenchants} rankStops={guide.rankStops}
+        />
+        <Disclosure summary="Guide sources">
+          <p>Selected Forever trainer and vendor facts are adapted from <a href={PROFESSION_TRAINER_SOURCE_URL} className="underline underline-offset-4">Efficient Games</a> under <a href={PROFESSION_TRAINER_LICENSE_URL} className="underline underline-offset-4">CC BY 4.0</a>.</p>
+        </Disclosure>
+      </div>
+    </Container>
+  );
+}
+
 /**
- * One profession: every recipe the game files list for it, grouped by the skill where it turns yellow, with the
- * item it makes and its reagents; then what players' uploads add (agreed colour ranges, the path, cost per craft).
- * The two are labelled apart: the recipe list is found in game files, unconfirmed; the player facts need 3 installs.
+ * Crafting opens on the planner. The reference view carries the game-file recipes, market margins and player
+ * observations. Gathering pages retain their field guides and references together.
  */
 export default async function ProfessionPage(props: Props) {
   const segment = (await props.params).profession;
   const p = professionBySegment(segment);
   if (!p) notFound();
-  const searchParams = (await props.searchParams) ?? {};
+  const requested = (await props.searchParams) ?? {};
+  const path = professionHref(p.slug);
   // The slug is the one canonical segment; the skill line id and `<id>-<slug>` forms land here and move on, keeping
   // the range and class context they came with, as the hub's `?profession=` redirect does.
   if (segment !== p.slug) {
-    const search = new URLSearchParams(Object.entries(searchParams).flatMap(([k, v]) => (Array.isArray(v) ? v : v === undefined ? [] : [v]).map((x) => [k, x]))).toString();
-    permanentRedirect(`${professionHref(p.slug)}${search ? `?${search}` : ""}`);
+    const search = queryString(requested);
+    permanentRedirect(`${path}${search ? `?${search}` : ""}`);
   }
+  const gathering = GATHERING_GUIDE_SLUGS.has(p.slug);
+  const pane = one(requested.view);
+  const reference = !gathering && (pane === "reference" || (!pane && REFERENCE_PARAMS.some(key => one(requested[key]))));
+  if (!gathering && !reference) return CraftingPlanner({ profession: p, search: requested });
+  // Commands inside the reference stay there even when they clear the last filter in a legacy link.
+  const searchParams = reference ? { ...requested, view: "reference" } : requested;
   const read = parseClassContext(searchParams);
   const context = read.ok ? read.context : null;
-  const toSkill = Math.max(2, skill(one(searchParams.to), 300));
-  const fromSkill = Math.min(skill(one(searchParams.from), 1), toSkill - 1);
-  const modeParam = one(searchParams.mode);
-  const mode = GUIDE_MODES.has(modeParam) ? modeParam as GuideMode : undefined;
-  const path = professionHref(p.slug);
   // Leather and cloth come from mob areas, which have levels: `?mobs=11-20` filters them (an old
   // `/tools/farming-routes?category=cloth&level=11-20` lands here with it). `level` is the class context's, not this.
   // A malformed range is a 404, as on the farming page.
-  const gathering = GATHERING_GUIDE_SLUGS.has(p.slug);
   const gather = p.slug === "herbalism" || p.slug === "mining" ? undefined : GATHERING[p.slug];
   const mobFarm = gather?.source === "leather" || gather?.source === "cloth" ? gather.source : null;
   const level = mobFarm ? range(searchParams, "mobs") : undefined;
@@ -205,24 +301,8 @@ export default async function ProfessionPage(props: Props) {
 
   const spellName = (id: number) => spellNames?.names.get(id);
   const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
-  const guide = !gathering
-    ? buildProfessionGuideData(p, facts, spellName, (id) => tips.get(id)?.vendorSellCopper)
-    : null;
-  let disenchants: GuideDisenchants | undefined;
-  if (guide?.recipes.some(recipe => recipe.output)) {
-    const data = await loadDisenchant(view.corpus);
-    if (!data.unreachable) {
-      const yields = new Map(data.yields.filter(row => row.state === "rated").map(row => [row.band.id, row.rows]));
-      disenchants = Object.fromEntries(guide.recipes.flatMap(({ output }) => {
-        if (!output) return [];
-        const match = data.placer.place(output.itemId);
-        const materials = match.kind === "band" ? yields.get(match.band.id) : null;
-        return materials ? [[output.itemId, materials.map(row => ({ itemId: row.materialId, count: row.perDisenchant }))]] : [];
-      }));
-    }
-  }
   const selectedRecipe = catalog.find(r => String(r.spellId) === searchParams.recipe && r.reagents.length > 0);
-  const recipeMarket = realmHouseParams(searchParams);
+  const recipeMarket = referenceMarketParams(searchParams);
   const requestedCrafts = Number(searchParams.crafts);
   const crafts = Number.isInteger(requestedCrafts) && requestedCrafts >= 1 && requestedCrafts <= 999 ? requestedCrafts : 1;
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
@@ -268,20 +348,6 @@ export default async function ProfessionPage(props: Props) {
   const groups = recipeGroups(p.recipes);
   const shownGroups = recipeGroups(listed.rows);
   const tableGroups = shownGroups.map((g) => ({ key: g.key, label: g.label, rows: g.recipes.map(row) }));
-  const guideItemIds = new Set(guide?.recipes.flatMap(recipe => [
-    ...recipe.reagents.map(reagent => reagent.itemId),
-    ...(recipe.toolIds ?? []),
-    ...(recipe.unlockReagents?.map(reagent => reagent.itemId) ?? []),
-    ...("teachingItemIds" in recipe.source ? recipe.source.teachingItemIds : []),
-  ]));
-  for (const { source } of guide?.rankStops ?? []) {
-    if (source?.kind === "book") guideItemIds.add(source.itemId);
-    if (source?.kind === "quest") for (const { itemId } of source.requirements) guideItemIds.add(itemId);
-  }
-  const guideItems = Object.fromEntries([...guideItemIds].flatMap(id => {
-    const name = names.get(id)?.name ?? shown.matched?.names.get(id)?.name;
-    return name ? [[id, { name }]] : [];
-  }));
   const listFilters = Number(Boolean(listQuery.q)) + Number(listQuery.min !== null || listQuery.max !== null);
   const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={listQuery.size} href={(page) => listHere({ page })} label={`${p.name} recipe pages`} />;
   const trail = trailFor(path)!;
@@ -314,12 +380,12 @@ export default async function ProfessionPage(props: Props) {
       <EdgeDegraded when={view.unreachable === true || gathered.down || crafting?.ok === false} />
       <PageHeader
         trail={trail}
-        title={gathering ? `${p.name} gathering` : `${p.name} profession guide`}
+        title={gathering ? `${p.name} gathering` : `${p.name} profession reference`}
         icon={icons.get(p.name.toLowerCase()) ? <GameIcon src={icons.get(p.name.toLowerCase())!} size={40} /> : undefined}
         lede={p.slug === "herbalism"
           ? "Find herb gathering areas from player uploads. Herbalism crafts new in Forever are listed below."
           : gathering ? `Find ${p.name} zones, materials and trainers reported by WoW: Forever players.`
-            : `Plan your ${p.name} crafts and shopping list for WoW: Forever.`}
+            : `Browse ${p.name} recipes, crafting margins, and skill ranges reported by players.`}
         meta={<>
           <span className="font-mono tabular-nums">{plural(p.recipes.length, "recipe")}</span>
           <span>Game files, build {RECIPES_BUILD}</span>
@@ -331,20 +397,14 @@ export default async function ProfessionPage(props: Props) {
         actions={<>
           {ledgerAt && <a className="btn" href="#ahledger-margins">Crafting margins</a>}
           <a className="btn" href="#prof-recipes">Recipes</a>
-          <a className="btn" href="#prof-path">Leveling and shopping</a>
         </>}
       />
       <ClassContextChip read={read} here={withoutClassContext(path, searchParams)} className="-mt-2 mb-6" />
 
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
+        {reference && <ProfessionViewTabs path={path} reference initialQuery={queryString(searchParams)} referenceParams={REFERENCE_PARAMS} referenceAnchors={REFERENCE_ANCHORS} />}
         {gatheringGuide}
-        {guide && <LevelingGuide profession={p.name} recipes={guide.recipes} items={guideItems}
-          from={fromSkill} to={toSkill} initialMode={mode}
-          contextFields={context ? classContextParams(context) : undefined}
-          initialRealm={one(searchParams.realm)} initialHouse={one(searchParams.house)}
-          initialModeled={one(searchParams.estimate) !== "0"}
-          vendor={guide.vendorBuyCopper} vendorNpcs={guide.vendorNpcIds} disenchants={disenchants} rankStops={guide.rankStops} />}
         {ledgerAt && (
           <div id="ahledger-margins" className="scroll-mt-24">
             <AhledgerCrafting profession={p.name} market={ledgerAt.market} read={crafting} path={path} search={searchParams} spellIcon={(id) => assets?.spellIcons.get(id)} picker={ledgerAt.picker} none={ledgerAt.none} />

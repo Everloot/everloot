@@ -395,7 +395,7 @@ describe("the profession hubs", () => {
     // The cross keeps the skill range.
     expect(withContext).toContain('href="/tools/professions/tailoring?from=1&amp;to=75"');
     // The profession picker and the form carry the context on.
-    expect(withContext).toContain('href="/tools/professions/alchemy?class=mage&amp;level=25"');
+    expect(withContext).toContain('value="/tools/professions/alchemy?class=mage&amp;level=25"');
     expect(withContext).toMatch(/<input[^>]*name="class"[^>]*value="mage"/);
     expect(withContext).toMatch(/<input[^>]*name="level"[^>]*value="25"/);
     // Nothing else says anything about the class: no skill-up claim for a Mage.
