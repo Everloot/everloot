@@ -590,3 +590,15 @@ test("an item's Sold by rows give the day as Nov 25, 2026, and the line above pa
     observed.edges = [];
   }
 });
+
+test("on a phone the active filters show under the Filters button as chips, each a link that drops that filter alone", async () => {
+  const page = await html(SubclassPage(sub("armor", "plate", { slot: "feet", quality: "epic" })));
+  const row = /<p data-filter-chips[^>]*>([\s\S]*?)<\/p>/.exec(page);
+  expect(row).not.toBeNull();
+  // Shown below 640 px only: from there the menus show their own choices.
+  expect(row![0]).toMatch(/class="[^"]*sm:hidden/);
+  expect(row![1]).toMatch(/<a href="\/database\/items\/armor\/plate\?quality=epic"[^>]*>Feet<span aria-hidden="true">×<\/span><span class="sr-only">\(remove\)<\/span><\/a>/);
+  expect(row![1]).toMatch(/<a href="\/database\/items\/armor\/plate\?slot=feet"[^>]*>Epic<span aria-hidden="true">×/);
+  const plain = await html(SubclassPage(sub("armor", "plate")));
+  expect(plain).not.toContain("data-filter-chips");
+});

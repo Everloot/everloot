@@ -85,3 +85,32 @@ test("Used in gives each recipe's skill levels too", async () => {
   expect(used).toMatch(th("Yellow"));
   expect(used).toMatch(td("15"));
 });
+
+const quest = (installId: string, questId: number, itemId: number) => ({ kind: "quest", installId, eventId: `q:${n++}`, capturedAt: AT, questId, title: "Return to Sender", level: 10, giverNpcId: 77, rewardItemIds: [itemId] });
+/** One quick fact's markup, from its label to the end of its value; "" when the page has no such fact. */
+const factOf = (html: string, label: string) => {
+  const at = html.indexOf(`>${label}</dt>`);
+  return at < 0 ? "" : html.slice(at, html.indexOf("</dd>", at));
+};
+
+test("Get it from links the quests 3 installs saw reward the item", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: AT, records: INSTALLS.map((i) => quest(i, 5, 159)) });
+  expect(factOf(await render("159"), "Get it from")).toContain('href="/database/quests/5"');
+});
+
+test("Made from links the items its recipe takes, from the game files", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, dataAsOf: AT, records: [] });
+  // Rough Sharpening Stone (2862) is made from one Rough Stone (2835).
+  expect(factOf(await render("2862"), "Made from")).toContain('href="/database/items/2835"');
+  expect(factOf(await render("2835"), "Made from")).toBe("");
+});
+
+test("items sharing the icon sit under the relations, not in a tab ahead of them", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, dataAsOf: AT, records: [] });
+  // 2862 has a recipe (Created by) and shares its icon file with other items.
+  const html = await render("2862");
+  expect(html).not.toMatch(/id="[^"]*-tab-related"/);
+  const section = /<section[^>]*aria-labelledby="same-icon"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+  expect(section).toContain(">Same icon<");
+  expect(html.indexOf('aria-labelledby="same-icon"')).toBeGreaterThan(html.indexOf("-panel-created-by"));
+});
