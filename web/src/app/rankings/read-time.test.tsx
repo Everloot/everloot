@@ -50,8 +50,9 @@ test("the guild gear tooltip says what the average covers and when, in one sente
     memberCount: 40, membersRead: 30, averageItemLevel: 52.4, level60: 12, fetchedAt: "2026-11-23T03:44:00.000Z",
   };
   const html = renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [guild] }} raids={null} region={null} />);
-  expect(html).toContain("Average across the members the armory has read (Nov 23, 2026, 03:44 UTC).");
+  expect(html).toContain("Average item level 52.4 across the members the armory has read (Nov 23, 2026, 03:44 UTC).");
+  expect(html).not.toContain("Average item level: ");
   expect(html).not.toContain("guild members read.");
   const unread = renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [{ ...guild, fetchedAt: null as unknown as string }] }} raids={null} region={null} />);
-  expect(unread).toContain("Average across the members the armory has read. Read time unrecorded.");
+  expect(unread).toContain("Average item level 52.4 across the members the armory has read. Read time unrecorded.");
 });
