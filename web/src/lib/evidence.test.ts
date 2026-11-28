@@ -115,6 +115,13 @@ describe("the lines the other entity pages carry", () => {
     expect(observedLine([null], null, NOW, [])).toBe("No player has reported it yet.");
   });
 
+  test("QA round 15: a name some installs reported, short of 3, says how many beside its meter, not that nobody did", () => {
+    expect(observedLine([null], null, NOW, [], 1)).toBe("1 install reported this name; it needs 3.");
+    expect(observedLine([null], null, NOW, [], 2)).toBe("2 installs reported this name; it needs 3.");
+    // Other reports lead; the name's count is not repeated there.
+    expect(observedLine(["1 map position"], null, NOW, [], 1)).toBe("Players reported 1 map position.");
+  });
+
   test("the date rides along when there is one", () => {
     expect(observedLine(["1 map position"], "2026-10-20T09:00:00.000Z", NOW)).toBe("Players reported 1 map position, last seen 3 h ago.");
   });

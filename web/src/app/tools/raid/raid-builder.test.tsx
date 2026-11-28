@@ -2,8 +2,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { CURRENT_BUILD } from "@/data/game-data/raid";
-import { emptySlots, encodeRaid } from "@/lib/raid";
+import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
+import { emptySlots, encodeRaid, suggestNext, titleCase } from "@/lib/raid";
 import RaidBuilder from "./RaidBuilder";
 import { track } from "@/lib/analytics/track";
 
@@ -237,6 +237,20 @@ test("coverage: missing buffs as chips first, the full table behind a closed dis
   expect(details.querySelector("dl")!.textContent).toContain("No class you picked brings it.");
 });
 
+test("under the missing chips, a Suggested next line names the class that would bring the most of them", async () => {
+  await render();
+  expect(container.querySelector("[data-raid-suggest]")).toBeNull();
+  await dragTo(tile("Warrior"), slot(0));
+  const slots = emptySlots(20);
+  slots[0] = { class: "warrior", tree: 0 };
+  const next = suggestNext(slots, TABLES[CURRENT_BUILD]);
+  expect(next.classes.length).toBeGreaterThan(0);
+  const line = container.querySelector("[data-raid-suggest]")!.textContent!;
+  expect(line).toMatch(/^Suggested next: /);
+  for (const c of next.classes) expect(line).toContain(titleCase(c));
+  expect(line).toMatch(new RegExp(`brings? ${next.count} of the missing`));
+});
+
 test("a party buff in one group is missing only for the others, by group", async () => {
   await render();
   await dragTo(tile("Paladin"), slot(0));
@@ -305,7 +319,7 @@ test("the Missing count is the buffs and debuffs the summary calls missing, adde
   await dragTo(tile("Warrior"), slot(0));
   const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
   const buffs = Number(/(\d+) missing\.\s*Debuffs/.exec(note)?.[1]);
-  const debuffs = Number(/Debuffs: \d+ of \d+, \d+ if talented, (?:\d+ unknown reach, )?(\d+) missing/.exec(note)?.[1]);
+  const debuffs = Number(/Debuffs, \d+ in all: \d+ yes, \d+ if talented, (?:\d+ unknown reach, )?(\d+) missing/.exec(note)?.[1]);
   // The heading names both kinds, so it never reads as more buffs missing than the summary's count.
   const heading = container.querySelector("#raid-missing")!.textContent!;
   expect(heading).toMatch(/^Missing buffs and debuffs \(\d+\)$/);
@@ -333,9 +347,20 @@ test("the debuff summary says how many a talent could bring, as the buff summary
   await dragTo(tile("Mage"), slot(1));
   const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
   // Winter's Chill comes only through a Frost talent: "if talented", never counted in with the missing.
-  const m = /Debuffs: (\d+) of (\d+), (\d+) if talented, (?:(\d+) unknown reach, )?(\d+) missing\./.exec(note);
+  const m = /Debuffs, (\d+) in all: (\d+) yes, (\d+) if talented, (?:(\d+) unknown reach, )?(\d+) missing\./.exec(note);
   expect(m, note).not.toBeNull();
-  const [covered, total, possible, unknown, missing] = [m![1], m![2], m![3], m![4] ?? "0", m![5]].map(Number);
+  const [total, covered, possible, unknown, missing] = [m![1], m![2], m![3], m![4] ?? "0", m![5]].map(Number);
   expect(possible).toBeGreaterThan(0);
   expect(covered + possible + unknown + missing).toBe(total);
+});
+
+test("QA round 15: the buff line gives the total first, and its parts (yes, by cast, if talented, unknown, missing) add up to it", async () => {
+  await render();
+  await dragTo(tile("Priest"), slot(0));
+  await dragTo(tile("Mage"), slot(1));
+  const note = container.querySelector('[aria-labelledby="raid-coverage"]')!.textContent!;
+  const m = /Buffs for the whole raid, (\d+) in all: (\d+) yes, (\d+) by cast, (\d+) if talented, (\d+) unknown reach, (\d+) missing\./.exec(note);
+  expect(m, note).not.toBeNull();
+  const [total, ...parts] = m!.slice(1).map(Number);
+  expect(parts.reduce((a, b) => a + b, 0)).toBe(total);
 });

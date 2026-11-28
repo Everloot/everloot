@@ -15,6 +15,8 @@ import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
+import { zoneNamingPlaces } from "@/lib/places";
+import { zoneHref } from "@/lib/zones";
 import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { EMPTY, EmptyTab, EntityPage, LINK, Unreachable } from "../../entity";
@@ -96,6 +98,12 @@ export default async function AchievementPage(props: Props) {
     <span>{path.map((step, i) => <span key={step.id}>{i > 0 && " › "}<Link href={categoryHref(step.name)} className={LINK}>{step.name}</Link></span>)}</span>
   ) : category && <Link href={categoryHref(category)} className={LINK}>{category}</Link>;
   const faction = files?.faction ? `${files.faction} only` : null;
+  // An exploration achievement's zone: the one released zone whose game-file places most criteria name. Each criterion
+  // it names links to that zone page's Places tab, where the place is listed.
+  const explored = zoneNamingPlaces(fileCriteria.map((c) => c.text));
+  const exploredHref = explored ? zoneHref(explored.zone.mapId, explored.zone.name) : null;
+  const criterionText = (text: string) => (explored && explored.places.has(text.trim().toLowerCase())
+    ? <Link href={`${exploredHref}#places`} className={LINK}>{text}</Link> : text);
   const assets = files ? await loadSiteAssets() : null;
   const icon = assets?.achievementIcons.get(id);
   const rewardItem = files?.rewardItem;
@@ -103,6 +111,7 @@ export default async function AchievementPage(props: Props) {
   const facts: { label: string; value: ReactNode; numeric?: boolean }[] = [
     { label: "Category", value: categoryLinks || null },
     ...(faction ? [{ label: "Faction", value: faction }] : []),
+    ...(explored ? [{ label: "Zone", value: <Link href={exploredHref!} className={LINK}>{explored.zone.name}</Link> }] : []),
     { label: "Points", value: points === 0 ? NO_POINTS : points, numeric: points !== 0 },
     { label: "Criteria", value: criteria, numeric: true },
     { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
@@ -114,7 +123,7 @@ export default async function AchievementPage(props: Props) {
   const state = confirmedCell(listed ?? { confirmed: false }, catalog?.confirmations ?? false);
   const asOf = asOfLine(catalog?.dataAsOf ?? null, Date.now());
   const summary = entry || files ? [
-    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet" : pointsText(points).toLowerCase()}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
+    `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : category ? `An achievement in ${category}` : "An achievement"}, ${points === null ? "points not reported yet, " : points === 0 ? "" : `${pointsText(points).toLowerCase()}, `}${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
     entry
       ? fileCriteria.length && !fromReports ? `The category and points are as three installs reported them; the criteria and their count are the game files' (build ${fileVersion}), unconfirmed.`
       : `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
@@ -134,12 +143,13 @@ export default async function AchievementPage(props: Props) {
       box={entry ? (
         <TooltipFrame name={title} label={`${title}, as players reported it`}>
           <p>{entry.category}</p>
-          <p>{pointsText(entry.points)}</p>
+          {entry.points !== 0 && <p>{pointsText(entry.points)}</p>}
         </TooltipFrame>
       ) : files && (
         <TooltipFrame name={title} label={`${title}, from the game files`}>
           <p aria-hidden={!files.description} className={files.description ? "" : "text-muted"}>{files.description ?? "The game files give no text for it"}</p>
-          <p>{pointsText(files.points)}</p>
+          {/* No points is said once, in the facts. */}
+          {files.points !== 0 && <p>{pointsText(files.points)}</p>}
         </TooltipFrame>
       )}
       facts={(entry || files) && facts}
@@ -154,7 +164,7 @@ export default async function AchievementPage(props: Props) {
             columns={filledColumns<Criterion & { i: number }>([
               {
                 key: "text", header: "Criterion",
-                cell: (c: Criterion) => (fromReports ? c.text : <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{c.text}</span>),
+                cell: (c: Criterion) => (fromReports ? criterionText(c.text) : <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{criterionText(c.text)}</span>),
               },
               { key: "required", header: "Required", numeric: true, blank: (c) => !(c.required > 1), cell: (c: Criterion) => (c.required > 1 ? c.required : null) },
             ], fileCriteria.map((c, i) => ({ ...c, i })))}

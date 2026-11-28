@@ -165,7 +165,7 @@ test("an achievement from the files: its icon, the category path linking the lis
   expect(out).toContain('href="/database/achievements?category=Adventure"');
   expect(out).toContain('href="/database/achievements?category=Eastern+Kingdoms"');
   expect(factOf(out, "Faction")).toBe("Alliance only");
-  expect(out).toContain("An achievement in Eastern Kingdoms, no points in this game, 0 criteria.");
+  expect(out).toContain("An achievement in Eastern Kingdoms, 0 criteria.");
   expect(out).toContain("The name, category, points and criteria are from the game files of build 1.15.8.70862, unconfirmed.");
 });
 
@@ -210,4 +210,28 @@ test("a raid kill installs report with 0 criteria counts the one criterion the f
   expect(out).toContain("Onyxia");
   expect(factOf(out, "Criteria")).toBe("1");
   expect(out).toContain("An achievement in Raids, 1 point, 1 criterion.");
+});
+
+test("an exploration achievement links its zone, and each criterion the zone's places name to the zone page's Places tab", async () => {
+  game.achievements["728"] = { title: "Explore Durotar", points: 0, criteria: [{ text: "Razor Hill" }, { text: "Valley of Trials" }, { text: "Echo Isles" }, { text: "Nowhere Special" }] };
+  const out = await html("728-explore-durotar");
+  expect(factOf(out, "Zone")).toContain('href="/database/zones/1411-durotar"');
+  expect(out).toContain('<a href="/database/zones/1411-durotar#places">Razor Hill</a>');
+  expect(out).toContain('<a href="/database/zones/1411-durotar#places">Echo Isles</a>');
+  // A criterion the zone's places do not name stays plain text.
+  expect(out).not.toMatch(/<a [^>]*>Nowhere Special<\/a>/);
+});
+
+test("criteria that name no zone's places link nothing and add no Zone row", async () => {
+  game.achievements["729"] = { title: "Odd Jobs", points: 5, criteria: [{ text: "Razor Hill" }, { text: "Kill 10 boars" }, { text: "Win a duel" }] };
+  const out = await html("729-odd-jobs");
+  expect(out).not.toContain(">Zone</dt>");
+  expect(out).not.toContain("#places");
+});
+
+test("no points is said once, in the facts, not again in the box or In short", async () => {
+  game.achievements["728"] = { title: "Explore Durotar", points: 0, criteria: [{ text: "Razor Hill" }] };
+  const out = await html("728-explore-durotar");
+  expect(out.split("No points in this game")).toHaveLength(2);
+  expect(factOf(out, "Points")).toContain("No points in this game");
 });

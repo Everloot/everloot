@@ -76,7 +76,7 @@ test("one compact title row: the name Changes, one intro line, the latest build 
   const html = await page();
   expect(html).toMatch(/<h1[^>]*>Changes<\/h1>/);
   expect(html).toContain("Blue posts, hotfixes and new game builds, newest first.");
-  expect(html).toContain("Latest build: WoW: Forever 1.60.1.70460, first seen by Everloot on 2026-10-17.");
+  expect(html).toContain("Latest build: WoW: Forever 1.60.1.70460, first seen by Everloot on Oct 17, 2026.");
   expect(html).toMatch(/<a href="\/changes\/feed.xml"[^>]*>RSS<\/a>/);
   // Everloot's own write-ups are one click away.
   expect(html).toMatch(/<a href="\/news"[^>]*>Everloot news<\/a>/);

@@ -187,10 +187,10 @@ test("players' reports keep their evidence: the entrance and each boss 3 install
     ],
   });
   const html = await render("test-dungeon");
-  expect(section(html, "at-a-glance")).toMatch(/<dt[^>]*>Confirmed entrance<\/dt><dd[^>]*>[\s\S]*>Westfall<\/a>[\s\S]*>38, 77<\/a>[\s\S]*from 3 installs, last seen 2026-10-19/);
+  expect(section(html, "at-a-glance")).toMatch(/<dt[^>]*>Confirmed entrance<\/dt><dd[^>]*>[\s\S]*>Westfall<\/a>[\s\S]*>38, 77<\/a>[\s\S]*from 3 installs, last seen Oct 19, 2026/);
   const bosses = section(html, "bosses");
   expect(bosses).toContain(">Bosses</h2>");
-  expect(bosses).toContain("Edwin VanCleef (4 kills) from 3 installs, last seen 2026-10-21");
+  expect(bosses).toContain("Edwin VanCleef (4 kills) from 3 installs, last seen Oct 21, 2026");
   expect(html).not.toContain("Not-yet-public name");
 });
 

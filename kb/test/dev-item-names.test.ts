@@ -17,7 +17,7 @@ test("a spell name with Test as a word is a leftover; the quest spells named Tes
 
 test("names the game files keep for development items are leftovers", () => {
   for (const name of [
-    "Deprecated Copper Ingot", "DEPRECATED ITEM", "OLD Stormwind Seasoning Salts", "OLDRecruit's Belt", "(OLD)Medium Throwing Knife",
+    "Deprecated Copper Ingot", "Depricated Sharp Arrow", "DEPRECATED ITEM", "OLD Stormwind Seasoning Salts", "OLDRecruit's Belt", "(OLD)Medium Throwing Knife",
     "[PH] Naxxramas Sword", "Doomcaller's Handwraps [PH]", "Monster - Shield, Kite Metal", "Test Defense Chest", "test Eric Shirt",
     "TEST QUEST HELM", "AHNQIRAJ TEST ITEM A CLOTH LEGS", "Unused Black Night Elf Pants", "UNUSED - Cloak of Arcane Insulation",
     "QA Tabard of Weighted Dice", "zzOLD Bracers", "NPC Equip 1", "Ring of Righteous Flame (TEST)", "Plate Shoulderpad (Test)",

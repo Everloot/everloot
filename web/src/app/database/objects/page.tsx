@@ -8,7 +8,7 @@ import { loadObjectFacts, OBJECT_KIND_LABELS, objectTraits, type ObjectTraits } 
 import { objectNames } from "@/lib/names";
 import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
-import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, plural, pageParams, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, plural, pageParams, sortRows, twinDetails, TwinDetail, Unreadable, type ListQuery, type Search } from "../list-parts";
 
 const META = {
   title: "WoW Forever objects: chests, herbs and ore",
@@ -63,6 +63,8 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const rows = byRank(sortRows(matched, key, sort.desc, (o) => o.objectId), ranked, Boolean(q.sort));
   const { shown, pages, per } = paged(rows, q);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
+  // Names that repeat on this page (two Battered Chests) say their zone beside the name, or their ID when that is the same.
+  const twins = twinDetails(shown, (o) => names.get(o.objectId), (o) => o.objectId, [zoneOf]);
 
   const dash = <span className="text-muted">—</span>;
   const columns: Column<Row>[] = [
@@ -71,7 +73,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
       // An object with no agreed name is listed by its id, with a line saying why.
       return (
         <span title={name ? undefined : NO_NAME}>
-          <NameCell href={`/database/objects/${o.objectId}`} after={!name && <span className="text-meta text-muted">no agreed name yet</span>}>{name ?? `Object ${o.objectId}`}</NameCell>
+          <NameCell href={`/database/objects/${o.objectId}`} after={!name ? <span className="text-meta text-muted">no agreed name yet</span> : twins.has(o.objectId) && <TwinDetail>{twins.get(o.objectId)}</TwinDetail>}>{name ?? `Object ${o.objectId}`}</NameCell>
         </span>
       );
     } },

@@ -19,7 +19,9 @@ import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
-import { loreFor } from "@/lib/lore-links";
+import { loreForShownQuest } from "@/lib/lore-links";
+import { loadEdges } from "@/lib/edges";
+import { edgesTo } from "@kb/edges";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -67,8 +69,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const [facts, wiki] = await Promise.all([loadWorldFacts(), loadQuestNames(CLIENT_LAYER.build.version)]);
-  const page = questPage(Number(params.id), facts);
-  if (unknownQuest(page.questId, facts, wiki)) notFound();
+  const agreed = questPage(Number(params.id), facts);
+  if (unknownQuest(agreed.questId, facts, wiki)) notFound();
+  // The rewards 3 installs agree on, and any item whose own page lists this quest under "Reward from" (the same
+  // 3-install rule, read from the relations table), so the two pages always link each other.
+  const edges = facts.unreachable ? null : await loadEdges();
+  const linked = edges ? edgesTo(edges.observed, "quest", agreed.questId).filter((e) => e.rel === "reward_from" && e.fromKind === "item").map((e) => e.fromId) : [];
+  const page = { ...agreed, rewards: [...new Set([...agreed.rewards, ...linked])].sort((a, b) => a - b) };
   // Side, category and type (tag, group size), each once 3 installs agree; nothing guessed from the title or giver.
   const traits = facts.unreachable ? questTraits([]) : questTraits(facts.quests.filter((r) => r.questId === page.questId && r.installId.trim()), facts);
   const typeLabel = questTypeLabel(traits);
@@ -101,7 +108,8 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const assets = page.rewards.length > 0 || marks.length > 0 || starters.length > 0 ? await loadSiteAssets() : null;
   const mapZones = entityMapZones(marks, assets?.maps);
   const tips = await loadItemTips(assets, [...(facts.unreachable ? [] : page.rewards), ...starters]);
-  const lore = !facts.unreachable && page.title ? await loreFor("quest", page.questId, page.title) : null;
+  // By the title the page shows, players' or the Warcraft Wiki's, as item pages ask for theirs.
+  const lore = await loreForShownQuest(page.questId, reported ? { name: reported, source: "players" } : wikiTitle ? { name: wikiTitle, source: "wiki" } : null, wiki?.names);
   const trail = [...trailFor("/database/quests")!, { name: title, path: `/database/quests/${page.questId}` }];
   const people: Person[] = facts.unreachable ? [] : [
     ...(page.giverNpcId !== null ? [{ role: "Start", npcId: page.giverNpcId, map: where(page.giverNpcId) }] : []),

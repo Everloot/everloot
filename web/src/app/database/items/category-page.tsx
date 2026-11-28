@@ -22,7 +22,7 @@ import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
-import { Respelled, LEVEL_BRACKETS, NameCell, paged } from "../list-parts";
+import { Respelled, LEVEL_BRACKETS, NameCell, paged, twinDetails, TwinDetail } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -220,6 +220,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const assets = wide ? wideAssets : shownIds.length ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, shownIds);
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
+  // Names that repeat on this page (three Defiler's Lamellar Greaves) say their item level beside the name, or their ID.
+  const twins = twinDetails(shown, (row) => names.get(row[0])?.name, (row) => row[0], [(row) => (tips.get(row[0])?.level ? `Item level ${tips.get(row[0])!.level}` : null)]);
   // A named row the files give only an icon for (no tooltip) draws that icon, as its page does, not the question mark.
   const bare = shownIds.filter((id) => !tips.get(id)?.icon && names.get(id));
   const iconOnly = assets && bare.length ? await loadItemIcons(assets, bare) : new Map<number, string>();
@@ -255,7 +257,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined}
             tone={colour}
             style={name?.color ? { color: name.color } : undefined}
-            after={name?.source === "players" && <span className="sr-only"> ({NAME_TITLE.players.toLowerCase()})</span>}
+            after={<>
+              {name?.source === "players" && <span className="sr-only"> ({NAME_TITLE.players.toLowerCase()})</span>}
+              {twins.has(row[0]) && <TwinDetail>{twins.get(row[0])}</TwinDetail>}
+            </>}
             files={unconfirmed}
           >
             {name?.name ?? `Item ${row[0]}`}

@@ -1,4 +1,5 @@
 import type { ChangeEntry } from "./changes";
+import { utcDay } from "./time";
 
 /** The newest WoW: Forever build Everloot has seen, or null when none is recorded. Entries are newest first. */
 export function latestForeverBuild(entries: ChangeEntry[]): ChangeEntry | null {
@@ -9,5 +10,5 @@ export function latestForeverBuild(entries: ChangeEntry[]): ChangeEntry | null {
 export function latestBuildLine(entries: ChangeEntry[]): string {
   const build = latestForeverBuild(entries);
   if (!build?.version) return "No WoW: Forever build is recorded yet.";
-  return `Latest build: WoW: Forever ${build.version}, first seen by Everloot on ${build.at.slice(0, 10)}.`;
+  return `Latest build: WoW: Forever ${build.version}, first seen by Everloot on ${utcDay(build.at) ?? build.at.slice(0, 10)}.`;
 }

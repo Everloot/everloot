@@ -4,6 +4,7 @@ import { track } from "@/lib/analytics/track";
 import { parseEverlootLua, parsePolestarTable } from "@/lib/sv-parse";
 import { convertRecorder, type RecorderPayload } from "@/lib/polestar-recorder";
 import { censusSummary, prepareUpload, sendBatches, type SharingChoices, type UploadSession } from "@/lib/upload-batches";
+import { recordKindLabel } from "@/lib/record-kind-labels";
 import { contributionFiles } from "@/lib/ops/attribution-input";
 import type { SharingCategory } from "@kb/publication";
 import { parseSettledList, settledSkip, type SettledList } from "@kb/settled-list";
@@ -184,7 +185,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         <SectionHeading>Preview — selected records to send</SectionHeading>
         <ul className="grid sm:grid-cols-2 gap-2 text-sm">
           {Object.entries(prepared.value.counts).map(([kind, count]) => <li key={kind} className="flex justify-between rounded-control bg-canvas/60 px-3 py-2">
-            <span className="text-fg-2">{kind}</span><span className="text-accent font-semibold">{count}</span>
+            <span className="text-fg-2">{recordKindLabel(kind)}</span><span className="text-accent font-semibold">{count}</span>
           </li>)}
         </ul>
         {recorder && <div className="mt-3 text-sm text-fg-2">
@@ -222,7 +223,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         <p className="mt-3 text-sm text-fg-2">{prepared.value.held.legacy} legacy records without event IDs, {prepared.value.held.named} unchecked named records, and {prepared.value.held.invalid} invalid records stay out of this upload. Keep your original file.</p>
         {prepared.value.held.links > 0 && <p className="mt-1 text-sm text-fg-2">Character link codes never go in an upload. The Everloot Desktop App, signed in to your account, sends them to your account.</p>}
         {prepared.value.held.local > 0 && <p className="mt-1 text-sm text-fg-2">Your professions, talents, character stats, PvP standing, raid lockouts and boss kills never go in an upload. They stay in your file. The Everloot Desktop App can sync your raid lockouts to your account.</p>}
-        <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} batches. A storage receipt confirms saved records. A batch whose every record is rejected is processed without saving its records, so later batches can continue. Named choices are checked against the grant on the server.</p>
+        <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} {prepared.value.batches.length === 1 ? "batch" : "batches"}. A storage receipt confirms saved records. A batch whose every record is rejected is processed without saving its records, so later batches can continue. Named choices are checked against the grant on the server.</p>
         {isSample && <p className="mt-3 text-sm text-fg-2">This is a sample, to show what an upload holds. It is never sent. Choose your own file to upload.</p>}
         <button disabled={busy || isSample || !prepared.value.batches.length || complete} onClick={() => void send()} className={outlineButton + " mt-4"}>
           {isSample ? "Samples are not sent" : sending ? "Sending…" : complete ? rejected ? "Upload processed" : "Upload complete" : session?.next ? "Resume upload" : "Send upload"}

@@ -10,6 +10,7 @@ import {
   GUILD_DIRECTORY_PAGE, GUILD_SORTS, guildDirectoryHref, guildDirectoryQuery, loadGuildDirectory, rulesetSlug, type GuildDirectoryQuery, type GuildSortSlug,
 } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
+import { utcDay } from "@/lib/time";
 import {
   factionLabel, guildPath, guildSearchPrefix, guildsOn, LADDER_LINE, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, RAIDS_LINE, raidsOpen, realmPath, START_LINE,
   type BossFirst, type LadderQuery, type RankedRow,
@@ -110,7 +111,7 @@ function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
     // A hover title, not a Tooltip button: the header is already the column's sort link.
     { key: "l60", header: <span title={LEVEL_60_READ_TIP}>Level 60 read</span>, numeric: true, sortable: true, cell: (g) => number(g.level60) },
     // Numeric cells already set figures in mono (dt-num).
-    { key: "at", header: "Last read", numeric: true, cell: (g) => day(g.fetchedAt) || muted("—") },
+    { key: "at", header: "Newest read", numeric: true, cell: (g) => utcDay(g.fetchedAt) ?? muted("—") },
   ];
   // Before the directory's migration only the name, region, faction and roster size are known.
   return counted ? all : all.filter((c) => ["name", "where", "faction", "roster"].includes(c.key));
@@ -148,6 +149,27 @@ function directoryControls(d: GuildDirectoryQuery): FilterControl[] {
       ],
     },
   ];
+}
+
+/**
+ * On a phone the menus fold into one "Filters (n)" button, so the region and ruleset that are on show under it as
+ * chips, each a link to the directory without that one filter (the item lists do the same).
+ */
+function DirectoryChips({ d }: { d: GuildDirectoryQuery }) {
+  const chips = [
+    ...(d.region ? [{ label: regionLabel(d.region), href: guildDirectoryHref({ ...d, page: 1, region: null }) }] : []),
+    ...(d.ruleset !== null ? [{ label: ARMORY_RULESETS.find((r) => r.id === d.ruleset)?.label ?? "", href: guildDirectoryHref({ ...d, page: 1, ruleset: null }) }] : []),
+  ];
+  if (!chips.length) return null;
+  return (
+    <p data-filter-chips className="flex flex-wrap items-center gap-2 sm:hidden">
+      {chips.map((c) => (
+        <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
+          {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
+        </Link>
+      ))}
+    </p>
+  );
 }
 
 /** The guild hide list, or null when it could not be read (then the directory lists no guild). */
@@ -241,7 +263,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <Disclosure summary="How this is counted">
-                <p className="text-sm">{`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}</p>
+                <p className="text-sm">{`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} Newest read is the latest day the armory read the guild's roster or any of its members; the guild page's Roster read is the roster's own day, so it can be older. A character who asked to be hidden is not counted.`}</p>
               </Disclosure>
               <FilterBar
                 label="Directory filters"
@@ -252,6 +274,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                   <ResultStrip total={dir.total} noun={scanned && !scanned.complete ? "guilds found" : "guilds"} page={d.page} perPage={GUILD_DIRECTORY_PAGE} href={(page) => guildDirectoryHref({ ...d, page })} />
                 )}
               />
+              <DirectoryChips d={d} />
               {dir.state === "not-ready" && (
                 <p role="status" className="text-sm text-fg-2">
                   Counts and sorting start once the directory&apos;s database update is applied.

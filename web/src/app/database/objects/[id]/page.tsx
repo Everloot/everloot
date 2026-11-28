@@ -11,6 +11,8 @@ import { entityTitle, objectDescription } from "@/lib/entity-meta";
 import { formatMeasuredZero } from "@kb/item-page";
 import { loadObjectFacts, OBJECT_KIND_LABELS, objectTraits, skillRangeText } from "@/lib/objects";
 import { zoneHref } from "@/lib/zones";
+import { professionByName, professionHref } from "@/lib/professions";
+import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { qualityNamed } from "@/components/ui/quality";
@@ -53,6 +55,9 @@ const columns = (tips: Tips): Column<ObjectDrop>[] => [
   { key: "installs", header: "Installs", numeric: true, cell: (d) => d.reporters },
 ];
 
+/** The profession that gathers each kind; a chest needs none. */
+const GATHER_PROFESSION: Partial<Record<string, string>> = { herb: "Herbalism", ore: "Mining", fishing: "Fishing" };
+
 export default async function ObjectPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
@@ -70,6 +75,13 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   const traits = facts.unreachable ? undefined : objectTraits(facts, page.objectId).get(page.objectId);
   const kind = traits?.kind ? OBJECT_KIND_LABELS[traits.kind] : null;
   const zones = traits?.zones ?? [];
+  // The profession that gathers it, by the kind 3 installs agree on: its page on the site.
+  const profession = traits?.kind ? professionByName(GATHER_PROFESSION[traits.kind] ?? "") : undefined;
+  // Items a loot window held on average, stacks counted (the rollup's units), once every item's rate is public (3 installs).
+  const rates = facts.unreachable ? [] : facts.rates.filter((r) => r.sourceObjectId === page.objectId && r.reporters > 0);
+  const units = rates.flatMap((r) => ("units" in r && typeof r.units === "number" ? [r.units] : []));
+  const perWindow = rates.length && windows && units.length === rates.length && rates.every((r) => r.reporters >= INDEPENDENT_INSTALLS)
+    ? (units.reduce((sum, u) => sum + u, 0) / windows).toFixed(1) : null;
   const zoneLinks = zones.length ? <span>{zones.map((z, i) => <span key={z.mapId}>{i > 0 && ", "}<Link href={zoneHref(z.mapId, z.name)} className={LINK}>{z.name}</Link></span>)}</span> : null;
   const assets = pins.length || page.drops.length ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.drops.map((d) => d.itemId));
@@ -106,8 +118,10 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         { label: "Type", value: known(kind) },
         // What players had when they gathered it, not what the game requires: the client files tie no skill to an object.
         ...(traits?.skill ? [{ label: "Players' skill", value: skillRangeText(traits.skill) }] : []),
+        ...(profession ? [{ label: "Profession", value: <Link href={professionHref(profession.slug)} className={LINK}>{profession.name}</Link> }] : []),
         { label: zones.length > 1 ? "Zones" : "Zone", value: zoneLinks ?? known(null) },
         { label: "Loot windows", value: known(windows), numeric: true },
+        ...(perWindow ? [{ label: "Items per loot window", value: perWindow, numeric: true }] : []),
         { label: "Items seen", value: known(page.zero ? "None" : page.drops.length || null), numeric: true },
         { label: "Map positions", value: known(page.pins?.length || null), numeric: true },
       ]}

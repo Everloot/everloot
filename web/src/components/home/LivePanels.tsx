@@ -7,6 +7,7 @@ import { Movers, Swatch, percent } from "@/app/rankings/parts";
 import { Progress } from "@/app/guilds/parts";
 import { guildPath, LADDER_LINE, START_LINE as LADDER_START_LINE } from "@/lib/guilds";
 import { COLLECTING_LINE, START_LINE as RANKINGS_START_LINE } from "@/lib/rankings";
+import { utcDay } from "@/lib/time";
 import type { HomeFact, HomeLadder, HomeWeek } from "@/lib/home-live";
 
 /**
@@ -43,7 +44,7 @@ export function NewestPanel({ facts, id = "live-newest", title = "Newly confirme
                 <span className="ml-1.5 text-cell-2 text-muted">{KIND[f.kind]}</span>
               </span>
               <time dateTime={f.publicAt} className="shrink-0 font-mono text-cell-2 tabular-nums text-fg-2" title={f.estimated ? "Estimated: the third report's capture day" : undefined}>
-                {f.publicAt.slice(0, 10)}{f.estimated && <span className="text-muted"> est.</span>}
+                {utcDay(f.publicAt) ?? f.publicAt.slice(0, 10)}{f.estimated && <span className="text-muted"> est.</span>}
               </time>
             </li>
           ))}
@@ -84,7 +85,7 @@ function LadderPanel({ ladder }: { ladder: HomeLadder | null }) {
 
 function WeekPanel({ week }: { week: HomeWeek | null }) {
   // The census page opens on a rolling 7 days, this panel on the calendar week: say so, so the shares do not read as a contradiction.
-  const label = week?.week ? (week.week.current ? `So far this week, from ${week.week.start}.` : `Week of ${week.week.start}.`) : undefined;
+  const label = week?.week ? (week.week.current ? `So far this week, from ${utcDay(week.week.start) ?? week.week.start}.` : `Week of ${utcDay(week.week.start) ?? week.week.start}.`) : undefined;
   const differs = "The census page counts the last 7 days, so its shares can differ.";
   return (
     <Panel id="live-week" title="This week" note={`${label ? `${label} ` : ""}Characters by class, from players who turned the census on. ${differs}`} action={<Link href="/rankings" prefetch={false} className={link}>Rankings →</Link>}>

@@ -275,6 +275,23 @@ test("the top five by item level link to the members, highest first, and leave o
   expect(hidden.slice(hidden.indexOf('aria-labelledby="guild-top"'), hidden.indexOf('aria-labelledby="armory-roster"'))).not.toContain("brannoc-tide");
 });
 
+test("each class in the class bar links to the roster filtered to that class", async () => {
+  const out = await html(pages.guild("eu", "ember-wardens"));
+  const bar = out.slice(out.indexOf("data-class-bar"), out.indexOf('aria-labelledby="guild-top"'));
+  expect(bar).toMatch(/<a href="\/armory\/eu\/guilds\/ember-wardens\?class=hunter"[^>]*>(?:<[^>]*>)*Hunter(?:<[^>]*>)*\s*(?:<!-- -->)?(?:<[^>]*>)*2</);
+  expect(bar).toContain('href="/armory/eu/guilds/ember-wardens?class=warrior"');
+  // The filtered roster keeps only that class.
+  const table = rosterTable(await html(pages.guild("eu", "ember-wardens", { class: "warrior" })));
+  expect(table).toContain("Torvin Ashbrook");
+  expect(table).not.toContain("Velkara Duskmantle");
+});
+
+test("the top item levels say the spread of the item levels read, lowest to highest", async () => {
+  const out = await html(pages.guild("eu", "ember-wardens"));
+  const top = out.slice(out.indexOf('aria-labelledby="guild-top"'), out.indexOf('aria-labelledby="armory-roster"'));
+  expect(top).toMatch(/data-item-level-spread[^>]*>Spread among the 2 read: (?:<!-- -->)?<span[^>]*>50<\/span>(?:<!-- -->)? to (?:<!-- -->)?<span[^>]*>57\.41<\/span>/);
+});
+
 test("no top five when no member has an item level read", async () => {
   mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), [{ characterSlug: "nobody-read", name: "Nobody", surname: "Read", level: 20, classId: 1, raceId: 1, rank: 0 }]);
   const out = await html(pages.guild("eu", "wardens"));
@@ -409,7 +426,17 @@ describe("the guild home", () => {
   test("the roster columns run name, level, race and class, rank, item level, last login", async () => {
     const out = roster(await html(pages.guild("eu", "ember-wardens")));
     const heads = [...out.slice(0, out.indexOf("</thead>")).matchAll(/<th[^>]*>(?:\s*<[^>]*>)*\s*([A-Z][a-z ]+)/g)].map((m) => m[1].trim());
-    expect(heads).toEqual(["Character", "Level", "Race and class", "Rank", "Item level", "Last login"]);
+    expect(heads).toEqual(["Character", "Level", "Race and class", "Guild rank", "Item level", "Last login"]);
+  });
+
+  test("with no rank name published the rank column says the names are not public; with one it is plain Rank", async () => {
+    const head = (out: string) => roster(out).slice(0, roster(out).indexOf("</thead>"));
+    expect(head(await html(pages.guild("eu", "ember-wardens")))).toContain("Guild rank (names not public)");
+    const member = (name: string, rank: string | null) => ({ name, realm: "EU1 Realm 2 Normal", class: "HUNTER", level: 60, rank, lastSeen: null, path: null, alts: [] });
+    addon.data = { page: { progression: [], summary: { realm: "EU1 Realm 2 Normal" } }, board: null, namesWithheld: false, dataAsOf: null, members: [member("Velkara", "Raider")] };
+    const named = head(await html(pages.guild("eu", "ember-wardens")));
+    expect(named).not.toContain("names not public");
+    expect(named).toMatch(/>Rank</);
   });
 
   test("rank names come from the officers' roster where it agrees, else Guild Master or Rank n", async () => {
@@ -522,6 +549,16 @@ describe("QA round 1: rosters and the directory", () => {
     expect(dir).toContain("Level 60 read: characters we read at level 60. It can be higher than the guild page&#x27;s count, because each character is counted as of its own read.");
     const guild = await html(pages.guild("eu", "ember-wardens"));
     expect(guild).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
+  });
+
+  test("QA round 15: the directory's date is the newest read of the roster or a member, and says so beside the guild page's Roster read", async () => {
+    const dir = await html(pages.directory());
+    expect(dir).not.toContain("Last read");
+    expect(dir).toMatch(/<th[^>]*>(?:<[^>]*>)*Newest read(?:<[^>]*>)*<\/th>/);
+    const fold = /<details[^>]*data-disclosure[^>]*>([\s\S]*?)<\/details>/.exec(dir.slice(dir.indexOf('id="directory"')))?.[1] ?? "";
+    expect(fold).toContain("Newest read is the latest day the armory read the guild&#x27;s roster or any of its members; the guild page&#x27;s Roster read is the roster&#x27;s own day, so it can be older.");
+    const guild = await html(pages.guild("eu", "ember-wardens"));
+    expect(guild).toMatch(/Roster read<\/dt>/);
   });
 
   test("QA round 11: the directory note is one line; how each count works sits behind a closed disclosure", async () => {

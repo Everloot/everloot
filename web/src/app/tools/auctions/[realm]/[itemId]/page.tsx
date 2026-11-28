@@ -188,7 +188,7 @@ export default async function RealmItemPage(props: Props) {
             tabs={[
               ...(houses.length > 0 ? [{
                 id: "houses", label: "Houses", count: houses.length,
-                panel: <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>,
+                panel: <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${shown}`} /></div>,
               }] : []),
               {
                 id: "other-realms", label: "Other realms", count: others.length,
@@ -196,7 +196,7 @@ export default async function RealmItemPage(props: Props) {
               },
               ...(row ? [{
                 id: "daily", label: "Daily values", count: row.points.length,
-                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${realm}, ${row.house} auction house`} /></div>,
+                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${shown}, ${row.house} auction house`} /></div>,
               }] : []),
             ]}
           />

@@ -37,12 +37,14 @@ export const BANNER_CAPTION = "Art © Blizzard Entertainment";
  *
  * `hero` is the home page's taller version: at least 432 px on a phone and 544 px from `lg`. `aside` sits on
  * the art at the bottom-right on a wide screen, above the caption, and under `children` on a narrow one.
+ * `short` is a tool page's lower band (at least 144 px on a phone, 176 px from `lg`), so the tool starts above the fold.
  * With no `image` the band is the plain panel and there is no caption. `caption={false}` leaves it out, for a page that
  * puts the credit at its end instead (PageHeader's banner: the caption would sit between the title and the lede).
  */
-export default function Banner({ image, children, aside, hero = false, caption = true }: { image: ReactNode; children?: ReactNode; aside?: ReactNode; hero?: boolean; caption?: boolean }) {
+export default function Banner({ image, children, aside, hero = false, short = false, caption = true }: { image: ReactNode; children?: ReactNode; aside?: ReactNode; hero?: boolean; short?: boolean; caption?: boolean }) {
+  const height = hero ? "pt-18 min-h-[27rem] lg:min-h-[34rem]" : short ? "pt-12 min-h-36 lg:min-h-44" : "pt-18 min-h-64 lg:min-h-[21rem]";
   return (
-    <div data-banner className={`relative -mt-8 flex flex-col justify-end pb-4 pt-18 lg:pb-8 ${hero ? "min-h-[27rem] lg:min-h-[34rem]" : "min-h-64 lg:min-h-[21rem]"}`}>
+    <div data-banner data-banner-short={short ? "" : undefined} className={`relative -mt-8 flex flex-col justify-end pb-4 lg:pb-8 ${height}`}>
       <div data-banner-art className="absolute inset-y-0 left-[calc(50%-50vw)] w-screen overflow-hidden bg-panel">
         {image}
         <div aria-hidden="true" className="absolute inset-0 lg:hidden" style={hero ? HERO_FADE_NARROW : FADE_NARROW} />

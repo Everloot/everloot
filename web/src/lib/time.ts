@@ -18,6 +18,12 @@ export function utcDay(at: string | null | undefined): string | null {
   return d && `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }
 
+/** "Nov 28": a chart tick's day, where the year is plain from the chart; null when unreadable. */
+export function shortDay(at: string | null | undefined): string | null {
+  const d = utcDate(at);
+  return d && `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
 /** "Nov 28, 2026, 03:11 UTC": a moment, the site's one timestamp form; null when unreadable. */
 export function utcStamp(at: string | null | undefined): string | null {
   const d = utcDate(at);

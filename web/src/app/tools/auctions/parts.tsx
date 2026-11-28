@@ -213,9 +213,9 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
   // The scale follows the days the market value keeps: a day the trim took out (the page's note counts it) would
   // otherwise flatten every other day against the floor.
   const { trimmed } = trimDays(points);
-  const values = points.map((p) => p.market);
+  // The range is the kept days' too: the trimmed day's own label gives its value.
   const kept = points.filter((p) => !trimmed.has(p)).map((p) => p.market);
-  const low = Math.min(...values), high = Math.max(...values);
+  const low = Math.min(...kept), high = Math.max(...kept);
   const step = axisStep(Math.max(...kept));
   const days = points.map((p) => ({
     day: p.day, value: p.market, outlier: trimmed.has(p),
