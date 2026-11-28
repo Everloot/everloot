@@ -499,6 +499,12 @@ test("a realm item page names the realm as the site shows it, not the raw CAMWOW
   const params = item("camwow-us1-realm-4-pvp", "2589");
   const words = text(renderToStaticMarkup(await RealmItemPage(params)));
   expect(words).toContain("Horde auction house price on US1 · Realm 4 PvP in WoW: Forever");
+  // QA round 15: the tables' captions (and their scroll regions' names) too.
+  const page = renderToStaticMarkup(await RealmItemPage(params));
+  const captions = [...page.matchAll(/<caption[^>]*>([^<]*)<\/caption>/g)].map((m) => m[1]);
+  expect(captions.length).toBeGreaterThan(0);
+  for (const c of captions) expect(c).not.toContain("CAMWOW");
+  expect(captions.some((c) => c.includes("on US1 · Realm 4 PvP"))).toBe(true);
   const meta = await itemMetadata(params);
   expect(String(meta.title)).toContain("on US1 · Realm 4 PvP");
   expect(String(meta.title)).not.toContain("CAMWOW");

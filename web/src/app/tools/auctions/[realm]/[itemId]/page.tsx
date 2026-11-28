@@ -173,7 +173,7 @@ export default async function RealmItemPage(props: Props) {
               ...(row ? [{
                 id: "houses", label: "Houses", count: houses.length,
                 panel: houses.length
-                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>
+                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${shown}`} /></div>
                   : <div className="pt-4"><EmptyState framed={false} count={Math.max(...HOUSES.map((h) => agreementSoFar(state, slug, itemId, h)))} message="No auction house has its own price for this item yet: a house's price needs scans from 3 players in that house." /></div>,
               }] : []),
               {
@@ -182,7 +182,7 @@ export default async function RealmItemPage(props: Props) {
               },
               ...(row ? [{
                 id: "daily", label: "Daily values", count: row.points.length,
-                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${realm}, ${row.house} auction house`} /></div>,
+                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${shown}, ${row.house} auction house`} /></div>,
               }] : []),
             ]}
           />
