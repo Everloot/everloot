@@ -326,6 +326,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: auction and recipe links keep the chosen market. Compare Blackwater prices, value a bag or bank, filter dungeons by level, and save or share a Legacy plan.
 
 ### Changed
+
+- Site: profession plans update as you change skill, remember your Auction House, and put the recipe catalog and market analysis on a separate Reference view.
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
 - Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.

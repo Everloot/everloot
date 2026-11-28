@@ -290,14 +290,15 @@ test("changes: a compact title row like the database lists, no loading-screen ba
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
-test("professions: the hub's cards and the profession page's picker carry the profession icons with their names", async () => {
+test("professions: the hub and planner heading carry the profession icon beside a lightweight picker", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
   const hub = await render(() => ProfessionsPage({ searchParams: Promise.resolve({}) }));
   expect(hub).toMatch(/href="\/tools\/professions\/alchemy"[^>]*><img[^>]*icons\/7001\.webp[^>]*\/?>/);
   const html = await render(() => ProfessionPage({ params: Promise.resolve({ profession: "alchemy" }), searchParams: Promise.resolve({}) }));
-  expect(html).toMatch(/<nav aria-label="Professions"/);
-  expect(html).toMatch(/href="\/tools\/professions\/alchemy" aria-current="page"[^>]*><img[^>]*icons\/7001\.webp[^>]*\/?>Alchemy/);
+  expect(html).toMatch(/<img[^>]*icons\/7001\.webp/);
+  expect(html).toMatch(/<select aria-label="Profession"/);
+  expect(html).toMatch(/<option value="\/tools\/professions\/alchemy" selected="">Alchemy/);
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
 });
 
