@@ -20,6 +20,8 @@ test("How it stays free separates Everloot's free search from an optional AI pro
   expect(free).toContain("There are no ads.");
   expect(free).not.toMatch(/AdSense|Google ads/);
   expect(free).toContain("popups or interstitials");
+  // QA round 11: the cookie notice covers the foot of a phone until a choice is made, so the page names it.
+  expect(free).toContain("The one exception is the cookie notice at the foot of the window, shown until you choose.");
 });
 
 test("the chat page describes sourced search first and the model as optional and the player's own", () => {

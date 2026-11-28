@@ -99,6 +99,13 @@ test("a zone page shows its confirmed NPCs, its lore, and the map link; the name
   expect((await generateMetadata(props("1436-westfall"))).robots).toMatchObject({ index: true });
 });
 
+test("QA round 11: zone positions always show one decimal, so 40, 50 reads 40.0, 50.0 beside 55.7, 62.9", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
+  const page = await html(ZonePage(props("1436-westfall")));
+  expect(page).toContain(">40.0, 50.0<");
+  expect(page).not.toContain(">40, 50<");
+});
+
 test("a zone with two installs and no entrance is noindex and says what is missing", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1450, 40, 50).slice(0, 2)));
   const page = await html(ZonePage(props("1450-moonglade")));

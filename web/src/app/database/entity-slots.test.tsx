@@ -126,6 +126,21 @@ test("facts nobody has reported fold into one Not yet reported row with a single
   expect(row?.[3]).toMatch(/>level, type, zone, XP<\/span>/);
 });
 
+test("a folded Reported title or name reads as plain title or name, never 'Not yet reported … reported title'", () => {
+  const html = renderToStaticMarkup(EntityPage({
+    name: "Quest 5441",
+    header: { trail: [], title: "Quest 5441" },
+    facts: [
+      { label: "Reported title", value: known(null) },
+      { label: "Category", value: known(null) },
+      { label: "Zone", value: known(null) },
+    ],
+  }));
+  const row = /<dt[^>]*>Not yet reported<\/dt><dd[^>]*>(.*?)<\/dd>/.exec(html);
+  expect(row?.[1]).toMatch(/>title, category, zone<\/span>/);
+  expect(row?.[1]).not.toMatch(/reported/i);
+});
+
 test("quest and boss pages draw no box that would only repeat their header", async () => {
   // The quest has an agreed level, so its old box was "Wanted: Hogger / Level 10", the header's own words.
   for (const page of [QuestPage(id("176")), BossPage({ params: Promise.resolve({ boss: "2742-sneed" }) })]) {

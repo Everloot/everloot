@@ -64,8 +64,8 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
             </details>}
           </div>
           <div className="space-y-2 text-sm">
-            <span className="text-fg">{r.state}</span>
-            {"threshold" in r && <p className="text-muted">{r.threshold === null ? "size unknown" : `${r.threshold} of the roster`}</p>}
+            {"threshold" in r ? <p className="text-fg"><span className="text-muted">Guild clear:</span> {r.state}</p> : <span className="text-fg">{r.state}</span>}
+            {"threshold" in r && <p className="text-muted">{r.threshold === null ? "Group size unknown, so no boss counts here yet" : `A boss counts once ${r.threshold} of the roster hold its kill`}</p>}
             {r.state === "no data" && <p className="text-muted">no data from this character</p>}
             {r.newestKillDay && <p className="text-muted">Newest kill <time dateTime={r.newestKillDay} className="font-mono tabular-nums">{r.newestKillDay}</time> UTC</p>}
           </div>

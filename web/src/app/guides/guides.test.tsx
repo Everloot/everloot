@@ -521,6 +521,17 @@ describe("the guide index", () => {
     expect(visible(html)).toContain("Community-sourced checklist, unverified in Forever");
     expect(dom(html).querySelectorAll('[data-guide="darkmoon-faire"]')).toHaveLength(0);
   });
+
+  test("with no reviewed guide, nothing promises a list of them: no 'guides below', no 'Everloot's reviewed guides' lede", async () => {
+    const empty = visible(await index());
+    expect(empty).not.toMatch(/\bbelow\b/);
+    expect(empty).not.toContain("Everloot's reviewed guides, each");
+    expect(empty).toContain("No guide is reviewed yet.");
+    stubGuides(SOME);
+    const listed = visible(await index());
+    expect(listed).toContain("Everloot's reviewed guides, each a talent plan for one class");
+    expect(listed).not.toMatch(/\bbelow\b/);
+  });
   const listed = (html: string) => [...dom(html).querySelectorAll("[data-guide]")].map((li) => li.getAttribute("data-guide"));
 
   test("lists the published guides by class with the state of any that is not current, never a draft; an empty index says so and stays out of search", async () => {

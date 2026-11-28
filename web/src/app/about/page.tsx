@@ -61,7 +61,7 @@ export default function AboutPage() {
           <p className="text-fg-2">
             Everloot is run by {OPERATOR}, who pays for the hosting. There are no
             ads. We don&apos;t sell data, we don&apos;t gate tools behind signups, and we
-            don&apos;t show popups or interstitials.
+            don&apos;t show popups or interstitials. The one exception is the cookie notice at the foot of the window, shown until you choose.
           </p>
           <p className="mt-4 text-fg-2">
             Everloot search is free. If you add an optional AI model to{" "}

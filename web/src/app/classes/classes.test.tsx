@@ -340,6 +340,8 @@ describe("the class index", () => {
     expect(note?.textContent).toContain("No guide is reviewed yet.");
     expect(note?.querySelector('a[href="/classes"]')).toBeNull();
     expect(ledeOf(empty)).not.toMatch(/guide/i);
+    // No column of nine dashes: the guides column shows once a class has one.
+    expect(empty).not.toContain("Reviewed guides");
     // No guide yet, but every hub carries its races' traits, so the index is indexed too.
     expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
 
