@@ -302,6 +302,7 @@ export default async function ProfessionPage(props: Props) {
   const spellName = (id: number) => spellNames?.names.get(id);
   const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
   const selectedRecipe = catalog.find(r => String(r.spellId) === searchParams.recipe && r.reagents.length > 0);
+  const outputItem = selectedRecipe && p.recipes.find(r => r.spellId === selectedRecipe.spellId)?.itemId;
   const recipeMarket = referenceMarketParams(searchParams);
   const requestedCrafts = Number(searchParams.crafts);
   const crafts = Number.isInteger(requestedCrafts) && requestedCrafts >= 1 && requestedCrafts <= 999 ? requestedCrafts : 1;
@@ -419,6 +420,7 @@ export default async function ProfessionPage(props: Props) {
             {p.otherSpells > 0 && ` ${plural(p.otherSpells, "other spell")} on the ${p.name} line make and cost nothing and are not listed.`}
           </p>
           {selectedRecipe && <RecipeShopping key={`${selectedRecipe.spellId}:${recipeMarket.realm}:${recipeMarket.house}`} recipe={selectedRecipe} initialCrafts={crafts}
+            outputItem={outputItem ?? undefined}
             initialMarket={recipeMarket.realm && recipeMarket.house ? { realm: recipeMarket.realm, house: recipeMarket.house } : undefined} />}
           {groups.length > 0 && (
             <FilterBar

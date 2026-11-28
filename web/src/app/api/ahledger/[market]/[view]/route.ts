@@ -1,4 +1,4 @@
-import { craftingMargins, dealPrices, isAhledgerMarket, isAhledgerProfession, itemsParam, priceHistory } from "@/lib/ahledger";
+import { ahledgerItemUrl, craftingMargins, dealPrices, isAhledgerMarket, isAhledgerProfession, itemsParam, listingTiming, priceHistory } from "@/lib/ahledger";
 import { proxyError, readAhledger, refuseOtherSite } from "@/lib/ahledger-proxy";
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ market: 
     const ids = itemsParam(query.get("item"));
     if (!only("item") || ids?.length !== 1) return proxyError("item must be one positive item id.", 400);
     return readAhledger(`prices/${market}/${ids[0]}?range=30d`, (body) => ({ history: priceHistory(body) }));
+  }
+  if (view === "timing") {
+    const ids = itemsParam(query.get("item"));
+    if (!only("item") || ids?.length !== 1) return proxyError("item must be one positive item id.", 400);
+    return readAhledger(`timing/${market}/${ids[0]}?days=28`, body => ({ timing: listingTiming(body, ids[0]) }), ahledgerItemUrl(ids[0], market));
   }
   if (view === "crafting") {
     const profession = query.get("profession") ?? "";

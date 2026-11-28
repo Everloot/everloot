@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 
+- Site: Auction House Activity opens your Everloot sales ledger locally for the same cycles and links from profession recipes and auction item pages. Market timing by item shows AH Ledger asking-price windows and scan coverage.
 - Site: all Forever professions have leveling or gathering guides. Crafting guides plan recipes, training stops and a copyable shopping list for your skill range, with optional auction prices. Gathering guides show sourced trainers, zones and materials.
 - Site: guild pages link each class count to the roster filtered by class, show the spread of item levels read, and say when rank names are not public; /guilds shows active region and ruleset filters as chips on a phone; the raid planner has a shorter banner and suggests the class that would bring the most missing buffs and debuffs; talent trees say what the next locked row needs, show a tree's role where a class's trees differ, and explain what Save does (#1687).
 - Site: quest pages list items that name them as a reward and show the wiki blurb for wiki-titled quests; object pages link their gathering profession and give items per loot window; exploration achievements link their zone and each place; repeated names in the object and item lists say their zone, item level or ID; same-icon rows show the shared icon and drop "Depricated" leftovers (#1689).

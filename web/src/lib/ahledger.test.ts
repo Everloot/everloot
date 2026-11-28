@@ -92,6 +92,8 @@ const ALLOWED = [
   "web/src/app/tools/professions/[profession]/page.tsx",
   "web/src/app/tools/auctions/item/[itemId]/page.tsx",
   "web/src/app/tools/auctions/[realm]/[itemId]/page.tsx",
+  "web/src/app/tools/auctions/activity/page.tsx",
+  "web/src/app/tools/auctions/activity/market-timing.tsx",
   // Names AH Ledger only to say how the house-to-ruleset mapping was worked out; it keeps none of its prices.
   "web/src/lib/blizzard-houses.ts",
 ];
