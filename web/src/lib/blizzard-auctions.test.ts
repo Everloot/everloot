@@ -100,6 +100,8 @@ const ALLOWED = [
   "web/src/app/blizzard-auctions/page.tsx",
   // Plain link to the ad-free document only; no Blizzard reader on the player-price page.
   "web/src/app/tools/auctions/browse-view.tsx",
+  // The scans-paused notice's plain link to the ad-free page only; it reads nothing.
+  "web/src/app/tools/auctions/parts.tsx",
   // Breadcrumb route label only.
   "web/src/lib/breadcrumbs.ts",
   // Links to the page only; database/items/[id]/blizzard-link.test.tsx checks it reads nothing.

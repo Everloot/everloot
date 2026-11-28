@@ -3,7 +3,7 @@ import Link from "@/components/Link";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { filterTimeline, loadTimeline, timelineDegraded, type ChangeEntry } from "@/lib/changes";
+import { filterTimeline, loadTimeline, oneRowPerTitleDay, timelineDegraded, type ChangeEntry } from "@/lib/changes";
 import { keepBrieflyIf } from "@/lib/degraded-render";
 import { hubIndexable, loadNews, publishedPosts } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
@@ -35,7 +35,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function NewsHub() {
   const posts = publishedPosts(loadNews());
   // Who wrote it is checked before the six newest are taken, so an Everloot entry can neither show nor push one out.
-  const blizzard = filterTimeline(await loadTimeline(), "all", "forever").filter(fromBlizzard).slice(0, FROM_BLIZZARD);
+  // Two posts under one title on one day are one row, as on the home page.
+  const blizzard = oneRowPerTitleDay(filterTimeline(await loadTimeline(), "all", "forever").filter(fromBlizzard), FROM_BLIZZARD).map((r) => r.entry);
   // Drawn from the bundled posts (the build's render, or a store outage): kept seconds, not the hour.
   const degraded = await keepBrieflyIf(await timelineDegraded());
   return (

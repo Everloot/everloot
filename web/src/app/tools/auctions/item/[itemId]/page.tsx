@@ -16,7 +16,7 @@ import {
   AH_PATH, crossRealmHref, indexable, itemIdParam, itemLabel, itemRows, scanDayText, type MarketRow,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, Facts, PriceFacts, RealmPrices, UnnamedReason, count, itemQuality } from "../../parts";
+import { Contribute, Facts, PriceFacts, RealmPrices, ScansPaused, UnnamedReason, count, itemQuality } from "../../parts";
 import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerRegionMarkets } from "@/lib/ahledger";
@@ -97,6 +97,7 @@ export default async function CrossRealmItemPage(props: Props) {
 
       <div className="space-y-10">
         <UnnamedReason id={itemId} names={names} />
+        <ScansPaused state={state} now={now} />
 
         {!state && (
           <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>

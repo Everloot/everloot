@@ -422,6 +422,9 @@ test("November 11 and 12: twins on both forums are one card, and two posts under
   expect(nov11).toContain('href="/changes/us-30863849-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toContain('href="/changes/us-30863846-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toMatch(/<p data-thread-posts="true"[^>]*>Read <span><a [^>]*>post 7<\/a><\/span><span> · <a [^>]*>post 8<\/a><\/span><\/p>/);
+  // The later post's words are labelled with its number and time, so they do not read as a repeat; the first post's are not.
+  expect(nov11).toMatch(/<p data-excerpt="true"[^>]*><span data-post-label="true"[^>]*>Post 8 · 00:48 UTC: <\/span>November 11, 2026/);
+  expect(nov11.match(/data-post-label/g)).toHaveLength(1);
   // Posted at 00:48 UTC on the 12th, the card is dated the day its title names.
   expect(nov11).toMatch(/<time dateTime="2026-11-12T00:48:47.076Z"[^>]*>2026-11-11<\/time>/);
   expect(nov12).toMatch(/<time [^>]*>2026-11-12<\/time>/);

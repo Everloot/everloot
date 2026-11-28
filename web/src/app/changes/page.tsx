@@ -159,7 +159,13 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
           </p>
           <h2 className="text-base">{title(e)}</h2>
           {blue ? blueByline(e, where) : byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
-          {bodies.map(([p, body]) => <p key={p.id} data-excerpt className="text-cell text-fg">{body}</p>)}
+          {/* A later post's words carry its number and time, so they do not read as a repeat of the first. */}
+          {bodies.map(([p, body], i) => (
+            <p key={p.id} data-excerpt className="text-cell text-fg">
+              {i > 0 && <span data-post-label className="text-fg-2">{p.postNumber ? `Post ${p.postNumber} · ` : ""}{stamp(p.at).slice(11)}: </span>}
+              {body}
+            </p>
+          ))}
           {posts.length > 1 && (
             <p data-thread-posts className="text-cell-2 text-fg-2">
               Read{" "}

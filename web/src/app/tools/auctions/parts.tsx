@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
 import GameIcon from "@/components/game/GameIcon";
 import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
+import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, scansPaused, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
-import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "@kb/market";
+import { HISTORY_DAYS, formatCopper, reportersText, type MarketState, type PublicDay } from "@kb/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import ClientCoins from "./ClientCoins";
@@ -96,6 +96,22 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
     },
   ];
   return <DataTable dense caption="Auction House by ruleset, all houses" columns={columns} rows={rows} rowKey={(r) => r.ruleset} />;
+}
+
+/**
+ * With no scan anywhere for SCANS_PAUSED_DAYS, one line on why and where current prices are. It links Blizzard's prices
+ * and never shows them: those pages are ad-free, this one is not.
+ */
+export function ScansPaused({ state, now, className }: { state: MarketState | null; now: Date; className?: string }) {
+  if (!scansPaused(state, now)) return null;
+  return (
+    <Card className={className}>
+      <p className="text-fg-2" role="status">
+        Community scans are paused: the game stopped reporting realm names, so the addon holds scans back. Current Blizzard prices are on{" "}
+        <a href="/blizzard-auctions" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Blizzard auctions</a>.
+      </p>
+    </Card>
+  );
 }
 
 /** Contributing is the one way a realm gets prices: run a scan, upload it. */
