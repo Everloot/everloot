@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
-import { CLASS_BG, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
+import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
@@ -10,8 +10,8 @@ import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
-import { StackedWeeksChart, WeeklyTotalsChart } from "./charts";
-import { fill, nameOf, number, percent, weekLabel, weekTick } from "./chart-words";
+import { StackedWeeksChart, WeeklyLinesChart, WeeklyTotalsChart } from "./charts";
+import { nameOf, number, percent, stroke, weekLabel } from "./chart-words";
 
 export { percent, weekLabel };
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -240,66 +240,19 @@ export function StartState() {
   );
 }
 
-const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_STROKE, s.classToken) : "stroke-fg-2");
 const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_BG, s.classToken) : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
-
-const W = 720;
-const H = 300;
-const PAD = { left: 40, right: 140, top: 16, bottom: 28 };
-
-/** A round top for the share axis: the next 5% above the highest point. */
-const topOf = (max: number) => Math.max(0.05, Math.ceil(max * 20) / 20);
 
 /**
  * The weekly chart: each of the top rows' share of the week's characters, over the frozen weeks and the current
- * one ("so far"). Inline SVG, drawn on the server, in a card. Lines take their row's colour; markers are ringed by
- * the card so they read over a crossing line. Lines break where a week's count is hidden. Every line is named in
- * the legend (and at its end when there are four or fewer), so identity never rests on colour; the table below holds the numbers.
+ * one ("so far"), drawn at its measured width (WeeklyLinesChart), in a card. Lines take their row's colour; markers
+ * are ringed by the card so they read over a crossing line. Lines break where a week's count is hidden. Every line is
+ * named in the legend (and at its end when there are four or fewer and room), so identity never rests on colour; the table below holds the numbers.
  */
 export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; series: ChartSeries[]; title: string }) {
-  const max = topOf(Math.max(0, ...series.flatMap((s) => s.points.filter((p): p is number => p !== null))));
-  const x = (i: number) => PAD.left + (weeks.length === 1 ? 0 : (i / (weeks.length - 1)) * (W - PAD.left - PAD.right));
-  const y = (v: number) => PAD.top + (1 - v / max) * (H - PAD.top - PAD.bottom);
-  const path = (points: (number | null)[]) =>
-    points.map((p, i) => (p === null ? "" : `${i > 0 && points[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`)).join(" ").trim();
-  // With four lines or fewer, each is also labelled at its last point, nudged apart so labels never overlap.
-  const ends = (series.length > 4 ? [] : series)
-    .map((s) => {
-      const i = s.points.reduce<number>((last, p, j) => (p !== null ? j : last), -1);
-      return i < 0 ? null : { key: s.key, label: nameOf(s), y: y(s.points[i]!) };
-    })
-    .filter((e): e is { key: string; label: string; y: number } => e !== null)
-    .sort((a, b) => a.y - b.y);
-  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 12);
   return (
     <Card>
       <figure data-weekly-chart className="min-w-0">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} className="h-auto w-full">
-          <title>{title}</title>
-          {[0, max / 2, max].map((v) => (
-            <g key={v}>
-              <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-              <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{percent(v)}</text>
-            </g>
-          ))}
-          {weeks.map((w, i) => (
-            <text key={w.start} x={x(i)} y={H - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(w)}</text>
-          ))}
-          {series.map((s) => (
-            <g key={s.key}>
-              <title>{nameOf(s)}</title>
-              <path d={path(s.points)} fill="none" strokeWidth={2} strokeLinejoin="round" strokeDasharray={s.faction === "Horde" ? "6 3" : undefined} className={stroke(s)} />
-              {s.points.map((p, i) => p !== null && (
-                <circle key={i} cx={x(i)} cy={y(p)} r={4} className={`${fill(s)} stroke-panel`} strokeWidth={2}>
-                  <title>{`${nameOf(s)}, ${weekLabel(weeks[i])}: ${percent(p)}`}</title>
-                </circle>
-              ))}
-            </g>
-          ))}
-          {ends.map((e) => (
-            <text key={e.key} x={W - PAD.right + 8} y={e.y + 4} className="fill-fg-2 text-caption">{e.label}</text>
-          ))}
-        </svg>
+        <WeeklyLinesChart weeks={weeks} series={series} title={title} />
         <figcaption className="mt-3">
           <ul aria-label="Legend" className="flex flex-wrap gap-x-4 gap-y-1 text-cell-2 text-fg-2">
             {series.map((s) => (

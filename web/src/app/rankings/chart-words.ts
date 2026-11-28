@@ -1,4 +1,4 @@
-import { CLASS_FILL, classColour } from "@/components/ui/class-colour";
+import { CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import type { ChartSeries, RankingWeek } from "@/lib/rankings";
 
 // Words and marks the server-drawn rankings parts and the measured client charts share.
@@ -11,3 +11,4 @@ export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (fro
 export const nameOf = (s: ChartSeries) => (s.faction && s.label !== s.faction ? `${s.label} (${s.faction})` : s.label);
 export const weekTick = (w: RankingWeek) => (w.current ? "so far" : w.start.slice(5));
 export const fill = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_FILL, s.classToken) : "fill-fg-2");
+export const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_STROKE, s.classToken) : "stroke-fg-2");
