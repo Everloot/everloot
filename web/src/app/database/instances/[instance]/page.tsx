@@ -5,7 +5,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, DataTable, Disclosure, filledColumns, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";
 import {
-  bossRows, difficultyLabel, difficultyList, groupSizeLabel, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
+  bossRows, difficultyLabel, difficultyList, groupSizeLabel, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadInstanceSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceQuest, type InstanceRow,
 } from "@/lib/instances";
 import { entityTitle } from "@/lib/entity-meta";
@@ -51,7 +51,8 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean; asOf?: Date } | null> {
   const id = parseInstanceSegment(segment);
   if (id === null) return null;
-  const seen = await loadSightings();
+  // The page reads the aggregate set for its quests anyway (loadWorldFacts below): one file, not two.
+  const seen = await loadInstanceSightings({ fromAggregates: true });
   const row = instanceRows(seen.unreachable ? {} : seen).get(id);
   return row ? { row, unreachable: seen.unreachable, asOf: seen.unreachable ? undefined : seen.asOf } : null;
 }

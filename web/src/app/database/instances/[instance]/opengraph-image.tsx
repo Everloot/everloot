@@ -1,4 +1,4 @@
-import { instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
+import { instanceRows, instanceTitle, loadInstanceSightings, parseInstanceSegment } from "@/lib/instances";
 import { CARD_SIZE } from "@/lib/og-card";
 import { count, shareImage } from "../../share-image";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function Image({ params }: { params: Promise<{ instance: string }> }) {
   const id = parseInstanceSegment((await params).instance);
   if (id === null) return shareImage(null);
-  const seen = await loadSightings();
+  const seen = await loadInstanceSightings();
   const row = instanceRows(seen.unreachable ? {} : seen).get(id);
   if (!row) return shareImage(null);
   const level = row.level ? (row.level.min === row.level.max ? `Level ${row.level.min}` : `Level ${row.level.min}-${row.level.max}`) : null;

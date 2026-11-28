@@ -22,6 +22,7 @@ vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.val
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
+  loadInstanceSightings: async () => state.seen,
 }));
 
 // The asset manifest: no art unless a test hands in loading screens.
