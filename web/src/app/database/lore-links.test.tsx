@@ -28,6 +28,7 @@ vi.mock("@/lib/instances", async (importOriginal) => {
   return {
     ...real,
     loadSightings: async () => ({ unreachable: true }),
+    loadInstanceSightings: async () => ({ unreachable: true }),
     instanceRows: (...args: Parameters<typeof real.instanceRows>) => {
       const rows = real.instanceRows(...args);
       if (!extra.instanceNamed) return rows;

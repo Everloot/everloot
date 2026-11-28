@@ -6,17 +6,12 @@ import type { ArmoryMember } from "./armory-store";
 import { progressionByLink, progressionStore, type PublicHistory } from "./progression-store";
 import { bossKillSyncOn, instanceClearsOn } from "./boss-kill-sync";
 import { dungeonsAndRaids, instanceClears } from "./dungeon-clears";
-import { instanceHref, instanceRows } from "./instances";
-import { loadInstanceFacts } from "./rollup-compute";
-import { loadStoredInstanceFacts } from "./instance-facts-store";
+import { instanceHref, instanceRows, loadInstanceFactsStoredFirst } from "./instances";
 import type { InstanceFacts } from "@kb/instances";
 
 /** The instance facts from their small stored file (instance-facts-store.ts); without it, from the whole aggregate set. */
 async function instanceFacts(): Promise<InstanceFacts | null> {
-  const stored = await loadStoredInstanceFacts();
-  if (stored) return stored.instances;
-  const facts = await loadInstanceFacts().catch(() => null);
-  return facts && !facts.unreachable ? facts : null;
+  return (await loadInstanceFactsStoredFirst())?.instances ?? null;
 }
 
 async function catalogueData() {

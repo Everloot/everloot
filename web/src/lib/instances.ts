@@ -12,6 +12,7 @@ import { playableEncounters } from "@kb/encounter-set";
 import { objectNames } from "./names";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadInstanceFacts, loadItemFacts } from "./rollup-compute";
+import { loadStoredInstanceFacts, type StoredInstanceFacts } from "./instance-facts-store";
 import { WORLD_MAP } from "./world-map";
 import { placedEntrances, publicZones, type PlacedEntrance, type ZoneSightings } from "./zones";
 
@@ -290,4 +291,26 @@ export async function loadSightings(): Promise<ZoneSightings & { unreachable: bo
   if (instances.unreachable || items.unreachable) return { unreachable: true };
   const asOf = instances.dataAsOf && Number.isFinite(Date.parse(instances.dataAsOf)) ? new Date(instances.dataAsOf) : undefined;
   return { instances, sightings: instances.sightings, objectNames: objectNames(items), ...(asOf ? { asOf } : {}), unreachable: false };
+}
+
+/**
+ * The instance entrances and encounters players reported, and the corpus's date: from their small stored file
+ * (instance-facts-store.ts), else from the whole aggregate set. Null when neither can be read.
+ */
+export async function loadInstanceFactsStoredFirst(): Promise<StoredInstanceFacts | null> {
+  const stored = await loadStoredInstanceFacts();
+  if (stored) return stored;
+  const facts = await loadInstanceFacts().catch(() => null);
+  return facts && !facts.unreachable ? { dataAsOf: facts.dataAsOf, instances: { entrances: facts.entrances, encounters: facts.encounters } } : null;
+}
+
+/**
+ * `loadSightings` without the treasures and object names, for the pages that list only instances and bosses (the
+ * boss and instance pages and their share images): with the stored file they skip parsing the 10 MB aggregate set.
+ */
+export async function loadInstanceSightings(): Promise<ZoneSightings & { unreachable: boolean }> {
+  const facts = await loadInstanceFactsStoredFirst();
+  if (!facts) return { unreachable: true };
+  const asOf = facts.dataAsOf && Number.isFinite(Date.parse(facts.dataAsOf)) ? new Date(facts.dataAsOf) : undefined;
+  return { instances: facts.instances, ...(asOf ? { asOf } : {}), unreachable: false };
 }

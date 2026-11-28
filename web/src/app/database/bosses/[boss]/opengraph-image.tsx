@@ -1,6 +1,6 @@
 import { CLIENT_LABEL } from "@kb/edges";
 import { bossEntry } from "@/lib/bosses";
-import { instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
+import { instanceRows, instanceTitle, loadInstanceSightings, parseInstanceSegment } from "@/lib/instances";
 import { CARD_SIZE } from "@/lib/og-card";
 import { shareImage } from "../../share-image";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function Image({ params }: { params: Promise<{ boss: string }> }) {
   const id = parseInstanceSegment((await params).boss);
   if (id === null) return shareImage(null);
-  const seen = await loadSightings();
+  const seen = await loadInstanceSightings();
   const boss = bossEntry(id, instanceRows(seen.unreachable ? {} : seen));
   if (!boss) return shareImage(null);
   return shareImage({

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { bossEntries, bossHref, BOSSES_PATH, type BossEntry } from "@/lib/bosses";
-import { compareInstances, instanceHref, instanceRows, instanceTitle, loadSightings } from "@/lib/instances";
+import { compareInstances, instanceHref, instanceRows, instanceTitle, loadInstanceSightings } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { LINK } from "../entity";
@@ -35,7 +35,7 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 export default async function BossListPage(props: { searchParams?: Promise<Search> }) {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
-  const seen = await loadSightings();
+  const seen = await loadInstanceSightings();
   const rows = instanceRows(seen.unreachable ? {} : seen);
   const ordered = new Map([...rows].sort(([, a], [, b]) => compareInstances(a, b)));
   const all = bossEntries(ordered);

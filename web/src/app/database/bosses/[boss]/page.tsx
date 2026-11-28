@@ -13,7 +13,7 @@ import { entityTitle } from "@/lib/entity-meta";
 import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
 import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import { loadRenders } from "@/lib/game-renders";
-import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
+import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTitle, loadInstanceSightings, parseInstanceSegment } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { npcNames } from "@/lib/names";
 import { loadInstanceClears } from "@/lib/progression";
@@ -34,7 +34,7 @@ type Props = { params: Promise<{ boss: string }>; searchParams?: Promise<Record<
 async function find(segment: string): Promise<{ boss: BossEntry; unreachable: boolean; asOf?: Date } | null> {
   const id = parseInstanceSegment(segment);
   if (id === null) return null;
-  const seen = await loadSightings();
+  const seen = await loadInstanceSightings();
   const boss = bossEntry(id, instanceRows(seen.unreachable ? {} : seen));
   return boss ? { boss, unreachable: seen.unreachable, asOf: seen.unreachable ? undefined : seen.asOf } : null;
 }

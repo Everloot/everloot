@@ -20,6 +20,7 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
+  loadInstanceSightings: async () => state.seen,
 }));
 const clears = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.value }));
