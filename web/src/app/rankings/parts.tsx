@@ -9,7 +9,7 @@ import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSU
 import type { CensusCount, Faction } from "@kb/census";
 import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
-  type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
+  type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingSlug, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
 import { StackedWeeksChart, WeeklyLinesChart, WeeklyTotalsChart } from "./charts";
 import { nameOf, number, percent, seriesMarks, stroke, weekLabel, weekTick } from "./chart-words";
@@ -17,6 +17,10 @@ import { utcDay } from "@/lib/time";
 
 export { percent, weekLabel };
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+
+/** What a ranking's rows are, as its tables' first column header. */
+export type RankNoun = "Class" | "Race" | "Faction";
+export const RANK_NOUN: Record<RankingSlug, RankNoun> = { classes: "Class", races: "Race", factions: "Faction" };
 
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
@@ -125,11 +129,11 @@ export function ShareBar({ share, classToken, className = "" }: { share: number;
  * The ranked rows: rank, change against last week, the colour mark, name, faction, count, share and the data's
  * date. With `hrefOf`, each name links to the census filtered to that row.
  */
-export function RankTable({ rows, caption, showChange, asOf, hrefOf }: { rows: RankRow[]; caption: string; showChange: boolean; asOf: string; hrefOf?: (r: RankRow) => string }) {
+export function RankTable({ rows, caption, showChange, asOf, hrefOf, noun }: { rows: RankRow[]; caption: string; showChange: boolean; asOf: string; hrefOf?: (r: RankRow) => string; noun: RankNoun }) {
   const showSub = rows.some((r) => r.sub);
   const columns: Column<RankRow>[] = [
     {
-      key: "name", header: "Name",
+      key: "name", header: noun,
       cell: (r) => (
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-6 shrink-0 text-right font-mono tabular-nums text-muted">{r.rank ?? "—"}</span>
@@ -251,7 +255,7 @@ const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLA
  * are ringed by the card so they read over a crossing line. Lines break where a week's count is hidden. Every line is
  * named in the legend (and at its end when there are four or fewer and room), so identity never rests on colour; the table below holds the numbers.
  */
-export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; series: ChartSeries[]; title: string }) {
+export function WeeklyChart({ weeks, series, title, noun }: { weeks: RankingWeek[]; series: ChartSeries[]; title: string; noun: RankNoun }) {
   const marks = seriesMarks(series);
   return (
     <Card>
@@ -268,7 +272,7 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
               </li>
             ))}
           </ul>
-          <SharesTable weeks={weeks} series={series} caption={title} />
+          <SharesTable weeks={weeks} series={series} caption={title} noun={noun} />
         </figcaption>
       </figure>
     </Card>
@@ -280,7 +284,7 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
  * the newest week's rank order. Drawn at its measured width (StackedWeeksChart), in a card. A hidden count has no segment, so a
  * week missing one is marked partial and the legend says why once. Every segment is named in the legend.
  */
-export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: RankingWeek[]; series: ChartSeries[]; hidden?: boolean; title: string }) {
+export function StackedWeeks({ weeks, series, hidden = false, title, noun }: { weeks: RankingWeek[]; series: ChartSeries[]; hidden?: boolean; title: string; noun: RankNoun }) {
   // A week with no numbers at all is still collecting; one missing a few is partial.
   const partial = weeks.map((_, i) => (series.every((s) => s.points[i] === null) ? "collecting" : series.some((s) => s.points[i] === null) ? "partial" : null));
   return (
@@ -299,7 +303,7 @@ export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: 
           {(hidden || partial.some(Boolean)) && (
             <p className="text-cell-2 text-muted">A count under the thresholds has no segment, so that week&apos;s bar is partial.</p>
           )}
-          <SharesTable weeks={weeks} series={series} caption={title} />
+          <SharesTable weeks={weeks} series={series} caption={title} noun={noun} />
         </figcaption>
       </figure>
     </Card>
@@ -328,9 +332,9 @@ function ChartTable<T>({ caption, columns, rows, rowKey }: { caption: string; co
 const shareCell = (p: number | null) => (p === null ? <span className="text-muted">{HIDDEN_LABEL}</span> : percent(p));
 
 /** Each series' share week by week, a row per series and a column per week. */
-function SharesTable({ weeks, series, caption }: { weeks: RankingWeek[]; series: ChartSeries[]; caption: string }) {
+function SharesTable({ weeks, series, caption, noun }: { weeks: RankingWeek[]; series: ChartSeries[]; caption: string; noun: RankNoun }) {
   const columns: Column<ChartSeries>[] = [
-    { key: "name", header: "Name", nowrap: true, cell: (s) => <span className="font-medium">{nameOf(s)}</span> },
+    { key: "name", header: noun, nowrap: true, cell: (s) => <span className="font-medium">{nameOf(s)}</span> },
     ...weeks.map((w, i): Column<ChartSeries> => ({ key: w.start, header: w.current ? "So far" : weekTick(w), numeric: true, cell: (s) => shareCell(s.points[i]) })),
   ];
   return <ChartTable caption={caption} columns={columns} rows={series} rowKey={(s) => s.key} />;
