@@ -289,7 +289,7 @@ def price_file(as_of: str) -> str:
 
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, "
             "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 } } }",
-            API + price_file("2026-10-29T06:00:00Z"), extra=("modules/sellcheck.lua",))
+            API + price_file("2026-10-29T06:00:00Z"), extra=("modules/sellcheck.lua", "modules/shopping.lua"))
 lua.execute("""
 local U, E = Everloot.Window, Everloot
 local M = U.MoneyShort
@@ -342,7 +342,8 @@ assert(row(1) == 'Smelt Copper' and row(2) == 'Spiced Wolf Meat' and row(3) == '
   and row(4) == 'Boiled Clams' and row(5) == 'Mystery Stew' and not c.rows[6].shown, tostring(row(1)))
 local r1 = c.rows[1]
 -- The finished item's sales come from the character's local ledger, by the invoice's item name.
-local itemInfo = GetItemInfo
+local itemInfo, dateStub = GetItemInfo, date
+date = os.date
 GetItemInfo = function(id) if id == 2840 then return 'Copper Bar' end end
 local key = E.CharacterKey()
 assert(key and E.Ledger.RecordSale(key, { itemName = 'Copper Bar', count = 20, total = 500 }))
@@ -353,7 +354,7 @@ r1.scripts.OnEnter(r1)
 local saleTip = table.concat(GameTooltip.lines, '|')
 assert(saleTip:find('Copper Bar', 1, true) and saleTip:find('24h: 1', 1, true), saleTip)
 assert(not saleTip:find('Copper Ore', 1, true), saleTip)
-GetItemInfo, GameTooltip = itemInfo, nil
+GetItemInfo, date, GameTooltip = itemInfo, dateStub, nil
 -- Priced: the newest row's reagents (one Copper Ore at its 20c market value, not the vendor's 30c). A gain is signed
 -- and green.
 assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == '+' .. M(265), r1.profit.text)
