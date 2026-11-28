@@ -315,10 +315,17 @@ export default function SaveBuild({ classSlug, codes, defaultName, onMessage }: 
     <>
       <button ref={saveButton} type="button" className={button} onClick={onSave} aria-expanded={panel !== null}
         disabled={!codes[0] || account.status === "loading" || account.status === "unchecked"}
-        aria-describedby={account.status === "unchecked" ? "save-build-unchecked" : undefined}
+        aria-describedby={account.status === "unchecked" ? "save-build-unchecked" : "save-build-hint"}
         onKeyDown={(e) => { if (e.key === "Escape" && panel) { e.stopPropagation(); setPanel(null); } }}
         title={codes[0] ? undefined : "Spend a point in set 1 to save"}>Save</button>
       {account.status === "unchecked" && <p id="save-build-unchecked" className="text-sm text-fg-2">{UNCHECKED}</p>}
+      {/* What Save does, as it does it: the build goes to the account on the server, not to this browser (that is
+          "Save on this device" under the trees). */}
+      {account.status !== "unchecked" && (
+        <p id="save-build-hint" className="text-xs text-muted">
+          Save keeps this build in your Everloot account.{account.status === "signed-out" ? " Sign in first." : ""}
+        </p>
+      )}
       {mine.length > 0 && (
         <details ref={menu} className="relative min-w-0 max-sm:open:basis-full" onKeyDown={onMenuKey}>
           <summary className={`${button} cursor-pointer list-none`}>My builds</summary>

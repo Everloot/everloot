@@ -180,7 +180,8 @@ function rosterColumns(region: string, ranks: RankNames, icons: CensusIcons): Co
         </span>
       ),
     },
-    { key: "rank", header: "Rank", nowrap: true, sortable: true, cell: ({ m }) => (m.rank === null ? muted(UNKNOWN) : rankName(m.rank, ranks)) },
+    // With no rank name published every rank reads "Rank n"; the header says why rather than leaving it to look like data.
+    { key: "rank", header: ranks.size ? "Rank" : "Guild rank (names not public)", nowrap: true, sortable: true, cell: ({ m }) => (m.rank === null ? muted(UNKNOWN) : rankName(m.rank, ranks)) },
     { key: "item-level", header: "Item level", numeric: true, sortable: true, cell: ({ m }) => (m.itemLevel === null ? muted("Not read") : metricValue("item-level", m.itemLevel)) },
     {
       key: "last-login", header: "Last login", numeric: true, sortable: true,
@@ -300,7 +301,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
     <Container width="data">
       <article className="space-y-8">
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
-        <SummaryStrip guild={g} members={roster} summary={summary} activity={<>
+        <SummaryStrip guild={g} members={roster} summary={summary} classHref={(cls) => href({ cls })} activity={<>
           <LevelStrip members={roster} summary={summary} href={(level) => href({ level })} />
           <ActivityStrip members={roster} asOf={asOf} readDay={utcDay(g.fetchedAt)} href={(active) => href({ active })} />
         </>} />
@@ -442,7 +443,7 @@ function AddonSection({ addon }: { addon: GuildPageData }) {
 const averageRead = (average: number, read: number) => <>{`${metricValue("item-level", average)} `}<span className="whitespace-nowrap">({read} read)</span></>;
 
 /** The guild at a glance, under its header: roster size, members read, level 60s, average item level, roster read, and the class mix as one bar. */
-function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary; activity: ReactNode }) {
+function SummaryStrip({ guild: g, members, summary: s, activity, classHref }: { guild: ArmoryGuild; members: ArmoryMember[]; summary: RosterSummary; activity: ReactNode; classHref: (cls: string) => string }) {
   const read = members.filter((m) => m.stored).length;
   // The all-levels average mixes in low characters; at 60 it says what a raid-ready member wears.
   const at60 = members.filter((m) => m.level === 60 && m.itemLevel !== null).map((m) => m.itemLevel!);
@@ -463,7 +464,7 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
         ...(average60 === null ? [] : [{ label: "Average item level at 60", value: averageRead(average60, at60.length), numeric: true }]),
         { label: "Roster read", value: utcDay(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
-      {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}
+      {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} href={classHref} />}
       {activity}
     </section>
   );
@@ -519,16 +520,20 @@ function CountStrip({ kind, title, note, total, rows }: { kind: "activity" | "le
 
 const share = (count: number, total: number) => (total ? Math.round(count / total * 1000) / 10 : 0);
 
-/** The class mix in one row: a stacked bar, then each class named in its colour with its count. */
-function ClassBar({ total, classes }: { total: number; classes: RosterSummary["classes"] }) {
+/** The class mix in one row: a stacked bar, then each class named in its colour with its count, linking the roster filtered to it. */
+function ClassBar({ total, classes, href }: { total: number; classes: RosterSummary["classes"]; href: (cls: string) => string }) {
   const label = `Class mix: ${classes.map((c) => `${className(c.token)} ${c.count}`).join(", ")}`;
   return (
     <div className="space-y-2">
       <div data-class-bar role="img" aria-label={label} className="flex h-2 overflow-hidden rounded-full bg-panel">
         {classes.map((c) => <span key={c.token} className={`block h-2 ${classColour(CLASS_BG, c.token)}`} style={{ width: `${share(c.count, total)}%` }} />)}
       </div>
-      <p aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1 text-meta">
-        {classes.map((c) => <span key={c.token}><span className={classText(c.token)}>{className(c.token)}</span> <span className="font-mono tabular-nums text-fg-2">{c.count}</span></span>)}
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-meta">
+        {classes.map((c) => (
+          <Link key={c.token} href={href(c.token.toLowerCase())} rel="nofollow" className="underline decoration-edge underline-offset-4 hover:decoration-fg">
+            <span className={classText(c.token)}>{className(c.token)}</span> <span className="font-mono tabular-nums text-fg-2">{c.count}</span>
+          </Link>
+        ))}
       </p>
     </div>
   );
@@ -536,14 +541,16 @@ function ClassBar({ total, classes }: { total: number; classes: RosterSummary["c
 
 /** The five members with the highest item level read, each linking to their character. */
 function TopItemLevels({ region, rows }: { region: string; rows: readonly Row[] }) {
-  const top = rows
+  const read = rows
     .filter((r) => r.m.stored && r.m.itemLevel !== null)
-    .sort((a, b) => b.m.itemLevel! - a.m.itemLevel! || byName(a, b))
-    .slice(0, 5);
+    .sort((a, b) => b.m.itemLevel! - a.m.itemLevel! || byName(a, b));
+  const top = read.slice(0, 5);
   if (top.length === 0) return null;
+  const figure = (v: number) => <span className="font-mono tabular-nums text-fg">{metricValue("item-level", v)}</span>;
   return (
     <section aria-labelledby="guild-top" className="space-y-3">
       <SectionHeading id="guild-top" note="Among the members the armory has read.">Top item levels</SectionHeading>
+      {read.length > 1 && <p data-item-level-spread className="text-meta text-fg-2">Spread among the {read.length} read: {figure(read.at(-1)!.m.itemLevel!)} to {figure(read[0].m.itemLevel!)}</p>}
       <ol className="grid gap-x-6 gap-y-1 text-cell sm:grid-cols-2 lg:grid-cols-5">
         {top.map(({ m, token }) => (
           <li key={m.characterSlug} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-line py-2">
