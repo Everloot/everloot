@@ -129,8 +129,8 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     <Container width="data">
       <article className="space-y-8">
         {/* The header and the facts under it read as one block: the header's own margin is the gap between them. */}
-        <div data-character-head>
-          <div className="flex items-start gap-4">
+        <div data-character-head className="space-y-3">
+          <div className="flex items-start gap-3 rounded-card border border-line border-t-2 border-t-accent bg-panel p-3 sm:gap-5 sm:p-5">
             <Portrait src={portrait} name={c.name} />
             <div className="min-w-0 flex-1">
               <PageHeader
@@ -164,9 +164,9 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
           </div>
         </div>
 
-        <CharacterOverview character={c} />
-
         <Equipment character={shown.character} tips={tips} unknownIcon={unknownIcon} unknown={unknown} fromFiles={shown.fromFiles} setNames={(id) => setNames?.names.get(id)} center={<SheetSummary character={c} />} />
+
+        <CharacterOverview character={c} />
 
         <DungeonRaidSlot data={progression.dungeons} href="#progress" character={c} />
 

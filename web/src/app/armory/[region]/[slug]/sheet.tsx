@@ -94,7 +94,7 @@ export function RankBadges({ ranks }: { ranks: readonly RankBadge[] }) {
 }
 
 /**
- * The overview above the gear: a card per talent tree (the largest first and brightest) and the profession bars. With
+ * The overview below the gear: a card per talent tree (the largest first and brightest) and the profession bars. With
  * both, the spec cards sit beside the professions from a wide screen up, so neither leaves an empty band beside it;
  * the professions take two columns from small screens up. One alone fills the width. Nothing when the read brought neither.
  */
@@ -131,12 +131,11 @@ export function CharacterOverview({ character: c }: { character: ArmoryCharacter
 export function SheetSummary({ character: c }: { character: ArmoryCharacter }) {
   const stats = c.details?.statistics?.rows ?? [];
   const key = KEY_STATS.flatMap((label) => stats.filter((s) => s.label === label));
+  if (c.averageItemLevel === null && key.length === 0) return null;
   return (
-    <section aria-label="Summary" data-sheet-summary className="flex h-full flex-col gap-4 rounded-card border border-edge bg-panel p-4">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {c.averageItemLevel !== null && <Pair label="Blizzard's average item level">{itemLevelValue(c, c.averageItemLevel, c.averageItemLevel)}</Pair>}
-      </dl>
-      {key.length > 0 && <dl aria-label="Key stats" className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4">
+    <section aria-label="Summary" data-sheet-summary className="flex flex-col gap-4 rounded-card border border-edge bg-panel p-4">
+      {c.averageItemLevel !== null && <dl><Pair label="Blizzard's average item level">{itemLevelValue(c, c.averageItemLevel, c.averageItemLevel)}</Pair></dl>}
+      {key.length > 0 && <dl aria-label="Key stats" className={`grid grid-cols-2 gap-x-4 gap-y-3 ${c.averageItemLevel === null ? "" : "border-t border-line pt-4"}`}>
         {key.map((s) => <Pair key={s.label} label={s.label}>{s.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{s.percent ? "%" : ""}</Pair>)}
       </dl>}
     </section>
