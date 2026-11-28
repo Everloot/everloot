@@ -120,7 +120,7 @@ export default async function RealmItemPage(props: Props) {
         meta={v && (
           <Facts items={[
             `${row.house} auction house`,
-            `Newest scan ${scanDayText(v.day, now)}`,
+            `Newest scan ${scanDayText(v.day)}`,
             reportersText(v.reporters),
           ]} />
         )}
@@ -167,7 +167,7 @@ export default async function RealmItemPage(props: Props) {
               ...(row ? [{
                 id: "houses", label: "Houses", count: houses.length,
                 panel: houses.length
-                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} now={now} /></div>
+                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>
                   : <div className="pt-4"><EmptyState framed={false} count={Math.max(...HOUSES.map((h) => agreementSoFar(state, slug, itemId, h)))} message="No auction house has its own price for this item yet: a house's price needs scans from 3 players in that house." /></div>,
               }] : []),
               {

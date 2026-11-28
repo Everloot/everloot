@@ -11,7 +11,7 @@ import { loadWikiEntityNames } from "@/lib/wiki-entity-names";
 import { wikiNpcNames } from "@/lib/wiki-npc-names";
 import { NAME_FROM } from "@/lib/items";
 import { LINK } from "../entity";
-import { byRank, countBy, facetRows, nameMatches, Respelled,
+import { byRank, countBy, facetRows, nameMatches, Respelled, unrecordedNote,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -124,30 +124,36 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
       options: [{ label: "Any zone", href: here({ zone: undefined }), on: !q.zone, reset: true }, ...zones.map((z) => ({
         label: z.name, href: here({ zone: z.mapId }), on: q.zone === z.mapId, count: inZone.get(z.mapId) ?? 0,
       }))],
+      // The rows no option holds, so the options adding to less than the list says why.
+      note: unrecordedNote(without.zone, (n) => n.zone !== null),
     },
     {
       type: "menu", key: "level", label: "Level",
       options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
         label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((n) => inLevel(n, b)).length,
       }))],
+      note: unrecordedNote(without.level, (n) => n.level !== null),
     },
     {
       type: "menu", key: "react", label: "Reaction",
       options: [{ label: "Any reaction", href: here({ react: undefined }), on: !q.react, reset: true }, ...Object.entries(REACTIONS).map(([k, r]) => ({
         label: REACTION_LABEL[r], href: here({ react: k }), on: q.react === k, count: ofReaction.get(r) ?? 0,
       }))],
+      note: unrecordedNote(without.react, (n) => n.reaction !== null),
     },
     {
       type: "menu", key: "type", label: "Type",
       options: [{ label: "Any type", href: here({ type: undefined }), on: !q.type, reset: true }, ...[...TYPES].map(([k, t]) => ({
         label: t, href: here({ type: k }), on: q.type === k, count: ofType.get(t) ?? 0,
       })).filter((o) => o.count > 0 || o.on)],
+      note: unrecordedNote(without.type, (n) => n.creatureType !== null),
     },
     {
       type: "menu", key: "rank", label: "Rank",
       options: [{ label: "Any rank", href: here({ rank: undefined }), on: !q.rank, reset: true }, ...[...RANKS].map(([k, r]) => ({
         label: RANK_LABEL[r], href: here({ rank: k }), on: q.rank === k, count: ofRank.get(r) ?? 0,
       })).filter((o) => o.count > 0 || o.on)],
+      note: unrecordedNote(without.rank, (n) => n.rank !== null),
     },
     { type: "toggle", key: "drops", label: "Has drops", href: here({ drops: q.drops ? undefined : true }), on: Boolean(q.drops) },
   ];

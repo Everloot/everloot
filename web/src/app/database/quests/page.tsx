@@ -13,7 +13,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { bareQuestRow, publicQuests, questTypeLabel, SIDE_LABEL, SIDE_TONE, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
-import { byRank, countBy, facetRows, nameMatches, Respelled,
+import { byRank, countBy, facetRows, nameMatches, Respelled, unrecordedNote,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -137,18 +137,22 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
       options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
         label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((x) => inLevel(x, b)).length,
       }))],
+      // The rows no option holds, so the options adding to less than the list says why.
+      note: unrecordedNote(without.level, (x) => x.level !== null),
     },
     {
       type: "menu", key: "category", label: "Category",
       options: [{ label: "Any category", href: here({ category: undefined }), on: !q.category, reset: true }, ...categories.map((c) => ({
         label: c, href: here({ category: c }), on: q.category === c, count: inCategory.get(c) ?? 0,
       }))],
+      note: unrecordedNote(without.category, (x) => x.category !== null),
     },
     {
       type: "menu", key: "side", label: "Side",
       options: [{ label: "Any side", href: here({ side: undefined }), on: !q.side, reset: true }, ...Object.entries(SIDES).map(([k, s]) => ({
         label: SIDE_LABEL[s], href: here({ side: k }), on: q.side === k, count: onSide.get(s) ?? 0,
       }))],
+      note: unrecordedNote(without.side, (x) => x.side !== null),
     },
     // Offered once some quest has agreed rewards (3 installs report the same item); until then it could only empty the list.
     ...(anyRewards || q.rewards ? [{ type: "toggle" as const, key: "rewards", label: "Has rewards", href: here({ rewards: q.rewards ? undefined : true }), on: Boolean(q.rewards) }] : []),

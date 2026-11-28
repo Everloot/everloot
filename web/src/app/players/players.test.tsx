@@ -235,6 +235,9 @@ describe("player directory", () => {
     const recent = html.slice(html.indexOf('id="players-recent"'), html.indexOf('id="players-best"'));
     expect(recent.indexOf("/armory/eu/arla-quill")).toBeLessThan(recent.indexOf("/armory/eu/brin-mire"));
     expect(recent.indexOf("/armory/eu/brin-mire")).toBeLessThan(recent.indexOf("/armory/eu/velkara-duskmantle"));
+    // QA round 13: the Read day in the site's day form, in the cell and the phone line, never "2026-11-09".
+    expect(recent).toContain("Nov 9, 2026");
+    expect(recent).not.toContain("2026-11-09<");
     const best = html.slice(html.indexOf('id="players-best"'));
     expect(best).toContain('href="/armory/eu/arla-quill"');
     expect(best).not.toContain("/armory/eu/brin-mire");

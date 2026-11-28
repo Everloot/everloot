@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { timeAgo } from "@/lib/auction-house";
+import { utcStamp } from "@/lib/time";
 
 /**
  * "12 min ago", recounted in the browser each minute: a cached page would otherwise keep the age it had
@@ -15,5 +16,5 @@ export default function TimeAgo({ at, renderedAt }: { at: number; renderedAt: nu
     return () => clearInterval(timer);
   }, []);
   const iso = new Date(at).toISOString();
-  return <time dateTime={iso} title={`${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`}>{timeAgo(at, now)}</time>;
+  return <time dateTime={iso} title={utcStamp(iso) ?? undefined}>{timeAgo(at, now)}</time>;
 }

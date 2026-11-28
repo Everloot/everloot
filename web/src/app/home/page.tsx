@@ -14,7 +14,6 @@ import LaunchCountdown from "@/components/LaunchCountdown";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Badge, Card, GET_THE_ADDON } from "@/components/ui";
 import Coins from "@/components/ui/Coins";
-import { day } from "@/app/armory/parts";
 import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { loadAccountShell } from "@/lib/account-shell";
 import { armoryCharacterPath, regionLabel } from "@/lib/armory";
@@ -28,6 +27,7 @@ import { postPath } from "@kb/blue-pages";
 import { HOME_REWRITE_HEADER, profilesOn } from "@/lib/profiles";
 import { editPath, savedBuildsOn, type AccountBuilds } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";
+import { utcDay } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +78,7 @@ function AltCard({ href, name, classSlug, line }: { href: string; name: string; 
 /** The linked hero's sheet summary from its armory row, and its gold only when the owner's own sync supplied it. */
 function LinkedHero({ hero, isMain, gold }: { hero: ArmoryCharacter; isMain: boolean; gold: Record<string, number> | undefined }) {
   const classSlug = hero.class.toLowerCase();
-  const login = day(hero.lastLogin);
+  const login = utcDay(hero.lastLogin);
   const acquired = gold?.["328"], most = gold?.["334"];
   return (
     <Card href={armoryCharacterPath(hero.region, hero.slug)} padding="none">
@@ -179,7 +179,7 @@ function SinceLastPlayed({ login, posts }: { login: string; posts: ChangeEntry[]
   return (
     <section aria-labelledby="since-last-played" className="space-y-1">
       <h2 id="since-last-played" className="text-cell font-semibold text-fg">Since you last played</h2>
-      <p className="text-meta text-muted">New blue posts since your last login on <time dateTime={login}>{day(login)}</time>.</p>
+      <p className="text-meta text-muted">New blue posts since your last login on <time dateTime={login}>{utcDay(login)}</time>.</p>
       <ul>
         {posts.map((e) => (
           <li key={e.id} className="border-b border-line py-1.5">

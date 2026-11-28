@@ -65,7 +65,7 @@ const text = (html: string) => {
   return (document.body.textContent ?? "").replace(/[<>]/g, "").replace(/ gold/g, "g").replace(/ silver/g, "s").replace(/ copper/g, "c");
 };
 // The newest scan day as every Auction House page writes it: "27 Nov".
-const todayText = today.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const todayText = today.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const hub = async (searchParams: Record<string, string>) =>
   renderToStaticMarkup(await AuctionHousePage({ searchParams: Promise.resolve(searchParams) }));
 const realm = (slug: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ realm: slug }), searchParams: Promise.resolve(search) });

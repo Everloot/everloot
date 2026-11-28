@@ -19,7 +19,8 @@ import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAs
 import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
-import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
+import { edgesFrom, type Edge, type Rel } from "@kb/edges";
+import { utcDay } from "@/lib/time";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
@@ -87,7 +88,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 /** Who vouches for a relation row: the installs that agree, or (the quiet marker) the game files. */
-const evidence = (e: Edge) => (e.evidence === "observed" ? evidenceLabel(e) : <Badge tone="files" href={e.build ? `/changes?show=builds&q=${e.build}` : undefined} />);
+// A player-seen row: its installs and the day it was last seen, in the site's day form.
+const evidence = (e: Edge) => (e.evidence === "observed" ? `${e.installs} installs${e.lastSeen ? `, last seen ${utcDay(e.lastSeen) ?? e.lastSeen}` : ""}` : <Badge tone="files" href={e.build ? `/changes?show=builds&q=${e.build}` : undefined} />);
 
 export default async function ItemPage(props: Props) {
   const params = await props.params;

@@ -11,8 +11,11 @@ export interface FilterOption {
 }
 
 export type FilterControl =
-  /** A dropdown button. `multi` draws a box before each option (several can be on at once). */
-  | { type: "menu"; key: string; label: string; options: FilterOption[]; multi?: boolean }
+  /**
+   * A dropdown button. `multi` draws a box before each option (several can be on at once). `note` is a plain line
+   * under the choices, not one itself: "Not recorded: 2,829", the rows no option holds.
+   */
+  | { type: "menu"; key: string; label: string; options: FilterOption[]; multi?: boolean; note?: string }
   /** A yes-only filter: on or off ("Crafted"). */
   | { type: "toggle"; key: string; label: string; href: string; on: boolean };
 
@@ -65,6 +68,7 @@ function Menu({ c: given, rel }: { c: Extract<FilterControl, { type: "menu" }>; 
             </Link>
           </li>
         ))}
+        {c.note && <li className="px-2 py-1.5 text-meta text-muted">{c.note}</li>}
       </ul>
     </details>
   );

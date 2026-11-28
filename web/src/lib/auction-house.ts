@@ -5,6 +5,7 @@ import {
   type ItemDays, type MarketState, type MarketValue, type MoveSpan, type PublicDay, type RealmDays,
 } from "@kb/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
+import { utcDay } from "./time";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -406,10 +407,9 @@ export function newestScanDay(rows: readonly { value: { day: string } }[]): stri
   return newest;
 }
 
-/** A public day as the pages write it: "20 Nov", with the year when it is not `now`'s. */
-export function scanDayText(day: string, now: Date): string {
-  const at = new Date(`${day}T00:00:00Z`);
-  return at.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(at.getUTCFullYear() !== now.getUTCFullYear() ? { year: "numeric" } : {}), timeZone: "UTC" });
+/** A public day as the pages write it: "Nov 20, 2026", the site's day form. */
+export function scanDayText(day: string): string {
+  return utcDay(day) ?? day;
 }
 
 const moveMemo = new WeakMap<MarketRow, Map<string, Move | null>>();
@@ -440,8 +440,8 @@ export function noWeekMoveReason(row: MarketRow, now: Date): string | null {
   if (priceMove(row, 7, now)) return null;
   const to = solidDays(row.points).at(-1);
   if (!to) return "No public day to compare";
-  if (todayNumber(now) - dayNumber(to.day) > 1) return `No public scan since ${scanDayText(to.day, now)}: a 7-day change needs one from today or yesterday`;
-  return priceMoveOf(row.points, 7, now) ? "Unchanged over 7 days" : `No public scan 7 to 10 days before ${scanDayText(to.day, now)} to compare with`;
+  if (todayNumber(now) - dayNumber(to.day) > 1) return `No public scan since ${scanDayText(to.day)}: a 7-day change needs one from today or yesterday`;
+  return priceMoveOf(row.points, 7, now) ? "Unchanged over 7 days" : `No public scan 7 to 10 days before ${scanDayText(to.day)} to compare with`;
 }
 
 export const SPARK_DAYS = 14;

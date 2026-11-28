@@ -528,7 +528,7 @@ describe("the guild page", () => {
     expect(out).toMatch(/>Horde<\/span> guild/);
     expect(out).toMatch(/>EU<\/span>Normal/);
     expect(out).toContain("3 members");
-    expect(out).toContain("2026-10-01");
+    expect(out).toContain("Oct 1, 2026");
     expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
     expect(out).not.toContain('href="/armory/eu/brannoc-tide"');
     expect(roster(out).indexOf("Brannoc")).toBeLessThan(roster(out).indexOf("Velkara"));

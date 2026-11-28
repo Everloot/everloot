@@ -147,7 +147,7 @@ export default async function MarketChangesPage(props: Props) {
   ) : (
     <p className="text-meta text-fg-2">
       {newest && dayNumber(newest) < dayNumber(now.toISOString().slice(0, 10)) - 1
-        ? <>No week comparison: the newest scan in this house is {scanDayText(newest, now)}, older than yesterday (UTC), so the week has no current end.</>
+        ? <>No week comparison: the newest scan in this house is {scanDayText(newest)}, older than yesterday (UTC), so the week has no current end.</>
         : "No week comparison yet: no item here has a solid day today or yesterday with one 7 to 10 days before it."}
       {ownScans(c)}
     </p>
@@ -207,7 +207,7 @@ export default async function MarketChangesPage(props: Props) {
           meta={market.state && (
             <Facts items={[
               shown ? `${shown} auction house` : "No house priced yet",
-              newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet",
+              newest ? `Newest scan ${scanDayText(newest)}` : "No public scan yet",
               ...(board ? [`${count(board.reporters, "reporter")} this week`] : []),
             ]} />
           )}
