@@ -138,5 +138,5 @@ test("the file holds the vendors /database/vendors lists; a file written before 
   const { vendorIds: _gone, ...older } = file;
   expect(parseSearchNames(JSON.stringify(older))!.vendorIds).toBeUndefined();
   expect(parseSearchNames(JSON.stringify({ ...file, vendorIds: ["x"] }))).toBeNull();
-  expect(SEARCH_NAMES_REVISION).toBe("names-2");
+  expect(SEARCH_NAMES_REVISION).toBe("names-3");
 });

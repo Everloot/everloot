@@ -17,7 +17,7 @@ import type { R2Config } from "./upload-store";
 
 export const INSTANCE_FACTS_KEY = "snapshots/instance-facts.json";
 /** The file's shape in its stamp. Change it when the file changes shape, so the next job run rewrites it. */
-export const INSTANCE_FACTS_REVISION = "instance-facts-1";
+export const INSTANCE_FACTS_REVISION = "instance-facts-2";
 const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 60_000;
 

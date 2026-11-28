@@ -96,6 +96,23 @@ describe("POST /api/intake", () => {
     expect(body).not.toHaveProperty("upload");
   });
 
+  test("the upload page's sample is refused row by row with a reason, and nothing is stored", async () => {
+    const POST = await freshPost();
+    const installId = "sample-0f1e2d3c-aaaa-4bbb-8ccc-dddddddddddd";
+    const response = await POST(request({ addonVersion: "0.2.0", records: [
+      { installId, eventId: "sample:1", capturedAt, kind: "npc_sighting", npcId: 1234, name: "Forest Spider", mapId: 141, x: 42.5, y: 61, level: 60, reaction: "hostile" },
+      { installId, eventId: "sample:2", capturedAt, kind: "loot", sourceNpcId: 1234, items: [{ itemId: 456, count: 2 }] },
+    ] }));
+
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, accepted: [] });
+    expect(body.rejected.map((r: { index: number }) => r.index)).toEqual([0, 1]);
+    expect(body.rejected[0].reason).toBe("This is the upload page's sample, which is never stored. Choose your own Everloot.lua to send.");
+    expect(store.putUpload).not.toHaveBeenCalled();
+    expect(store.installQuota).not.toHaveBeenCalled();
+  });
+
   test("the stored upload keeps the client build the addon reported", async () => {
     const POST = await freshPost();
     const response = await POST(request({ addonVersion: "0.2.6", clientBuild: "1.60.1.70450", records: [loot("install-1234")] }));
