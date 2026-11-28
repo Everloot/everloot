@@ -25,6 +25,7 @@ import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
 import { REGION_LABEL, RULESET_LABEL, realmRegion, realmRuleset } from "@/lib/realms";
+import { realmDisplayName } from "../../RealmName";
 
 type Props = { params: Promise<{ realm: string; itemId: string }> };
 
@@ -61,7 +62,9 @@ const loadFor = cache(async (rawRealm: string, rawItemId: string) => {
 });
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const { slug, itemId, row, realm, label } = await load(props.params);
+  const { slug, itemId, row, realm: recorded, label } = await load(props.params);
+  // The realm as the site shows it ("US1 · Realm 4 PvP"), not the recorded CAMWOW label.
+  const realm = realmDisplayName(recorded);
   const description = row
     ? `${label} on ${realm} in WoW: Forever, ${row.house} auction house: market value ${money(row.value.market)}, minimum buyout ${formatCopper(row.value.min)}, and 60 days of prices from player scans.`
     : `No public auction price for ${label} on ${realm} in WoW: Forever yet. A price shows once 3 reporters scan the item in one auction house on this realm.`;
@@ -84,6 +87,8 @@ export default async function RealmItemPage(props: Props) {
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
+  // Sentences name the realm as the site shows it; the store, the API link and AH Ledger read the recorded name.
+  const shown = realmDisplayName(realm);
   // AH Ledger's markets for this realm's ruleset and region, both factions; none for a realm the map cannot place.
   const ruleset = realmRuleset(realm);
   const region = realmRegion(realm);
@@ -115,8 +120,8 @@ export default async function RealmItemPage(props: Props) {
         title={label}
         quality={quality}
         lede={row
-          ? `${row.house} auction house price on ${realm} in WoW: Forever. Each house is its own market${houses.length > 1 ? "; the Houses tab lists the others" : ""}.`
-          : `Auction House price on ${realm} in WoW: Forever, one auction house at a time.`}
+          ? `${row.house} auction house price on ${shown} in WoW: Forever. Each house is its own market${houses.length > 1 ? "; the Houses tab lists the others" : ""}.`
+          : `Auction House price on ${shown} in WoW: Forever, one auction house at a time.`}
         meta={v && (
           <Facts items={[
             `${row.house} auction house`,
@@ -141,7 +146,7 @@ export default async function RealmItemPage(props: Props) {
         {state && !v && (
           <EmptyState
             count={agreementSoFar(state, slug, itemId)}
-            message={`No price for ${label} on ${realm} yet: it needs scans from 3 players in one auction house.`}
+            message={`No price for ${label} on ${shown} yet: it needs scans from 3 players in one auction house.`}
           />
         )}
 

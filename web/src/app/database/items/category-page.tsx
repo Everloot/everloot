@@ -379,14 +379,16 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     ...(q.set ? [{ label: "Set piece", href: here({ set: undefined }) }] : []),
     ...(q.seen ? [{ label: "Seen by players", href: here({ seen: undefined }) }] : []),
   ];
+  // Each chip is a link to the list without that one filter.
+  const chipLinks = chips.map((c) => (
+    <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
+      {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
+    </Link>
+  ));
   const empty = active > 0 ? (
     <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
       <span>No items match these filters.</span>
-      {chips.map((c) => (
-        <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
-          {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
-        </Link>
-      ))}
+      {chipLinks}
       <Link href={link(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   ) : <p className="py-4 text-cell text-fg-2">{context ? `No items in this category a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}.` : "No items in this category."}</p>;
@@ -411,6 +413,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           active={active}
           clearHref={link(cls?.slug, sub?.slug)}
         />
+        {/* On a phone the menus fold into one "Filters (n)" button, so the filters that are on show here, each removable. */}
+        {rows.length > 0 && chips.length > 0 && <p data-filter-chips className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">{chipLinks}</p>}
         <ClassContextChip read={read} here={withoutClassContext(itemsHref(cls?.slug, sub?.slug), search)}>
           {context && (
             <span>
