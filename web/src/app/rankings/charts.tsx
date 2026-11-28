@@ -1,12 +1,12 @@
 "use client";
 
 import type { CensusCount } from "@kb/census";
-import { axisStep } from "@/lib/chart-axis";
+import { axisStep, percentAxisStep } from "@/lib/chart-axis";
 import type { ChartSeries, RankingWeek } from "@/lib/rankings";
 import { useMeasuredWidth } from "@/lib/use-measured-width";
-import { fill, nameOf, number, percent, weekLabel, weekTick } from "./chart-words";
+import { fill, nameOf, number, percent, stroke, weekLabel, weekTick } from "./chart-words";
 
-// The hub's two charts, drawn at the width they are laid out at, one viewBox unit a CSS pixel, so their labels keep
+// The hub's two charts and a ranking's trend chart, drawn at the width they are laid out at, one viewBox unit a CSS pixel, so their labels keep
 // their size on a phone and at 1440 instead of scaling with the picture; 720 until the width is measured.
 
 const TH = 200;
@@ -103,6 +103,67 @@ export function StackedWeeksChart({ weeks, series, partial, title }: { weeks: Ra
             )}
             <text x={x(i) + barW / 2} y={SH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(week)}</text>
           </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+const LH = 300;
+const LPAD = { left: 40, right: 24, top: 16, bottom: 28 };
+/** Room for the names at the lines' ends (with LPAD.right, 140 as before); a phone's card has none to spare, and the legend names every line anyway. */
+const END_ROOM = 116;
+const END_MIN_WIDTH = 480;
+
+/**
+ * Each series' share of the week's characters, a line over the weeks. The share axis runs 0 / step / 2 × step in
+ * whole percents, so each label is its gridline's value. Lines break where a week's count is hidden; with four lines
+ * or fewer, and room for it, each is also named at its last point, nudged apart so the names never overlap.
+ */
+export function WeeklyLinesChart({ weeks, series, title }: { weeks: RankingWeek[]; series: ChartSeries[]; title: string }) {
+  const [box, width] = useMeasuredWidth();
+  const step = percentAxisStep(Math.max(0, ...series.flatMap((s) => s.points.filter((p): p is number => p !== null))));
+  const max = step * 2;
+  const named = series.length <= 4 && width >= END_MIN_WIDTH;
+  const right = LPAD.right + (named ? END_ROOM : 0);
+  const x = (i: number) => LPAD.left + (weeks.length === 1 ? 0 : (i / (weeks.length - 1)) * (width - LPAD.left - right));
+  const y = (v: number) => LPAD.top + (1 - v / max) * (LH - LPAD.top - LPAD.bottom);
+  const path = (points: (number | null)[]) =>
+    points.map((p, i) => (p === null ? "" : `${i > 0 && points[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`)).join(" ").trim();
+  const ends = (named ? series : [])
+    .map((s) => {
+      const i = s.points.reduce<number>((last, p, j) => (p !== null ? j : last), -1);
+      return i < 0 ? null : { key: s.key, label: nameOf(s), y: y(s.points[i]!) };
+    })
+    .filter((e): e is { key: string; label: string; y: number } => e !== null)
+    .sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 12);
+  return (
+    <div ref={box}>
+      <svg viewBox={`0 0 ${width} ${LH}`} width={width} height={LH} role="img" aria-label={title} className="block max-w-full">
+        <title>{title}</title>
+        {[0, step, max].map((v) => (
+          <g key={v}>
+            <line x1={LPAD.left} x2={width - right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
+            <text x={LPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{percent(v)}</text>
+          </g>
+        ))}
+        {weeks.map((w, i) => (
+          <text key={w.start} x={x(i)} y={LH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(w)}</text>
+        ))}
+        {series.map((s) => (
+          <g key={s.key}>
+            <title>{nameOf(s)}</title>
+            <path d={path(s.points)} fill="none" strokeWidth={2} strokeLinejoin="round" strokeDasharray={s.faction === "Horde" ? "6 3" : undefined} className={stroke(s)} />
+            {s.points.map((p, i) => p !== null && (
+              <circle key={i} cx={x(i)} cy={y(p)} r={4} className={`${fill(s)} stroke-panel`} strokeWidth={2}>
+                <title>{`${nameOf(s)}, ${weekLabel(weeks[i])}: ${percent(p)}`}</title>
+              </circle>
+            ))}
+          </g>
+        ))}
+        {ends.map((e) => (
+          <text key={e.key} x={width - right + 8} y={e.y + 4} className="fill-fg-2 text-caption">{e.label}</text>
         ))}
       </svg>
     </div>

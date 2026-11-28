@@ -23,13 +23,15 @@ export function BoardMetric({ metric }: { metric: ArmoryMetric }) {
   return <Tooltip label={`${ARMORY_BOARDS[metric].column}: ${ARMORY_BOARDS[metric].lede}`}>{ARMORY_BOARDS[metric].column}</Tooltip>;
 }
 
+/** The value over a bar of it against the board's top. The bar's track is a fixed 4rem, so equal values draw equal bars
+ * whatever text sits beside them. */
 export function BoardValue({ row, metric, top }: { row: ArmoryBoardRow; metric: ArmoryMetric; top: number }) {
   const value = metricValue(metric, row.value);
   const read = new Date(row.fetchedAt).toLocaleString("en-US", { timeZone: "UTC", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   return (
-    <span className="inline-flex min-w-16 flex-col items-stretch text-right font-medium text-fg">
+    <span className="inline-flex min-w-16 flex-col text-right font-medium text-fg">
       <span><Tooltip label={`${ARMORY_BOARDS[metric].column}: ${value}. ${ARMORY_BOARDS[metric].lede} Read ${read} UTC.`}>{value}</Tooltip>{!rankable(row.value) && <span className="font-sans font-normal text-muted"> · not ranked</span>}</span>
-      <span aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-edge"><span className={`block h-1 rounded-full ${classColour(CLASS_BG, row.class) ?? "bg-muted"}`} style={{ width: `${top > 0 ? Math.min(100, Math.max(0, row.value / top * 100)) : 0}%` }} /></span>
+      <span aria-hidden="true" className="h-1 w-16 self-end overflow-hidden rounded-full bg-edge"><span className={`block h-1 rounded-full ${classColour(CLASS_BG, row.class) ?? "bg-muted"}`} style={{ width: `${top > 0 ? Math.min(100, Math.max(0, row.value / top * 100)) : 0}%` }} /></span>
     </span>
   );
 }
