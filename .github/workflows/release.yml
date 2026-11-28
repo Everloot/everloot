@@ -88,7 +88,7 @@ jobs:
         run: |
           previous="$(git tag --list 'addon-v*' --sort=-v:refname | grep -vx "${GITHUB_REF_NAME}" | head -n 1 || true)"
           args=(--title "Everloot addon ${GITHUB_REF_NAME#addon-v}" --notes-file release-notes.md --generate-notes --verify-tag)
-          if grep -qx 'Release channel: Alpha' release-notes.md; then args+=(--prerelease); fi
+          if tr -d '\r' < release-notes.md | grep -qx 'Release channel: Alpha'; then args+=(--prerelease); fi
           if [ -n "${previous}" ]; then args+=(--notes-start-tag "${previous}"); fi
           gh release create "${GITHUB_REF_NAME}" "${args[@]}" Everloot-*.zip SHA256SUMS
       - name: Announce the release in Discord

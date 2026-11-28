@@ -21,22 +21,28 @@ with tempfile.TemporaryDirectory(prefix='everloot-release-') as temp:
     stub = folder / 'bin'
     stub.mkdir()
     gh = stub / 'gh'
-    gh.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CAPTURE_ARGS"\n', encoding='utf-8')
+    gh.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CAPTURE_ARGS"\n', encoding='utf-8', newline='\n')
     gh.chmod(0o755)
+    # MSYS grep can strip CR automatically; force the byte semantics used by the Linux release runner.
+    grep = stub / 'grep'
+    grep.write_text('#!/bin/sh\nexec /usr/bin/grep -U "$@"\n', encoding='utf-8', newline='\n')
+    grep.chmod(0o755)
     posix = stub.as_posix()
     if os.name == 'nt':
         posix = '/' + posix[0].lower() + posix[2:]
     run = folder / 'release.sh'
-    run.write_text(f'export PATH="{posix}:$PATH"\n' + script, encoding='utf-8')
-    for notes, alpha in [('Release channel: Alpha\nLive-client verification pending.\n', True), ('Stable release.\n', False)]:
-        (folder / 'release-notes.md').write_text(notes, encoding='utf-8')
+    run.write_text(f'export PATH="{posix}:$PATH"\n' + script, encoding='utf-8', newline='\n')
+    for notes, alpha in [('Release channel: Alpha\nLive-client verification pending.\n', True),
+                         ('Release channel: Alpha\r\nLive-client verification pending.\r\n', True),
+                         ('Stable release.\n', False), ('Stable release.\r\n', False)]:
+        (folder / 'release-notes.md').write_bytes(notes.encode('utf-8'))
         capture = folder / 'args.txt'
         env = dict(os.environ, GITHUB_REF_NAME='addon-v0.3.11', CAPTURE_ARGS=capture.as_posix())
         for secret in ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']:
             env.pop(secret, None)
         subprocess.run([bash, '--noprofile', '--norc', '-e', run.as_posix()], cwd=temp, env=env, check=True)
         args = capture.read_text(encoding='utf-8').splitlines()
-        assert ('--prerelease' in args) == alpha, args
+        assert ('--prerelease' in args) == alpha, (notes, args)
 for name in ['nightly.yml', 'release.yml']:
     workflow = (root / '.github/workflows' / name).read_text(encoding='utf-8')
     for contract in ['planner_contract.py', 'raid_plan_contract.py']:
