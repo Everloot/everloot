@@ -1,3 +1,4 @@
+import { storedHotfixExcerpt } from "./blue-forum.js";
 import { postPath } from "./blue-pages.js";
 import type { BlueGame, BluePost, BlueRegion } from "./blue-posts.js";
 import { clampExcerpt, clampText, isoTime, safeHttpUrl } from "./text-safety.js";
@@ -86,7 +87,8 @@ export function sanitizePost(raw: unknown): BluePost | null {
     category: clampText(raw.category, 100),
     game: raw.game,
     kind: raw.kind === "hotfix" ? "hotfix" : "post",
-    excerpt: clampExcerpt(raw.excerpt),
+    // A forum hotfix stored before its headings were left out reads as one stored now (see storedHotfixExcerpt).
+    excerpt: clampExcerpt(source === "forum" && raw.kind === "hotfix" ? storedHotfixExcerpt(clampExcerpt(raw.excerpt)) : raw.excerpt),
     ...(topicId !== undefined ? { topicId, ...(slug ? { topicSlug: slug } : {}) } : {}),
     ...(postNumber !== undefined ? { postNumber, startedThread: postNumber === 1 } : {}),
     ...(summary ? { summary } : {}),
