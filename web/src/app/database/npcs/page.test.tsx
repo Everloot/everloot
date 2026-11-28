@@ -114,3 +114,40 @@ test("an NPC its own page names from the Warcraft Wiki is listed, searched and s
   expect(found).toContain('<a href="/database/npcs/103">Npc Gamma</a>');
   expect(found).not.toContain('href="/database/npcs/104"');
 });
+
+test("each NPC menu counts what the list would hold with every other filter on, so no choice leads to an empty list", async () => {
+  const durotar = { mapId: 1411, name: "Durotar", continentId: 1, continentName: "Synthetic Continent" };
+  const hills = { mapId: 1426, name: "Synthetic Hills", continentId: 0, continentName: "Synthetic Continent" };
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", zone: durotar, creatureType: "Humanoid", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", zone: durotar, creatureType: "Humanoid", rank: "elite", reaction: "friendly", level: 12 }),
+    npc({ npcId: 103, name: "Npc Gamma", zone: hills, creatureType: "Beast", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 104, name: "Npc Delta", zone: hills, creatureType: "Beast", rank: "normal", reaction: "hostile", level: 30 }),
+  ];
+  // A menu choice's count, or null when the menu leaves the choice out (it would match nothing).
+  const count = (page: string, menu: string, label: string) => {
+    const part = page.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const m = new RegExp(`>${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span><span class="tabular-nums text-muted">([\\d,]+)<`).exec(part);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  const inZone = await html({ zone: "1411-durotar" });
+  expect(count(inZone, "type", "Humanoid")).toBe(2);
+  expect(count(inZone, "type", "Beast")).toBeNull();
+  expect(count(inZone, "rank", "Elite")).toBe(1);
+  // The Level and Reaction menus count too.
+  expect(count(inZone, "react", "Hostile")).toBe(1);
+  expect(count(inZone, "react", "Friendly")).toBe(1);
+  expect(count(inZone, "level", "1–10")).toBe(1);
+  expect(count(inZone, "level", "21–30")).toBeNull();
+  // A menu ignores its own filter: the other zone still counts what it holds.
+  expect(count(inZone, "zone", "Synthetic Hills")).toBe(2);
+  // Two filters: each menu counts with the other one on.
+  const beasts = await html({ type: "beast", level: "1-10" });
+  expect(count(beasts, "zone", "Durotar")).toBeNull();
+  expect(count(beasts, "zone", "Synthetic Hills")).toBe(1);
+  expect(count(beasts, "type", "Humanoid")).toBe(1);
+  expect(count(beasts, "level", "21–30")).toBe(1);
+  // With nothing on, the counts are the whole list's.
+  expect(count(await html(), "type", "Beast")).toBe(2);
+});

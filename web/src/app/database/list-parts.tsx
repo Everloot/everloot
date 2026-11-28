@@ -121,6 +121,39 @@ export function range(search: Search, k: string): { min: number; max: number } |
 
 export const rangeParam = (r?: { min: number; max: number }) => (r ? (r.min === r.max ? String(r.min) : `${r.min}-${r.max}`) : undefined);
 
+/**
+ * Faceted menu counts, the item lists' rule: each menu counts what the list would hold with every other filter on.
+ * `tests` holds each filter's test, null while it is off. One pass gives the rows that pass every test (`matched`)
+ * and, for each filter, the rows that fail none but its own (`without`), which its menu counts.
+ */
+export function facetRows<T, K extends string>(rows: readonly T[], tests: Record<K, ((row: T) => boolean) | null>): { matched: T[]; without: Record<K, T[]> } {
+  const keys = Object.keys(tests) as K[];
+  const on = keys.filter((k) => tests[k] !== null);
+  const matched: T[] = [];
+  const without = Object.fromEntries(keys.map((k) => [k, [] as T[]])) as Record<K, T[]>;
+  for (const row of rows) {
+    let missed: K | null = null;
+    let many = false;
+    for (const k of on) {
+      if (tests[k]!(row)) continue;
+      if (missed !== null) { many = true; break; }
+      missed = k;
+    }
+    if (many) continue;
+    if (missed !== null) { without[missed].push(row); continue; }
+    matched.push(row);
+    for (const k of keys) without[k].push(row);
+  }
+  return { matched, without };
+}
+
+/** How many of `rows` each key holds, in one pass. */
+export function countBy<T, V>(rows: readonly T[], key: (row: T) => V): Map<V, number> {
+  const out = new Map<V, number>();
+  for (const row of rows) out.set(key(row), (out.get(key(row)) ?? 0) + 1);
+  return out;
+}
+
 /** The level brackets the level menus offer; any other range still works typed into the URL. */
 export const LEVEL_BRACKETS = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 50], [51, 60]].map(([min, max]) => ({ min, max }));
 
