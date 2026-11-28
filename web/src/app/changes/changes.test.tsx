@@ -417,7 +417,7 @@ test("November 11 and 12: twins on both forums are one card, and two posts under
   expect(nov11).toContain("US · EU forum");
   expect(nov11).toMatch(/<span data-posts="true"[^>]*>2 posts<\/span>/);
   // Both posts' words, and a link to each post's page.
-  expect(nov11).toContain("Feral Rend and Tear now works on Pounce Bleed.");
+  expect(nov11).toContain("November 11, 2026: Rend and Tear now works on Pounce Bleed.");
   expect(nov11).toContain("Auction House changes");
   expect(nov11).toContain('href="/changes/us-30863849-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toContain('href="/changes/us-30863846-wow-forever-hotfixes-november-11-2026"');
