@@ -11,10 +11,15 @@ follows.
 "Legacy" here is the game system's name. The catalog has nothing to do with the [legacy-data policy](LEGACY_DATA_POLICY.md)
 (uploads from before event ids) or with the code that reads old data formats and old sign-in sessions.
 
-`/tools/legacy` lists it, read-only: trees, perks, ids, ranks and prerequisites, the gate amounts, and the cost
-and cap as unconfirmed readings, with the build and the label. No planner reads it. A planner may enforce only the rules the catalog marks `stored`. The cost, the
-cap and where a spend gate counts its points are `inferred`: they may be shown, labelled as unconfirmed readings, and
-nothing enforces them until each is confirmed in game or by Blizzard.
+`/tools/legacy` has a planner alongside the sourced reference. The reference shows trees, perks, ids, ranks,
+prerequisites, gate amounts, and the inferred cost and cap, with the build and source label. The planner enforces
+stored rank limits and known prerequisite links. Its per-currency totals, estimated shared cap and spend-gate
+estimates are advisory. The cost, cap and where a spend gate counts remain unconfirmed until verified in game or
+by Blizzard.
+
+The share link and one browser-local save store a versioned list of node and entry ids in rank purchase order,
+with the source build id. The current catalog replays each rank under its stored rules and reports ranks it cannot
+restore. Withdrawn ids identify removals when the catalog has their history.
 
 ## Regenerate
 
@@ -162,7 +167,11 @@ As of build 1.60.1.70707, which holds the same Legacy rows as 70634 and the buil
   names only bit 1 of that column, so whether they can be bought is not known. The catalog keeps them with their flags
   and two warnings; each counts 1 rank in its tree's 25. A planner should not offer them until that is known.
 - **How points are earned**, and whether the points belong to the account or the character: not in the tables this
-  catalog reads.
+  catalog reads. The separate [client achievement catalog](../web/src/data/game-data/client-achievements.json) for
+  build 1.60.1.71139 lists 130 achievement rewards with `Legacy Point` in their text. The source audit also inspected
+  `TraitCurrencySource`, including one 16-point source whose live availability it could not verify. The planner
+  links to a sourced achievement example. A complete challenge checklist with verified availability, criteria and
+  reward amounts still needs a joined and reviewed first-party catalog of the source, achievement and criteria rows.
 
 ## Withdrawal
 

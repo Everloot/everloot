@@ -7,13 +7,16 @@ import type { SearchRecipe } from "@/lib/profession-planner";
 import { formatCopper } from "@kb/profession-path";
 import type { FullPriceRow } from "@kb/market";
 import { SELECT_CLASS } from "./controls";
+import { realmSlug } from "@/lib/auction-house";
 
-export default function RecipeShopping({ recipe, initialCrafts }: { recipe: SearchRecipe; initialCrafts: number }) {
+type SelectedMarket = { realm: string; house: string };
+
+export default function RecipeShopping({ recipe, initialCrafts, initialMarket }: { recipe: SearchRecipe; initialCrafts: number; initialMarket?: SelectedMarket }) {
   const [count, setCount] = useState(String(initialCrafts));
   const [houses, setHouses] = useState<Record<string, string[]> | null>(null);
   const [realm, setRealm] = useState("");
   const [house, setHouse] = useState("");
-  const [discovering, setDiscovering] = useState(false);
+  const [discovering, setDiscovering] = useState(Boolean(initialMarket));
   const [marketError, setMarketError] = useState(false);
   const [request, setRequest] = useState(0);
   const [result, setResult] = useState<{ key: string; rows: FullPriceRow[] | null }>();
@@ -22,21 +25,37 @@ export default function RecipeShopping({ recipe, initialCrafts }: { recipe: Sear
   const trades = Number(count);
   const valid = Number.isInteger(trades) && trades >= 1 && trades <= 999;
 
-  async function loadMarkets() {
-    setDiscovering(true);
-    setMarketError(false);
+  async function loadMarkets(start?: SelectedMarket, signal?: AbortSignal) {
     try {
-      const response = await fetch("/api/market/prices");
+      const response = await fetch("/api/market/prices", { signal });
       if (!response.ok) throw new Error();
       const data: { houses: Record<string, string[]> } = await response.json();
       if (!data.houses || typeof data.houses !== "object") throw new Error();
+      if (signal?.aborted) return;
       setHouses(data.houses);
+      if (start) {
+        const matches = Object.keys(data.houses).filter(name => realmSlug(name) === start.realm);
+        const name = matches.length === 1 ? matches[0] : null;
+        if (name && data.houses[name]?.includes(start.house)) {
+          setRealm(name);
+          setHouse(start.house);
+        }
+      }
     } catch {
-      setMarketError(true);
+      if (!signal?.aborted) setMarketError(true);
     } finally {
-      setDiscovering(false);
+      if (!signal?.aborted) setDiscovering(false);
     }
   }
+
+  const initialRealm = initialMarket?.realm;
+  const initialHouse = initialMarket?.house;
+  useEffect(() => {
+    if (!initialRealm || !initialHouse) return;
+    const abort = new AbortController();
+    void loadMarkets({ realm: initialRealm, house: initialHouse }, abort.signal);
+    return () => abort.abort();
+  }, [initialRealm, initialHouse]);
 
   useEffect(() => {
     if (!realm || !house) return;
@@ -58,6 +77,16 @@ export default function RecipeShopping({ recipe, initialCrafts }: { recipe: Sear
     if (!Number.isInteger(n) || n < 1 || n > 999) return;
     const url = new URL(window.location.href);
     url.searchParams.set("crafts", String(n));
+    window.history.replaceState(window.history.state, "", url);
+  }
+
+  function chooseMarket(nextRealm: string, nextHouse: string) {
+    setRealm(nextRealm);
+    setHouse(nextHouse);
+    setResult(undefined);
+    const url = new URL(window.location.href);
+    if (nextRealm) url.searchParams.set("realm", realmSlug(nextRealm)); else url.searchParams.delete("realm");
+    if (nextHouse) url.searchParams.set("house", nextHouse.toLowerCase()); else url.searchParams.delete("house");
     window.history.replaceState(window.history.state, "", url);
   }
 
@@ -86,22 +115,23 @@ export default function RecipeShopping({ recipe, initialCrafts }: { recipe: Sear
             <Input className="w-24" type="number" min={1} max={999} step={1} value={count} onChange={e => changeCount(e.target.value)} />
           </label>
         </div>
-        {!houses ? <button type="button" className="btn" disabled={discovering} onClick={() => void loadMarkets()}>
+        {!houses ? <button type="button" className="btn" disabled={discovering} onClick={() => { setDiscovering(true); setMarketError(false); void loadMarkets(initialMarket); }}>
           {discovering ? "Loading auction houses…" : "Load auction prices"}
         </button> : <div className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-0 flex-wrap items-center gap-y-1 text-cell">Realm
-            <select aria-label="Realm" className={SELECT_CLASS} value={realm} onChange={e => { setRealm(e.target.value); setHouse(""); setResult(undefined); }}>
+            <select aria-label="Realm" className={SELECT_CLASS} value={realm} onChange={e => chooseMarket(e.target.value, "")}>
               <option value="">Select realm</option>
               {Object.keys(houses).sort().map(name => <option key={name}>{name}</option>)}
             </select>
           </label>
           {realm && <label className="text-cell">Auction house
-            <select aria-label="Auction house" className={SELECT_CLASS} value={house} onChange={e => { setHouse(e.target.value); setResult(undefined); }}>
+            <select aria-label="Auction house" className={SELECT_CLASS} value={house} onChange={e => chooseMarket(realm, e.target.value)}>
               <option value="">Select house</option>
               {houses[realm].map(name => <option key={name}>{name}</option>)}
             </select>
           </label>}
           {Object.keys(houses).length === 0 && <p className="text-muted">No auction houses have public quotes yet.</p>}
+          {initialRealm && initialHouse && !realm && <p role="status" className="text-meta text-fg-2">The linked market has no public quotes. Choose an available market or copy the quantities.</p>}
         </div>}
         {(marketError || current?.rows === null) && <div className="flex flex-wrap items-center gap-2" role="status">
           <span>Market prices unavailable. Material quantities are ready to copy.</span>

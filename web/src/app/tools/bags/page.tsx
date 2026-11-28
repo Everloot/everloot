@@ -66,7 +66,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const realmName = realm?.realm.name ?? null;
   const where = house && realmName ? `the ${house} auction house on ${realmDisplayName(realmName)}` : null;
 
-  const bagLink = (row: MarketRow) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />;
+  const bagLink = (row: MarketRow) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId, row.house)} tip={tips.get(row.value.itemId)} names={names} />;
   const sizeColumns: Column<SizeRow>[] = [
     { key: "slots", header: "Slots", numeric: true, cell: (s) => s.slots },
     { key: "bag", header: "Cheapest bag", cell: (s) => (s.row ? bagLink(s.row) : <span className="text-fg-2">{NO_PRICE}</span>) },
@@ -129,7 +129,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
         title={HEADING}
         lede={lede}
         meta={where ? <span>{house} auction house on <RealmName name={realmName!} /></span> : undefined}
-        actions={<Link href={AH_PATH} className="btn">Auction House</Link>}
+        actions={<><Link href="/tools/bags/value" className="btn">Value bags and bank</Link><Link href={AH_PATH} className="btn">Auction House</Link></>}
       />
       <div className="space-y-8">
         <RealmHousePicker

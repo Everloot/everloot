@@ -198,6 +198,7 @@ export default async function ProfessionPage(props: Props) {
   const spellName = (id: number) => spellNames?.names.get(id);
   const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
   const selectedRecipe = catalog.find(r => String(r.spellId) === searchParams.recipe && r.reagents.length > 0);
+  const recipeMarket = realmHouseParams(searchParams);
   const requestedCrafts = Number(searchParams.crafts);
   const crafts = Number.isInteger(requestedCrafts) && requestedCrafts >= 1 && requestedCrafts <= 999 ? requestedCrafts : 1;
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
@@ -302,6 +303,11 @@ export default async function ProfessionPage(props: Props) {
             <span>{dataAgeLabel(view.dataAsOf)}</span>
           </>}
         </>}
+        actions={<>
+          {ledgerAt && <a className="btn" href="#ahledger-margins">Crafting margins</a>}
+          <a className="btn" href="#prof-recipes">Recipes</a>
+          <a className="btn" href="#prof-path">Leveling and shopping</a>
+        </>}
       />
       <ClassContextChip read={read} here={withoutClassContext(path, searchParams)} className="-mt-2 mb-6" />
 
@@ -321,7 +327,8 @@ export default async function ProfessionPage(props: Props) {
             Found in game files, unconfirmed, build {RECIPES_BUILD}. Grouped by the skill where a recipe turns yellow.
             {p.otherSpells > 0 && ` ${plural(p.otherSpells, "other spell")} on the ${p.name} line make and cost nothing and are not listed.`}
           </p>
-          {selectedRecipe && <RecipeShopping key={selectedRecipe.spellId} recipe={selectedRecipe} initialCrafts={crafts} />}
+          {selectedRecipe && <RecipeShopping key={`${selectedRecipe.spellId}:${recipeMarket.realm}:${recipeMarket.house}`} recipe={selectedRecipe} initialCrafts={crafts}
+            initialMarket={recipeMarket.realm && recipeMarket.house ? { realm: recipeMarket.realm, house: recipeMarket.house } : undefined} />}
           {groups.length > 0 && (
             <FilterBar
               label={`${p.name} recipe filters`}
@@ -372,8 +379,11 @@ export default async function ProfessionPage(props: Props) {
         <section aria-labelledby="prof-path" className="space-y-4">
           <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
           <Card>
-            <form method="get" action={path} className="space-y-4">
+            <form method="get" action={`${path}#prof-path`} className="space-y-4">
               {context && classContextParams(context).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+              {recipeMarket.realm && <input type="hidden" name="realm" value={recipeMarket.realm} />}
+              {recipeMarket.house && <input type="hidden" name="house" value={recipeMarket.house.toLowerCase()} />}
+              {!recipeMarket.realm && isAhledgerMarket(one(searchParams.market)) && <input type="hidden" name="market" value={one(searchParams.market)} />}
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="From skill" name="from" defaultValue={fromSkill} inputMode="numeric" mono />
                 <Field label="To skill" name="to" defaultValue={toSkill} inputMode="numeric" mono />

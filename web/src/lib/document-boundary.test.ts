@@ -45,6 +45,15 @@ describe("isProtectedPath", () => {
     for (const path of ["/tools/altsx", "/tools/alt", ...underOthers("/tools/alts")]) expect(isProtectedPath(path), path).toBe(false);
   });
 
+  test("the inventory paste runs on a protected document, including on the served version", () => {
+    for (const path of ["/tools/bags/value", ...underServed("/tools/bags/value")]) {
+      expect(isProtectedPath(path), path).toBe(true);
+      expect(isAdFreePath(path), path).toBe(true);
+    }
+    expect(isProtectedPath("/tools/bags")).toBe(false);
+    expect(crossesDocumentBoundary("/tools/bags/value", fakeWindow("/tools/bags/value", "https://everloot.app/tools/bags"))).toBe(true);
+  });
+
   test("writing a guide is protected, under the served prefix too; the guide pages and look-alikes are not", () => {
     for (const path of ["/guides/write", "/guides/write/x", ...underServed("/guides/write")]) expect(isProtectedPath(path), path).toBe(true);
     for (const path of ["/guides", "/guides/frost-leveling", "/guides/feed.xml", "/guides/writer", "/guides/writ", ...underOthers("/guides/write")]) {

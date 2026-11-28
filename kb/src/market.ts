@@ -620,9 +620,12 @@ export function itemListings(state: MarketState, realm: string, itemId: number, 
 }
 
 /** Every item with a public value in one bucket, most units first, with the public days and the stored days behind it. */
-function realmRows(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null): { value: MarketValue; points: PublicDay[]; days: ItemDays }[] {
+function realmRows(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null, selectedIds?: readonly number[]): { value: MarketValue; points: PublicDay[]; days: ItemDays }[] {
   const items = bucketOf(state, realm, house)?.items ?? {};
-  return Object.entries(items)
+  const entries = selectedIds
+    ? [...new Set(selectedIds)].flatMap((id): [string, ItemDays][] => items[String(id)] ? [[String(id), items[String(id)]!]] : [])
+    : Object.entries(items);
+  return entries
     .flatMap(([itemId, days]) => {
       const points = publicDays(days, now);
       const value = valueOf(Number(itemId), points, now);
@@ -780,8 +783,7 @@ export type FullPriceRow = readonly [...PriceRow, updatedAt: string | null, ageD
  * (the Desktop App's did) keep working, and a reader asks for more.
  */
 export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[], full = false): { realm: string; house?: AuctionHouse; items: PriceRow[] | FullPriceRow[] } {
-  const selected = itemIds ? new Set(itemIds) : null;
-  const rows = realmRows(state, realm, now, house).filter((r) => !selected || selected.has(r.value.itemId)).slice(0, limit);
+  const rows = realmRows(state, realm, now, house, itemIds).slice(0, limit);
   const row = (v: MarketValue): PriceRow => [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters];
   return {
     realm: realmName(state, realm),

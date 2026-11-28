@@ -36,6 +36,19 @@ export const BLIZZARD_HOUSES: ReadonlyMap<number, BlizzardHouse> = new Map(
   GROUPS.flatMap(([ruleset, ...ids]) => ids.map((id, i): [number, BlizzardHouse] => [id, { ruleset, faction: FACTIONS[i] }])),
 );
 
+export type BlizzardMarket = { region: "us" | "eu"; house: number };
+
+/** Both parts must be explicit and known when following a saved market. */
+export function blizzardMarket(region: unknown, house: unknown): BlizzardMarket | null {
+  if ((region !== "us" && region !== "eu") || typeof house !== "string" || !/^\d{3}$/.test(house)) return null;
+  const id = Number(house);
+  return BLIZZARD_HOUSES.has(id) ? { region, house: id } : null;
+}
+
+export function blizzardMarketQuery(market: BlizzardMarket): string {
+  return `region=${market.region}&house=${market.house}`;
+}
+
 /** "PvP, Alliance" for a known house, else Blizzard's own name ("Alliance, house 112"). */
 export function houseLabel(houseId: number, houseName: string): string {
   const house = BLIZZARD_HOUSES.get(houseId);

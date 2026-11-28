@@ -627,9 +627,10 @@ prerequisites, spend gates, the cost and the cap, with spell ids, perk names and
 icons or tooltip text. Like the talent catalog it may be committed to the git repository as a clearly marked game-data
 file (`web/src/data/game-data/legacy-perks.json`, see [LEGACY_PERKS](LEGACY_PERKS.md)), labelled *found in game
 files, unconfirmed*: it is Blizzard's data, kept apart from our CC BY-SA data and outside our licence. Each rule says
-how it was read, and a rule the files do not settle has no value. Decided 2026-11-02 by Carlos: a read-only page,
-`/tools/legacy`, lists it. No planner uses it: a Legacy planner waits until the cost, the cap and the spend gates it
-would enforce are confirmed in game or by Blizzard. It is not in the dataset or the API. Decided 2026-11-03 by Carlos: its
+how it was read, and a rule the files do not settle has no value. Decided 2026-11-02 by Carlos: `/tools/legacy` lists
+the catalog. The page now also lets players plan ranks using stored limits and known prerequisite links. The cost,
+cap and where the spend gates count appear as unconfirmed advisory estimates. Enforcing these values requires
+confirmation in game or by Blizzard. It is not in the dataset or the API. Decided 2026-11-03 by Carlos: its
 perk names and ids reach the MCP knowledge search through the catalog index (see *Game-file facts in answers*).
 
 **The map layer.** From the map tables we publish zone rectangles (`UiMapAssignment`), continents
@@ -1332,6 +1333,8 @@ not stored. The job stays off until the maintainer sets the repository variable 
   days are deleted every pass, and by a purge job that runs on schedule whether the refresh is on or not, with
   the Supabase secrets alone. The page never reads a row older than 30 days, and no shared cache keeps it.
   Backups skip these tables, since a backup outlives 30 days.
+- **Cross-house comparisons.** The ad-free Blackwater page compares recent official asking-price snapshots on
+  the same ruleset. One-unit estimates use the printed sale-cut and deposit assumptions. They remain on the page.
 
 ## Chat
 

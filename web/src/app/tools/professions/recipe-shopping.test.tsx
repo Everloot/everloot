@@ -56,3 +56,28 @@ test("only prices the selected recipe's reagents and copies missing materials", 
     vi.unstubAllGlobals();
   }
 });
+
+test("a linked recipe opens the matching realm and house before requesting prices", async () => {
+  const recipe = {
+    profession: "Tailoring", slug: "tailoring", spellId: 3755, name: "Linen Bag", itemName: "Linen Bag",
+    yellow: 30, grey: 65, recipeItems: [],
+    reagents: [{ itemId: 2996, name: "Bolt of Linen Cloth", count: 3 }],
+  };
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const fetcher = vi.fn(async (url: string) => Response.json(url.includes("items=")
+    ? { ok: true, items: [[2996, 10, 10, 10, 30, "2026-11-27", 3, null, 0, null]] }
+    : { houses: { "Forever PvP": ["Alliance", "Horde"] } }));
+  vi.stubGlobal("fetch", fetcher);
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<RecipeShopping recipe={recipe} initialCrafts={2} initialMarket={{ realm: "forever-pvp", house: "Horde" }} />));
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "/api/market/prices", "/api/market/prices?realm=Forever+PvP&house=Horde&items=2996&fields=full",
+    ]);
+    expect(host.textContent).toContain("Estimated material total: 60c");
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

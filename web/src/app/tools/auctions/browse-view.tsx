@@ -74,7 +74,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   if (!q) notFound();
   // Keep numeric searches in the browse view when a region is selected, so it cannot be lost in a redirect.
   const typedId = q.q ? itemIdParam(q.q) : null;
-  if (typedId && !q.region) redirect(slug ? itemHref({ slug }, typedId) : crossRealmHref(typedId));
+  if (typedId && !q.region) redirect(slug ? itemHref({ slug }, typedId, q.house) : crossRealmHref(typedId));
 
   const path = slug ? realmHref({ slug }) : AH_PATH;
   const now = new Date();
@@ -197,7 +197,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const columns: Column<BrowseRow>[] = [
     {
       key: "name", header: "Item", sortable: true,
-      cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} icon={icons.get(row.value.itemId)} names={names} />,
+      cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId, row.house)} tip={tips.get(row.value.itemId)} icon={icons.get(row.value.itemId)} names={names} />,
     },
     ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link prefetch={false} href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
     ...(showRealm ? [{ key: "region", header: "Region", nowrap: true, cell: ({ row }: BrowseRow) => REGION_LABEL[realmRegion(row.realm.name) ?? "unknown"] }] : []),
@@ -306,11 +306,11 @@ export async function browseView({ slug, search }: { slug: string | null; search
         />
         {/* Nothing above the title: the all-realms page's links sit in this row under it. */}
         {!slug && (
-          <p className="mb-3 text-sm">
-            <Link href="/tools/auctions/report" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Daily market report and share image</Link>
-            {" · "}
-            <a href="/blizzard-auctions" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Blizzard auction house data</a>
-          </p>
+          <nav aria-label="Auction House tools" className="mb-4 flex flex-wrap gap-2">
+            <a href="/blizzard-auctions" className="btn">Browse current Blizzard prices</a>
+            <Link href="/tools/auctions/report" className="btn">Community market report</Link>
+            <a href="#market-deals" className="btn">AH Ledger deals</a>
+          </nav>
         )}
         <ScansPaused state={state} now={now} className="mb-3" />
         {slug && stored && <p className="mb-3 text-sm"><Link href={changesHref({ slug }, q.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Market changes this week: risers, fallers and what has no comparison yet</Link></p>}

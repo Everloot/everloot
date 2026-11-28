@@ -84,7 +84,7 @@ export default async function AddonPage() {
         meta={<><Badge tone="neutral">AGPL-3.0</Badge><span>Free and open source</span></>}
       />
 
-      <p className="text-sm text-fg-2">The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.</p>
+      <p className="mb-4 text-sm text-fg-2">The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.</p>
 
       <div className="space-y-12">
         <div className="grid items-start gap-6 md:grid-cols-2">
@@ -109,10 +109,9 @@ export default async function AddonPage() {
                     Download the zip
                   </TrackedDownload>
                   <p className="text-sm text-fg-2">Addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}</p>
+                  {!ADDON_LIVE_VERIFIED && <p className="text-sm text-fg-2">Live-client verification is pending.</p>}
                 </div>
-                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This release opens Collection on an overview of every area, charts your gold per day, and adds a Ranks and trainers screen and a crafting cost breakdown. The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.</p>
-                <div>
-                  <SectionHeading as="h3">Install</SectionHeading>
+                <Disclosure summary="Install from the zip">
                   <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">
                     <li>Quit the game.</li>
                     <li>Extract the zip. It holds one folder, <code className="font-mono">Everloot</code>.</li>
@@ -124,14 +123,23 @@ export default async function AddonPage() {
                       </ul>
                       If you installed the game somewhere else, start from that World of Warcraft folder instead.
                     </li>
-                    <li>Start the game, check Everloot is ticked in the AddOns list, and type <code className="font-mono">/everloot status</code> in chat.</li>
+                    <li>Start WoW: Forever and check Everloot is enabled in the AddOns list.</li>
                   </ol>
+                </Disclosure>
+                <div>
+                  <SectionHeading as="h3" size="data">Check the addon in game</SectionHeading>
+                  <p className="text-sm text-fg-2">
+                    Run <code className="font-mono">/everloot version</code> in chat and look for Everloot and its version number.
+                    Open your dashboard with <code className="font-mono">/everloot window</code> to see your gold and collection.
+                  </p>
                   <p className="mt-3 text-sm text-fg-2">
-                    To send what it collected, log out and pick <code className="font-mono">Everloot.lua</code> on the{" "}
-                    <Link href="/upload" className={link}>upload page</Link>, which shows you everything before it is sent. Or let the
-                    Desktop App do it.
+                    To contribute, open a vendor window, then log out or type <code className="font-mono">/reload</code> to save
+                    the observation. Pick <code className="font-mono">Everloot.lua</code> on the{" "}
+                    <Link href="/upload" className={link}>upload page</Link> to preview what it found. After you send it, look for
+                    the count of records saved. The <Link href="#desktop" className={link}>Desktop App</Link> can send observations automatically.
                   </p>
                 </div>
+                <p className="text-sm text-fg-2">This release opens Collection on an overview of every area, charts your gold per day, and adds a Ranks and trainers screen and a crafting cost breakdown. The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.</p>
                 {served && (
                   <Disclosure summary="SHA-256 checksum">
                     <ul className="text-sm"><Checksum name={zipName} sha256={served.sha256} /></ul>
@@ -200,6 +208,21 @@ export default async function AddonPage() {
                 </p>
               </div>
             </Disclosure>
+            <div>
+              <SectionHeading as="h3" size="data">Check your first upload</SectionHeading>
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-fg-2">
+                <li>
+                  Choose the <code className="font-mono">_forever_</code> game folder that contains <code className="font-mono">WTF</code>.
+                  Install the addon there if setup offers it.
+                </li>
+                <li>Review your sharing choices and press <strong className="font-semibold text-fg">Start</strong>. You can continue without an account.</li>
+                <li>
+                  Keep Desktop running with Upload enabled, open a vendor window in game, then log out or <code className="font-mono">/reload</code>.
+                  When Overview says <strong className="font-semibold text-fg">Watching</strong>, Desktop found your addon file.
+                  Open Upload and look at Account files. A <strong className="font-semibold text-fg">Confirmed</strong> count above zero means the site accepted records from this install.
+                </li>
+              </ol>
+            </div>
             {desktop && desktopFiles.length > 0 && (
               <Disclosure summary="SHA-256 checksums">
                 <ul className="space-y-1 text-sm">

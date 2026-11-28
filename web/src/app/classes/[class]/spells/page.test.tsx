@@ -55,6 +55,15 @@ test("every spell with a level is listed under it, lowest level first, linking i
   expect(html).toContain('href="/classes/mage"');
 });
 
+test("the ability list links back to the class, talent calculator and matching patch notes", async () => {
+  const html = await render();
+  const nav = html.match(/<nav aria-label="Mage pages"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  expect(nav).toContain('aria-current="page">Abilities');
+  expect(nav).toContain('href="/classes/mage"');
+  expect(nav).toContain('href="/tools/talents/mage"');
+  expect(nav).toContain('href="/changes?q=Mage"');
+});
+
 test("names that cannot be read are said so, and the spells still list by number", async () => {
   store.names = null;
   const html = await render();

@@ -40,14 +40,16 @@ test("carries the game-files label, the build stamp and Blizzard's credit", asyn
   expect(html).toContain("Blizzard Entertainment");
 });
 
-test("shows the cost and cap only as unconfirmed readings, and gates as partial", async () => {
+test("shows the cost, cap and gates as advisory alongside an interactive planner", async () => {
   const html = await page();
   expect(html).toContain("Cost per rank: 1 (unconfirmed).");
   expect(html).toContain("Most points a character holds: 16 (unconfirmed).");
   expect(html).toContain("5 points spent (where they count is unconfirmed)");
   expect(html).toContain("Spend gates are partial");
-  // Nothing on the page spends points.
-  expect(html).not.toMatch(/<button|<input/);
+  expect(html).toContain("Estimated shared cap");
+  expect(html).toContain("Add rank to Master Chef");
+  expect(html).not.toContain("Add rank to Unknown");
+  expect(html).toContain('href="/database/achievements/684"');
 });
 
 test("each tree is named by its top perk, and the file names sit in a small note from the game files", async () => {
