@@ -4,13 +4,15 @@ local E = Everloot
 local C = {}
 E.Cooldowns = C
 
-local TRACKED = {
-  { key = "transmute", name = "Transmute", spells = { 11479, 11480, 17187, 17559, 17560, 17561, 17562, 17563, 17564, 17565, 17566, 25146 } },
-  { key = "mooncloth", name = "Mooncloth", spells = { 18560 } },
-  { key = "saltShaker", name = "Salt Shaker", item = 15846 },
-}
+-- Learned craft spells with a cooldown of at least one minute in the Forever 71139
+-- recipe and spell exports. Other recipes are discovered from the player's open profession.
+local RECIPES = { 818, 11479, 11480, 17187, 17559, 17560, 17561, 17562, 17563, 17564, 17565, 17566,
+  18560, 22430, 25146, 1317279 }
+local SALT_SHAKER = 15846
 local MAX_DURATION = 14 * 24 * 60 * 60
+local MAX_RECIPES, CHUNK = 1024, 40
 local queued, waiting = false, true
+local windowOpen, windowRequested, windowRevision = false, false, 0
 local refreshTracker
 
 local function read(fn, ...)
@@ -45,29 +47,78 @@ local function spellKnown(id)
   return read(C_SpellBook and C_SpellBook.IsSpellKnown, id)
 end
 
--- The first result is capability (true, false or unknown). The second is a reliable duration, if any.
-local function sample(group, uptime)
-  if group.item then
-    local count = read(C_Item and C_Item.GetItemCount, group.item, false)
-    if not number(count) then return nil end
-    if count == 0 then return false end
-    local start, duration, enabled = read(C_Container and C_Container.GetItemCooldown, group.item)
-    return true, remaining(start, duration, enabled, uptime)
-  end
+local function saveTimer(stored, id, name, seconds, now, fromRecipe)
+  local previous = stored[id]
+  if seconds == nil and not previous and not name then return end
+  stored[id] = {
+    name = name or (previous and previous.name),
+    readyAt = seconds and (now + math.ceil(seconds)) or (previous and previous.readyAt),
+    unknown = seconds == nil or nil,
+    fromRecipe = fromRecipe or (previous and previous.fromRecipe),
+  }
+end
 
-  local known, uncertain, longest = false, false, 0
-  for _, id in ipairs(group.spells) do
-    local hasSpell = spellKnown(id)
-    if hasSpell == true then
-      known = true
-      local seconds = spellRemaining(id, uptime)
-      if seconds then longest = math.max(longest, seconds) else uncertain = true end
-    elseif hasSpell ~= false then
-      uncertain = true
+local function spellTimer(stored, id, now, uptime)
+  local previous = stored[id]
+  local known = spellKnown(id)
+  -- The profession window can report a cooldown that the spellbook cannot see.
+  if previous and previous.fromRecipe and (known ~= true or (number(previous.readyAt) and previous.readyAt > now)) then return end
+  if known == false then stored[id] = nil; return end
+  if known == true then
+    local name = read(C_Spell and C_Spell.GetSpellName, id)
+    if type(name) == "string" and name ~= "" then
+      saveTimer(stored, id, name, spellRemaining(id, uptime), now)
+      return
     end
   end
-  if uncertain then return known and true or nil end
-  return known, longest
+  if previous then saveTimer(stored, id, nil, nil, now) end
+end
+
+local function recipeCooldown(api, id)
+  local ok, seconds = pcall(api.GetRecipeCooldown, id)
+  if not ok or (issecretvalue and issecretvalue(seconds)) then return nil end
+  if seconds == nil then return 0 end
+  if number(seconds) and seconds <= MAX_DURATION then return seconds end
+end
+
+local function scanRecipeWindow(key, stored)
+  local api = C_TradeSkillUI
+  if not (windowOpen and api and type(api.GetRecipeCooldown) == "function")
+    or read(api.IsTradeSkillLinked) or read(api.IsTradeSkillGuild) or read(api.IsNPCCrafting)
+    or read(api.IsDataSourceChanging) then return end
+  local ids = read(api.GetAllRecipeIDs)
+  if type(ids) ~= "table" then ids = read(api.GetFilteredRecipeIDs) end
+  if type(ids) ~= "table" then return end
+  local revision, last, index = windowRevision, math.min(#ids, MAX_RECIPES), 1
+  local function step()
+    if not windowOpen or revision ~= windowRevision or key ~= E.CharacterKey()
+      or not E:IsEnabled("roster") or read(api.IsDataSourceChanging) then return end
+    if read(InCombatLockdown) then windowRequested, waiting = true, true; return end
+    local now = read(GetServerTime)
+    if not number(now) or now == 0 then return end
+    local stop = math.min(last, index + CHUNK - 1)
+    for i = index, stop do
+      local id = E.Readable(ids[i])
+      local info = number(id) and read(api.GetRecipeInfo, id)
+      if type(info) == "table" and not E.Readable(info.isDummyRecipe) then
+        local learned = E.Readable(info.learned)
+        if learned == false then
+          stored[id] = nil
+        elseif learned == true then
+          local name = E.Readable(info.name)
+          local seconds = recipeCooldown(api, id)
+          if type(name) == "string" and name ~= "" and ((seconds and seconds > 0) or stored[id]) then
+            saveTimer(stored, id, name, seconds, now, true)
+            EverlootDB.professionCooldowns[key] = stored
+          end
+        end
+      end
+    end
+    index = stop + 1
+    if index <= last then C_Timer.After(0, step)
+    elseif C.tracker then refreshTracker() end
+  end
+  step()
 end
 
 local function scan()
@@ -84,18 +135,26 @@ local function scan()
   EverlootDB.professionCooldowns = EverlootDB.professionCooldowns or {}
   local all = EverlootDB.professionCooldowns
   local stored = all[key] or {}
-  for _, group in ipairs(TRACKED) do
-    local known, seconds = sample(group, uptime)
-    if known == false then
-      stored[group.key] = nil
-    elseif seconds then
-      stored[group.key] = { readyAt = now + math.ceil(seconds) }
-    elseif known or stored[group.key] then
-      local previous = stored[group.key]
-      stored[group.key] = { readyAt = previous and previous.readyAt, unknown = true }
-    end
+  local scanned = {}
+  for _, id in ipairs(RECIPES) do
+    scanned[id] = true
+    spellTimer(stored, id, now, uptime)
+  end
+  for id in pairs(stored) do
+    if type(id) == "number" and not scanned[id] then spellTimer(stored, id, now, uptime) end
+  end
+  local count = read(C_Item and C_Item.GetItemCount, SALT_SHAKER, false)
+  if count == 0 then
+    stored.saltShaker = nil
+  elseif number(count) or stored.saltShaker then
+    local start, duration, enabled = read(C_Container and C_Container.GetItemCooldown, SALT_SHAKER)
+    saveTimer(stored, "saltShaker", "Salt Shaker", number(count) and remaining(start, duration, enabled, uptime), now)
   end
   all[key] = next(stored) and stored or nil
+  if windowRequested then
+    windowRequested = false
+    scanRecipeWindow(key, stored)
+  end
 end
 
 local function queue()
@@ -122,9 +181,8 @@ function C.Rows()
     if saved then
       local name = character.name or "Unknown character"
       if character.surname then name = name .. " " .. character.surname end
-      for _, group in ipairs(TRACKED) do
-        local timer = saved[group.key]
-        if timer then
+      for id, timer in pairs(saved) do
+        if type(timer) == "table" and (timer.name or id == "saltShaker") then
           local seconds
           if not timer.unknown and number(now) and now > 0 and number(timer.readyAt)
             and not (character.key == current and (queued or waiting)) then
@@ -132,7 +190,7 @@ function C.Rows()
           end
           rows[#rows + 1] = {
             key = character.key, character = name, realm = character.realm, class = character.class,
-            current = character.key == current, name = group.name, remaining = seconds,
+            current = character.key == current, name = timer.name or "Salt Shaker", remaining = seconds,
             state = seconds == 0 and "ready" or (seconds and "cooling" or "unknown"),
           }
         end
@@ -140,6 +198,8 @@ function C.Rows()
     end
   end
   table.sort(rows, function(a, b)
+    if a.state == "cooling" and b.state ~= "cooling" then return true end
+    if b.state == "cooling" and a.state ~= "cooling" then return false end
     if a.remaining ~= b.remaining then return (a.remaining or math.huge) < (b.remaining or math.huge) end
     if a.character ~= b.character then return a.character < b.character end
     if a.name ~= b.name then return a.name < b.name end
@@ -169,7 +229,8 @@ local function paintRow(line, row, showRealm)
   local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[row.class]
   if color then line.character:SetTextColor(color.r, color.g, color.b)
   else line.character:SetTextColor(unpack(colors.text)) end
-  line.name:SetText(row.name)
+  line.name:SetText((row.name:gsub("^Transmute:%s*", "")):gsub("|", "||"))
+  line.tooltip = row.name:gsub("|", "||")
   line.status:SetText(status(row))
   line.status:SetTextColor(unpack(row.state == "ready" and colors.accent or colors.muted))
   local class = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[row.class]
@@ -213,6 +274,7 @@ refreshTracker = function()
     c.empty:Hide()
   else
     c.summary.icon:Hide(); c.summary.character:Hide(); c.summary.name:Hide(); c.summary.status:Hide()
+    c.summary.tooltip = nil
     c.empty:Show()
   end
   c.hasMore = #rows > 0
@@ -268,8 +330,21 @@ local function addRowContent(U, line)
   if line.character.SetWordWrap then line.character:SetWordWrap(false) end
   line.name = U.Text(line, 11)
   line.name:SetPoint("LEFT", 159, 0)
+  line.name:SetWidth(64)
+  line.name:SetJustifyH("LEFT")
+  if line.name.SetWordWrap then line.name:SetWordWrap(false) end
   line.status = U.Text(line, 11, U.NARROW)
   line.status:SetPoint("RIGHT", -21, 0)
+  line:EnableMouse(true)
+  line:SetScript("OnEnter", function(self)
+    if not (self.tooltip and GameTooltip) then return end
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetText(self.tooltip)
+    GameTooltip:Show()
+  end)
+  line:SetScript("OnLeave", function()
+    if GameTooltip and GameTooltip:IsOwned(line) then GameTooltip:Hide() end
+  end)
 end
 
 local function buildTracker(U)
@@ -340,15 +415,40 @@ local EVENTS = {
   PLAYER_ENTERING_WORLD = true, SPELLS_CHANGED = true, SPELL_UPDATE_COOLDOWN = true,
   BAG_UPDATE_DELAYED = true, BAG_UPDATE_COOLDOWN = true,
 }
+local WINDOW_EVENTS = {
+  TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true, TRADE_SKILL_DATA_SOURCE_CHANGED = true,
+  NEW_RECIPE_LEARNED = true, UNIT_SPELLCAST_SUCCEEDED = true,
+}
 
 E:RegisterModule("cooldowns", function()
   if not (C_Timer and C_Timer.After) then return "unavailable: no timer API" end
+  for _, saved in pairs(EverlootDB.professionCooldowns or {}) do
+    if saved.mooncloth and not saved[18560] then
+      saved.mooncloth.name = "Mooncloth"
+      saved[18560] = saved.mooncloth
+    end
+    -- The old aggregate cannot say which recipe was cooling down.
+    saved.transmute, saved.mooncloth = nil, nil
+  end
   if E.Window and UIParent then buildTracker(E.Window) end
   local f = E.frame
   for event in pairs(EVENTS) do pcall(f.RegisterEvent, f, event) end
+  for event in pairs(WINDOW_EVENTS) do
+    if event ~= "UNIT_SPELLCAST_SUCCEEDED" then pcall(f.RegisterEvent, f, event) end
+  end
+  pcall(f.RegisterUnitEvent, f, "UNIT_SPELLCAST_SUCCEEDED", "player")
+  pcall(f.RegisterEvent, f, "TRADE_SKILL_CLOSE")
   pcall(f.RegisterEvent, f, "PLAYER_REGEN_ENABLED")
   f:HookScript("OnEvent", function(_, event)
-    if EVENTS[event] or (event == "PLAYER_REGEN_ENABLED" and waiting) then queue() end
+    if event == "TRADE_SKILL_CLOSE" then
+      windowOpen, windowRequested, windowRevision = false, false, windowRevision + 1
+    elseif WINDOW_EVENTS[event] then
+      if event == "TRADE_SKILL_SHOW" then windowOpen = true end
+      if windowOpen then
+        windowRequested, windowRevision = true, windowRevision + 1
+        queue()
+      end
+    elseif EVENTS[event] or (event == "PLAYER_REGEN_ENABLED" and waiting) then queue() end
   end)
   return "ready (local profession cooldowns)"
 end, "roster")
