@@ -256,6 +256,9 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(html).toContain("/api/market/prices?realm=Forever&house=horde");
   // The day list: three days ago the value was 1s 90c.
   expect(text(html)).toContain("1s 90c");
+  // Days read in the site's day form everywhere on the page: tiles, the chart range, the day list.
+  expect(words).toContain(`On ${todayText}`);
+  expect(words).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect(html).toContain('"@type":"Dataset"');
   expect(html).not.toMatch(/"@type":"(Product|Offer|AggregateRating|Review)"/);
   const meta = await itemMetadata(item("forever", "2589"));
@@ -298,6 +301,9 @@ test("the cross-realm page compares every realm with a price", async () => {
   expect(html).toContain("Lowest market value1s 98cForever, Horde");
   expect(html).toContain("Highest market value3sMal'Ganis, Horde");
   expect(html).toContain("Mal'Ganis");
+  // The all-realms table's day is in the site's day form.
+  expect(html).toContain(todayText);
+  expect(html).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
 });
@@ -463,7 +469,7 @@ test("the 60-day chart fits its axis to the public days, so the line runs end to
   const line = /<polyline points="([^"]+)"/.exec(html)![1]!.split(" ");
   expect(line[0]).toMatch(/^8\.0,/);
   expect(line.at(-1)).toMatch(/^992\.0,/);
-  expect(text(html)).toContain("2026-11-05 to 2026-11-20");
+  expect(text(html)).toContain("Nov 5, 2026 to Nov 20, 2026");
 });
 
 test("a realm item page's AH Ledger panels open on the page's own ruleset, region and house", async () => {

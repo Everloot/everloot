@@ -1,12 +1,13 @@
 import { CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import type { ChartSeries, RankingWeek } from "@/lib/rankings";
+import { utcDay } from "@/lib/time";
 
 // Words and marks the server-drawn rankings parts and the measured client charts share.
 
 export const number = (n: number) => n.toLocaleString("en-US");
 /** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
 export const percent = (share: number) => `${Math.round(share * 100)}%`;
-export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (from ${w.start})` : `Week of ${w.start}`);
+export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (from ${utcDay(w.start) ?? w.start})` : `Week of ${utcDay(w.start) ?? w.start}`);
 /** A race carries its faction (Skyborne is on both sides). */
 export const nameOf = (s: ChartSeries) => (s.faction && s.label !== s.faction ? `${s.label} (${s.faction})` : s.label);
 export const weekTick = (w: RankingWeek) => (w.current ? "so far" : w.start.slice(5));

@@ -217,7 +217,7 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
         <polyline points={line} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
       <figcaption className="flex flex-wrap justify-between gap-x-4 text-xs text-muted">
-        <span>{points[0]!.day} to {points.at(-1)!.day}</span>
+        <span>{scanDayText(points[0]!.day)} to {scanDayText(points.at(-1)!.day)}</span>
         <span className="font-mono tabular-nums"><CoinText text={formatCopper(low)} /> to <CoinText text={formatCopper(high)} /></span>
       </figcaption>
     </figure>
@@ -240,7 +240,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
     { key: "historical", header: "Historical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.historical)} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
-    { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
+    { key: "day", header: "Day", numeric: true, cell: (r) => scanDayText(r.value.day) },
   ];
   return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`} empty={<EmptyState framed={false} message={empty} />} />;
 }
@@ -248,7 +248,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
 /** The public days behind one price, newest first. */
 export function DayTable({ points, caption }: { points: PublicDay[]; caption: string }) {
   const columns: Column<PublicDay>[] = [
-    { key: "day", header: "Day", numeric: true, cell: (p) => p.day },
+    { key: "day", header: "Day", numeric: true, cell: (p) => scanDayText(p.day) },
     { key: "value", header: "Value", numeric: true, cell: (p) => <CoinText text={formatCopper(p.market)} /> },
     { key: "min", header: "Min buyout", numeric: true, cell: (p) => <CoinText text={formatCopper(p.min)} /> },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },

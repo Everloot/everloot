@@ -92,7 +92,7 @@ export default async function RealmItemPage(props: Props) {
   const houseMarket = ahledger.find((m) => row && m.split(".")[2] === row.house.toLowerCase()) ?? ahledger[0];
   const moves = row ? ([1, 7] as const).flatMap((span) => {
     const move = priceMove(row, span, now);
-    return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${move.from.day} to ${move.to.day}` }] : [];
+    return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${scanDayText(move.from.day)} to ${scanDayText(move.to.day)}` }] : [];
   }) : [];
 
   return (
@@ -149,9 +149,9 @@ export default async function RealmItemPage(props: Props) {
           <>
             <PriceFacts facts={[
               { label: "Market value", value: v.market === null ? "unrecorded" : <CoinText text={money(v.market)} />, note: v.market === null ? "No solid day in the last 14" : "Weighted over 14 days" },
-              { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${v.day}` },
+              { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${scanDayText(v.day)}` },
               { label: "Historical", value: <CoinText text={formatCopper(v.historical)} />, note: "60-day median" },
-              { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${v.day}` },
+              { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${scanDayText(v.day)}` },
               ...moves,
             ]} note={coverageText(marketCoverage(row.points, now))} />
             <section aria-labelledby="ah-chart">
