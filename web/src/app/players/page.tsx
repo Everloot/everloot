@@ -5,7 +5,7 @@ import JsonLd from "@/components/JsonLd";
 import { CENSUS_CLASSES } from "@kb/census";
 import {
   ARMORY_HIDE_PATH, ARMORY_RACES, ARMORY_SUBMIT_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryCharacterPath, armoryNameQuery, armoryOn,
-  classTokenOfName, GEAR_SCORE_HINT, metricValue, regionLabel,
+  classTokenOfName, GEAR_SCORE_HINT, metricValue, raceLabel, regionLabel,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow, type ArmoryDirectoryRow } from "@/lib/armory-store";
 import { isDisbandedGuild } from "@/lib/armory-guilds";
@@ -85,7 +85,7 @@ function columns(guildHref: ((guild: string) => string) | null, icons: ClassIcon
   const all: (Column<DirectoryRow> & { armory?: true })[] = [
     { key: "name", header: "Name", sortable: true, cell: (r) => <NameCell row={r} icons={icons} /> },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => r.level },
-    { key: "race", header: "Race", nowrap: true, cell: (r) => raceName(r.race) },
+    { key: "race", header: "Race", nowrap: true, cell: (r) => raceLabel(raceName(r.race)) },
     // Plain words: the name already carries the class colour and icon, and the phone line names it.
     { key: "class", header: "Class", nowrap: true, cell: (r) => className(r.classToken) },
     {
@@ -111,7 +111,7 @@ function gearWords(r: DirectoryRow): string {
 
 /** The phone line: what the folded columns hold. A row's sources are named only when it joins two. */
 function rowMeta(r: DirectoryRow) {
-  return `Level ${r.level} ${raceName(r.race)} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${gearWords(r)}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
+  return `Level ${r.level} ${raceLabel(raceName(r.race))} ${className(r.classToken)} · ${guildWords(r.guild)} · ${r.where}${r.sources.length > 1 ? ` · ${r.sources.map((s) => SOURCE_LABEL[s]).join(", ")}` : ""}${gearWords(r)}${r.lastSeen ? ` · Seen ${r.lastSeen}` : ""}`;
 }
 
 /** The menus above the list: every choice a link, so a filtered view is an address. */
@@ -133,7 +133,7 @@ function filterControls(d: PlayerDirectoryQuery): FilterControl[] {
       options: [
         { label: "All races", href: href({ race: null }), on: d.race === null, reset: true },
         // The names the armory stores: Skyborne is two races, one a side, as /rankings/races counts it.
-        ...ARMORY_RACES.map((name) => ({ label: name, href: href({ race: name }), on: d.race === name })),
+        ...ARMORY_RACES.map((name) => ({ label: raceLabel(name), href: href({ race: name }), on: d.race === name })),
       ],
     },
     {
@@ -190,12 +190,12 @@ function Recent({ rows, icons }: { rows: ArmoryDirectoryRow[]; icons: ClassIcons
         caption="Characters read most recently"
         columns={[
           { key: "name", header: "Name", cell: (r) => <><ClassMark token={classTokenOfName(r.class)} icons={icons} /><Link href={armoryCharacterPath(r.region, r.slug)} className={`${classText(classTokenOfName(r.class))} dir-name`}>{r.name} {r.surname}</Link></> },
-          { key: "who", header: "Character", cell: (r) => `Level ${r.level} ${r.race} ${r.class}` },
+          { key: "who", header: "Character", cell: (r) => `Level ${r.level} ${raceLabel(r.race)} ${r.class}` },
           { key: "at", header: "Read", numeric: true, cell: (r) => day(r.fetchedAt) },
         ]}
         rows={rows}
         rowKey={(r) => `${r.region}/${r.slug}`}
-        meta={(r) => `Level ${r.level} ${r.race} ${r.class} · ${r.fetchedAt.slice(0, 10)}`}
+        meta={(r) => `Level ${r.level} ${raceLabel(r.race)} ${r.class} · ${r.fetchedAt.slice(0, 10)}`}
       />
     </section>
   );

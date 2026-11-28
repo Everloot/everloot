@@ -527,6 +527,9 @@ describe("the guide index", () => {
     expect(empty).not.toMatch(/\bbelow\b/);
     expect(empty).not.toContain("Everloot's reviewed guides, each");
     expect(empty).toContain("No guide is reviewed yet.");
+    // QA round 12: "Each is reviewed before it is listed here" beside "No guide is reviewed yet." implied a list.
+    expect(empty).not.toContain("Each is reviewed before it is listed here");
+    expect(empty).toContain("Guides appear here once reviewed.");
     stubGuides(SOME);
     const listed = visible(await index());
     expect(listed).toContain("Everloot's reviewed guides, each a talent plan for one class");

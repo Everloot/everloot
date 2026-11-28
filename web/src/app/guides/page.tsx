@@ -22,7 +22,7 @@ type Props = { searchParams: Promise<Search> };
 const TITLE = "WoW Forever Guides";
 const LEDE = "Everloot's reviewed guides, each a talent plan for one class: who it is for, why it fits, how to play it and what we do not know yet.";
 /** While no guide is reviewed, the lede promises no list (the empty state under it says why). */
-const LEDE_EMPTY = "Talent plans for one class each, from Everloot: who it is for, why it fits, how to play it and what we do not know yet. Each is reviewed before it is listed here.";
+const LEDE_EMPTY = "Talent plans for one class each, from Everloot: who it is for, why it fits, how to play it and what we do not know yet. Guides appear here once reviewed.";
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** 120 to 160 characters, and honest about the guides (guides.test.tsx). */

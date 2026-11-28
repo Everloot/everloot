@@ -423,6 +423,20 @@ describe("QA round 1: the directory's races, labels and phone line", () => {
     expect(results(await page({ race: "high order skyborne" }))).toContain('href="/armory/eu/sora-vel"');
   });
 
+  // QA round 12: /players said "High Order Skyborne" and "Windshaper Skyborne" while /rankings and /census say
+  // "Skyborne (Alliance)" and "Skyborne (Horde)". The page now words them as the census does; the filter values stay.
+  test("the Skyborne races read as the census names them, Skyborne (Alliance) and Skyborne (Horde)", async () => {
+    armory.putCharacter(armoryCharacter({ slug: "gang-jubaster", name: "Gang", surname: "Jubaster", race: "Windshaper Skyborne", raceId: 96, class: "Rogue" }));
+    armory.putCharacter(armoryCharacter({ slug: "sora-vel", name: "Sora", surname: "Vel", race: "High Order Skyborne", raceId: 95, class: "Mage", faction: "Alliance" }));
+    const html = await page();
+    expect(html).toMatch(/href="\/players\?race=Windshaper\+Skyborne"[^>]*>(?:<[^>]*>)*Skyborne \(Horde\)</);
+    expect(html).toMatch(/href="\/players\?race=High\+Order\+Skyborne"[^>]*>(?:<[^>]*>)*Skyborne \(Alliance\)</);
+    expect(html).not.toContain("Windshaper Skyborne<");
+    expect(html).not.toContain("High Order Skyborne<");
+    expect(html).not.toMatch(/Level \d+ (?:High Order|Windshaper) Skyborne/);
+    expect(results(await page({ race: "Windshaper Skyborne" }))).toContain("Skyborne (Horde)");
+  });
+
   test("a disbanded guild, no guild and unread gear say so in words", async () => {
     armory.putCharacter(armoryCharacter({ slug: "old-oath", name: "Old", surname: "Oath", guildName: "DELETED", guildSlug: null }));
     armory.putCharacter(armoryCharacter({ slug: "lone-wolf", name: "Lone", surname: "Wolf", guildName: null, guildSlug: null, itemLevel: null, gearScore: null }));

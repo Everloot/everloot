@@ -35,8 +35,10 @@ export type NameFrom = "players" | "wiki" | "files" | "none";
 export interface ItemSummaryInput {
   /** What the game files say it is, in one line: type, quality, level. */
   identity: string;
-  /** Drop sources with three installs agreeing. */
+  /** Drop sources players reported: a rate shows from one install (reported, verified at two, confirmed at three). */
   dropSources: number;
+  /** Of those, the ones three installs confirm (kb/src/drop-rollup.ts dropTier). */
+  confirmedDropSources: number;
   /** Map positions with three installs agreeing. */
   mapPositions: number;
   /** Vendors seen selling it, recipes that make it, and recipes that use it as a reagent. */
@@ -61,12 +63,17 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 export function itemSummary(i: ItemSummaryInput): string[] {
   const bullets: string[] = [i.identity];
 
+  // A drop source shows from one install, a map position only once three agree: each says what is true of it.
   const observed: string[] = [];
-  if (i.dropSources > 0) observed.push(plural(i.dropSources, "drop source", "drop sources"));
-  if (i.mapPositions > 0) observed.push(plural(i.mapPositions, "map position", "map positions"));
+  if (i.dropSources > 0) {
+    const n = i.dropSources, c = i.confirmedDropSources;
+    const confirmed = c >= n ? (n === 1 ? "confirmed" : "each confirmed") : c === 0 ? (n === 1 ? "not yet confirmed" : "none yet confirmed") : `${c} of them confirmed`;
+    observed.push(`Players reported ${plural(n, "drop source", "drop sources")}, ${confirmed} by three installs.`);
+  }
+  if (i.mapPositions > 0) observed.push(`Three installs agree on ${plural(i.mapPositions, "map position", "map positions")}.`);
   if (observed.length) {
-    const when = i.lastSeen ? `, last seen ${timeAgo(Date.parse(i.lastSeen), i.now)}` : "";
-    bullets.push(`Players reported ${observed.join(" and ")}, each with three installs agreeing${when}.`);
+    if (i.lastSeen) observed.push(`Last seen ${timeAgo(Date.parse(i.lastSeen), i.now)}.`);
+    bullets.push(observed.join(" "));
   } else {
     bullets.push("No player has reported a drop source or a map position yet.");
   }

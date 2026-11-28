@@ -42,6 +42,7 @@ import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "@kb/pending-loot";
 import { itemDropSources } from "@kb/loot-tables";
+import { dropTier } from "@kb/drop-rollup";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
@@ -339,6 +340,7 @@ export default async function ItemPage(props: Props) {
   const summary = itemSummary({
     identity: identity || "An item the game files list.",
     dropSources: page.drops.length,
+    confirmedDropSources: page.drops.filter((d) => dropTier(d.reporters) === "confirmed").length,
     mapPositions: page.pins.length,
     vendors: rel("sold_by").length,
     recipes: rel("created_by").length,
