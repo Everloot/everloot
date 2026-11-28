@@ -6,6 +6,7 @@ import { loadCensus } from "@/lib/rollup-compute";
 import { REPO_URL } from "@/lib/source";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
+import CensusRoundingNote from "@/components/CensusRoundingNote";
 import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
@@ -20,7 +21,7 @@ import {
   activeDims, censusHref, filterCensus, parseCensusFilter, type CensusDim, type CensusFilter, type FilteredCensus,
 } from "@/lib/census-filter";
 import {
-  CENSUS_CLASSES, CENSUS_RACES, CENSUS_ROUND_TO, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
+  CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
 } from "@kb/census";
 import { utcDay, utcStamp } from "@/lib/time";
 
@@ -78,8 +79,7 @@ function CountTable({ id, title, item, rows, total, of, byClass = false, icons =
       <SectionHeading id={id}>{title}</SectionHeading>
       {item === "Faction" ? <Factions rows={rows} total={total} /> : <Bars title={title} rows={rows} byClass={byClass} icons={icons} />}
       <DataTable caption={`${title}: characters and share of ${of ? `all ${of} characters` : "all characters in the window"}`} columns={columns} rows={rows} rowKey={(row) => row.key} />
-      {/* Each count is rounded from its own true number, so a table's rows can miss its total by a few. */}
-      <p className="mt-3 text-meta text-muted">Counts are rounded to the nearest {CENSUS_ROUND_TO}, so parts may not add up exactly.</p>
+      <CensusRoundingNote />
     </Card>
   );
 }

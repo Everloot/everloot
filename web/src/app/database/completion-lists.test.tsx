@@ -682,3 +682,14 @@ test("the achievement and faction menus count with the name box on, and a catego
   expect(menuCount(factions, "header", "Horde")).toBe(1);
   expect(menuCount(factions, "header", "Alliance")).toBeNull();
 });
+
+// QA round 13: "1 quests" on /database/quest-chains; a one-quest chain says "1 quest", in the list and on its page.
+test("QA round 13: a one-quest chain counts one quest, singular", async () => {
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11] }];
+  const list = await html(ChainList(search()));
+  expect(list).toContain("1 quest · ID 1");
+  expect(list).not.toContain("1 quests");
+  const one = await html(ChainPage(page("1-the-missing-diplomat")));
+  expect(one).toContain("1 quest");
+  expect(one).not.toContain("1 quests");
+});

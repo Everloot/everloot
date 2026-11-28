@@ -11,6 +11,7 @@ import {
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { CENSUS_CLASSES, FACTIONS } from "@kb/census";
+import CensusRoundingNote from "@/components/CensusRoundingNote";
 import { HowItCounts, OneWeek, RankTable, RankingRail, StartState, WeeklyChart, weekLabel } from "../parts";
 
 export const dynamic = "force-dynamic";
@@ -103,13 +104,16 @@ export default async function RankingPage({ params, searchParams }: Props) {
                 {week.window.collecting ? (
                   <EmptyState count={week.window.installs} message={COLLECTING_LINE} />
                 ) : (
-                  <RankTable
-                    rows={view.rows}
-                    caption={`${def.title}, ${weekLabel(week)}`}
-                    showChange={view.previous !== null}
-                    asOf={week.to}
-                    hrefOf={(r) => censusHrefOf(def.slug, r, q)}
-                  />
+                  <div>
+                    <RankTable
+                      rows={view.rows}
+                      caption={`${def.title}, ${weekLabel(week)}`}
+                      showChange={view.previous !== null}
+                      asOf={week.to}
+                      hrefOf={(r) => censusHrefOf(def.slug, r, q)}
+                    />
+                    <CensusRoundingNote />
+                  </div>
                 )}
                 {!isFiltered(q) && rankedCount(view.rows) > 0 && (
                   <JsonLd data={itemListJsonLd(`WoW Forever ${def.title}`, path, ranked.map((r) => ({ name: r.sub ? `${r.label} (${r.sub})` : r.label })))} />

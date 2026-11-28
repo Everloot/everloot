@@ -267,8 +267,13 @@ export function boardValue(
   }
 }
 
+/** "Nov 9, 2026, 14:05 UTC": the time in readLine's form, for a sentence that words "read" itself; null when unrecorded. */
+export function readAt(at: string | null | undefined): string | null {
+  return utcStamp(at);
+}
+
 /** "Read Nov 9, 2026, 14:05 UTC": when the crawler last read the row, or that it is unrecorded. The one read-time form. */
 export function readLine(at: string | null | undefined): string {
-  const stamp = utcStamp(at);
+  const stamp = readAt(at);
   return stamp ? `Read ${stamp}` : "Read time unrecorded";
 }

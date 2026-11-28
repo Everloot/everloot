@@ -21,7 +21,7 @@ import { agreedNpc } from "@kb/world-pages";
 import { loadRenders } from "@/lib/game-renders";
 import EntityLink from "@/components/EntityLink";
 import { loadingArt, loadItemSetNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import GameIcon from "@/components/game/GameIcon";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
@@ -166,7 +166,7 @@ export default async function InstancePage(props: Props) {
   };
   const topDrops = (b: BossRow) => npcsOf(b).flatMap((id) => lootTables.get(id)?.rows ?? [])
     .sort((x, y) => y.rate - x.rate || y.withItem - x.withItem || x.itemId - y.itemId).slice(0, 3);
-  const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; };
+  const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} />; };
   // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
   // reads as names with their unconfirmed marker, not rows of [?].
   // A row 3 installs have not reported has nothing to show in the report columns: a dash, explained once under the table.

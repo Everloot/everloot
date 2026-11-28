@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
-import { readLine } from "@/lib/armory";
+import { readAt } from "@/lib/armory";
 import type { ArmoryBoardRow, ArmoryGuildRow } from "@/lib/armory-store";
 import { GuildBoards } from "./leaderboards";
 import { BoardValue } from "../armory/board-parts";
@@ -16,7 +16,7 @@ test("the guild gear board says when a guild was read in the site's one read-tim
   };
   const html = renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [row] }} raids={null} region={null} />);
   expect(html).not.toContain("GMT");
-  expect(html).toContain(`${readLine(fetchedAt)}.`);
+  expect(html).toContain(`(${readAt(fetchedAt)}).`);
 });
 
 // QA round 12: the Characters board's credit line and the gear board's screen-reader text said "Read 2026-11-23 03:44 UTC"
@@ -37,7 +37,21 @@ test("every read time on the rankings boards uses one format, never the ISO form
     renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [guild] }} raids={null} region={null} />),
   ];
   for (const h of html) {
-    expect(h).toContain("Read Nov 23, 2026, 03:44 UTC");
+    expect(h).toContain("Nov 23, 2026, 03:44 UTC");
     expect(h).not.toContain("2026-11-23 03:44");
   }
+});
+
+// QA round 13: the gear tooltip read "Average of the guild members read. Read Nov 23, …": one sentence now, the read time
+// in brackets, in the same read-time form.
+test("the guild gear tooltip says what the average covers and when, in one sentence", () => {
+  const guild: ArmoryGuildRow = {
+    region: "eu", slug: "invented-watch", name: "Invented Watch", faction: "Horde", rulesetId: 1, ruleset: "Normal",
+    memberCount: 40, membersRead: 30, averageItemLevel: 52.4, level60: 12, fetchedAt: "2026-11-23T03:44:00.000Z",
+  };
+  const html = renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [guild] }} raids={null} region={null} />);
+  expect(html).toContain("Average across the members the armory has read (Nov 23, 2026, 03:44 UTC).");
+  expect(html).not.toContain("guild members read.");
+  const unread = renderToStaticMarkup(<GuildBoards gear={{ state: "ready", rows: [{ ...guild, fetchedAt: null as unknown as string }] }} raids={null} region={null} />);
+  expect(unread).toContain("Average across the members the armory has read. Read time unrecorded.");
 });

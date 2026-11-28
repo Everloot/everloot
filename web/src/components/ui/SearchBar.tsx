@@ -209,8 +209,9 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
       >
         {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
         {row.faction && <span role="img" aria-label={row.faction} className={`h-2 w-2 shrink-0 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} />}
-        {/* Two lines, not one cut short: two long names that start alike ("Thunderfury, Bless…") stay apart at 390 px. */}
-        <span className={`line-clamp-2 min-w-0 flex-1 break-words ${labelColour(row)}`}>{row.label}</span>
+        {/* Three lines, not one cut short: a long name ("Thunderfury, Blessed Blade of the Windseeker") shows whole beside
+            its ID at 390 px, and two names that start alike stay apart. */}
+        <span className={`line-clamp-3 min-w-0 flex-1 break-words ${labelColour(row)}`}>{row.label}</span>
         <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
       </Link>
     </li>

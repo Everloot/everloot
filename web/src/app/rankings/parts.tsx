@@ -2,6 +2,7 @@ import Link from "@/components/Link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { CLASS_BG, classColour } from "@/components/ui/class-colour";
+import CensusRoundingNote from "@/components/CensusRoundingNote";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
@@ -218,6 +219,7 @@ export function RankCard({ view }: { view: RankingView }) {
           ))}
         </ol>
       )}
+      {!week.window.collecting && <CensusRoundingNote className="border-t border-line px-4 py-3 sm:px-6" />}
     </Card>
   );
 }

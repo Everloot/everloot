@@ -189,6 +189,14 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const [open, setOpen] = useState(false);
   // The phone menu groups opened past their first links with More….
   const [moreOpen, setMoreOpen] = useState<string[]>([]);
+  // More… removes itself when pressed, so focus moves to the first link it showed instead of falling to the page body.
+  const moreFocus = useRef<string | null>(null);
+  useEffect(() => {
+    const label = moreFocus.current;
+    if (!label) return;
+    moreFocus.current = null;
+    document.querySelectorAll<HTMLAnchorElement>(`#${menuId(label)}-phone a[href]`)[PHONE_LINKS]?.focus();
+  }, [moreOpen]);
   // The top bar menu that is open, by its label; one at a time.
   const [menu, setMenu] = useState<string | null>(null);
   // Below 1280 px the bar has no room for the field: the search icon opens it full width under the bar.
@@ -425,7 +433,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                     ))}
                     {rest.length > 0 && !expanded && (
                       <li className="md:hidden">
-                        <button type="button" aria-expanded={false} aria-controls={`${menuId(group.label)}-phone`} className={`${menuLink} w-full text-left`} onClick={() => setMoreOpen([...moreOpen, group.label])}>More…</button>
+                        <button type="button" aria-expanded={false} aria-controls={`${menuId(group.label)}-phone`} className={`${menuLink} w-full text-left`} onClick={() => { moreFocus.current = group.label; setMoreOpen([...moreOpen, group.label]); }}>More…</button>
                       </li>
                     )}
                     {group.label === "More" && (

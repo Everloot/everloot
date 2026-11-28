@@ -36,6 +36,18 @@ test("the terrain page has a section per terrain type with its zones, then the s
   expect(metadata.alternates?.canonical).toBe("/database/terrain");
 });
 
+// QA round 13: hovering "Item 274648" asked /card/item/274648, which 404s and logs a console error. An item the page
+// shows only by its id has no card, so its link opts out of the hover card and asks nothing.
+// (Here no item names load, so every row reads "Item N"; a named item keeps its card: lib/item-look.ts lookHasCard.)
+test("an item shown only by its id carries no hover card", async () => {
+  const page = renderToStaticMarkup(await TerrainPage());
+  // Each item link and the EntityLink span it sits in.
+  const rows = [...page.matchAll(/<span class="inline-flex items-center gap-2"([^>]*)>(?:(?!<span class="inline-flex items-center gap-2")[\s\S])*?<a href="\/database\/items\/(\d+)">([^<]+)<\/a>/g)];
+  const unnamed = rows.filter((m) => m[3] === `Item ${m[2]}`);
+  expect(unnamed.length).toBeGreaterThan(0);
+  for (const m of unnamed) expect(m[1], `Item ${m[2]}`).toContain("data-no-hover-card");
+});
+
 test("the terrain page's hundreds of links navigate on click without prefetching", async () => {
   // Prefetching every visible row sent a burst of RSC requests that the edge answered with 429s and a challenge.
   links.length = 0;

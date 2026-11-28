@@ -18,7 +18,7 @@ import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { zoneCoverageHref } from "@/lib/coverage-view";
 import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import ItemTip from "@/components/game/ItemTip";
 import { loadProfessions } from "@/lib/profession-store";
 import { rateWithRange } from "../../loot-tables";
@@ -215,7 +215,7 @@ export default async function ZonePage(props: Props) {
     { key: "item", header: "Item", cell: (i) => {
       const x = itemLookOf!(i.itemId);
       // The tooltip draws its own icon in front; an item the files give only an icon for draws it in the link.
-      return <ItemTip tip={x.tip}><EntityLink kind="item" id={i.itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} /></ItemTip>;
+      return <ItemTip tip={x.tip}><EntityLink kind="item" id={i.itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} /></ItemTip>;
     } },
     { key: "from", header: "From", cell: (i) => (!manySources(i) ? sourceLink(i.sources[0]) : (
       <details data-item-sources className="group">
