@@ -12,7 +12,7 @@ import { wikiNpcNames } from "@/lib/wiki-npc-names";
 import { NAME_FROM } from "@/lib/items";
 import { LINK } from "../entity";
 import { byRank, countBy, facetRows, nameMatches, Respelled, unrecordedNote,
-  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, plural, range, rangeParam, sortRows, Unreadable,
+  COUNTED_LEVEL_BRACKETS, flag, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, plural, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -129,8 +129,8 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
     },
     {
       type: "menu", key: "level", label: "Level",
-      options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
-        label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((n) => inLevel(n, b)).length,
+      options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...COUNTED_LEVEL_BRACKETS.map((b) => ({
+        label: b.label, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((n) => inLevel(n, b)).length,
       }))],
       note: unrecordedNote(without.level, (n) => n.level !== null),
     },
