@@ -1,6 +1,11 @@
+import Database from "better-sqlite3";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "vitest";
+import { hotfixTable } from "../src/client-hotfixes.js";
 import { emptyLedger, mergeLedger, WIKI_PAGE_PREFIX } from "../src/item-names.js";
-import { baselineNames, fileNameGaps, formatNameGaps, itemGaps, kindCoverage, NAME_GAPS_SCHEMA, playerNames, questGaps, type NameGaps } from "../src/name-gaps.js";
+import { baselineNames, fileNameGaps, formatNameGaps, itemGaps, kindCoverage, NAME_GAPS_SCHEMA, playerNames, questGaps, runNameGaps, type NameGaps } from "../src/name-gaps.js";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 
@@ -121,4 +126,31 @@ test("the baseline's item and quest names are read from its rows, and players' n
   ]);
   expect([...p.items.keys()], "items two installs report").toEqual([25]);
   expect([...p.quests.keys()], "quests one install reports").toEqual([7]);
+});
+
+test("a run counts an item the hotfix cache names as named by the game files, as the shown names do", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kb-name-gaps-"));
+  const snapshotPath = join(dir, "client.sqlite");
+  const snap = new Database(snapshotPath);
+  snap.exec("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE client_rows (tbl TEXT NOT NULL, id INTEGER NOT NULL, raw TEXT NOT NULL, PRIMARY KEY (tbl, id));");
+  for (const [k, v] of Object.entries({ product: "wowf", buildId: "71139", version: B1, buildConfig: "7a16decda3672d84db0d34d0784fda98", extractedAt: "2026-11-25T00:00:00Z", library: "x" })) snap.prepare("INSERT INTO meta VALUES (?, ?)").run(k, v);
+  const row = (tbl: string, id: number, raw: object) => snap.prepare("INSERT INTO client_rows VALUES (?, ?, ?)").run(tbl, id, JSON.stringify({ ID: id, ...raw }));
+  // Made-up rows: 10 is named by the file, 20 only by the hotfix cache, 30 by neither.
+  for (const id of [10, 20, 30]) row("Item", id, { ClassID: 2 });
+  row("ItemSparse", 10, { Display_lang: "Plain Sword", OverallQualityID: 1 });
+  row(hotfixTable("ItemSparse"), 20, { Display_lang: "Server Dagger", OverallQualityID: 2 });
+  row("QuestV2", 1, {});
+  row("ItemSet", 1, { Name_lang: "Some Set" });
+  row("SpellName", 1, { Name_lang: "Some Spell" });
+  snap.close();
+  const kbPath = join(dir, "kb.sqlite");
+  const kb = new Database(kbPath);
+  kb.exec("CREATE TABLE sources (id TEXT PRIMARY KEY, name TEXT, licence TEXT, publishable INTEGER, homepage TEXT); CREATE TABLE entities (id INTEGER PRIMARY KEY, kind TEXT, ext_id TEXT, name TEXT, body TEXT, data TEXT, game_version TEXT, source_id TEXT, source_url TEXT, licence TEXT, retrieved_at TEXT);");
+  kb.prepare("INSERT INTO sources VALUES ('warcraft-wiki-2023', 'Warcraft Wiki', 'CC-BY-SA-4.0', 1, 'https://warcraft.wiki.gg')").run();
+  kb.prepare("INSERT INTO entities (kind, name, data, source_id, source_url, licence, retrieved_at) VALUES ('lore_page', 'Thrall', '{}', 'warcraft-wiki-2023', ?, 'CC-BY-SA-4.0', '2023-11-13')").run(page("Thrall"));
+  kb.close();
+  const report = runNameGaps({ snapshotPath, kbPath });
+  expect(report.coverage.find((c) => c.kind === "item")!.named.files).toBe(2);
+  const items = report.kinds.find((k) => k.kind === "item")!;
+  expect(items.buckets.filter((b) => b.route === "shown").reduce((n, b) => n + b.count, 0)).toBe(2);
 });

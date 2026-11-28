@@ -15,6 +15,7 @@
  * The report lists ids and counts, never names: it holds every id of the build, released or not, and the
  * baseline's rows are not publishable (docs/DATA_POLICY.md), so it stays local.
  */
+import { withHotfixes } from "./client-hotfixes.js";
 import { readClientMeta, readClientRows } from "./client-snapshot.js";
 import type { DB } from "./db.js";
 import { itemFactsFromRecords } from "./drop-rollup.js";
@@ -174,7 +175,8 @@ export function runNameGaps(opts: { snapshotPath: string; kbPath: string; baseli
     throw new Error("the snapshot lacks Item, QuestV2, ItemSet or SpellName; run `client-extract --refresh` first");
   }
   const wiki = wikiNames(opts.kbPath);
-  const files = fileNames(get);
+  // The hotfix cache's rows for items the ItemSparse file lacks count as the game files', as item-names shows them.
+  const files = fileNames(withHotfixes(get));
   const ledger = mergeLedger(emptyLedger(), { at: meta.extractedAt, build: meta.version, files, wikiDump: wiki.dump, wiki: wiki.names });
   const questTitles = wikiQuestTitles(opts.kbPath).titles;
   const baseline = opts.baseline ?? null, players = opts.players ?? null;

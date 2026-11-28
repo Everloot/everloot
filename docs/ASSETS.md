@@ -122,7 +122,18 @@ How it works, and what it will not do:
 
 - **Talent icons.** `SpellMisc.SpellIconFileDataID` of each talent's shown spell. The BLP file is
   fetched from Blizzard's CDN the same way the DB2 tables are, and converted to WebP.
-- **Item icons and tooltips.** `Item.IconFileDataID` for the icon; name, quality, item level,
+- **Item rows from the client's hotfix cache.** About 12,600 items in `Item` have no `ItemSparse` row in the CDN's
+  files: the server sends those rows as hotfixes, and the client keeps them in `_forever_/Cache/ADB/enUS/DBCache.bin`.
+  `npm run kb -- client-hotfixes <snapshot> --cache <DBCache.bin> --out <new snapshot>` reads `ItemSparse` of the
+  snapshot's build from the CDN with that cache (only that table's entries; the cache's key rows are never read,
+  nothing is decrypted) and writes a new snapshot with the rows for ids the file lacks in `Hotfix.ItemSparse`, the
+  cache's build and checksum in its manifest. It refuses a cache or a CDN build other than the snapshot's.
+  `client-assets` and `item-names` read those rows like the file's own; other commands see the file alone. A row the
+  file has is never replaced; the command prints how many the cache changes (1,736 in 71139, none in name, quality or
+  levels) and the file's encrypted sections (15, holding 89 `ItemSparse` records). Build 71139 gained 5,364 rows.
+- **Item icons and tooltips.** `Item.IconFileDataID` for the icon, else, where it is 0, the item's base appearance's
+  icon (`ItemModifiedAppearance` with modifier 0, `ItemAppearance.DefaultIconFileDataID`), as the client draws it;
+  name, quality, item level,
   required level, binding, slot, armour or weapon kind, weapon speed, stat kinds, flavour text and
   sell price from `ItemSparse` and `Item`, the quest the item begins (`StartQuestID`, as `qs`) and the
   spell behind each Use, Equip and Chance on hit line (`ItemEffect.SpellID`, as `fs`, in the order of
@@ -356,7 +367,14 @@ repeat these steps for a new build or another deployment.
    only. This one goes into the Worker's secrets (step 7).
 5. **Snapshot.** On a maintainer machine with the game's build available from the CDN, run
    `client-extract --refresh` (above) once for the build, so the snapshot has the item, map art and
-   atlas tables.
+   atlas tables. Then, with an install of the same build that has been logged in (so its hotfix cache is
+   current), add the cache's item rows into a new snapshot and use that one in steps 6 and 8:
+
+   ```
+   npm run kb -- client-hotfixes data/client/<product>-<build>-<config>.sqlite --cache "<install>/_forever_/Cache/ADB/enUS/DBCache.bin" --out data/client/hotfixes/<product>-<build>-<config>.sqlite
+   ```
+
+   Keep the output's file name: the asset and name folders are named after the build, read from the snapshot.
 6. **Extract and upload, one command.** In `web/`, with the upload key in the environment (never on
    the command line):
 
@@ -415,7 +433,8 @@ repeat these steps for a new build or another deployment.
    It adds both sources to the name ledger (`data/item-names/ledger.json`, which only grows and stays on
    this machine), prints the count per tier and the mismatches, and writes the names to show to
    `data/assets/<product>-<build>-<config>-names/item-names.json`. Check the counts and a sample of the
-   names in a pull request, then upload that one file to the private bucket from `web/`, with the same
+   names in a pull request (names read from the hotfix cache are marked `hotfix` in the ledger), then upload that
+   one file to the private bucket from `web/`, with the same
    upload key in the environment:
 
    ```
