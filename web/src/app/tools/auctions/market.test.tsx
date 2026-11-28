@@ -64,6 +64,12 @@ const text = (html: string) => {
   document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
   return (document.body.textContent ?? "").replace(/[<>]/g, "").replace(/ gold/g, "g").replace(/ silver/g, "s").replace(/ copper/g, "c");
 };
+// The text a reader sees: the markup's text without its scripts (the Dataset JSON-LD keeps ISO days).
+const shownText = (html: string) => {
+  const document = new JSDOM(html).window.document;
+  document.querySelectorAll("script").forEach((el) => el.remove());
+  return document.body.textContent ?? "";
+};
 // The newest scan day as every Auction House page writes it: "27 Nov".
 const todayText = today.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const hub = async (searchParams: Record<string, string>) =>
@@ -258,7 +264,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(text(html)).toContain("1s 90c");
   // Days read in the site's day form everywhere on the page: tiles, the chart range, the day list.
   expect(words).toContain(`On ${todayText}`);
-  expect(words).not.toMatch(/20\d\d-\d\d-\d\d/);
+  expect(shownText(html)).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect(html).toContain('"@type":"Dataset"');
   expect(html).not.toMatch(/"@type":"(Product|Offer|AggregateRating|Review)"/);
   const meta = await itemMetadata(item("forever", "2589"));
@@ -303,7 +309,7 @@ test("the cross-realm page compares every realm with a price", async () => {
   expect(html).toContain("Mal'Ganis");
   // The all-realms table's day is in the site's day form.
   expect(html).toContain(todayText);
-  expect(html).not.toMatch(/20\d\d-\d\d-\d\d/);
+  expect(shownText(renderToStaticMarkup(await CrossRealmItemPage(props)))).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
 });

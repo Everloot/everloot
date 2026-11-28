@@ -18,11 +18,13 @@ const EXAMPLES = [
 export default function HomeSearch() {
   return (
     <div className="w-full max-w-xl">
-      <form action="/search" method="get" role="search" aria-label="Search Everloot" onSubmit={() => track("search", { surface: "home" })} className="flex gap-2">
+      <form action="/search" method="get" role="search" aria-label="Search Everloot" onSubmit={() => track("search", { surface: "home" })} className="relative flex gap-2">
         <SuggestField
           id="home-search"
           label="Search Everloot"
           placeholder="Search items, NPCs, quests and zones"
+          // The suggestions are as wide as the field and its button together.
+          listFillsForm
           className="min-h-11 w-full min-w-0 rounded-full border border-edge bg-canvas/80 px-4 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button type="submit" className="btn btn-primary min-h-11 shrink-0 px-5">Search</button>
