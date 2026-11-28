@@ -16,7 +16,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 
-- Addon: Auction House > Everloot > Sales cycles shows your peak sale hours and top products by paid auctions over the last 24 hours, since weekly reset or this month. Crafting Costs shows the finished item's activity by name.
 - Site: Auction House Activity opens your Everloot sales ledger locally for the same cycles and links from profession recipes and auction item pages. Market timing by item shows AH Ledger asking-price windows and scan coverage.
 - Site: all Forever professions have leveling or gathering guides. Crafting guides plan recipes, training stops and a copyable shopping list for your skill range, with optional auction prices. Gathering guides show sourced trainers, zones and materials.
 - Site: guild pages link each class count to the roster filtered by class, show the spread of item levels read, and say when rank names are not public; /guilds shows active region and ruleset filters as chips on a phone; the raid planner has a shorter banner and suggests the class that would bring the most missing buffs and debuffs; talent trees say what the next locked row needs, show a tree's role where a class's trees differ, and explain what Save does (#1687).

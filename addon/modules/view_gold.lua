@@ -12,9 +12,8 @@ local COLORS, NARROW, text, surface = U.COLORS, U.NARROW, U.Text, U.Surface
 local W = 604          -- the view frame window.lua gives every view (W - MAIN - 12 wide)
 local DAY = 86400
 local ROWS, ROW_H = 12, 18
-local TABS = { { "overview", "Overview" }, { "ledger", "Ledger" }, { "sales", "Sales" }, { "cycles", "Sales cycles" }, { "session", "Session" } }
+local TABS = { { "overview", "Overview" }, { "ledger", "Ledger" }, { "sales", "Sales" }, { "session", "Session" } }
 local PERIODS = { { "today", "Today" }, { "7d", "7 days" }, { "30d", "30 days" }, { "all", "All" } }
-local CYCLES = { { "day", "Last 24 hours" }, { "week", "Weekly reset" }, { "month", "This month" } }
 -- The days each period covers, for the per-day averages and the by-item rates. "All" is the ledger's own 90-day
 -- window.
 local PERIOD_DAYS = { today = 1, ["7d"] = 7, ["30d"] = 30, all = 90 }
@@ -436,21 +435,6 @@ local function drawSales(g, keys)
   g.groupButton:SetText(g.grouped and "Each sale" or "By item")
 end
 
-local function drawCycles(g, keys)
-  local report = E.Ledger.SaleCycles(keys)
-  local cycle = g.cycle
-  local start = report.start[cycle]
-  g.cycleRevision, g.cycleMinute = E.Ledger.revision, math.floor(time() / 60)
-  g.peakHour:SetText(E.Ledger.PeakHourText(report.peak))
-  g.cycleStart:SetText(start and ("Payouts collected since " .. date("!%Y-%m-%d %H:%M UTC", start))
-    or "Weekly reset time unavailable on this client.")
-  show(g.topSellers, report.rank[cycle], function(row, sale)
-    row.item:SetText(sale.itemName)
-    row.sales:SetText(sale.sales)
-    row.total:SetText(U.MoneyShort(sale.total))
-  end, start and "No confirmed auction payouts collected in this cycle." or "")
-end
-
 local function gphSession()
   local s = type(EverlootDB.gph) == "table" and EverlootDB.gph.current
   return type(s) == "table" and s or nil
@@ -473,12 +457,7 @@ function refresh(f)
   for _, p in ipairs(PERIODS) do
     local b = g.periods[p[1]]
     lit(b, p[1] == g.period)
-    if g.tab ~= "session" and g.tab ~= "cycles" then b:Show() else b:Hide() end
-  end
-  for _, c in ipairs(CYCLES) do
-    local b = g.cycleButtons[c[1]]
-    lit(b, c[1] == g.cycle)
-    if g.tab == "cycles" then b:Show() else b:Hide() end
+    if g.tab ~= "session" then b:Show() else b:Hide() end
   end
   for _, s in ipairs(SCOPES) do
     local b = g.scopes[s[1]]
@@ -489,7 +468,6 @@ function refresh(f)
   if g.tab == "overview" then drawOverview(g, keys)
   elseif g.tab == "ledger" then drawLedger(g, keys)
   elseif g.tab == "sales" then drawSales(g, keys)
-  elseif g.tab == "cycles" then drawCycles(g, keys)
   else drawSession(g) end
 end
 
@@ -502,11 +480,11 @@ local function rule(chart, color)
 end
 
 local function build(f, parent)
-  local g = { tab = "overview", period = "30d", cycle = "day", scope = "character", grouped = false,
-    tabs = {}, periods = {}, cycleButtons = {}, scopes = {}, pages = {}, slots = {}, axis = {} }
+  local g = { tab = "overview", period = "30d", scope = "character", grouped = false,
+    tabs = {}, periods = {}, scopes = {}, pages = {}, slots = {}, axis = {} }
   f.gold = g
   local function reset()
-    for _, rows in ipairs({ g.rows, g.categories, g.days, g.receipts, g.sales, g.topSellers }) do rows.offset = 0 end
+    for _, rows in ipairs({ g.rows, g.categories, g.days, g.receipts, g.sales }) do rows.offset = 0 end
     g.day = nil
   end
 
@@ -526,10 +504,6 @@ local function build(f, parent)
   for i, p in ipairs(PERIODS) do
     g.periods[p[1]] = button(parent, p[2], 64, function() g.period = p[1]; reset() end)
     g.periods[p[1]]:SetPoint("TOPLEFT", (i - 1) * 68, -36)
-  end
-  for i, c in ipairs(CYCLES) do
-    g.cycleButtons[c[1]] = button(parent, c[2], 107, function() g.cycle = c[1]; reset() end)
-    g.cycleButtons[c[1]]:SetPoint("TOPLEFT", (i - 1) * 111, -36)
   end
   local right = 0
   for i = #SCOPES, 1, -1 do
@@ -653,19 +627,6 @@ local function build(f, parent)
   g.groupButton = button(salesBox, "By item", 90, function() g.grouped = not g.grouped; g.sales.offset = 0 end)
   g.groupButton:SetPoint("BOTTOMLEFT", 6, 6)
 
-  local cycles = g.pages.cycles
-  g.peakHour = text(cycles, 14)
-  g.peakHour:SetPoint("TOPLEFT", 8, -6)
-  g.peakHour:SetWidth(W - 16)
-  g.cycleStart = text(cycles, 12, nil, COLORS.muted)
-  g.cycleStart:SetPoint("TOPLEFT", 8, -29)
-  g.topSellers = list(cycles, 0, -54, W, 234, "Your top-selling products",
-    { { "item", 0, 312 }, { "sales", 316, 116, true }, { "total", 442, 148, true } }, 10,
-    { sales = "Paid auctions", total = "Net proceeds" })
-  local web = text(cycles, 11, nil, COLORS.muted)
-  web:SetPoint("TOPLEFT", 8, -301)
-  web:SetText("Web report: everloot.app/tools/auctions/activity")
-
   -- Session: the gph lines, moving once a second while this tab is open. Tall enough for every line gph writes
   -- (four, the vendor line, five items and the cut) above the buttons.
   local sb = box(g.pages.session, 0, 0, W, 250)
@@ -692,7 +653,6 @@ local function build(f, parent)
         or (g.pendingExpiry and now > g.pendingExpiry) then redraw() end
       return
     end
-    if g.tab == "cycles" and (g.cycleRevision ~= E.Ledger.revision or g.cycleMinute ~= math.floor(time() / 60)) then redraw() end
     if g.tab ~= "session" then return end
     local ok, err = pcall(drawSession, g)
     if not ok then U.Fail(err) end
@@ -700,10 +660,3 @@ local function build(f, parent)
 end
 
 U.Views.gold = { build = build, refresh = refresh }
-
-function U.OpenSaleCycles()
-  if U.Open("gold") and U.frame.gold then
-    U.frame.gold.tab = "cycles"
-    redraw()
-  end
-end
