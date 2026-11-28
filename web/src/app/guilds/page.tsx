@@ -110,7 +110,7 @@ function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
     // A hover title, not a Tooltip button: the header is already the column's sort link.
     { key: "l60", header: <span title={LEVEL_60_READ_TIP}>Level 60 read</span>, numeric: true, sortable: true, cell: (g) => number(g.level60) },
     // Numeric cells already set figures in mono (dt-num).
-    { key: "at", header: "Last read", numeric: true, cell: (g) => day(g.fetchedAt) || muted("—") },
+    { key: "at", header: "Newest read", numeric: true, cell: (g) => day(g.fetchedAt) || muted("—") },
   ];
   // Before the directory's migration only the name, region, faction and roster size are known.
   return counted ? all : all.filter((c) => ["name", "where", "faction", "roster"].includes(c.key));
@@ -241,7 +241,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                 Read from Blizzard&apos;s API
               </SectionHeading>
               <Disclosure summary="How this is counted">
-                <p className="text-sm">{`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}</p>
+                <p className="text-sm">{`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} Newest read is the latest day the armory read the guild's roster or any of its members; the guild page's Roster read is the roster's own day, so it can be older. A character who asked to be hidden is not counted.`}</p>
               </Disclosure>
               <FilterBar
                 label="Directory filters"
