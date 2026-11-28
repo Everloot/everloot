@@ -15,7 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
-- Addon: Professions shows local cooldowns across your characters for transmutes, Mooncloth and Salt Shaker. Ready timers appear first.
+- Addon: A movable tracker below the minimap shows transmutes, Mooncloth and Salt Shaker cooldowns across your characters. Open or hide it with Tracker in Professions.
 - Site: item pages list item level, required level and binding beside the tooltip, link the quests that reward the item and the items its recipe takes, and move "Same icon" below the other relations; realm price charts scale to the trimmed days with a labelled axis and hover values and name the realm as the site shows it; item lists on a phone show active filters as removable chips (#1678).
 - Site: zone pages list the quests players file under the zone or its subzones, say how many NPCs the level range comes from, name map dots on hover and focus, and open a short terrain list; the NPC list says "Unnamed NPC", has a Named only toggle and shows level ranges like 5–7; character pages count item-set pieces (3/8) and say why an equal Gear Score matches the item level (#1679).
 - Site: item tooltips show how many fit in a stack, and a recipe's tooltip shows the item it teaches underneath, as in the game (#1597).

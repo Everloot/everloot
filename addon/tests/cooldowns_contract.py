@@ -3,6 +3,7 @@ from pathlib import Path
 from window_world import fresh
 
 API = """
+MinimapCluster = CreateFrame('Frame', nil, UIParent)
 guid = 'Player-1-0001'
 UnitGUID = function() return guid end
 GetServerTime = function() return now end
@@ -49,12 +50,27 @@ for _, rows in pairs(EverlootDB.records) do
   end
 end
 local U = E.Window
+local tracker = E.Cooldowns.tracker
+assert(tracker and tracker.panel.shown and tracker.panel.parent == UIParent, 'tracker lives outside Everloot')
+assert(tracker.panel.point[2] == MinimapCluster, 'tracker starts below the minimap')
+assert(tracker.rows[1].status.text == 'Ready')
 assert(U.Open('professions'))
 local p = U.frame.professions
-assert(p.cooldownNav.text == 'Cooldowns')
+assert(p.cooldownNav.text == 'Tracker')
 p.cooldownNav.scripts.OnClick()
-assert(p.cooldowns.page.shown and not p.trainers.page.shown)
-assert(p.cooldowns.rows[1].status.text == 'Ready')
+assert(not tracker.panel.shown and EverlootDB.professionTrackerShown == false, 'toggle hides the tracker')
+assert(p.mode == 'list' and p.cooldowns == nil, 'there is no duplicate page')
+p.cooldownNav.scripts.OnClick()
+assert(tracker.panel.shown and EverlootDB.professionTrackerShown == true, 'toggle reopens the tracker')
+U.frame:Hide()
+assert(tracker.panel.shown, 'closing the main window leaves the tracker visible')
+tracker.panel.GetRight = function() return 1800 end
+tracker.panel.GetTop = function() return 800 end
+for _, frame in ipairs(created) do
+  if frame.parent == tracker.panel and frame.scripts.OnDragStop then frame.scripts.OnDragStop() end
+end
+assert(EverlootDB.professionTrackerPosition.x == -120 and EverlootDB.professionTrackerPosition.y == -280)
+assert(tracker.panel.point[2] == UIParent, 'a manual position overrides the minimap anchor')
 assert(8 + p.footer.width <= 604 + p.cooldownNav.point[2] - p.cooldownNav.width, 'all buttons clear the footer')
 
 local secret = {}
@@ -89,7 +105,9 @@ assert(entry('Salt Shaker').state == 'ready')
 reloadFixture = string.format([[{ installId = 'cooldown-test',
   roster = { ['%s'] = { name = 'Samplechar', realm = 'Forever' } },
   professionCooldowns = { ['%s'] = { transmute = { readyAt = %d } } },
-}]], me, me, EverlootDB.professionCooldowns[me].transmute.readyAt)
+  professionTrackerPosition = { x = %d, y = %d }, professionTrackerShown = false,
+}]], me, me, EverlootDB.professionCooldowns[me].transmute.readyAt,
+  EverlootDB.professionTrackerPosition.x, EverlootDB.professionTrackerPosition.y)
 
 guid = 'Player-1-0002'
 known = { [18560] = true }
@@ -104,7 +122,9 @@ assert(not entry('Transmute'), 'forgetting a character removes its timers')
 
 EverlootDB.toggles.roster = false
 sample()
+tracker.panel.scripts.OnUpdate(tracker.panel, 1)
 assert(#E.Cooldowns.Rows() == 0, 'the roster option also controls cooldown reads and display')
+assert(not tracker.panel.shown)
 """)
 
 reloaded = fresh(lua.globals().reloadFixture, API, extra=(MODULE,))
@@ -117,6 +137,8 @@ fire('PLAYER_ENTERING_WORLD')
 drain()
 local rows = Everloot.Cooldowns.Rows()
 assert(#rows == 2 and rows[1].name == 'Mooncloth' and rows[2].remaining == 2000)
+local panel = Everloot.Cooldowns.tracker.panel
+assert(not panel.shown and panel.point[4] == -120 and panel.point[5] == -280, 'visibility and position survive reload')
 now = now + 2001
 assert(Everloot.Cooldowns.Rows()[2].state == 'ready')
 """)

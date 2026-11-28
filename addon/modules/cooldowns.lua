@@ -11,6 +11,7 @@ local TRACKED = {
 }
 local MAX_DURATION = 14 * 24 * 60 * 60
 local queued, waiting = false, true
+local refreshTracker
 
 local function read(fn, ...)
   if type(fn) ~= "function" then return end
@@ -103,6 +104,7 @@ local function queue()
   C_Timer.After(0.25, function()
     queued = false
     scan()
+    if C.tracker then refreshTracker() end
   end)
 end
 
@@ -145,6 +147,146 @@ function C.Rows()
   return rows
 end
 
+local WIDTH, ROWS, ROW_HEIGHT = 286, 6, 19
+
+local function status(row)
+  if row.state == "ready" then return "Ready" end
+  if row.state == "unknown" then return "Unknown" end
+  local minutes = math.ceil(row.remaining / 60)
+  if minutes < 60 then return string.format("%dm", minutes) end
+  if minutes < 1440 then return string.format("%dh %02dm", math.floor(minutes / 60), minutes % 60) end
+  return string.format("%dd %dh", math.floor(minutes / 1440), math.floor(minutes / 60) % 24)
+end
+
+refreshTracker = function()
+  local c = C.tracker
+  local preference = EverlootDB.professionTrackerShown
+  local rows = C.Rows()
+  if not E:IsEnabled("roster") or preference == false or (preference == nil and #rows == 0) then
+    c.panel:Hide()
+    return
+  end
+  local lastPage = math.max(0, math.ceil(#rows / ROWS) - 1)
+  c.offset = math.max(0, math.min(c.offset, lastPage))
+  local realms = {}
+  for _, row in ipairs(rows) do
+    if row.realm then realms[row.realm] = true end
+  end
+  local firstRealm = next(realms)
+  local showRealm = firstRealm and next(realms, firstRealm) ~= nil
+  local visible = 0
+  local colors = E.Window.COLORS
+  for i, line in ipairs(c.rows) do
+    local row = rows[c.offset * ROWS + i]
+    if row then
+      local name = row.character
+      if showRealm and row.realm then name = name .. " (" .. row.realm .. ")" end
+      line.character:SetText(name:gsub("|", "||"))
+      line.name:SetText(row.name)
+      line.status:SetText(status(row))
+      line.status:SetTextColor(unpack(row.state == "ready" and colors.accent or colors.muted))
+      line:Show()
+      visible = visible + 1
+    else
+      line:Hide()
+    end
+  end
+  if visible == 0 then c.empty:Show() else c.empty:Hide() end
+  if c.offset > 0 then c.prev:Show() else c.prev:Hide() end
+  if c.offset < lastPage then c.next:Show() else c.next:Hide() end
+  c.panel:SetHeight(34 + math.max(1, visible) * ROW_HEIGHT + (lastPage > 0 and 24 or 0))
+  c.panel:Show()
+end
+
+function C.ToggleTracker()
+  if not C.tracker or not E:IsEnabled("roster") then return end
+  EverlootDB.professionTrackerShown = not C.tracker.panel:IsShown()
+  refreshTracker()
+end
+
+local function pager(panel, label, side, move)
+  local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  b:SetSize(78, 22)
+  b:SetPoint(side, side == "BOTTOMLEFT" and 6 or -6, 4)
+  b:SetText(label)
+  b:SetScript("OnClick", function()
+    C.tracker.offset = C.tracker.offset + move
+    refreshTracker()
+  end)
+  return b
+end
+
+local function buildTracker(U)
+  local panel = CreateFrame("Frame", nil, UIParent)
+  panel:SetWidth(WIDTH)
+  panel:SetClampedToScreen(true)
+  panel:SetMovable(true)
+  U.Surface(panel)
+  local pos = EverlootDB.professionTrackerPosition
+  local map = MinimapCluster or Minimap
+  if type(pos) == "table" and type(pos.x) == "number" and type(pos.y) == "number" then
+    panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", pos.x, pos.y)
+  elseif map then
+    panel:SetPoint("TOPRIGHT", map, "BOTTOMRIGHT", -4, -8)
+  else
+    panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -24, -170)
+  end
+
+  local grip = CreateFrame("Frame", nil, panel)
+  grip:SetPoint("TOPLEFT", 0, 0)
+  grip:SetSize(WIDTH - 30, 27)
+  grip:EnableMouse(true)
+  grip:RegisterForDrag("LeftButton")
+  grip:SetScript("OnDragStart", function() panel:StartMoving() end)
+  grip:SetScript("OnDragStop", function()
+    panel:StopMovingOrSizing()
+    local right, top = panel:GetRight(), panel:GetTop()
+    if not (right and top) then return end
+    local x, y = right - UIParent:GetWidth(), top - UIParent:GetHeight()
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, y)
+    EverlootDB.professionTrackerPosition = { x = x, y = y }
+  end)
+  local title = U.Text(grip, 12, nil, U.COLORS.gold)
+  title:SetPoint("LEFT", 8, 0)
+  title:SetText("Profession cooldowns")
+  local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", 3, 3)
+  close:SetScript("OnClick", C.ToggleTracker)
+
+  local c = { panel = panel, rows = {}, offset = 0 }
+  c.empty = U.Text(panel, 12, nil, U.COLORS.muted)
+  c.empty:SetPoint("TOPLEFT", 8, -30)
+  c.empty:SetText("No tracked cooldowns seen yet.")
+  for i = 1, ROWS do
+    local line = CreateFrame("Frame", nil, panel)
+    line:SetPoint("TOPLEFT", 0, -28 - (i - 1) * ROW_HEIGHT)
+    line:SetSize(WIDTH, ROW_HEIGHT)
+    line.character = U.Text(line, 12)
+    line.character:SetPoint("LEFT", 8, 0)
+    line.character:SetWidth(128)
+    line.character:SetJustifyH("LEFT")
+    if line.character.SetWordWrap then line.character:SetWordWrap(false) end
+    line.name = U.Text(line, 12)
+    line.name:SetPoint("LEFT", 142, 0)
+    line.status = U.Text(line, 12, U.NARROW)
+    line.status:SetPoint("RIGHT", -8, 0)
+    c.rows[i] = line
+  end
+  c.prev = pager(panel, "Previous", "BOTTOMLEFT", -1)
+  c.next = pager(panel, "Next", "BOTTOMRIGHT", 1)
+  local elapsed = 0
+  panel:SetScript("OnUpdate", function(_, dt)
+    elapsed = elapsed + dt
+    if elapsed >= 1 then
+      elapsed = 0
+      refreshTracker()
+    end
+  end)
+  C.tracker = c
+  refreshTracker()
+end
+
 local EVENTS = {
   PLAYER_ENTERING_WORLD = true, SPELLS_CHANGED = true, SPELL_UPDATE_COOLDOWN = true,
   BAG_UPDATE_DELAYED = true, BAG_UPDATE_COOLDOWN = true,
@@ -152,6 +294,7 @@ local EVENTS = {
 
 E:RegisterModule("cooldowns", function()
   if not (C_Timer and C_Timer.After) then return "unavailable: no timer API" end
+  if E.Window and UIParent then buildTracker(E.Window) end
   local f = E.frame
   for event in pairs(EVENTS) do pcall(f.RegisterEvent, f, event) end
   pcall(f.RegisterEvent, f, "PLAYER_REGEN_ENABLED")
