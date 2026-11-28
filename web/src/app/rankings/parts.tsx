@@ -11,7 +11,7 @@ import {
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
 import { StackedWeeksChart, WeeklyLinesChart, WeeklyTotalsChart } from "./charts";
-import { nameOf, number, percent, stroke, weekLabel } from "./chart-words";
+import { nameOf, number, percent, seriesMarks, stroke, weekLabel } from "./chart-words";
 
 export { percent, weekLabel };
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -249,16 +249,17 @@ const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLA
  * named in the legend (and at its end when there are four or fewer and room), so identity never rests on colour; the table below holds the numbers.
  */
 export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; series: ChartSeries[]; title: string }) {
+  const marks = seriesMarks(series);
   return (
     <Card>
       <figure data-weekly-chart className="min-w-0">
         <WeeklyLinesChart weeks={weeks} series={series} title={title} />
         <figcaption className="mt-3">
           <ul aria-label="Legend" className="flex flex-wrap gap-x-4 gap-y-1 text-cell-2 text-fg-2">
-            {series.map((s) => (
+            {series.map((s, n) => (
               <li key={s.key} className="inline-flex items-center gap-1.5">
                 <svg aria-hidden="true" width="16" height="4" viewBox="0 0 16 4">
-                  <line x1="0" x2="16" y1="2" y2="2" strokeWidth={2} strokeDasharray={s.faction === "Horde" ? "4 2" : undefined} className={stroke(s)} />
+                  <line x1="0" x2="16" y1="2" y2="2" strokeWidth={2} strokeDasharray={marks[n].horde ? "4 2" : undefined} className={marks[n].stroke} />
                 </svg>
                 {nameOf(s)}
               </li>

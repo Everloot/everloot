@@ -335,24 +335,82 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
 
 /** The rows of `base` that pass every filter, in `base`'s order: listItems before it sorts, for a page that only counts them. */
 export function matchingItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(base, q, ctx)): ItemRow[] {
+  const miss = filterMisses(q, ctx, match);
+  return base.filter((row) => miss(row) === null);
+}
+
+/** The menus that count their choices; each counts with every other filter on. */
+export type ItemFacet = "slot" | "quality" | "src" | "skill";
+
+const qualitySlug = (quality: number | null) => (quality === null ? UNRECORDED : QUALITIES[quality]?.slug ?? UNRECORDED);
+
+/**
+ * Which filter a row fails: null for none, the menu when its filter is the only one the row fails, "other" when the
+ * only one is a filter no menu counts (name, levels, binding, the yes-only ones), "many" for two or more.
+ */
+function filterMisses(q: CategoryQuery, ctx: ItemListContext, match: ReturnType<typeof matchItemNames>): (row: ItemRow) => ItemFacet | "other" | "many" | null {
   const text = q.q?.toLowerCase();
   const id = idOf(text);
-  return base.filter((row) => {
+  const bind = q.bind ? BINDINGS.find((b) => b.slug === q.bind)?.value : undefined;
+  return (row) => {
     const [itemId, , , inv, quality] = row;
-    if (text && !(id !== null ? itemId === id : match.ranked!.has(row))) return false;
+    let missed: ItemFacet | "other" | null = null;
+    let many = false;
+    const fail = (what: ItemFacet | "other") => { if (missed) many = true; else missed = what; };
+    if (text && !(id !== null ? itemId === id : match.ranked!.has(row))) fail("other");
     // A development leftover stays out unless asked for, or looked up by its id.
-    if (!q.dev && id === null && isDevelopmentItemName(ctx.name?.(itemId))) return false;
-    if (q.slot?.length && !q.slot.includes(slotOf(inv)?.slug ?? "")) return false;
-    if (q.quality?.length && !q.quality.includes(quality === null ? UNRECORDED : QUALITIES[quality]?.slug ?? UNRECORDED)) return false;
-    if (q.seen && !ctx.seen?.has(itemId)) return false;
-    if (q.src?.length && !ctx.sources?.(itemId)?.some((x) => q.src!.includes(x))) return false;
+    if (!q.dev && id === null && isDevelopmentItemName(ctx.name?.(itemId))) fail("other");
+    if (q.slot?.length && !q.slot.includes(slotOf(inv)?.slug ?? "")) fail("slot");
+    if (q.quality?.length && !q.quality.includes(qualitySlug(quality))) fail("quality");
+    if (q.seen && !ctx.seen?.has(itemId)) fail("other");
+    if (q.src?.length && !ctx.sources?.(itemId)?.some((x) => q.src!.includes(x))) fail("src");
     // Only an item whose facts the page shows can match these; the rest have no known value.
     const tip = q.ilvl || q.req || q.bind ? ctx.tip?.(itemId) : undefined;
-    if (q.ilvl && !within(tip?.level, q.ilvl)) return false;
-    if (q.req && !within(tip?.required, q.req)) return false;
-    if (q.bind && (!tip || BINDINGS.find((b) => b.slug === q.bind)?.value !== tip.binding)) return false;
-    return matchesFacets(itemId, q);
-  });
+    if (q.ilvl && !within(tip?.level, q.ilvl)) fail("other");
+    if (q.req && !within(tip?.required, q.req)) fail("other");
+    if (q.bind && (!tip || bind !== tip.binding)) fail("other");
+    if (!matchesFacets(itemId, { crafted: q.crafted, reagent: q.reagent, set: q.set })) fail("other");
+    if (q.skill && !matchesFacets(itemId, { skill: q.skill })) fail("skill");
+    return many ? "many" : missed;
+  };
+}
+
+/** A list's menu counts: each menu's choices counted with every filter on but its own. */
+export interface ItemFacetCounts {
+  slot: Map<string | null, number>;
+  quality: Map<string, number>;
+  src: Map<SourceSlug, number>;
+  skill: Map<number, number>;
+  /** The Class and Type menus: rows that pass every filter (the path's class and type are not filters), by class id and by "class/subclass". */
+  all: number;
+  classes: Map<number, number>;
+  subclasses: Map<string, number>;
+}
+
+/**
+ * Faceted counts in one pass over `rows` (every item the list could show, whatever its class): a row that fails no
+ * filter counts in every menu, one that fails only one menu's filter counts in that menu alone. `inPath` is the
+ * page's class and type; the slot, quality, source and profession menus count only rows in it.
+ */
+export function itemFacetCounts(rows: readonly ItemRow[], inPath: (row: ItemRow) => boolean, q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(rows, q, ctx)): ItemFacetCounts {
+  const out: ItemFacetCounts = { slot: new Map(), quality: new Map(), src: new Map(), skill: new Map(), all: 0, classes: new Map(), subclasses: new Map() };
+  const add = <K,>(m: Map<K, number>, k: K) => m.set(k, (m.get(k) ?? 0) + 1);
+  const miss = filterMisses(q, ctx, match);
+  const skillsOf = itemSkills();
+  for (const row of rows) {
+    const m = miss(row);
+    if (m === null) {
+      out.all++;
+      add(out.classes, row[1]);
+      add(out.subclasses, `${row[1]}/${row[2]}`);
+    }
+    if (!inPath(row) || (m !== null && (m === "other" || m === "many"))) continue;
+    if (m === null || m === "slot") add(out.slot, slotOf(row[3])?.slug ?? null);
+    if (m === null || m === "quality") add(out.quality, qualitySlug(row[4]));
+    if (m === null || m === "src") for (const x of ctx.sources?.(row[0]) ?? []) add(out.src, x);
+    if (m === null || m === "skill") for (const skill of skillsOf.get(row[0]) ?? []) add(out.skill, skill);
+  }
+  return out;
 }
 
 /**

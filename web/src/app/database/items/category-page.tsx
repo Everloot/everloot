@@ -5,7 +5,7 @@ import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,
-  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, itemSkills, ITEM_LEVEL_BRACKETS, itemsHref,
+  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacetCounts, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
   listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
 } from "@/lib/items";
 import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
@@ -142,8 +142,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
   // A level or binding filter or sort reads the levels of every row that may show them; the tooltips are this page's only.
-  const wide = Boolean(q.ilvl || q.req || q.bind) || order?.key === "ilvl" || order?.key === "req";
-  const wideIds = wide ? base.map((row) => row[0]).filter(showsTip) : [];
+  const levelFilter = Boolean(q.ilvl || q.req || q.bind);
+  const wide = levelFilter || order?.key === "ilvl" || order?.key === "req";
+  // A level or binding filter narrows the Class menu's counts too, so on a class page it reads every class's levels.
+  const wideIds = wide ? (levelFilter && cls ? T.items.filter(fits) : base).map((row) => row[0]).filter(showsTip) : [];
   const wideAssets = wideIds.length ? await loadSiteAssets() : null;
   const levels = wide ? await loadItemLevels(wideAssets, wideIds) : null;
   const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => levels?.get(id), order: index.order };
@@ -165,13 +167,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const pool = base.filter((row) => !gone(row[0]));
   // Only counted, so the rows with the leftovers are not sorted.
   const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : matchingItems(base, { ...q, dev: true }, ctx, match).filter((row) => !unnamed.has(row[0])).length - rows.length;
-  // What a class or type menu's count leaves out, counted for every class and type in one pass.
-  const hiddenCounts = new Map<string, number>();
-  for (const row of T.items) {
-    if (!gone(row[0]) && fits(row)) continue;
-    for (const key of ["", `${row[1]}`, `${row[1]}/${row[2]}`]) hiddenCounts.set(key, (hiddenCounts.get(key) ?? 0) + 1);
-  }
-  const hiddenIn = (classId?: number, subclassId?: number) => hiddenCounts.get(classId === undefined ? "" : subclassId === undefined ? `${classId}` : `${classId}/${subclassId}`) ?? 0;
+  // Every menu counts what the list would hold with all the other filters on, in one pass over the items any class
+  // could list; the Class and Type menus read every class, the others this page's class and type.
+  const candidates = cls ? T.items.filter((row) => fits(row) && !gone(row[0])) : pool;
+  const counts = itemFacetCounts(candidates, (row) => !cls || (row[1] === cls.id && (!sub || row[2] === sub.id)), q, ctx, cls && q.q ? matchItemNames(candidates, q, ctx) : match);
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
   const { shown, pages, per } = paged(rows, q);
@@ -233,22 +232,17 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (row) => row[0] },
   ];
 
-  // Choices with their counts in this category, so a menu never offers an empty list.
-  const counted = <K,>(key: (row: ItemRow) => K) => { const m = new Map<K, number>(); for (const row of pool) m.set(key(row), (m.get(key(row)) ?? 0) + 1); return m; };
-  const slots = counted((row) => slotOf(row[3])?.slug ?? null);
-  const qualities = counted((row) => (row[4] === null ? UNRECORDED : QUALITIES[row[4]]?.slug ?? UNRECORDED));
+  // Choices with their counts (counts above); a choice that matches nothing drops out of its menu unless it is on.
+  const slots = counts.slot;
+  const qualities = counts.quality;
   const sourceOptions = SOURCES.map((x) => ({
     label: x.menu, href: link(cls?.slug, sub?.slug, toggled(q, "src", x.slug)), on: Boolean(q.src?.includes(x.slug)),
-    count: pool.reduce((n, row) => n + Number(seen.from.get(row[0])?.includes(x.slug) ?? false), 0),
+    count: counts.src.get(x.slug) ?? 0,
   }))
     .filter((o) => o.count > 0 || o.on);
   const facets = itemFacets();
   const inBase = (set: Set<number>) => pool.reduce((n, row) => n + Number(set.has(row[0])), 0);
-  // Each profession's count in one pass over the list, through the professions of each item.
-  const bySkill = new Map<number, number>();
-  const skillsOf = itemSkills();
-  for (const row of pool) for (const skill of skillsOf.get(row[0]) ?? []) bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
-  const skills = facets.professions.map((p) => ({ ...p, count: bySkill.get(p.id) ?? 0 })).filter((p) => p.count > 0 && (q.dev || !isDevelopmentItemName(p.name)));
+  const skills = facets.professions.map((p) => ({ ...p, count: counts.skill.get(p.id) ?? 0 })).filter((p) => (p.count > 0 || q.skill === p.slug) && (q.dev || !isDevelopmentItemName(p.name)));
   const slotNames = new Map(pool.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
   const toggle = (key: "crafted" | "reagent" | "set" | "seen", label: string, count: number): FilterControl[] =>
     count > 0 || q[key] ? [{ type: "toggle", key, label, href: here({ [key]: q[key] ? undefined : true }), on: Boolean(q[key]) }] : [];
@@ -257,15 +251,15 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     {
       type: "menu", key: "class", label: "Class",
       options: [
-        { label: "All classes", href: link(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - hiddenIn() },
-        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: link(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
+        { label: "All classes", href: link(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: counts.all },
+        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: link(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: counts.classes.get(c.id) ?? 0 })),
       ],
     },
     ...(cls ? [{
       type: "menu" as const, key: "type", label: "Type",
       options: [
-        { label: `All ${cls.label.toLowerCase()}`, href: link(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items - hiddenIn(cls.id) },
-        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: link(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items - hiddenIn(cls.id, s.id) })),
+        { label: `All ${cls.label.toLowerCase()}`, href: link(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: counts.classes.get(cls.id) ?? 0 },
+        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: link(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: counts.subclasses.get(`${cls.id}/${s.id}`) ?? 0 })),
       ],
     }] : []),
     {
@@ -274,10 +268,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     },
     {
       type: "menu", key: "quality", label: "Quality", multi: true,
-      options: [...QUALITIES.filter((x) => qualities.has(x.slug)).map((x) => ({
+      options: [...QUALITIES.filter((x) => qualities.has(x.slug) || q.quality?.includes(x.slug)).map((x) => ({
         label: x.name, className: x.id <= 5 ? QUALITY_TEXT[qualityOf(x.id)] : undefined,
         href: link(cls?.slug, sub?.slug, toggled(q, "quality", x.slug)), on: Boolean(q.quality?.includes(x.slug)), count: qualities.get(x.slug) ?? 0,
-      })), ...(qualities.has(UNRECORDED) ? [{
+      })), ...(qualities.has(UNRECORDED) || q.quality?.includes(UNRECORDED) ? [{
         label: "Unrecorded", href: link(cls?.slug, sub?.slug, toggled(q, "quality", UNRECORDED)), on: Boolean(q.quality?.includes(UNRECORDED)), count: qualities.get(UNRECORDED) ?? 0,
       }] : [])],
     },
@@ -415,6 +409,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           </p>
         )}
         {match.respelled && rows.length > 0 && <Respelled q={match.respelled} />}
+        {/* The order a quality filter brings is named, since a phone shows only the name column and no header arrow. */}
+        {qualityFirst && rows.length > 1 && <p data-sort-note className="mt-2 text-cell-2 text-muted">Sorted by item level, highest first.</p>}
         {/* Where wiki names come from, once for the page rather than under every row it names. */}
         {shown.some((row) => names.get(row[0])?.source === "wiki") && (
           <p data-name-note className="mt-2 text-cell-2 text-muted">
@@ -426,8 +422,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             dense
             caption={`${title}: ${plural(rows.length)}`}
             // A column nothing in the category has (Source, until an item the list can show has one) is left out. It is
-            // read over the category, not the filtered result, so it shows wherever the Source menu does and does not
-            // come and go from page to page or under a filter.
+            // read over the category, not the filtered result, so it does not come and go from page to page or under a filter.
             columns={filledColumns(columns, pool)}
             rows={shown}
             rowKey={(row) => String(row[0])}

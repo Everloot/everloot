@@ -4,12 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false }));
+const observed = vi.hoisted(() => ({ edges: [] as unknown[] }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => facts,
   loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
-  loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),
+  loadObservedEdges: async () => ({ edges: observed.edges, unreachable: false, dataAsOf: null }),
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, unreachable: false, dataAsOf: null }),
 }));
 vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable" }));
@@ -26,6 +27,7 @@ import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subc
 import ItemsPage from "./page";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY } from "@/lib/items";
+import { slotOf } from "@kb/item-taxonomy";
 import { PER_PAGE } from "../list-parts";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
 
@@ -212,14 +214,15 @@ test("the Source column and filter: reported items show where they come from, th
     // Only the reported item has a source; the rest of the page shows a dash.
     expect(all.match(/>Drop<\/td>/g)).toHaveLength(1);
     expect(all).toContain(">Source</a></th>");
-    // The column shows wherever the Source menu does: a page or a filtered result with no reported row keeps it, so it
-    // does not come and go from page to page or vanish under a filter (?quality=epic with a Source menu and no column).
+    // The column is read over the category: a page or a filtered result with no reported row keeps it, so it does not
+    // come and go from page to page or vanish under a filter.
     if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).toContain(">Source</a></th>");
     expect(await html(SubclassPage(sub("armor", "cloth", { q: "#" + plain })))).toContain(">Source</a></th>");
     const epic = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === 1 && r[4] === 4);
     if (epic && epic[0] !== dropped) {
       const filtered = await html(SubclassPage(sub("armor", "cloth", { quality: "epic", unnamed: "1" })));
-      expect(filtered).toContain('data-filter="src"');
+      // The menu counts with the quality on (no epic cloth has a source, so it has nothing to offer); the column stays.
+      expect(filtered).not.toContain('data-filter="src"');
       expect(filtered).toContain(">Source</a></th>");
     }
     // A category where no item has a source has neither the menu nor the column.
@@ -264,6 +267,60 @@ test("a quality filter with no sort chosen lists by item level, highest first; a
   expect(await html(items())).not.toMatch(/aria-sort="descending"[^>]*>(?:<[^>]*>)*Item level/);
   expect(ids(await html(items({ quality: "epic", sort: "name" })))).toEqual(ids(await html(items({ quality: "epic", sort: "name" }))));
   expect(await html(items({ quality: "epic", sort: "name" }))).toMatch(/aria-sort="ascending"[^>]*>(?:<[^>]*>)*Name/);
+});
+
+test("a quality filter's item-level order is named above the list, so a phone (name column only) sees it too", async () => {
+  expect(await html(items({ quality: "epic" }))).toMatch(/data-sort-note[^>]*>Sorted by item level, highest first\./);
+  for (const search of [{}, { quality: "epic", sort: "name" }, { slot: "feet" }] as Record<string, string>[]) {
+    expect(await html(items(search)), JSON.stringify(search)).not.toContain("data-sort-note");
+  }
+});
+
+test("each menu counts what the list would hold with every other filter on (faceted counts)", async () => {
+  const T = CLIENT_TAXONOMY;
+  const count = (page: string, menu: string, label: string) => {
+    const part = page.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const m = new RegExp(`>${label}</span><span class="tabular-nums text-muted">([\\d,]+)<`).exec(part);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  const isEpic = (r: (typeof T.items)[number]) => r[4] === 4;
+  const isFeet = (r: (typeof T.items)[number]) => slotOf(r[3])?.slug === "feet";
+  const epic = await html(items({ quality: "epic" }));
+  // The Slot and Class menus honour the quality; the Quality menu ignores its own filter.
+  expect(count(epic, "slot", "Feet")).toBe(T.items.filter((r) => isEpic(r) && isFeet(r)).length);
+  expect(count(epic, "class", "All classes")).toBe(T.items.filter(isEpic).length);
+  const armor = T.classes.find((c) => c.slug === "armor")!;
+  expect(count(epic, "class", "Armor")).toBe(T.items.filter((r) => isEpic(r) && r[1] === armor.id).length);
+  expect(count(epic, "quality", "Rare")).toBe(T.items.filter((r) => r[4] === 3).length);
+  // Two filters: each menu counts with the other one on.
+  const both = await html(items({ quality: "epic", slot: "feet" }));
+  expect(count(both, "quality", "Epic")).toBe(T.items.filter((r) => isEpic(r) && isFeet(r)).length);
+  expect(count(both, "slot", "Chest")).toBe(T.items.filter((r) => isEpic(r) && ["chest"].includes(slotOf(r[3])?.slug ?? "")).length);
+  // A class page's Type menu counts its types with the filters on.
+  const cloth = T.subclasses.find((s) => s.classId === armor.id && s.slug === "cloth")!;
+  const armorEpic = await html(ItemPage(props("armor", { quality: "epic" })));
+  expect(count(armorEpic, "type", "Cloth")).toBe(T.items.filter((r) => isEpic(r) && r[1] === armor.id && r[2] === cloth.id).length);
+});
+
+test("a vendor's zone column names released zones only; a zone held back from the site is a dash, never a raw id", async () => {
+  const seen = { evidence: "observed", build: null, installs: 4, firstSeen: "2026-11-20T00:00:00.000Z", lastSeen: "2026-11-25T00:00:00.000Z" };
+  const itemId = CLIENT_TAXONOMY.items[0][0];
+  observed.edges = [
+    { ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900001 },
+    { ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900002 },
+    // 2548 is a zone map.json holds back (heldBackZones); 1411 is Durotar, a released zone with a page.
+    { ...seen, fromKind: "npc", fromId: 900001, rel: "located_in", toKind: "zone", toId: 2548 },
+    { ...seen, fromKind: "npc", fromId: 900002, rel: "located_in", toKind: "zone", toId: 1411 },
+  ];
+  try {
+    const page = await html(ItemPage(props(String(itemId))));
+    expect(page).toContain(">Zone<");
+    expect(page).toContain(">Durotar</a>");
+    expect(page).not.toMatch(/zone 2548/i);
+    expect(page).not.toContain("Riverglades");
+  } finally {
+    observed.edges = [];
+  }
 });
 
 test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {
