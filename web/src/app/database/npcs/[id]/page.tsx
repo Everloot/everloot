@@ -21,7 +21,7 @@ import { loadRenders } from "@/lib/game-renders";
 import EntityMap from "../../EntityMap";
 import { entityMapZones } from "../../entity-map";
 import { NPC_LOOT_SORTS, NpcLootPanel, lootPage } from "../../loot-tables";
-import { listHref, nextSort, sortParam, sortRows } from "../../list-parts";
+import { listHref, nextSort, plural, sortParam, sortRows } from "../../list-parts";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
 import { unknownNpc } from "../../unknown";
@@ -215,7 +215,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
           : known(null) },
         { label: "Map positions", value: known(page.pins.length || null), numeric: true },
         // Drop rows show from one install; their table labels the agreement tier.
-        { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
+        { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? plural(dropped.length, "item") : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
       ]}
       media={picture && <ModelPicture picture={picture} name={title} />}
       summary={summary}

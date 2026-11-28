@@ -18,6 +18,9 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
 export type Search = Record<string, string | string[] | undefined>;
 
+/** "1 item", "3 items": a count with its noun, singular for one. */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
 /** Rows on one page of a list when the address names no size (?per= picks another, lib/page-size.ts). */
 export { PER_PAGE };
 

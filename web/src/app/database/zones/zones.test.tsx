@@ -479,3 +479,13 @@ test("farming and gathering links sit in the quick facts", async () => {
   expect(facts).toContain("Farming and gathering");
   expect(facts).toContain('href="/tools/farming-routes"');
 });
+
+test("the zone index counts one entrance in the singular, and explains a dash only where the count columns show", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
+  const page = await html(ZonesPage({}));
+  expect(page).not.toContain("1 dungeons and raids");
+  expect(page).toMatch(/[^0-9]1 dungeon or raid</);
+  expect(page).toMatch(/[^0-9][2-9] dungeons and raids</);
+  // Below 640 px the table shows only the zone and its meta line, so there is no dash to explain there.
+  expect(page).toMatch(/<span class="hidden sm:inline">A dash means nobody has confirmed anything of that kind in the zone yet\. It does not mean there is none\. <\/span>/);
+});

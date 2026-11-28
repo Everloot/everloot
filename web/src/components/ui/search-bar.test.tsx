@@ -381,10 +381,22 @@ test("a box with a surface counts each search as that surface's event, never wit
   expect(JSON.stringify(capture.mock.calls)).not.toContain("Thrall");
 });
 
-test("suggestion rows are 44 px tall on phones and 36 px from 640 px, the All results row too", async () => {
+test("suggestion rows are at least 44 px tall on phones and 36 px from 640 px, the All results row too", async () => {
   await type("tallrow");
   await answer("tallrow", [suggestion(4, "Tallrow Map")]);
   const links = [...container.querySelectorAll("[role=option] a")];
   expect(links).toHaveLength(2);
-  for (const link of links) expect(link.className.split(" ")).toEqual(expect.arrayContaining(["h-11", "sm:h-9"]));
+  for (const link of links) expect(link.className.split(" ")).toEqual(expect.arrayContaining(["min-h-11", "sm:min-h-9"]));
+});
+
+// At 390 px "Thunderfury, Blessed Blade of the Windseeker" and its namesake both cut to "Thunderfury, Bless…".
+test("a long suggestion name wraps to two lines instead of being cut to one", async () => {
+  await type("thunderfury");
+  await answer("thunderfury", [suggestion(19019, "Thunderfury, Blessed Blade of the Windseeker")]);
+  const name = [...container.querySelectorAll("[role=option] a span")].find((s) => s.textContent === "Thunderfury, Blessed Blade of the Windseeker")!;
+  const classes = name.className.split(" ");
+  expect(classes).toContain("line-clamp-2");
+  expect(classes).not.toContain("truncate");
+  // A row that wraps grows, so it has no fixed height.
+  expect(name.closest("a")!.className.split(" ")).not.toContain("h-11");
 });
