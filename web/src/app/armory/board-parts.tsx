@@ -4,7 +4,7 @@ import { Card, DataTable, type Column } from "@/components/ui";
 import Tooltip from "@/components/ui/Tooltip";
 import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import { classText } from "@/app/players/player-view";
-import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, metricValue, rankable, regionLabel, rulesetName, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
+import { ARMORY_BOARDS, armoryCharacterPath, armoryGuildPath, metricValue, rankable, readLine, regionLabel, rulesetName, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
 import type { ArmoryBoardRow } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { RegionChip } from "./parts";
@@ -27,10 +27,9 @@ export function BoardMetric({ metric }: { metric: ArmoryMetric }) {
  * whatever text sits beside them. */
 export function BoardValue({ row, metric, top }: { row: ArmoryBoardRow; metric: ArmoryMetric; top: number }) {
   const value = metricValue(metric, row.value);
-  const read = new Date(row.fetchedAt).toLocaleString("en-US", { timeZone: "UTC", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   return (
     <span className="inline-flex min-w-16 flex-col text-right font-medium text-fg">
-      <span><Tooltip label={`${ARMORY_BOARDS[metric].column}: ${value}. ${ARMORY_BOARDS[metric].lede} Read ${read} UTC.`}>{value}</Tooltip>{!rankable(row.value) && <span className="font-sans font-normal text-muted"> · not ranked</span>}</span>
+      <span><Tooltip label={`${ARMORY_BOARDS[metric].column}: ${value}. ${ARMORY_BOARDS[metric].lede} ${readLine(row.fetchedAt)}.`}>{value}</Tooltip>{!rankable(row.value) && <span className="font-sans font-normal text-muted"> · not ranked</span>}</span>
       <span aria-hidden="true" className="h-1 w-16 self-end overflow-hidden rounded-full bg-edge"><span className={`block h-1 rounded-full ${classColour(CLASS_BG, row.class) ?? "bg-muted"}`} style={{ width: `${top > 0 ? Math.min(100, Math.max(0, row.value / top * 100)) : 0}%` }} /></span>
     </span>
   );

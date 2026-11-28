@@ -169,7 +169,7 @@ describe("the guild page summary", () => {
     expect(out).toContain("Level 60");
     expect(out).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
     expect(out).toMatch(/Roster members read<\/dt><dd[^>]*>2<\/dd>/);
-    expect(out).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+    expect(out).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
     expect(out).toContain('data-population="classes"');
     expect(out).toContain("2 (66.7%)");
     expect(out).toContain("1 (33.3%)");
@@ -316,7 +316,7 @@ describe("the guild activity strip", () => {
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*8 to 30 days/);
     expect(s).toMatch(/>0<\/span>\s*(?:\s*<[^>]*>)*\s*Longer/);
     // QA round 11: a login comes from the character's own read, which can be later than the roster read.
-    expect(s).toContain("Last login from each character&#x27;s latest read, counted back from the 2026-11-09 roster read");
+    expect(s).toContain("Last login from each character&#x27;s latest read, counted back from the 2026-11-09 roster read; a login after that read counts in the last 7 days");
     expect(s).not.toContain("as of the 2026-11-09 roster read");
     const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
     expect(recent).toContain("Velkara Duskmantle</a>");
@@ -518,7 +518,7 @@ describe("QA round 1: rosters and the directory", () => {
     // Said in the visible note, not only on hover: phones never hover.
     expect(dir).toContain("Level 60 read: characters we read at level 60. It can be higher than the guild page&#x27;s count, because each character is counted as of its own read.");
     const guild = await html(pages.guild("eu", "ember-wardens"));
-    expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+    expect(guild).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
   });
 
   test("QA round 11: the directory note is one line; how each count works sits behind a closed disclosure", async () => {
@@ -621,6 +621,6 @@ describe("QA round 4: the item level order without the database's minimum", () =
     expect(out).toMatch(/<td[^>]*><span class="text-muted">—<\/span><\/td>/);
     spy.mockRestore();
     const listed = await html(pages.directory());
-    expect(listed).toMatch(/Newest read among the guilds listed: 2026-11-09/);
+    expect(listed).toMatch(/Newest read among the guilds listed: Nov 9, 2026,/);
   });
 });

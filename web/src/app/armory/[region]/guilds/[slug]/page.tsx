@@ -453,7 +453,7 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
         // Members of this roster whose character has been read; /guilds counts characters read whose guild this is.
         { label: "Roster members read", value: read.toLocaleString("en-US"), numeric: true },
         // Blizzard's roster, as of its read below; /guilds counts the characters read at 60 instead.
-        { label: "Level 60 on the roster", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
+        { label: "Level 60 when the roster was read", value: members.filter((m) => m.level === 60).length.toLocaleString("en-US"), numeric: true },
         {
           label: "Average item level",
           value: s.averageItemLevel === null ? "Not read" : averageRead(s.averageItemLevel, s.itemLevelsRead),
@@ -481,7 +481,7 @@ function ActivityStrip({ members, asOf, readDay, href }: { members: readonly Arm
   const counts = new Map<Activity | null, number>();
   for (const m of members) { const a = activityOf(m, asOf); counts.set(a, (counts.get(a) ?? 0) + 1); }
   const rows = ACTIVITY_ROWS.map((r) => ({ label: r.label, colour: r.colour, count: counts.get(r.key) ?? 0, href: r.key ? href(r.key) : null }));
-  return <CountStrip kind="activity" title={readDay ? `Last login from each character's latest read, counted back from the ${readDay} roster read` : "Last login"} total={members.length} rows={rows} />;
+  return <CountStrip kind="activity" title={readDay ? `Last login from each character's latest read, counted back from the ${readDay} roster read; a login after that read counts in the last 7 days` : "Last login"} total={members.length} rows={rows} />;
 }
 
 /** Members by level band as one bar, highest band first; each band with members links the roster filtered to it. */

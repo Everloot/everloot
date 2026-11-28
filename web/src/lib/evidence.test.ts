@@ -43,7 +43,7 @@ describe("the key", () => {
 describe("the page's four lines", () => {
   const base: ItemSummaryInput = {
     identity: "One-Hand sword · Legendary · Requires level 60",
-    dropSources: 0, mapPositions: 0, vendors: 0, recipes: 0, uses: 0, nameFrom: "none", lastSeen: null, now: NOW,
+    dropSources: 0, confirmedDropSources: 0, mapPositions: 0, vendors: 0, recipes: 0, uses: 0, nameFrom: "none", lastSeen: null, now: NOW,
   };
 
   test("an item nobody has reported says so, in four lines", () => {
@@ -57,13 +57,22 @@ describe("the page's four lines", () => {
 
   test("a reported item says what players saw, and when", () => {
     const bullets = itemSummary({
-      ...base, dropSources: 2, mapPositions: 1, lastSeen: "2026-10-20T09:00:00.000Z",
+      ...base, dropSources: 2, confirmedDropSources: 2, mapPositions: 1, lastSeen: "2026-10-20T09:00:00.000Z",
     });
-    expect(bullets[1]).toBe("Players reported 2 drop sources and 1 map position, each with three installs agreeing, last seen 3 h ago.");
+    expect(bullets[1]).toBe("Players reported 2 drop sources, each confirmed by three installs. Three installs agree on 1 map position. Last seen 3 h ago.");
   });
 
   test("one drop source is singular", () => {
-    expect(itemSummary({ ...base, dropSources: 1 })[1]).toBe("Players reported 1 drop source, each with three installs agreeing.");
+    expect(itemSummary({ ...base, dropSources: 1, confirmedDropSources: 1 })[1]).toBe("Players reported 1 drop source, confirmed by three installs.");
+    expect(itemSummary({ ...base, dropSources: 1 })[1]).toBe("Players reported 1 drop source, not yet confirmed by three installs.");
+  });
+
+  // QA round 12: item 2589 said "79 drop sources, each with three installs agreeing" beside rows "reported by 1 player".
+  // A drop source shows from one install (reported, verified at two, confirmed at three); the line counts each tier truly.
+  test("drop sources say how many three installs confirm, never that every one is agreed", () => {
+    expect(itemSummary({ ...base, dropSources: 79, confirmedDropSources: 4 })[1]).toBe("Players reported 79 drop sources, 4 of them confirmed by three installs.");
+    expect(itemSummary({ ...base, dropSources: 79 })[1]).toBe("Players reported 79 drop sources, none yet confirmed by three installs.");
+    expect(itemSummary({ ...base, mapPositions: 2 })[1]).toBe("Three installs agree on 2 map positions.");
   });
 
   test("a vendor and a recipe are named when they are known", () => {

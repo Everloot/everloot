@@ -366,3 +366,16 @@ test("QA round 7: under a filter the headline tiles say they count all character
   expect(page).not.toMatch(/<dt[^>]*>Top class shown<\/dt>/);
   expect(await html("launch")).toMatch(/<dt[^>]*>Top class shown<\/dt>/);
 });
+
+// QA round 12: Alliance 9,065 + Horde 9,865 = 18,930 against a stated 18,925. Each count is rounded on its own
+// (CENSUS_ROUND_TO), so every table of counts says why its parts may not add up to the total.
+test("QA round 12: each count table says counts are rounded, so parts may not add up exactly", async () => {
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const footnote = "Counts are rounded to the nearest 5, so parts may not add up exactly.";
+  const page = await html();
+  for (const id of ["factions", "classes", "races", "levels"]) {
+    const table = page.slice(page.indexOf(`id="${id}"`));
+    expect(table.slice(0, table.indexOf("</section>"))).toContain(footnote);
+  }
+  expect(await filtered({ race: "troll", window: "launch" })).toContain(footnote);
+});
