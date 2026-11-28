@@ -46,13 +46,15 @@ export default function EntityMap({ name, zones }: { name: string; zones: MapZon
         </div>
       )}
       <figure className="max-w-3xl">
-        <div role="img" aria-label={`${name} on the map of ${zone.name}: ${zone.marks.length} ${zone.marks.length === 1 ? "position" : "positions"}`} className="relative overflow-hidden rounded-card border border-line bg-panel" style={{ aspectRatio: zone.ratio }}>
+        <div role="group" aria-label={`${name} on the map of ${zone.name}: ${zone.marks.length} ${zone.marks.length === 1 ? "position" : "positions"}`} className="relative overflow-hidden rounded-card border border-line bg-panel" style={{ aspectRatio: zone.ratio }}>
           {/* The zone's picture from the asset bucket as it is; next/image would only proxy it. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img key={zone.mapId} src={zone.art} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+          {/* Each dot names itself while hovered or focused, the name on the side with room (the frame clips past its edge). */}
           {[...zone.marks].sort((a, b) => layer(a.kind) - layer(b.kind)).map((m, i) => (
-            <span key={`${m.kind}-${m.x}-${m.y}-${i}`} title={`${m.label} · ${m.x}, ${m.y}`} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${m.x}%`, top: `${m.y}%` }}>
+            <span key={`${m.kind}-${m.x}-${m.y}-${i}`} role="img" tabIndex={0} aria-label={`${m.label} · ${m.x}, ${m.y}`} className="group absolute -translate-x-1/2 -translate-y-1/2 rounded-full p-1 outline-none hover:z-10 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-fg" style={{ left: `${m.x}%`, top: `${m.y}%` }}>
               <Mark kind={m.kind} agreed={m.agreed} className="ring-2 ring-black/60" />
+              <span aria-hidden="true" data-mark-label className={`pointer-events-none absolute top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded border border-line bg-panel px-1.5 py-0.5 text-xs text-fg group-hover:block group-focus-visible:block ${m.x > 60 ? "right-full mr-1" : "left-full ml-1"}`}>{m.label}</span>
             </span>
           ))}
         </div>

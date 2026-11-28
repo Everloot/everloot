@@ -62,8 +62,9 @@ test("rarer kinds are drawn after the plain NPC and place pins, so a vendor next
   const out = renderToStaticMarkup(<EntityMap name="Westfall" zones={zones} />);
   const drawn = [...out.matchAll(/data-mark="(\w+)"/g)].map((m) => m[1]).slice(0, 4);
   expect(drawn).toEqual(["place", "npc", "vendor", "flight"]);
-  // Each pin still names itself on hover.
-  expect(out).toContain('title="Quartermaster · 52, 47"');
+  // Each pin still names itself, on hover and on keyboard focus.
+  expect(out).toContain('aria-label="Quartermaster · 52, 47"');
+  expect(out).toMatch(/data-mark-label[^>]*>Quartermaster</);
 });
 
 test("positions in several zones get a zone switcher, the first zone shown", () => {
