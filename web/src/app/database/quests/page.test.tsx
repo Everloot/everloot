@@ -119,3 +119,26 @@ test("under the title, the list says what its count holds: the quests players co
   const header = (await html()).split("data-page-header")[1]?.split("</header>")[0] ?? "";
   expect(header).toMatch(/1 confirmed by players · 1 more from the game files, titled by the Warcraft Wiki where it has a title; others show their number/);
 });
+
+test("each quest menu counts what the list would hold with every other filter on", async () => {
+  store.wiki = null;
+  store.quests = [
+    quest({ questId: 301, title: "Quest Alpha", level: 5, category: "Synthetic Vale", side: "alliance" }),
+    quest({ questId: 303, title: "Quest Gamma", level: 25, category: "Synthetic Vale", side: "horde" }),
+    quest({ questId: 304, title: "Quest Delta", level: 5, category: "Synthetic Marsh", side: "horde" }),
+  ];
+  const menuCount = (out: string, menu: string, label: string) => {
+    const part = out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const at = part.split(`>${label}</span><span class="tabular-nums text-muted">`)[1];
+    return at === undefined ? null : Number(at.split("<")[0].replace(/,/g, ""));
+  };
+  const low = await html({ level: "1-10" });
+  expect(menuCount(low, "category", "Synthetic Vale")).toBe(1);
+  expect(menuCount(low, "side", "Horde")).toBe(1);
+  // The Level menu counts too, ignoring its own filter.
+  expect(menuCount(low, "level", "21–30")).toBe(1);
+  const horde = await html({ side: "horde", category: "Synthetic Vale" });
+  expect(menuCount(horde, "level", "1–10")).toBeNull();
+  expect(menuCount(horde, "side", "Alliance")).toBe(1);
+  expect(menuCount(horde, "category", "Synthetic Marsh")).toBe(1);
+});

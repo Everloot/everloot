@@ -337,7 +337,9 @@ test("development leftovers are out of a list by default, counted honestly, and 
     expect(list).toContain(`>${(total - 1).toLocaleString("en-US")}</span> items`);
     expect(list).toContain("Show 1 development leftover");
     expect(list).toContain('href="/database/items/armor/cloth?dev=1&amp;unnamed=1"');
-    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
+    // The plain list folds the unnamed items away, so its title counts the one named item it shows.
+    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toMatch(/: 1 Item$/);
+    expect(String((await subclassMetadata(sub("armor", "cloth", { unnamed: "1" }))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
     // Asked for, the leftover is listed and the control turns around; the view is its own URL and stays out of search.
     const all = await html(SubclassPage(sub("armor", "cloth", { dev: "1", unnamed: "1" })));
     expect(all).toContain("Deprecated Cloth Cap");
@@ -525,5 +527,40 @@ test("with upload storage out of reach, an item page and the item lists are mark
     expect(edgeDegraded(await html(SubclassPage(sub("armor", "cloth"))))).toBe(true);
   } finally {
     facts.unreachable = false;
+  }
+});
+
+test("the Slot menu lists the slots in the character window's order, head to feet, then the weapons", async () => {
+  const labels = (page: string) => [...(page.split('data-filter="slot"')[1]?.split("</details>")[0] ?? "").matchAll(/class="fm-lbl[^"]*">([^<]+)</g)].map((m) => m[1]);
+  const order = ["Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket",
+    "Main Hand", "One-Hand", "Two-Hand", "Off Hand", "Shield", "Held In Off-hand", "Ranged", "Thrown", "Ammo", "Quiver", "Relic", "Bag"];
+  for (const page of [await html(items()), await html(ItemPage(props("weapons"))), await html(ItemPage(props("armor")))]) {
+    const shown = labels(page);
+    expect(shown.length).toBeGreaterThan(1);
+    expect(shown.every((s) => order.includes(s)), shown.join(", ")).toBe(true);
+    expect(shown).toEqual([...shown].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+  }
+});
+
+test("a category's title counts what its list shows: the same filters, the unnamed items folded away the same", async () => {
+  const plate = CLIENT_TAXONOMY.subclasses.find((s) => s.classId === 4 && s.slug === "plate")!;
+  const ids = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === plate.id).map((r) => r[0]);
+  const feet = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === plate.id && slotOf(r[3])?.slug === "feet")![0];
+  // Three named plate items, one of them boots: the lists fold the rest away as unnamed.
+  facts.names = [...ids.slice(0, 2), feet].flatMap((itemId) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Plate ${itemId}` })));
+  const shown = (page: string) => /([\d,]+)<\/span> items?</.exec(page)?.[1];
+  try {
+    for (const [meta, page] of [
+      [await generateMetadata(props("armor")), await html(ItemPage(props("armor")))],
+      [await subclassMetadata(sub("armor", "plate")), await html(SubclassPage(sub("armor", "plate")))],
+      [await subclassMetadata(sub("armor", "plate", { slot: "feet" })), await html(SubclassPage(sub("armor", "plate", { slot: "feet" })))],
+    ] as const) {
+      const count = shown(page);
+      expect(count).toBeDefined();
+      expect(String(meta.title)).toMatch(new RegExp(`: (All )?${count} Items?$`));
+      expect(String(meta.description)).toContain(`All ${count} `);
+    }
+  } finally {
+    facts.names = [];
   }
 });

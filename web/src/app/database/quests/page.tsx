@@ -13,7 +13,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { bareQuestRow, publicQuests, questTypeLabel, SIDE_LABEL, SIDE_TONE, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
-import { byRank, nameMatches, Respelled,
+import { byRank, countBy, facetRows, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -67,10 +67,15 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, titleOf);
-  const matched = all.filter((x) =>
-    (!text || (id !== null ? x.questId === id : ranked!.has(x)))
-    && (!q.level || (x.level !== null && x.level >= q.level.min && x.level <= q.level.max)) && (!q.rewards || x.rewards.length > 0)
-    && (!q.category || x.category === q.category) && (!q.side || x.side === SIDES[q.side]));
+  const inLevel = (x: QuestRow, r: { min: number; max: number }) => x.level !== null && x.level >= r.min && x.level <= r.max;
+  // Each menu counts what the list would hold with every other filter on (facetRows), so no choice empties the list.
+  const { matched, without } = facetRows(all, {
+    q: text ? (x: QuestRow) => (id !== null ? x.questId === id : ranked!.has(x)) : null,
+    level: q.level ? (x: QuestRow) => inLevel(x, q.level!) : null,
+    rewards: q.rewards ? (x: QuestRow) => x.rewards.length > 0 : null,
+    category: q.category ? (x: QuestRow) => x.category === q.category : null,
+    side: q.side ? (x: QuestRow) => x.side === SIDES[q.side!] : null,
+  });
   const sort = q.sort ?? DEFAULT_SORT;
   const npcKey = (n: number | null) => (n === null ? null : npcs.get(n)?.toLowerCase() ?? `~${String(n).padStart(9, "0")}`);
   const key = (x: QuestRow): string | number | null => sort.key === "name" ? titleOf(x)?.toLowerCase() ?? null : sort.key === "level" ? x.level
@@ -125,23 +130,24 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
 
   const anyRewards = all.some((x) => x.rewards.length > 0);
   const categories = [...new Set(all.map((x) => x.category).filter((c): c is string => c !== null))].sort((a, b) => a.localeCompare(b));
+  const inCategory = countBy(without.category, (x) => x.category), onSide = countBy(without.side, (x) => x.side);
   const controls: FilterControl[] = [
     {
       type: "menu", key: "level", label: "Level",
       options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
-        label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max,
+        label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((x) => inLevel(x, b)).length,
       }))],
     },
     {
       type: "menu", key: "category", label: "Category",
       options: [{ label: "Any category", href: here({ category: undefined }), on: !q.category, reset: true }, ...categories.map((c) => ({
-        label: c, href: here({ category: c }), on: q.category === c, count: all.filter((x) => x.category === c).length,
+        label: c, href: here({ category: c }), on: q.category === c, count: inCategory.get(c) ?? 0,
       }))],
     },
     {
       type: "menu", key: "side", label: "Side",
       options: [{ label: "Any side", href: here({ side: undefined }), on: !q.side, reset: true }, ...Object.entries(SIDES).map(([k, s]) => ({
-        label: SIDE_LABEL[s], href: here({ side: k }), on: q.side === k, count: all.filter((x) => x.side === s).length,
+        label: SIDE_LABEL[s], href: here({ side: k }), on: q.side === k, count: onSide.get(s) ?? 0,
       }))],
     },
     // Offered once some quest has agreed rewards (3 installs report the same item); until then it could only empty the list.

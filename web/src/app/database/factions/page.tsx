@@ -4,7 +4,7 @@ import type { FactionEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, ResultStrip, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import Link from "@/components/Link";
 import { factionChildren, factionHref, factionInFiles, loadCatalog, type Listed } from "@/lib/completion-lists";
-import { byRank, nameMatches, Respelled,
+import { byRank, countBy, facetRows, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
@@ -54,8 +54,11 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
-  const matched = all.filter((x) =>
-    (!text || (id !== null ? x.factionId === id : ranked!.has(x))) && (!q.header || x.header === q.header));
+  // The Header menu counts with the name box on, as the list would hold it (facetRows).
+  const { matched, without } = facetRows(all, {
+    q: text ? (x: Listed<FactionEntry>) => (id !== null ? x.factionId === id : ranked!.has(x)) : null,
+    header: q.header ? (x: Listed<FactionEntry>) => x.header === q.header : null,
+  });
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
   const sorted = byRank(sortRows(matched, key, sort.desc, (x) => x.factionId), ranked, Boolean(q.sort));
@@ -87,11 +90,12 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   ];
 
   const headers = [...new Set(all.flatMap((x) => (x.header ? [x.header] : [])))].sort((a, b) => a.localeCompare(b));
+  const underHeader = countBy(without.header, (x) => x.header);
   const controls: FilterControl[] = [
     {
       type: "menu", key: "header", label: "Header",
       options: [{ label: "Any header", href: here({ header: undefined }), on: !q.header, reset: true }, ...headers.map((h) => ({
-        label: h, href: here({ header: h }), on: q.header === h, count: all.filter((x) => x.header === h).length,
+        label: h, href: here({ header: h }), on: q.header === h, count: underHeader.get(h) ?? 0,
       }))],
     },
   ];

@@ -346,8 +346,11 @@ test("rows whose name repeats with nothing else to tell them apart say their ID"
   // Beside the name, not only in the small-screen line under it (a div).
   expect(row(3276)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3276<\/span>/);
   expect(row(3281)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3281<\/span>/);
-  // A name that does not repeat gets nothing added.
+  // Once: the small-screen line under the name does not say the ID again.
+  expect(row(3276).match(/ID 3276/g)).toHaveLength(1);
+  // A name that does not repeat gets nothing added, and its ID stays in the line under it.
   expect(row(3275)).toMatch(/>Linen Bandage<\/a><\/span>/);
+  expect(row(3275)).toMatch(/class="dt-meta">ID 3275</);
 });
 
 test("a talent's level column is blank: its level is its row in the tree, as on the spell page", async () => {

@@ -169,7 +169,8 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
             rowKey={(x) => String(x.spellId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => [x.rank ? `Rank ${x.rank}` : null, x.level ? `Level ${x.level}` : null, `ID ${x.spellId}`].filter(Boolean).join(" · ")}
+            // A twin already says its ID beside the name, so the line under it does not repeat it.
+            meta={(x) => [x.rank ? `Rank ${x.rank}` : null, x.level ? `Level ${x.level}` : null, twin(x) ? null : `ID ${x.spellId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

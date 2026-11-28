@@ -11,7 +11,7 @@ import { loadWikiEntityNames } from "@/lib/wiki-entity-names";
 import { wikiNpcNames } from "@/lib/wiki-npc-names";
 import { NAME_FROM } from "@/lib/items";
 import { LINK } from "../entity";
-import { byRank, nameMatches, Respelled,
+import { byRank, countBy, facetRows, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -82,12 +82,17 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, (n) => n.name);
-  const matched = all.filter((n) =>
-    (!text || (id !== null ? n.npcId === id : ranked!.has(n)))
-    && (!q.zone || n.zone?.mapId === q.zone) && (!q.drops || n.drops > 0)
-    && (!q.level || (n.level !== null && n.level >= q.level.min && n.level <= q.level.max))
-    && (!q.react || n.reaction === REACTIONS[q.react])
-    && (!q.type || n.creatureType === TYPES.get(q.type)) && (!q.rank || n.rank === RANKS.get(q.rank)));
+  const inLevel = (n: NpcRow, r: { min: number; max: number }) => n.level !== null && n.level >= r.min && n.level <= r.max;
+  // Each menu counts what the list would hold with every other filter on (facetRows), so no choice empties the list.
+  const { matched, without } = facetRows(all, {
+    q: text ? (n: NpcRow) => (id !== null ? n.npcId === id : ranked!.has(n)) : null,
+    zone: q.zone ? (n: NpcRow) => n.zone?.mapId === q.zone : null,
+    drops: q.drops ? (n: NpcRow) => n.drops > 0 : null,
+    level: q.level ? (n: NpcRow) => inLevel(n, q.level!) : null,
+    react: q.react ? (n: NpcRow) => n.reaction === REACTIONS[q.react!] : null,
+    type: q.type ? (n: NpcRow) => n.creatureType === TYPES.get(q.type!) : null,
+    rank: q.rank ? (n: NpcRow) => n.rank === RANKS.get(q.rank!) : null,
+  });
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (n: NpcRow): string | number | null => sort.key === "name" ? n.name?.toLowerCase() ?? null : sort.key === "level" ? n.level
     : sort.key === "type" ? n.creatureType?.toLowerCase() ?? null : sort.key === "rank" ? (n.rank ? NPC_RANKS.indexOf(n.rank) : null)
@@ -111,35 +116,37 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   ];
 
   const zones = [...new Map(all.filter((n) => n.zone).map((n) => [n.zone!.mapId, n.zone!])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  const inZone = countBy(without.zone, (n) => n.zone?.mapId), ofType = countBy(without.type, (n) => n.creatureType), ofRank = countBy(without.rank, (n) => n.rank);
+  const ofReaction = countBy(without.react, (n) => n.reaction);
   const controls: FilterControl[] = [
     {
       type: "menu", key: "zone", label: "Zone",
       options: [{ label: "Any zone", href: here({ zone: undefined }), on: !q.zone, reset: true }, ...zones.map((z) => ({
-        label: z.name, href: here({ zone: z.mapId }), on: q.zone === z.mapId, count: all.filter((n) => n.zone?.mapId === z.mapId).length,
+        label: z.name, href: here({ zone: z.mapId }), on: q.zone === z.mapId, count: inZone.get(z.mapId) ?? 0,
       }))],
     },
     {
       type: "menu", key: "level", label: "Level",
       options: [{ label: "Any level", href: here({ level: undefined }), on: !q.level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
-        label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max,
+        label: `${b.min}–${b.max}`, href: here({ level: b }), on: q.level?.min === b.min && q.level?.max === b.max, count: without.level.filter((n) => inLevel(n, b)).length,
       }))],
     },
     {
       type: "menu", key: "react", label: "Reaction",
       options: [{ label: "Any reaction", href: here({ react: undefined }), on: !q.react, reset: true }, ...Object.entries(REACTIONS).map(([k, r]) => ({
-        label: REACTION_LABEL[r], href: here({ react: k }), on: q.react === k,
+        label: REACTION_LABEL[r], href: here({ react: k }), on: q.react === k, count: ofReaction.get(r) ?? 0,
       }))],
     },
     {
       type: "menu", key: "type", label: "Type",
       options: [{ label: "Any type", href: here({ type: undefined }), on: !q.type, reset: true }, ...[...TYPES].map(([k, t]) => ({
-        label: t, href: here({ type: k }), on: q.type === k, count: all.filter((n) => n.creatureType === t).length,
+        label: t, href: here({ type: k }), on: q.type === k, count: ofType.get(t) ?? 0,
       })).filter((o) => o.count > 0 || o.on)],
     },
     {
       type: "menu", key: "rank", label: "Rank",
       options: [{ label: "Any rank", href: here({ rank: undefined }), on: !q.rank, reset: true }, ...[...RANKS].map(([k, r]) => ({
-        label: RANK_LABEL[r], href: here({ rank: k }), on: q.rank === k, count: all.filter((n) => n.rank === r).length,
+        label: RANK_LABEL[r], href: here({ rank: k }), on: q.rank === k, count: ofRank.get(r) ?? 0,
       })).filter((o) => o.count > 0 || o.on)],
     },
     { type: "toggle", key: "drops", label: "Has drops", href: here({ drops: q.drops ? undefined : true }), on: Boolean(q.drops) },
