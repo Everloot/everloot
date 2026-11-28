@@ -4,6 +4,9 @@ from window_world import fresh
 
 API = """
 MinimapCluster = CreateFrame('Frame', nil, UIParent)
+UnitName = function() return 'Balbic', 'Morning Star' end
+SetPortraitTexture = function(texture, unit) texture.portraitUnit = unit end
+CLASS_ICON_TCOORDS = { SHAMAN = { 0.5, 0.75, 0.25, 0.5 } }
 guid = 'Player-1-0001'
 UnitGUID = function() return guid end
 GetServerTime = function() return now end
@@ -40,6 +43,8 @@ local function entry(label, character)
   end
 end
 
+local tracker = E.Cooldowns.tracker
+function tracker.panel:SetHeight(height) self.height = height end
 sample('PLAYER_ENTERING_WORLD')
 assert(#E.Cooldowns.Rows() == 2, 'shared transmutes are one row; unknown spells are omitted')
 assert(entry('Transmute').remaining == 890, 'longest valid shared timer wins')
@@ -50,10 +55,17 @@ for _, rows in pairs(EverlootDB.records) do
   end
 end
 local U = E.Window
-local tracker = E.Cooldowns.tracker
 assert(tracker and tracker.panel.shown and tracker.panel.parent == UIParent, 'tracker lives outside Everloot')
 assert(tracker.panel.point[2] == MinimapCluster, 'tracker starts below the minimap')
-assert(tracker.rows[1].status.text == 'Ready')
+assert(tracker.panel.height == 23 and not tracker.rows[1].shown, 'the tracker starts as one line')
+assert(tracker.summary.character.text == 'Balbic Morning Star', 'use the full character name')
+assert(tracker.summary.name.text == 'Transmute' and tracker.summary.status.text == '15m')
+assert(tracker.summary.character.color[2] == RAID_CLASS_COLORS.SHAMAN.g)
+assert(tracker.summary.icon.portraitUnit == 'player')
+tracker.summary.scripts.OnClick()
+assert(tracker.rows[1].shown and tracker.rows[1].name.text == 'Salt Shaker', 'the line expands to reveal more timers')
+tracker.summary.scripts.OnClick()
+assert(tracker.panel.height == 23 and not tracker.rows[1].shown, 'the line collapses again')
 assert(U.Open('professions'))
 local p = U.frame.professions
 assert(p.cooldownNav.text == 'Tracker')
@@ -115,6 +127,10 @@ spells[18560] = cooldown(0, 0)
 sample('PLAYER_ENTERING_WORLD')
 assert(entry('Mooncloth', E.CharacterKey()).state == 'ready', 'same name, different character')
 assert(entry('Transmute').remaining == 2000, 'the alt never replaces the other character timer')
+assert(tracker.summary.name.text == 'Mooncloth', 'collapsed view prioritizes the current character')
+tracker.summary.scripts.OnClick()
+assert(tracker.rows[1].icon.path:find('CharacterCreate%-Classes'), 'offline alts use class icons')
+tracker.summary.scripts.OnClick()
 now = now + 2001
 assert(entry('Transmute').state == 'ready', 'the server timestamp elapses while the character is offline')
 E.Roster.Forget(me)
