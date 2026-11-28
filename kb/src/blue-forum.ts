@@ -275,6 +275,28 @@ export function withoutHeadings(html: string): string {
     .replace(/(<li\b[^>]*>)\s*<(strong|b)>[^<]*<\/\2>\s*(?=<[uo]l\b)/gi, "$1");
 }
 
+/** The section headings of Blizzard's hotfix posts (a game's name heads its part of a shared post), and the classes listed under "Classes". */
+const HOTFIX_SECTIONS = "The Burning Crusade Classic|Mists of Pandaria Classic|Cataclysm Classic|Season of Discovery|Classes|Dungeons and Raids|Raids and Dungeons|Dungeons|Raids|Items|Quests|Creatures and NPCs|NPCs|Player versus Player|PvP|Professions|User Interface|Achievements|Bug Fixes|Battlegrounds";
+const CLASSES = "Druid|Hunter|Mage|Paladin|Priest|Rogue|Shaman|Warlock|Warrior";
+const STORED_DAY = /^((?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4})(?!:)\s+/;
+/** A section heading (with its class under "Classes") at the start or after a sentence, before a capitalised word. */
+const STORED_HEADING = new RegExp(`(^|[.!?]\\s+)(?:Classes\\s+(?:${CLASSES})|${HOTFIX_SECTIONS})\\s+(?=[A-Z])`, "g");
+
+/**
+ * A hotfix excerpt stored before withoutHeadings ran ("November 25, 2026 Classes Druid Hurricane now…"), read as it
+ * would be stored now: the day as a lead-in, section headings and the class under "Classes" left out. Only the flat
+ * text is stored, so only headings from that fixed list are known; a spec heading ("Balance") cannot be told from a
+ * spell ("Frost Nova") and stays. An excerpt already stored the new way (the day ends with ":") is left as it is.
+ */
+export function storedHotfixExcerpt(excerpt: string): string {
+  const day = STORED_DAY.exec(excerpt);
+  if (!day) return excerpt;
+  let out = excerpt.slice(day[0].length), prev;
+  // Again until nothing changes: a section can sit right after another ("Items Quests …").
+  do { prev = out; out = out.replace(STORED_HEADING, "$1"); } while (out !== prev);
+  return `${day[1]}: ${out}`;
+}
+
 const displayName = (username: string, name: string) => clampText(name, 100) || username.replace(/-\d+$/, "");
 
 export const postId = (region: BlueRegion, id: number) => (region === "us" ? `forum:${id}` : `forum:${region}:${id}`);

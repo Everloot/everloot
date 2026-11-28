@@ -52,6 +52,16 @@ test("the all-realms list offers a link to the remembered realm; a page with its
   expect(container.innerHTML).toBe("");
 });
 
+test("the remembered realm is named as the site names it: a CAMWOW realm by its short name, never the recorded code", async () => {
+  // As /tools/bags?realm=camwow-us1-realm-4-pvp stores it: the realm's recorded name.
+  localStorage.setItem(REALM_MEMORY_KEY, saved({ realm: "camwow-us1-realm-4-pvp", name: "CAMWOW US1 Realm 4 PvP", house: "horde" }));
+  await act(async () => root.render(<RealmMemory realm={null} name={null} house={null} known={["camwow-us1-realm-4-pvp"]} houses={houses} mode="link" linkBase="/tools/auctions" />));
+  expect(container.textContent).toBe("Your last realm: US1 · Realm 4 PvP");
+  expect(container.innerHTML).not.toContain("CAMWOW");
+  // What is stored stays as it was: the pages' links and the key depend on it.
+  expect(JSON.parse(localStorage.getItem(REALM_MEMORY_KEY)!).name).toBe("CAMWOW US1 Realm 4 PvP");
+});
+
 test("storage the browser refuses leaves the page as it is", async () => {
   const blocked = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("SecurityError"); });
   try {

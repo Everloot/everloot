@@ -170,7 +170,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
         {/* What the total holds: the hub counts the confirmed quests, the list adds the ones the files list with a wiki title. */}
         <DataTitle
           title="Quests"
-          meta={facts.unreachable ? undefined : `${reported.length.toLocaleString("en-US")} confirmed by players · ${(all.length - reported.length).toLocaleString("en-US")} more from the game files, titled by the Warcraft Wiki`}
+          meta={facts.unreachable ? undefined : `${reported.length.toLocaleString("en-US")} confirmed by players · ${(all.length - reported.length).toLocaleString("en-US")} more from the game files, titled by the Warcraft Wiki where it has a title; others show their number`}
           aside={strip}
         />
         <FilterBar

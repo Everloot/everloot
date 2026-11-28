@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
 import Link from "@/components/Link";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import JsonLd from "@/components/JsonLd";
@@ -69,9 +69,12 @@ export const known = (value: ReactNode, reported = 0) =>
 /** A fact `known` shows as an empty meter: no install has reported it. */
 const unreported = (value: ReactNode) => isValidElement<{ count?: number }>(value) && value.type === AgreementMeter && !value.props.count;
 
+/** A label inside a sentence: "Zone" reads "zone"; an abbreviation ("XP") keeps its capitals. */
+const sentenceCase = (label: string) => (/^\p{Lu}\p{Ll}/u.test(label) ? label[0].toLowerCase() + label.slice(1) : label);
+
 /**
  * The quick facts with every unreported one folded into a last "Not yet reported" row: one empty meter and their
- * labels as small chips under the row's label, instead of a row of hollow diamonds each. A fact some installs have
+ * labels as one plain line under the row's label ("chain, zone, start"), instead of a row of hollow diamonds each. A fact some installs have
  * reported keeps its row and its count.
  */
 function foldUnreported(facts: Fact[]): Fact[] {
@@ -85,9 +88,7 @@ function foldUnreported(facts: Fact[]): Fact[] {
       value: (
         <div className="flex items-start gap-2">
           <span className="inline-flex h-6 shrink-0 items-center"><AgreementMeter count={0} /></span>
-          <ul className="flex min-w-0 flex-wrap gap-1.5">
-            {missing.map((f, i) => <li key={i} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 text-xs text-fg-2">{f.label}</li>)}
-          </ul>
+          <span className="min-w-0 py-0.5 text-fg-2">{missing.map((f, i) => <Fragment key={i}>{i > 0 && ", "}{typeof f.label === "string" ? sentenceCase(f.label) : f.label}</Fragment>)}</span>
         </div>
       ),
     },

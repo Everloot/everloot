@@ -398,6 +398,13 @@ describe("labels", () => {
     expect(placeLabels([at("ok", 500, 250, 1)], view, 1000, 11)).toHaveLength(1);
   });
 
+  test("a label under a control drawn over the map (zoom buttons, Pin map centre) is left out; one clear of it shows", () => {
+    // Stratholme at the top right, under the Pin map centre button (screen pixels).
+    const button = { l: 860, t: 0, r: 1000, b: 60 };
+    expect(placeLabels([at("z1", 930, 30, 50, "Stratholme")], view, 1000, 11, [], [button])).toEqual([]);
+    expect(placeLabels([at("z1", 500, 30, 50, "Stratholme")], view, 1000, 11, [], [button])).toHaveLength(1);
+  });
+
   test("the same input always places the same labels, whatever the order it arrives in", () => {
     const a = [at("a", 500, 250, 5), at("b", 505, 250, 5, "Silverpine Forest"), at("c", 100, 100, 1)];
     expect(placeLabels(a, view, 1000, 11).map((l) => l.id)).toEqual(placeLabels([...a].reverse(), view, 1000, 11).map((l) => l.id));

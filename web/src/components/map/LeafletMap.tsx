@@ -176,7 +176,13 @@ export default function LeafletMap(props: LeafletMapProps) {
       if (now.marker) out.push({ id: "marker", text: now.marker.label, x: now.marker.x + yards * 26, y: now.marker.y, align: "start", priority: 100 });
       // Names keep off the pins drawn on the map (a city's name sits where its flight master and entrance are).
       const drawn = [...now.items.entrances, ...now.items.flightMasters, ...now.items.pins, ...now.items.treasures];
-      for (const l of placeLabels(out, v, px, fontPx, drawn)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
+      // Nor under the controls drawn over the map: Leaflet's own, and the page's (data-map-overlay) beside it.
+      const frame = m.getContainer().getBoundingClientRect();
+      const covered = Array.from(m.getContainer().parentElement?.querySelectorAll("[data-map-overlay], .leaflet-control") ?? []).map((el) => {
+        const r = el.getBoundingClientRect();
+        return { l: r.left - frame.left, r: r.right - frame.left, t: r.top - frame.top, b: r.bottom - frame.top };
+      }).filter((r) => r.r > r.l && r.b > r.t);
+      for (const l of placeLabels(out, v, px, fontPx, drawn, covered)) L.marker(ll(l.x, l.y), { icon: labelIcon(l), interactive: false, keyboard: false }).addTo(g.labels);
     };
 
     let zoneImage: ArtImage | null = null;

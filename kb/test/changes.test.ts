@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } from "../src/blue-posts.js";
-import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, postDay, renderFeed, sameAnnouncement, sameBody, type BuildLike } from "../src/changes.js";
+import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, postDay, renderFeed, sameAnnouncement, sameBody, sanitizePost, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
 import { postPath } from "../src/changes.js";
+import { storedHotfixExcerpt } from "../src/blue-forum.js";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/blue/${name}`, import.meta.url), "utf8"));
 const seen = new Date("2026-10-17T12:00:00Z");
@@ -211,8 +212,11 @@ test("the committed blue-posts.json is clean: unique ids, every forum post has i
     expect(p.postNumber, p.id).toBeGreaterThan(0);
     expect(p.url, p.id).toContain(`https://${p.region}.forums.blizzard.com/en/wow/t/`);
   }
-  // Nothing is widened on the way in: what is stored is what the site shows.
-  for (const [i, p] of raw.entries()) expect(stored[i].excerpt, String(p.id)).toBe(p.excerpt);
+  // Nothing is widened on the way in: what is stored is what the site shows, a hotfix stored before #1658 without its headings.
+  for (const [i, p] of raw.entries()) {
+    const shown = p.kind === "hotfix" && p.source === "forum" ? clampExcerpt(storedHotfixExcerpt(String(p.excerpt))) : p.excerpt;
+    expect(stored[i].excerpt, String(p.id)).toBe(shown);
+  }
 });
 
 test("MCP excerpts are marked as untrusted quoted source text", () => {
@@ -461,4 +465,20 @@ test("manual source fixture keeps sanitized source and text, with no detail page
   const [entry] = manualEntries({ entries: [{ ...manualFixture, title: "<b>Our</b> summary", summary: "<i>Our</i> words." }] });
   expect(entry).toMatchObject({ title: "Our summary", summary: "Our words.", url: manualFixture.url, source: "manual" });
   expect(postPath(entry)).toBeNull();
+});
+
+test("a hotfix excerpt stored before headings were left out reads as sentences: the day as a lead-in, no section or class heading", () => {
+  // As post 31066529 was stored on 2026-11-25, before #1658: headings flattened into the text.
+  const stored = { id: "forum:31066529", source: "forum", title: "WoW: Forever Hotfixes - November 25, 2026", postedAt: "2026-11-25T20:00:00Z", game: "forever", kind: "hotfix",
+    excerpt: "November 25, 2026 Classes Druid Hurricane now correctly lands its final hit. Balance Improved Wrath is now renamed Starlight Wrath." };
+  expect(sanitizePost(stored)!.excerpt).toBe("November 25, 2026: Hurricane now correctly lands its final hit. Balance Improved Wrath is now renamed Starlight Wrath.");
+  // A section heading after a sentence goes too; a class word that starts a spell under its own class heading stays.
+  expect(sanitizePost({ ...stored, excerpt: "November 25, 2026 Classes Mage Mage Armor now lasts 30 minutes. Items Thunderfury is now unique." })!.excerpt)
+    .toBe("November 25, 2026: Mage Armor now lasts 30 minutes. Thunderfury is now unique.");
+  expect(sanitizePost({ ...stored, excerpt: "September 29, 2026 The Burning Crusade Classic Honorary Brewer Hand Stamp can now be purchased." })!.excerpt)
+    .toBe("September 29, 2026: Honorary Brewer Hand Stamp can now be purchased.");
+  // Words that only look like headings stay: lower case after them, a post that is not a hotfix, an excerpt already right.
+  expect(sanitizePost({ ...stored, excerpt: "November 25, 2026 Items that drop from chests are now soulbound." })!.excerpt).toBe("November 25, 2026: Items that drop from chests are now soulbound.");
+  expect(sanitizePost({ ...stored, kind: "post" })!.excerpt).toBe(stored.excerpt);
+  expect(sanitizePost({ ...stored, excerpt: "November 25, 2026: Hurricane now correctly lands its final hit." })!.excerpt).toBe("November 25, 2026: Hurricane now correctly lands its final hit.");
 });

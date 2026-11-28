@@ -189,6 +189,13 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const [view, setView] = useState<View>(props.url.tab);
   const [collapsed, setCollapsed] = useState(false);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  // A phone's List sheet is the list view only while it is open: once it closes (Close, Escape, an item chosen), the
+  // view goes back to the categories, so the address drops view=list. A desk never opens a sheet.
+  const lastSheet = useRef(sheet);
+  useEffect(() => {
+    if (lastSheet.current === "list" && sheet === null) setView("categories");
+    lastSheet.current = sheet;
+  }, [sheet]);
   const [full, setFull] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(true);
   // Focus asked for after the next render: the search field once its panel shows, the card once it opens.
@@ -655,14 +662,14 @@ export default function WorldMapView(props: WorldMapViewProps) {
           onView={onView}
         />
         {props.notice && noticeOpen && (
-          <div data-map-notice className="absolute left-16 right-2 top-2 z-[1100] flex items-start gap-2 rounded-card border border-line bg-panel py-1 pl-3 pr-1 text-sm text-warning md:right-auto md:max-w-lg">
+          <div data-map-notice data-map-overlay className="absolute left-16 right-2 top-2 z-[1100] flex items-start gap-2 rounded-card border border-line bg-panel py-1 pl-3 pr-1 text-sm text-warning md:right-auto md:max-w-lg">
             <div className="min-w-0 flex-1 py-2">{props.notice}</div>
             <button type="button" aria-label="Close the notice" onClick={() => setNoticeOpen(false)} className="btn min-h-11 min-w-11 shrink-0 border-transparent px-0 text-lg leading-none text-fg">&times;</button>
           </div>
         )}
         {/* Where the pointer is, on the game's 0 to 100 scale. A phone has no pointer: it reads the card instead. */}
         <Coordinates ref={coordinates} zones={zones} bounds={coordinateBounds} name={props.name} />
-        <div className="absolute right-2 top-2 z-[1100] flex gap-2 rounded-control border border-line bg-panel p-1">
+        <div data-map-overlay className="absolute right-2 top-2 z-[1100] flex gap-2 rounded-control border border-line bg-panel p-1">
           <button type="button" className="btn min-h-11 px-3 text-sm" title="Pan with arrow keys, then pin the map centre. Shift-click also places a pin." onClick={() => placePin(camera.current?.x ?? base.x + base.width / 2, camera.current?.y ?? base.y + base.height / 2)}>Pin map centre</button>
           {sharedPoint && <button type="button" className="btn min-h-11 px-3 text-sm" onClick={clearPin}>Clear pin</button>}
         </div>
