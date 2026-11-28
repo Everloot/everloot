@@ -42,13 +42,14 @@ source = root / 'modules/inventory.lua'
 if source.exists():
     lua.execute(source.read_text())
 lua.execute((root / 'modules/options.lua').read_text())
-lua.execute('''
+lua.execute(r'''
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
 function event(name, ...)
  for _,hook in ipairs(Everloot.frame.hooks or {}) do hook(nil,name,...) end
 end
 local I = Everloot.Inventory
 assert(I, 'inventory snapshot module is available')
+assert(I.BagCheckCode('bags') == nil and reads == 0, 'copy flow requires inventory consent before reading')
 event('PLAYER_ENTERING_WORLD'); event('BANKFRAME_OPENED'); event('MAIL_SHOW')
 assert(EverlootDB.inventory == nil and reads == 0, 'default-off consent reads and stores nothing')
 local option
@@ -60,9 +61,12 @@ event('PLAYER_ENTERING_WORLD')
 local key = Everloot.CharacterKey()
 local row = EverlootDB.inventory[key]
 assert(row.bags.items[2589]==7 and row.bags.observedAt==NOW and row.bags.complete==true, 'bag stacks sum')
+assert(I.BagCheckCode('bags') == 'EVERLOOT-INVENTORY-1\n2589 7', 'a bag export contains only item ids and counts')
+assert(I.BagCheckCode('bank') == nil, 'copy flow requires the bank to be open')
 assert(row.bank==nil and row.mail==nil, 'unopened locations unknown')
 event('BANKFRAME_OPENED'); event('MAIL_SHOW')
 assert(row.bank.items[2592]==5 and row.mail.items[2589]==2, 'open bank and mail captured')
+assert(I.BagCheckCode('bank') == 'EVERLOOT-INVENTORY-1\n2592 5', 'bank code excludes bags and mail')
 event('BANKFRAME_CLOSED'); event('MAIL_CLOSED')
 NOW=1001; MISSING_LINK=true; event('MAIL_SHOW')
 assert(row.mail.items[2589]==2 and row.mail.observedAt==1000, 'uncached attachments preserve complete mail snapshot')
