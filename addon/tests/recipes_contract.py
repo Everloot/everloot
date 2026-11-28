@@ -88,7 +88,14 @@ C_TradeSkillUI = {
  GetFilteredRecipeIDs = function() return listed end,
  GetRecipeInfo = function(id, recipeLevel) getInfoCalls = getInfoCalls + 1; return recipeInfo(id) end,
  GetRecipeSchematic = function(id, isRecraft, recipeLevel) return schematic(id) end,
+ -- The player's own window: capability capture runs beside every public assertion below.
+ IsTradeSkillLinked = function() return false end,
+ IsTradeSkillGuild = function() return false end,
+ IsNPCCrafting = function() return false end,
 }
+UnitGUID = function(unit) if unit == 'player' then return 'Player-1-00000001' end end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 30 end
 for _, name in ipairs({ 'CraftRecipe', 'CraftEnchant', 'CraftSalvage', 'RecraftRecipe', 'RecraftRecipeForOrder', 'OpenTradeSkill',
   'OpenRecipe', 'CloseTradeSkill', 'SetRecipeTracked', 'SetShowLearned', 'SetShowUnlearned', 'SetSourceTypeFilter',
   'SetProfessionChildSkillLineID' }) do
@@ -125,10 +132,11 @@ end
 root = Path(__file__).parents[1]
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\professions.lua" in toc, "professions module must be in the TOC"
-for file in ["core.lua", "modules/professions.lua"]:
+for file in ["core.lua", "modules/crafting_plan.lua", "modules/professions.lua"]:
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+local playerKey = Everloot.CharacterKey()
 local function event(name) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name) end end
 function fire(name) event(name); return drain() end
 local function rows() return EverlootDB.records.recipe_observed or {} end
@@ -158,6 +166,11 @@ assert(byName('Currency Craft') and #byName('Currency Craft').reagents == 1, 'a 
 assert(byName('Late Potion') == nil and #loadRequests > 0 and loadRequests[1] == 9999, 'an unloaded reagent name defers the row and asks the client to load it')
 assert(#rows() == 4, 'got ' .. #rows())
 for _, r in ipairs(rows()) do assert(r.installId and r.capturedAt and r.eventId) end
+-- The same read captured this character's capability locally; the public rows above carry nothing new.
+local mine = Everloot.CraftingPlan.Known(playerKey)
+assert(mine[1002] and mine[1002].learned == true and mine[1002].itemId == 858, 'own window captures capability')
+assert(mine[1005] and mine[1005].reagents[1].itemId == 9999, 'capability needs reagent IDs, not loaded names')
+for _, r in ipairs(rows()) do assert(r.available == nil and r.reagentIds == nil and r.characterKey == nil, 'observation shape unchanged') end
 
 -- The name loads: the next read adds it; reopening at the same rank adds nothing.
 itemsLoaded = true
@@ -335,6 +348,59 @@ event('TRAINER_SHOW')
 assert(#trained == beforeEnriched + 1 and trained[#trained].skillLineId == 171 and trained[#trained].spellId == 2330)
 event('TRAINER_SHOW')
 assert(#trained == beforeEnriched + 1, 'identity enrichment happens once')
+
+-- A trainer service's recipe identity for payback estimates (Everloot.TrainerServiceIdentity): the documented
+-- C_TooltipInfo.GetTrainerService data (Blizzard's GameTooltip:SetTrainerService reads it; type and id as
+-- TooltipDataHandler.lua uses them), else an explicit |Hspell: link. An item is never a spell.
+local identity = Everloot.TrainerServiceIdentity
+assert(type(identity) == 'function', 'Everloot.TrainerServiceIdentity exists')
+Enum = { TooltipDataType = { Item = 0, Spell = 1 } }
+tipData = { [2] = { type = 1, id = 2330 }, [3] = { type = 0, id = 2457 } }
+C_TooltipInfo = { GetTrainerService = function(i) return tipData[i] end }
+GetTrainerServiceItemLink = nil
+local id = identity(2)
+assert(id and id.spellId == 2330 and id.itemId == nil and id.source == 'tooltip', 'tooltip spell identity')
+local item = identity(3)
+assert(item and item.spellId == nil and item.itemId == 2457, 'tooltip item data never becomes a spell')
+C_TooltipInfo = nil
+GetTrainerServiceItemLink = function(i)
+ if i == 2 then return '|cff71d5ff|Hspell:2330|h[Lesser Healing Potion]|h|r' end
+ if i == 3 then return '|cffffffff|Hitem:2330:0|h[Same number]|h|r' end
+end
+id = identity(2)
+assert(id and id.spellId == 2330 and id.source == 'link', 'an explicit spell link')
+item = identity(3)
+assert(item and item.spellId == nil and item.itemId == 2330, 'an item link whose number matches a spell is still an item')
+-- Two sources that disagree prove nothing; nothing readable proves nothing; a missing enum proves nothing.
+C_TooltipInfo = { GetTrainerService = function() return { type = 1, id = 9999 } end }
+local none, why = identity(2)
+assert(none == nil and why == 'conflict', tostring(why))
+C_TooltipInfo = { GetTrainerService = function() error('unavailable') end }
+GetTrainerServiceItemLink = nil
+none, why = identity(2)
+assert(none == nil and why == 'no identity', tostring(why))
+Enum = nil
+C_TooltipInfo = { GetTrainerService = function() return { type = 1, id = 2330 } end }
+none, why = identity(2)
+assert(none == nil and why == 'no identity', 'without the documented enum a tooltip type is not proof')
+-- The trainer's own rows use the same identity: a recipe identified by the tooltip is recorded with its spell ID.
+Enum = { TooltipDataType = { Item = 0, Spell = 1 } }
+C_TooltipInfo = { GetTrainerService = function(i) return tipData[i] end }
+services[2][1] = 'Tooltip identity'
+event('TRAINER_SHOW')
+assert(trainerByName('Tooltip identity').spellId == 2330 and trainerByName('Tooltip identity').productItemId == nil)
+-- A trainer offering is never this character's learned recipe: reading trainers leaves the learned store alone.
+local function dump(v)
+ if type(v) ~= 'table' then return tostring(v) end
+ local out = {}
+ for k, x in pairs(v) do out[#out + 1] = tostring(k) .. '=' .. dump(x) end
+ table.sort(out)
+ return '{' .. table.concat(out, ',') .. '}'
+end
+local knownBefore = dump(EverlootDB.craftingKnown)
+event('TRAINER_SHOW'); event('TRAINER_UPDATE')
+assert(dump(EverlootDB.craftingKnown) == knownBefore, 'trainer offerings are not captured as learned recipes')
+C_TooltipInfo, Enum = nil, nil
 
 -- Missing calls record nothing, never error, and the status says which.
 local saved = C_TradeSkillUI.GetFilteredRecipeIDs
@@ -529,6 +595,7 @@ local function rows() return EverlootDB.records.recipe_observed or {} end
 local function reload(rank) child.skillLevel = rank; event('TRADE_SKILL_SHOW'); event('TRADE_SKILL_CLOSE'); event('PLAYER_LOGOUT') end
 
 reload(10)
+assert(EverlootDB.craftingKnown == nil, 'without crafting_plan.lua loaded, professions.lua still records and captures nothing')
 assert(#rows() == 1 and rows()[1].rank == 10, 'the lowest rank is written at once; got ' .. #rows())
 for rank = 11, 13 do reload(rank) end
 assert(#rows() == 2, 'three reloads at one colour write one highest-rank row; got ' .. #rows())
@@ -576,8 +643,9 @@ assert(Everloot:Count('recipe_observed') == 0 and Everloot:Count('trainer_seen')
 """)
 
 # Display and read only: the professions module calls nothing that crafts, learns, trains, buys or posts, and
-# the only C_TradeSkillUI functions it names are these five readers. Source files outside tests are scanned.
-READERS = {"GetBaseProfessionInfo", "GetChildProfessionInfo", "GetAllRecipeIDs", "GetFilteredRecipeIDs", "GetRecipeInfo", "GetRecipeSchematic"}
+# the only C_TradeSkillUI functions it names are these readers. Source files outside tests are scanned.
+READERS = {"GetBaseProfessionInfo", "GetChildProfessionInfo", "GetAllRecipeIDs", "GetFilteredRecipeIDs", "GetRecipeInfo", "GetRecipeSchematic",
+           "IsTradeSkillLinked", "IsTradeSkillGuild", "IsNPCCrafting", "GetRecipeCooldown"}
 professions = (root / "modules" / "professions.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in professions.splitlines())
 named = set(re.findall(r"\b(?:T|C_TradeSkillUI)\.(\w+)", code))
@@ -587,10 +655,17 @@ actions = (r"CraftRecipe|CraftEnchant|CraftSalvage|RecraftRecipe|RecraftRecipeFo
            r"OpenTradeSkill|OpenRecipe|CloseTradeSkill|SetRecipeTracked|SetShowLearned|SetShowUnlearned|SetSourceTypeFilter|"
            r"SetProfessionChildSkillLineID|PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartCommoditiesPurchase|"
            r"ConfirmCommoditiesPurchase|BuyoutItem|StartAuction|PostAuction|CancelAuction")
+# One exception: the docked profit list beside the profession window selects a recipe the player clicked with
+# C_TradeSkillUI.OpenRecipe, the client's documented way to show a recipe in that window. It selects; it never crafts.
+SELECTS = {"native_recipes.lua": "OpenRecipe"}
 for source in sorted(root.rglob("*.lua")):
     if "tests" in source.parts:
         continue
     text = "\n".join(line.split("--")[0] for line in source.read_text(encoding="utf-8").splitlines())
+    if source.name in SELECTS:
+        allowed = SELECTS[source.name]
+        assert len(re.findall(rf"\b{allowed}\b", text)) == 2, f"{source.name} names {allowed} only in its one guarded call"
+        text = re.sub(rf"pcall\(\s*C_TradeSkillUI\.{allowed}\b|C_TradeSkillUI\.{allowed}\b", "", text)
     called = re.search(rf"\b({actions})\s*\(|pcall\(\s*(?:[A-Za-z_]+\.)?({actions})\b", text)
     assert not called, f"{source.name} calls a craft, learn, train, buy or post API: {called.group(0)}"
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).

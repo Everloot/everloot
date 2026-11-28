@@ -1,7 +1,8 @@
 import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("./upload-store", () => ({ uploadStore: store }));
-import { PROFESSIONS_KEY, buildProfessions, encodeProfessions, parseProfessions, writeProfessions, loadStoredProfessions, forgetStoredProfessions, loadProfessions } from "./profession-store";
+import { PROFESSIONS_KEY, PROFESSIONS_REVISION, buildProfessions, encodeProfessions, parseProfessions, writeProfessions, loadStoredProfessions, forgetStoredProfessions, loadProfessions } from "./profession-store";
+import { stampOf } from "./stored-view-freshness";
 
 const cloud = { r2AccountId: "acct", r2AccessKeyId: "id", r2SecretAccessKey: "secret", r2Bucket: "uploads" };
 const asOf = "2026-11-09T00:00:00.000Z";
@@ -9,6 +10,7 @@ const corpus = { uploads: 3, dataAsOf: asOf, records: ["a", "b", "c"].flatMap((i
   { kind: "npc_sighting", installId, npcId: 7, name: "Guard", mapId: 1429, x: 40, y: 60, positionKind: "npc", capturedAt: asOf },
   { kind: "loot", installId, sourceObjectId: 5, sourceObjectName: "Peacebloom", sourceEvidence: "loot-api", lootType: "gather", gatherKind: "herb", items: [{ itemId: 2447, count: 1 }], mapId: 1429, x: 20, y: 30, capturedAt: asOf },
   { kind: "recipe_observed", installId, profession: "Alchemy", recipe: "Potion", rank: 1, difficulty: "optimal", reagents: [], capturedAt: asOf },
+  { kind: "loot", installId, sourceNpcId: 6, sourceEvidence: "loot-api", lootType: "skinning", gatherSkill: 25, items: [{ itemId: 2934, count: 1 }] },
 ]) };
 beforeEach(() => {
   forgetStoredProfessions();
@@ -28,16 +30,27 @@ test("the cron writes the same facts as the corpus and a request reads the file 
   expect(await writeProfessions({ added: 1, dataAsOf: asOf }, { cloud, fetch: doFetch })).toMatchObject({ written: true });
   expect(requests[0].url).toContain(PROFESSIONS_KEY);
   expect(parseProfessions(body)?.set).toEqual(buildProfessions(corpus));
+  expect(parseProfessions(body)?.set.gathering?.skinning).toEqual([{ npcId: 6, installs: 3, skill: { min: 25, median: 25, installs: 3 }, itemIds: [2934] }]);
   store.loadCorpus.mockClear();
   vi.stubGlobal("fetch", doFetch);
   expect(await loadProfessions()).toEqual({ ...buildProfessions(corpus), unreachable: false });
   expect(store.loadCorpus).not.toHaveBeenCalled();
 });
 
+test("a stored snapshot from before Fish and Skin observations can still serve existing profession facts", () => {
+  const before = JSON.parse(encodeProfessions(buildProfessions(corpus), asOf));
+  delete before.set.gathering;
+  delete before.revision;
+  const parsed = parseProfessions(JSON.stringify(before));
+  expect(parsed?.set.sightings).toHaveLength(3);
+  expect(parsed?.set.gathering).toBeUndefined();
+});
+
 test("an idle run only checks the file's stamp; a missing, unstamped or older file and a rebuild write it", async () => {
   const build = vi.fn(async () => buildProfessions(corpus));
   const stamped = (stamp?: string) => new Response(null, { headers: stamp ? { "x-amz-meta-data-as-of": stamp } : {} });
-  const doFetch = vi.fn(async (input: RequestInfo | URL) => (input as Request).method === "PUT" ? new Response(null) : stamped(asOf));
+  const current = stampOf(asOf, PROFESSIONS_REVISION);
+  const doFetch = vi.fn(async (input: RequestInfo | URL) => (input as Request).method === "PUT" ? new Response(null) : stamped(current));
   expect(await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build })).toEqual({ written: false });
   expect(build).not.toHaveBeenCalled();
   doFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
@@ -47,12 +60,15 @@ test("an idle run only checks the file's stamp; a missing, unstamped or older fi
   await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
   doFetch.mockResolvedValueOnce(stamped("2026-11-08T00:00:00.000Z"));
   await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
+  // Same input data, but an earlier writer did not include fishing and skinning, so backfill even on an idle cron.
+  doFetch.mockResolvedValueOnce(stamped(asOf));
+  await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
   await writeProfessions({ added: 0, rebuild: true, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
-  expect(build).toHaveBeenCalledTimes(4);
+  expect(build).toHaveBeenCalledTimes(5);
   const puts = doFetch.mock.calls.map(([req]) => req as Request).filter((req) => req.method === "PUT");
-  expect(puts.map((req) => req.headers.get("x-amz-meta-data-as-of"))).toEqual([asOf, asOf, asOf, asOf]);
+  expect(puts.map((req) => req.headers.get("x-amz-meta-data-as-of"))).toEqual(Array(5).fill(current));
   // With no snapshot time the stamp says so, and a matching idle run still skips.
-  doFetch.mockResolvedValueOnce(stamped("none"));
+  doFetch.mockResolvedValueOnce(stamped(stampOf(null, PROFESSIONS_REVISION)));
   expect(await writeProfessions({ added: 0, dataAsOf: null }, { cloud, fetch: doFetch, build })).toEqual({ written: false });
 });
 
@@ -138,4 +154,26 @@ test("a file with characters past U+00FF is parsed from one-byte ASCII text, to 
   } finally {
     parse.mockRestore();
   }
+});
+
+test("item-id vendor prices and trainer spell ids are stored beside the old fields; an older file reads with no item-id prices", () => {
+  const records = [
+    ...["a", "b", "c"].map((installId) => ({ kind: "vendor", installId, vendorNpcId: 1, items: [{ itemId: 2320, priceCopper: 10 }, { itemId: 2321, priceCopper: 0 }], capturedAt: asOf })),
+    ...["a", "b", "c"].map((installId) => ({ kind: "trainer_seen", installId, profession: "Alchemy", recipe: "Lesser Healing Potion", spellId: 2337, productItemId: 858, requiredRank: 55, costCopper: 250, capturedAt: asOf })),
+  ];
+  const set = buildProfessions({ records, dataAsOf: asOf });
+  expect(set.facts.vendorPricesById).toEqual(new Map([[2320, 10]]));
+  const body = encodeProfessions(set, asOf);
+  const read = parseProfessions(body)!.set;
+  expect(read).toEqual(set);
+  expect(read.facts.trainers[0]).toMatchObject({ spellId: 2337, productItemId: 858 });
+  // A file written before item-id prices existed: the old fields read as before, and item-id prices are unavailable, not guessed from names.
+  const old = JSON.parse(body);
+  delete old.set.facts.vendorPricesById;
+  const fallback = parseProfessions(JSON.stringify(old))!.set;
+  expect(fallback.facts.vendorPricesById).toEqual(new Map());
+  expect(fallback.facts.vendorPrices).toEqual(set.facts.vendorPrices);
+  // Anything else in that slot is not a price list.
+  old.set.facts.vendorPricesById = [[2320, 10]];
+  expect(parseProfessions(JSON.stringify(old))).toBeNull();
 });

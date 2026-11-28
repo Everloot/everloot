@@ -4,10 +4,9 @@ local E = Everloot
 local C = {}
 E.Cooldowns = C
 
--- Learned craft spells with a cooldown of at least one minute in the Forever 71139
--- recipe and spell exports. Other recipes are discovered from the player's open profession.
-local RECIPES = { 818, 11479, 11480, 17187, 17559, 17560, 17561, 17562, 17563, 17564, 17565, 17566,
-  18560, 22430, 25146, 1317279 }
+-- Client data supplies candidate spell IDs. Every countdown comes from a live read.
+local RECIPES = E.RECIPE_COOLDOWNS.limited
+local BASIC_CAMPFIRE = 818
 local SALT_SHAKER = 15846
 local MAX_DURATION = 14 * 24 * 60 * 60
 local MAX_RECIPES, CHUNK = 1024, 40
@@ -135,13 +134,12 @@ local function scan()
   EverlootDB.professionCooldowns = EverlootDB.professionCooldowns or {}
   local all = EverlootDB.professionCooldowns
   local stored = all[key] or {}
-  local scanned = {}
-  for _, id in ipairs(RECIPES) do
-    scanned[id] = true
+  for id in pairs(RECIPES) do
     spellTimer(stored, id, now, uptime)
   end
+  spellTimer(stored, BASIC_CAMPFIRE, now, uptime)
   for id in pairs(stored) do
-    if type(id) == "number" and not scanned[id] then spellTimer(stored, id, now, uptime) end
+    if type(id) == "number" and id ~= BASIC_CAMPFIRE and not RECIPES[id] then spellTimer(stored, id, now, uptime) end
   end
   local count = read(C_Item and C_Item.GetItemCount, SALT_SHAKER, false)
   if count == 0 then

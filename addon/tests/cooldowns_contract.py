@@ -27,10 +27,12 @@ C_Container = { GetItemCooldown = function() return 0, 0, 1 end }
 """
 
 MODULE = "modules/cooldowns.lua"
+FILES = ("modules/recipe_cooldown_data.lua", MODULE)
 toc = (Path(__file__).parents[1] / "Everloot.toc").read_text(encoding="utf-8")
+assert toc.index("modules\\recipe_cooldown_data.lua") < toc.index("modules\\cooldowns.lua")
 assert toc.index(MODULE.replace("/", "\\")) < toc.index("modules\\view_professions.lua")
 
-lua = fresh("{ installId = 'cooldown-test' }", API, extra=(MODULE,))
+lua = fresh("{ installId = 'cooldown-test' }", API, extra=FILES)
 lua.execute("""
 local E = Everloot
 local me = E.CharacterKey()
@@ -170,7 +172,7 @@ assert(#E.Cooldowns.Rows() == 0, 'the roster option also controls cooldown reads
 assert(not tracker.panel.shown)
 """)
 
-reloaded = fresh(lua.globals().reloadFixture, API, extra=(MODULE,))
+reloaded = fresh(lua.globals().reloadFixture, API, extra=FILES)
 reloaded.execute("""
 guid = 'Player-1-0002'
 known = { [18560] = true }

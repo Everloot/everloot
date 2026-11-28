@@ -682,7 +682,7 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                       <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${shownAvailable ? Math.min(100, (points / shownAvailable) * 100) : 0}%` }} />
                     </div>
                     {!readOnly && gate !== null && (
-                      <p data-tree-gate className="text-xs text-fg-2">Next row needs {gate} points in {tree.name}: {gate - points} more.</p>
+                      <p data-tree-gate className="text-xs text-fg-2">Next row: {gate - points} more {gate - points === 1 ? "point" : "points"} in {tree.name}.</p>
                     )}
                   </div>
                   {(() => {

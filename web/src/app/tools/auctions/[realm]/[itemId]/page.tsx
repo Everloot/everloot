@@ -14,6 +14,7 @@ import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
+import { auctionActivityHref } from "@/lib/auction-activity-link";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
   AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseParam, houseSlug, indexable, itemHref, itemIdParam,
@@ -30,10 +31,9 @@ import { realmDisplayName } from "../../RealmName";
 
 type Props = { params: Promise<{ realm: string; itemId: string }>; searchParams?: Promise<{ house?: string | string[] }> };
 
+// No static params list: the page reads `?house=`, and a page rendered once and kept (ISR) that reads the query
+// string answers 500 in production (static-params-guard.test.ts).
 export const revalidate = 300;
-export async function generateStaticParams() {
-  return [];
-}
 
 // generateMetadata and the page both load this; one request reads the rollup and the item's art and names once, not twice.
 // Keyed by the two path strings (the params promises are not the same object in both calls).
@@ -211,6 +211,7 @@ export default async function RealmItemPage(props: Props) {
           />
         )}
         {houseMarket && <AhledgerHistory key={houseMarket} itemId={itemId} defaultMarket={houseMarket} />}
+        <a className="btn" href={auctionActivityHref(itemId, names.get(itemId), houseMarket)}>Auction activity for this item</a>
 
         <Contribute />
 

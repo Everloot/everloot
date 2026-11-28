@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { writeItemView, buildItemView } from "./item-view-store";
 import { writeAggregates, anonymousAggregates, AGGREGATES_REVISION } from "./aggregate-store";
-import { writeProfessions, buildProfessions } from "./profession-store";
+import { writeProfessions, buildProfessions, PROFESSIONS_REVISION } from "./profession-store";
 import { writeMapPins, buildMapPins } from "./map-pins-store";
 import { writeAuctionHistory, buildAuctionHistory } from "./auction-history-store";
 
@@ -13,7 +13,7 @@ const writers = [
   { name: "items", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeItemView({ added, dataAsOf }, { cloud, fetch, build: () => buildItemView(dataAsOf, new Date(), corpus) }) },
   // The aggregates' stamp carries the set's revision, so a file from before a new table is rewritten once.
   { name: "aggregates", current: `${dataAsOf};${AGGREGATES_REVISION}`, revision: AGGREGATES_REVISION, write: (added: number, fetch: typeof globalThis.fetch) => writeAggregates({ added, dataAsOf }, { cloud, fetch, build: async () => anonymousAggregates(corpus) }) },
-  { name: "professions", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeProfessions({ added, dataAsOf }, { cloud, fetch, build: async () => buildProfessions(corpus) }) },
+  { name: "professions", current: `${dataAsOf};${PROFESSIONS_REVISION}`, revision: PROFESSIONS_REVISION, write: (added: number, fetch: typeof globalThis.fetch) => writeProfessions({ added, dataAsOf }, { cloud, fetch, build: async () => buildProfessions(corpus) }) },
   { name: "map pins", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeMapPins({ added, dataAsOf }, { cloud, fetch, build: async () => buildMapPins(corpus) }) },
   { name: "auction history", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeAuctionHistory({ added, dataAsOf }, { cloud, fetch, build: async () => buildAuctionHistory(corpus) }) },
 ];

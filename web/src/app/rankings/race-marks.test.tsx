@@ -47,7 +47,7 @@ const races: ChartSeries[] = [
 const mark = (el: Element) => `${[...el.classList].find((c) => c.startsWith("stroke-") && c !== "stroke-panel")}|${el.getAttribute("stroke-dasharray") ?? "solid"}`;
 
 test("QA round 11: each race's trend line has its own mark, and the legend draws the same mark beside its name", async () => {
-  const div = await render(<WeeklyChart weeks={weeks} series={races} title="Races: share of each week's characters" />);
+  const div = await render(<WeeklyChart noun="Race" weeks={weeks} series={races} title="Races: share of each week's characters" />);
   const lines = [...div.querySelectorAll("[data-weekly-chart] svg[role=img] path")];
   expect(lines).toHaveLength(races.length);
   const marks = lines.map(mark);
@@ -70,6 +70,6 @@ test("QA round 11: class trend lines keep their class colours, solid", async () 
     { key: "hunter", label: "Hunter", classToken: "HUNTER", points: [0.14, 0.15, 0.14] },
     { key: "mage", label: "Mage", classToken: "MAGE", points: [0.1, 0.11, 0.12] },
   ];
-  const div = await render(<WeeklyChart weeks={weeks} series={classes} title="Classes" />);
+  const div = await render(<WeeklyChart noun="Class" weeks={weeks} series={classes} title="Classes" />);
   expect([...div.querySelectorAll("[data-weekly-chart] svg[role=img] path")].map(mark)).toEqual(["stroke-class-hunter|solid", "stroke-class-mage|solid"]);
 });

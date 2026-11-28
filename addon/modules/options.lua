@@ -29,6 +29,8 @@ O.ROWS = {
     text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
   { key = "mailCollect", group = "helpers", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
     text = "A button that takes money and items from auction letters only, one at a time. Skips cash on delivery and other letters." },
+  { key = "nativeCrafting", group = "helpers", perCharacter = true, live = true, label = "Profit in the profession window",
+    text = "Profit tags on recipe rows, an Everloot list beside the profession window that sorts and filters by profit, the cost summary under the selected recipe, and training payback in trainer window hovers. This character only. Off by default while CraftProfit is loaded; your choice here wins. Off while the Everloot window is off (Collect data only). Records nothing; applies at once." },
   { key = "census", group = "data", command = "census", label = "Census",
     text = "Race, class, level and faction of your characters and of players near you, nameplates included. Never names, guilds, gear or places. Off deletes its rows." },
   { key = "openworld", group = "data", label = "World",
@@ -134,8 +136,116 @@ local function choiceLabel(row)
   return label
 end
 
+-- Addons whose own profit display Everloot's profession-window estimates would duplicate. Folder names only.
+O.CRAFTPROFIT = { "CraftProfit" }
+
+--- True while CraftProfit is loaded.
+function O.CraftProfitLoaded()
+  local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+  if type(loaded) ~= "function" then return false end
+  for _, name in ipairs(O.CRAFTPROFIT) do
+    local ok, yes = pcall(loaded, name)
+    if ok and E.Readable(yes) then return true end
+  end
+  return false
+end
+
+-- A character whose key cannot be read keeps its choice for this session only.
+local sessionChoice
+
+--- This character's own choice for the profession window estimates: true, false, or nil when it never chose.
+function O.NativeCraftingChoice()
+  local key = E.CharacterKey()
+  if not key then return sessionChoice end
+  local saved = EverlootDB.nativeCrafting
+  if type(saved) ~= "table" or type(saved[key]) ~= "boolean" then return nil end
+  return saved[key]
+end
+
+--- Saves this character's choice and redraws the profession window and an open Options page.
+function O.SetNativeCrafting(on)
+  on = on and true or false
+  local key = E.CharacterKey()
+  if key then
+    if type(EverlootDB.nativeCrafting) ~= "table" then EverlootDB.nativeCrafting = {} end
+    EverlootDB.nativeCrafting[key] = on
+  else
+    sessionChoice = on
+  end
+  if E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting) end
+  O.Refresh()
+end
+
+--- Where crafted items are valued for profit, for every crafting estimate: "ah" (the default) or "vendor".
+function O.CraftDestination()
+  return EverlootDB.craftDestination == "vendor" and "vendor" or "ah"
+end
+
+--- Saves the destination and reprices every visible crafting surface.
+function O.SetCraftDestination(destination)
+  EverlootDB.craftDestination = destination == "vendor" and "vendor" or "ah"
+  if E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting)
+  elseif E.Window and E.Window.RefreshCrafting then pcall(E.Window.RefreshCrafting) end
+end
+
+--- Where crafting estimates take auction prices from (crafting_sources.lua): "everloot" (the default), "auctionator"
+--- or "tsm", and whether Everloot's prices fill in, marked as fallback, where that source has none.
+function O.CraftSource()
+  local CS = E.CraftingSources
+  if not CS then return "everloot", false end
+  return CS.Choice()
+end
+
+--- Saves the source and the fallback switch (only those) and reprices every visible crafting surface. Never starts a
+--- scan or a search.
+function O.SetCraftSource(name, fallback)
+  local CS = E.CraftingSources
+  if not CS then return end
+  CS.SetChoice(name, fallback)
+  if E.RefreshNativeCrafting then pcall(E.RefreshNativeCrafting)
+  elseif E.Window and E.Window.RefreshCrafting then pcall(E.Window.RefreshCrafting) end
+end
+
+-- The source button's order: each other addon on its own, then with the Everloot fallback.
+local SOURCE_CYCLE = { { "everloot", false }, { "auctionator", false }, { "auctionator", true }, { "tsm", false },
+  { "tsm", true } }
+
+--- Moves the choice to the next one in the source button's order and returns it.
+function O.NextCraftSource()
+  local name, fallback = O.CraftSource()
+  local at = 1
+  for i, c in ipairs(SOURCE_CYCLE) do if c[1] == name and c[2] == fallback then at = i end end
+  local nxt = SOURCE_CYCLE[at % #SOURCE_CYCLE + 1]
+  O.SetCraftSource(nxt[1], nxt[2])
+  return O.CraftSource()
+end
+
+--- How the source button reads: "Prices: Everloot", "Prices: TSM", "Prices: TSM, else Everloot".
+function O.CraftSourceText()
+  local name, fallback = O.CraftSource()
+  local CS = E.CraftingSources
+  local label = CS and CS.Label(name) or "Everloot"
+  return "Prices: " .. label .. (fallback and ", else Everloot" or "")
+end
+
+--- Whether the profession window shows Everloot's estimates, and why: "recorder" (the Everloot window is off, as
+--- Collect data only sets it; this wins over everything), "chosen" (this character's choice), "craftprofit" (off
+--- while CraftProfit is loaded and the character never chose) or "default".
+function O.NativeCrafting()
+  if not E:IsEnabled("window") then return false, "recorder" end
+  local choice = O.NativeCraftingChoice()
+  if choice ~= nil then return choice, "chosen" end
+  if O.CraftProfitLoaded() then return false, "craftprofit" end
+  return true, "default"
+end
+
 function O.IsOn(row)
   if row.choices then return O.Choice(row) ~= "off" end
+  if row.perCharacter then
+    local choice = O.NativeCraftingChoice()
+    if choice == nil then return not O.CraftProfitLoaded() end
+    return choice
+  end
   if row.field then
     if row.defaultOff then return EverlootDB[row.key] == true end
     return EverlootDB[row.key] ~= false
@@ -147,6 +257,8 @@ end
 function O.Set(row, on)
   if row.command and SlashCmdList and SlashCmdList.EVERLOOT then
     SlashCmdList.EVERLOOT(row.command .. (on and " on" or " off"))
+  elseif row.perCharacter then
+    O.SetNativeCrafting(on)
   elseif row.field then
     EverlootDB[row.key] = on
     if row.key == "inventoryCapture" and not on and E.Inventory then E.Inventory.Withdraw() end

@@ -7,6 +7,7 @@ import { loadMarketBoards } from "@/lib/market-boards";
 import { ahHref, ahQuery } from "../browse";
 import { browseView, isPlainView } from "../browse-view";
 import { count } from "../parts";
+import { realmDisplayName } from "../RealmName";
 
 type Search = Record<string, string | string[] | undefined>;
 type Props = { params: Promise<{ realm: string }>; searchParams?: Promise<Search> };
@@ -20,7 +21,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const market = await uploadStore.loadMarket();
   const stored = await loadMarketBoards(market);
   const board = stored ? findBoard(stored.boards(null), slug) : null;
-  const name = board?.realm.name ?? slugWords(slug);
+  const name = realmDisplayName(board?.realm.name ?? slugWords(slug));
   const items = board ? count(board.items, "item") : "the items";
   const q = ahQuery((await props.searchParams) ?? {});
   return {

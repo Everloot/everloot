@@ -13,14 +13,15 @@ import { loadSiteAssets } from "@/lib/game-assets";
 import { trailFor } from "@/lib/breadcrumbs";
 import { parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import { CLIENT_PROFESSIONS, professionByName, professionHref, RECIPES_BUILD } from "@/lib/professions";
+import { GATHERING_GUIDE_SLUGS } from "@/lib/gathering-guide";
 
 export const dynamic = "force-dynamic";
 
-const TITLE = "WoW Forever Profession Hubs";
-const lede = "Every profession's recipes from the game files, with the paths and skill ranges players upload.";
+const TITLE = "WoW Forever Profession Guides";
+const lede = "Plan crafts and build a shopping list, or find gathering zones and trainers for your skill.";
 
 export const metadata: Metadata = {
-  ...pageMetadata({ title: TITLE, description: "Every WoW: Forever profession's recipes from the game files, with reagents and skill ranks, and the leveling paths and recipe ranges players upload.", path: "/tools/professions" }),
+  ...pageMetadata({ title: TITLE, description: "Plan your WoW: Forever profession leveling route with crafting recipes, material prices and a shopping list, or find gathering zones and trainers.", path: "/tools/professions" }),
   keywords: ["wow forever professions", "wow forever profession leveling", "wow forever recipes"],
 };
 
@@ -76,9 +77,9 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
                     : <span aria-hidden="true" className="h-9 w-9 shrink-0 rounded-sm border border-line" />}
                   <span className="min-w-0">
                     <span className="block font-medium text-fg">{p.name}</span>
-                    <span className="block text-meta text-fg-2">
-                      <span className="font-mono tabular-nums">{p.recipes.length}</span> {p.recipes.length === 1 ? "recipe" : "recipes"} in the files
-                    </span>
+                    <span className="block text-meta text-fg-2">{GATHERING_GUIDE_SLUGS.has(p.slug)
+                      ? "Gathering zones and trainers"
+                      : "Leveling route and shopping list"}</span>
                   </span>
                 </Card>
               </li>
@@ -86,7 +87,7 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
           </ul>
           <p className="flex items-center gap-2 text-meta text-fg-2">
             <Badge tone="files" />
-            Recipe lists are found in game files, unconfirmed, build {RECIPES_BUILD}. Paths, ranges and costs come from player uploads once 3 installs agree.
+            Reference recipes from game files, build {RECIPES_BUILD}. Each guide shows the evidence behind its recommendations.
           </p>
         </section>
 
@@ -100,9 +101,8 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
           <SectionHeading id="prof-help">Questions</SectionHeading>
           <Disclosure summary="What is on a profession page?">
             <p>
-              Every recipe the game files list for the profession, grouped by the skill where it turns yellow, with the
-              item it makes, its reagents and the ranks the files give. Under it, what players upload: a leveling path,
-              the colour ranges their profession windows showed, and a cost per craft from agreed prices.
+              Crafting guides lead with a skill range, leveling route and shopping list. Gathering guides show zones,
+              materials and trainers. The recipe references include the ranks and ingredients from the game files.
             </p>
           </Disclosure>
           <Disclosure summary="Where do I gather materials?">

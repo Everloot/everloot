@@ -6,7 +6,7 @@
 ## Category: Auction & Economy
 ## X-Website: https://everloot.app
 ## X-Curse-Project-ID: 1762765
-## Version: 0.3.32
+## Version: 0.3.34
 ## X-License: AGPL-3.0
 ## SavedVariables: EverlootDB
 ## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds, EverlootProgress
@@ -23,6 +23,9 @@ modules\wealth.lua
 modules\roster.lua
 modules\ledger.lua
 modules\inventory.lua
+modules\recipe_cooldown_data.lua
+modules\crafting_plan.lua
+modules\crafting_history.lua
 modules\professions.lua
 modules\cooldowns.lua
 modules\ask.lua
@@ -54,10 +57,13 @@ modules\conveniences.lua
 modules\options.lua
 modules\planner.lua
 modules\window.lua
+modules\crafting_sources.lua
+modules\crafting.lua
 modules\view_gold.lua
 modules\view_collection.lua
 modules\view_professions.lua
 modules\native_crafting.lua
+modules\native_recipes.lua
 modules\minimap.lua
 modules\flight_data.lua
 modules\flight_times.lua

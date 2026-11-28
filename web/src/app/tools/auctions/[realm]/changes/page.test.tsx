@@ -175,3 +175,17 @@ test("without stored boards the page says they are unavailable and never builds 
   expect(auctionHouse.realmBoards).not.toHaveBeenCalled();
   expect((await generateMetadata(props("forever"))).robots).toMatchObject({ index: false });
 });
+
+test("a CAMWOW realm's changes page names the realm as its heading does in the captions, the trail and the metadata", async () => {
+  const camwow = foldMarket(emptyMarket(), [
+    ...scans("CAMWOW US1 Realm 4 PvP", "Horde", 7, [[101, 100]]),
+    ...scans("CAMWOW US1 Realm 4 PvP", "Horde", 0, [[101, 125]]),
+  ], now);
+  store.boards.mockResolvedValue(boardsFromFile(parseBoards(JSON.stringify(await buildMarketBoards(camwow, at(0), now, names)))!));
+  const html = await page("camwow-us1-realm-4-pvp");
+  expect(html).toContain("US1 · Realm 4 PvP, Horde auction house");
+  expect(html).not.toContain("CAMWOW");
+  const meta = await generateMetadata(props("camwow-us1-realm-4-pvp"));
+  expect(meta.title).toBe("WoW Forever US1 · Realm 4 PvP Market Changes This Week");
+  expect(String(meta.description)).toContain("the Horde auction house on US1 · Realm 4 PvP");
+});

@@ -19,6 +19,16 @@ UIParent = { GetWidth = function() return 1920 end, GetHeight = function() retur
 UISpecialFrames = {}
 SECRET = {}
 issecretvalue = function(v) return SECRET[v] == true end
+-- Local merchant unit evidence (openworld.lua) for this character, observed now on this client build: one item for
+-- money alone at each price. Call it after the addon has loaded.
+function unitEvidence(prices)
+  -- Evidence belongs to a character: give the player an id when the test world has none.
+  if not UnitGUID then UnitGUID = function(unit) if unit == 'player' then return 'Player-1-0000EV1D' end end end
+  EverlootDB.clientBuild = EverlootDB.clientBuild or '1.60.1.71139'
+  local mine = {}
+  for id, copper in pairs(prices) do mine[id] = { copper = copper, at = time(), build = EverlootDB.clientBuild } end
+  EverlootDB.vendorUnitPrices = { [Everloot.CharacterKey()] = mine }
+end
 
 -- A frame API that accepts every call and keeps what the window sets, so a test can read it back. As in the game,
 -- a named frame becomes a global and a new frame is shown until something hides it.
@@ -121,7 +131,7 @@ end
 
 BEFORE = ["core.lua", "modules/auctions.lua", "modules/gold.lua", "modules/roster.lua", "modules/ledger.lua",
           "modules/prices.lua", "modules/drops.lua", "modules/gph.lua", "modules/options.lua"]
-AFTER = ["modules/view_gold.lua", "modules/view_collection.lua",
+AFTER = ["modules/crafting_sources.lua", "modules/crafting.lua", "modules/view_gold.lua", "modules/view_collection.lua",
          "modules/view_professions.lua", "modules/minimap.lua"]
 
 

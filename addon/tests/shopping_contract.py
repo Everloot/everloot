@@ -331,12 +331,14 @@ assert(#queries == 1, 'results never send another query')
 assert(S.Search(765) and #queries == 2)
 full = false
 shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
-assert(S.Found(765).none and S.message:find('not in the first page', 1, true), S.message)
+assert(S.Found(765) == nil and S.Pending(), 'unrelated rows cannot establish that this item has no listings')
+assert(S.message:find('different items', 1, true), S.message)
 full = true
-assert(S.Search(765) and #queries == 3)
 browse = {}
 shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
 assert(S.message == 'Silverleaf: none listed with a buyout.', S.message)
+assert(S.Search(765) and #queries == 3)
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
 -- A refused search, an unanswered one and a closed house each free the next press; none retries by itself.
 assert(S.Search(2589) and #queries == 4)
 shopEvent('AUCTION_HOUSE_BROWSE_FAILURE')
@@ -351,6 +353,10 @@ fire('AUCTION_HOUSE_CLOSED'); shopEvent('AUCTION_HOUSE_CLOSED')
 assert(not S.Pending())
 assert(S.Search(2589) == false and #queries == 6, 'closed again')
 fire('AUCTION_HOUSE_SHOW')
+assert(S.Search(765) == false and #queries == 6 and S.message == 'Still waiting for the last search.',
+ 'reopening cannot release an abandoned query early')
+now = now + S.WAIT
+assert(S.Tick())
 -- An item the client has not loaded, and a price scan in progress, are said and send nothing.
 assert(S.Search(55555) == false and S.message:find('not loaded', 1, true) and #queries == 6)
 assert(S.Search(55555, 'Saved Name') and queries[7].searchString == 'Saved Name', 'the saved name stands in for an unloaded item')
@@ -604,6 +610,281 @@ assert(Everloot.Window.Open('professions') == true)
 local p = EverlootWindow.professions
 p.toggle.scripts.OnClick()
 assert(not p.craft.buy.add.shown and not Everloot.Window.failed)
+""")
+
+# --- Task 6: recipe plans as a second search source, beside the manual lists, never merged with them ---
+PLAN_FILES = ["core.lua", "modules/auctions.lua", "modules/inventory.lua", "modules/crafting_plan.lua",
+              "modules/prices.lua", "modules/shopping.lua", "modules/auctiontab.lua", "modules/crafting_sources.lua",
+              "modules/crafting.lua"]
+PLAN_API = """
+guid = 'Player-1-0000000A'
+UnitGUID = function(unit) if unit == 'player' then return guid end end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 30 end
+UnitName = function() return guid == 'Player-1-0000000A' and 'Alpha' or 'Bravo' end
+NUM_BAG_SLOTS = 4
+bag = {}
+C_Container = {
+  GetContainerNumSlots = function(b) if b == 0 then return 16 end return 0 end,
+  GetContainerItemInfo = function(b, s)
+    local entry = b == 0 and bag[s]
+    if entry then return { itemID = entry[1], stackCount = entry[2] } end
+  end,
+}
+function setBags(counts)
+  bag = {}
+  for id, n in pairs(counts) do bag[#bag + 1] = { id, n } end
+end
+-- Bolt of Linen: two Linen Cloth make one bolt. Recipe 3002 needs a Silverleaf and a Copper Ore.
+function learnBolt()
+  local E = Everloot
+  assert(E.CraftingPlan.ReplaceKnown(E.CharacterKey(), 197, {
+    { recipeId = 3001, learned = true, itemId = 2996, minimum = 1, maximum = 1, reagents = { { itemId = 2589, count = 2 } } },
+    { recipeId = 3002, learned = true, itemId = 2997, minimum = 1, maximum = 1,
+      reagents = { { itemId = 765, count = 1 }, { itemId = 2770, count = 1 } } },
+  }, false))
+end
+"""
+
+
+def plan_world(prices: str | None = None, extra_api: str = ""):
+    lua = fresh(PLAN_FILES, api=PLAN_API + extra_api)
+    lua.execute(prices or price_file("2026-10-20T06:00:00Z"))
+    lua.execute("openHouse()")
+    return lua
+
+
+# Case 10.5: manual counts stay additive and a recipe plan never changes them; each source stands alone.
+lua = plan_world()
+lua.execute("""
+local E, S, CP, T = Everloot, Everloot.Shopping, Everloot.CraftingPlan, Everloot.AuctionTab
+learnBolt()
+S.Set(2589, 5)
+S.AddReagents({ { id = 2589, item = 'Linen Cloth', count = 3 } }, 1)
+assert(S.Active().items[1].want == 8, 'manual list: 5 + 3 = 8')
+local receipt = CP.Put(E.CharacterKey(), 197, 3001, 9)
+assert(receipt.ok, receipt.said)
+assert(S.Active().items[1].want == 8 and #S.Active().items == 1, 'a recipe plan never changes the manual list')
+T.SetMode('shop')
+local shop = T.panel.shop
+assert(S.source == 'manual' and shop.sourceButton.text == 'Source: manual list', tostring(shop.sourceButton.text))
+assert(shop.rows[1].want.text == '8', 'the manual list shows its own count')
+click(shop.sourceButton)
+assert(S.source == 'plan' and shop.sourceButton.text == 'Source: recipe plans', shop.sourceButton.text)
+assert(not shop.itemBox.shown and not shop.addButton.shown and not shop.newButton.shown and shop.needButton.shown,
+  'plan rows are edited from the profession window, not the manual boxes')
+assert(shop.listName.text:find('Alpha', 1, true) and shop.listName.text:find('this character', 1, true), shop.listName.text)
+assert(shop.head.want.text == 'Need' and shop.head.max.text == 'Without bags' and shop.head.decision.text == 'In bags')
+local r = shop.rows[1]
+assert(r.shown and r.name.text == 'Linen Cloth' and r.want.text == '18' and r.max.text == '18' and r.decision.text == '0',
+  'the plan needs 18 cloth, never 26 or 10: ' .. tostring(r.want.text))
+assert(not r.remove.shown, 'plan rows have no remove button')
+assert(shop.help.text:find('Bags counted now', 1, true) and shop.help.text:find('bank, mail and other characters', 1, true),
+  shop.help.text)
+-- A route priced by another addon says so, with its unknown age and market; a new choice is not served from the cache.
+TSM_API = { IsCustomPriceValid = function() return true end,
+  ToItemString = function(item) return 'i:' .. item:match('%d+') end, GetCustomPriceValue = function() return nil end }
+E.CraftingSources.SetChoice('tsm', false)
+T.Refresh()
+assert(shop.help.text:find("Route prices: TSM AHDBMedianBuyout, age and market unknown; the Market column is Everloot's price file.",
+  1, true), shop.help.text)
+TSM_API = nil
+E.CraftingSources.SetChoice('tsm', true)
+T.Refresh()
+assert(shop.help.text:find('Route prices: TSM unavailable (not loaded), else Everloot', 1, true), shop.help.text)
+E.CraftingSources.SetChoice('everloot')
+T.Refresh()
+assert(not shop.help.text:find('Route prices', 1, true), shop.help.text)
+-- Fresh bags refresh the shortfall; the saved plan keeps its full requirement.
+setBags({ [2589] = 10 })
+T.Refresh()
+assert(r.want.text == '8' and r.max.text == '18' and r.decision.text == '10', 'bags reduce the need: ' .. r.want.text)
+setBags({ [2589] = 18 })
+T.Refresh()
+assert(r.want.text == '0', 'covered by bags')
+assert(EverlootDB.craftingPlans[E.CharacterKey()].recipes[3001].crafts == 9, 'the plan keeps its count')
+assert(EverlootDB.inventory == nil, 'no bag counts saved without consent')
+setBags({ [2589] = 4 })
+T.Refresh()
+assert(r.want.text == '14', r.want.text)
+-- Missing bag APIs: full needs, with the reason.
+local container = C_Container
+C_Container = nil
+T.Refresh()
+assert(r.want.text == '18' and shop.help.text:find('Bags could not be read (no bag API)', 1, true), shop.help.text)
+C_Container = container
+-- The route is saved with this character's plans and changes the plan's revision, so queued searches start over.
+local revision = CP.revision
+assert(shop.routeButton.text == 'Route: buy all')
+click(shop.routeButton)
+assert(EverlootDB.craftingPlans[E.CharacterKey()].strategy == 'cheapest' and shop.routeButton.text == 'Route: cheapest'
+  and CP.revision == revision + 1, shop.routeButton.text)
+-- Back to the manual list: its count is unchanged.
+click(shop.sourceButton)
+assert(S.source == 'manual' and shop.rows[1].want.text == '8' and shop.itemBox.shown)
+""")
+
+# Search needed: one item per press through the existing search, with its throttle and exclusions; a late reply after
+# a plan edit, a source change or a closed house never fills the new context.
+lua = plan_world()
+lua.execute("""
+local E, S, CP, T = Everloot, Everloot.Shopping, Everloot.CraftingPlan, Everloot.AuctionTab
+learnBolt()
+local A = E.CharacterKey()
+assert(CP.Put(A, 197, 3001, 5).ok and CP.Put(A, 197, 3002, 2).ok)
+setBags({ [2589] = 4, [765] = 2 })
+T.SetMode('shop')
+local shop = T.panel.shop
+click(shop.sourceButton)
+touched = {}
+-- Throttle and a running scan send nothing.
+ready = false
+click(shop.needButton)
+assert(#queries == 0 and S.message:find('still answering an earlier search', 1, true), S.message)
+ready = true
+local scanning = Everloot.Scanning
+Everloot.Scanning = function() return true end
+click(shop.needButton)
+assert(#queries == 0 and S.message:find('price scan is running', 1, true), S.message)
+Everloot.Scanning = scanning
+-- First press: the first item still needed (Silverleaf is covered by the bags).
+click(shop.needButton)
+assert(#queries == 1 and queries[1].searchString == 'Linen Cloth', 'searches the needed item: ' .. tostring(queries[1] and queries[1].searchString))
+browse = { { itemKey = { itemID = 2589, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 190, totalQuantity = 40 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+local linen
+for _, row in ipairs(shop.rows) do if row.shown and row.name.text == 'Linen Cloth' then linen = row end end
+assert(S.Found(2589).min == 190 and linen.found.text == S.Money(190) .. ' ×40', 'the reply lands in its row')
+assert(shop.rows[1].name.text == 'Silverleaf' and shop.rows[1].want.text == '0', 'bags cover the Silverleaf')
+-- Second press: the next needed item; Silverleaf (covered) is skipped.
+click(shop.needButton)
+assert(#queries == 2 and queries[2].searchString == 'Copper Ore', tostring(queries[2] and queries[2].searchString))
+-- The plan changes before the reply: the reply is ignored and the outstanding query still blocks a new one.
+assert(CP.Put(A, 197, 3001, 6).ok)
+click(shop.needButton)
+assert(#queries == 2 and S.message == 'Still waiting for the last search.', 'a stale query is not released: ' .. S.message)
+browse = { { itemKey = { itemID = 2770, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 25, totalQuantity = 5 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+assert(S.Found(2770) == nil and S.message:find('Ignored a late reply for Copper Ore', 1, true), S.message)
+-- The changed plan starts its sequence over: Linen Cloth again, then Copper Ore again, the same item the stale query
+-- was for; only the new reply fills it.
+click(shop.needButton)
+assert(#queries == 3 and queries[3].searchString == 'Linen Cloth', tostring(queries[3] and queries[3].searchString))
+browse = { { itemKey = { itemID = 2589, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 190, totalQuantity = 40 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+click(shop.needButton)
+assert(#queries == 4 and queries[4].searchString == 'Copper Ore')
+browse = { { itemKey = { itemID = 2770, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 30, totalQuantity = 7 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+assert(S.Found(2770).min == 30, 'the current reply fills the row')
+click(shop.needButton)
+assert(#queries == 4 and S.message:find('Every needed item has been searched', 1, true), S.message)
+-- Changing the source while a query waits: the late reply is ignored.
+click(shop.needButton)
+assert(#queries == 5)
+click(shop.sourceButton)
+browse = { { itemKey = { itemID = 2589, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 1, totalQuantity = 1 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+assert(S.Found(2589).min == 190, 'a reply for another source never overwrites a result')
+click(shop.sourceButton)
+-- A closed house: the outstanding query stays unreleased until the house is shown again.
+click(shop.needButton)
+assert(#queries == 6)
+fire('AUCTION_HOUSE_CLOSED'); shopEvent('AUCTION_HOUSE_CLOSED')
+assert(not S.Pending(), 'nothing is shown as searching once the house closes')
+browse = { { itemKey = { itemID = 2589, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 2, totalQuantity = 1 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+assert(S.Found(2589).min == 190, 'a reply after the house closed is ignored')
+touchedOnly(ALLOWED)
+""")
+
+# Another character's plan: the full requirement with its owner's recipes, this character's bags ignored, no search.
+lua = plan_world()
+lua.execute("""
+local E, S, CP = Everloot, Everloot.Shopping, Everloot.CraftingPlan
+learnBolt()
+assert(CP.Put(E.CharacterKey(), 197, 3001, 2).ok)
+S.SetSource('plan')
+S.PlanView()
+local preview, calls = CP.Preview, 0
+CP.Preview = function(...) calls = calls + 1; return preview(...) end
+local token = S.Token()
+shopEvent('TRADE_SKILL_CLOSE')
+S.PlanView()
+assert(calls == 1 and S.Token() ~= token, 'closing the profession invalidates cached route and search context')
+shopEvent('NEW_RECIPE_LEARNED', 3001)
+S.PlanView()
+assert(calls == 2, 'learning a recipe invalidates the route immediately')
+""")
+
+lua = plan_world()
+lua.execute("""
+local E, S, CP, T = Everloot, Everloot.Shopping, Everloot.CraftingPlan, Everloot.AuctionTab
+learnBolt()
+local A = E.CharacterKey()
+assert(CP.Put(A, 197, 3001, 9).ok)
+guid = 'Player-1-0000000B'
+setBags({ [2589] = 18 })
+T.SetMode('shop')
+local shop = T.panel.shop
+click(shop.sourceButton)
+assert(shop.listName.text:find('Bravo', 1, true) or shop.listName.text:find('this character', 1, true), shop.listName.text)
+assert(shop.empty.shown and shop.empty.text:find('Add materials', 1, true), 'this character has no plan yet')
+click(shop.nextOwner)
+assert(shop.listName.text:find('Alpha', 1, true) and shop.listName.text:find('view only', 1, true), shop.listName.text)
+local r = shop.rows[1]
+assert(r.shown and r.want.text == '18' and r.max.text == '18', 'Alpha\\'s full need; Bravo\\'s bags never count: ' .. r.want.text)
+assert(not r.search.shown, 'no search on another character\\'s plan')
+assert(shop.help.text:find('Another character', 1, true), shop.help.text)
+click(shop.needButton)
+assert(#queries == 0 and S.message:find('another character', 1, true), S.message)
+""")
+
+# On Forever, Search needed opens Blizzard's exact Buy search for the next needed item, with the plan's need beside it;
+# a plan change clears that context.
+lua = plan_world()
+lua.execute("""
+local E, S, CP, T, house = Everloot, Everloot.Shopping, Everloot.CraftingPlan, Everloot.AuctionTab, AuctionHouseFrame
+local buy = {}
+AuctionHouseFrameDisplayMode = { Buy = buy }
+Enum.AuctionHouseFilter = { ExactMatch = 5 }
+function house:GetCategoriesList() return { SetSelectedCategory = function() end } end
+function house:SetDisplayMode(mode) self.displayMode = mode end
+function house:SetSearchText(name) self.searchText = name; return true end
+function house:SendBrowseQuery(name, minLevel, maxLevel, filters) queries[#queries + 1] = { searchString = name, filters = filters } end
+learnBolt()
+assert(CP.Put(E.CharacterKey(), 197, 3001, 9).ok)
+setBags({ [2589] = 10 })
+T.SetMode('shop')
+local shop = T.panel.shop
+click(shop.sourceButton)
+click(shop.needButton)
+assert(#queries == 1 and queries[1].searchString == 'Linen Cloth' and queries[1].filters[1] == 5)
+assert(T.buyContext.shown and T.buyContext.text:find('Need 8', 1, true) and T.buyContext.text:find('recipe plan', 1, true),
+  tostring(T.buyContext.text))
+assert(CP.Put(E.CharacterKey(), 197, 3001, 3).ok)
+assert(not T.buyContext.shown, 'a plan change clears the plan search context')
+""")
+
+# Partial plans stay visible: item 51 and unknown reagents are named; a partial plan is never shown as complete.
+lua = plan_world()
+lua.execute("""
+local E, S, CP, T = Everloot, Everloot.Shopping, Everloot.CraftingPlan, Everloot.AuctionTab
+local many = { recipeId = 3010, learned = true, itemId = 4010, minimum = 1, maximum = 1, reagents = {} }
+for id = 5001, 5051 do many.reagents[#many.reagents + 1] = { itemId = id, count = 1 } end
+assert(CP.ReplaceKnown(E.CharacterKey(), 197, { many, { recipeId = 3011, learned = true, itemId = 4011, minimum = 1, maximum = 1 } }, false))
+assert(CP.Put(E.CharacterKey(), 197, 3010, 1).ok)
+local partial = CP.Put(E.CharacterKey(), 197, 3011, 1, { unresolved = { { item = 'Slot accepts multiple reagents', count = 1 } } })
+assert(partial.ok and partial.partial)
+T.SetMode('shop')
+local shop = T.panel.shop
+click(shop.sourceButton)
+assert(shop.help.text:find('Partial', 1, true) and shop.help.text:find('over the 50-item limit', 1, true)
+  and shop.help.text:find('reagents not all known', 1, true), shop.help.text)
+for i = 1, 5 do click(shop.down) end
+local last
+for _, row in ipairs(shop.rows) do if row.shown then last = row end end
+assert(last.name.text == 'Item 5051' and last.decision.text == 'not listed' and not last.search.shown, tostring(last.name.text))
 """)
 
 print("Lua 5.1 shopping lists: create, rename, choose, two-press delete; caps of 10 lists, 50 items and 24-character "

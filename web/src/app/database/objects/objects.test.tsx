@@ -215,11 +215,12 @@ test("a herb links its profession page, and agreed loot says how many items a lo
   ]));
   const page = await html(ObjectPage(props("1617")));
   expect(fact(page, "Profession")).toContain('href="/tools/professions/herbalism"');
-  // 7 items over 3 loot windows.
-  expect(fact(page, "Items per loot window")).toBe("2.3");
+  // 7 items over 3 loot windows: stacks counted, so it is not the 2 items seen over 3 windows, and the label says so.
+  expect(fact(page, "Items per loot window, stacks counted")).toBe("2.3");
+  expect(page).not.toContain(">Items per loot window</dt>");
   // Short of 3 installs, no average.
   store.loadCorpus.mockResolvedValue(corpus([window("install-a", [{ itemId: 2447, count: 2 }]), window("install-b", [{ itemId: 2447, count: 3 }])]));
-  expect(await html(ObjectPage(props("1617")))).not.toContain(">Items per loot window<");
+  expect(await html(ObjectPage(props("1617")))).not.toContain(">Items per loot window");
 });
 
 test("a chest has no profession row", async () => {

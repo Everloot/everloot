@@ -25,6 +25,7 @@ import {
 } from "./browse";
 import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, ScansPaused, Sparkline, count } from "./parts";
 import { RealmHousePicker } from "./RealmHousePicker";
+import { realmDisplayName } from "./RealmName";
 import TimeAgo from "./TimeAgo";
 import Icon from "@/components/ui/Icon";
 
@@ -132,7 +133,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
   // page also when the file was rebuilt, which is not a new scan.
   const newest = newestScanDay(rows);
   const rebuilt = market.dataAsOf ? Date.parse(market.dataAsOf) : null;
-  const title = realmName ?? (rulesetName ? `${rulesetName} Auction House` : "Auction House");
+  // Sentences, captions and the trail name a realm as its heading shows it ("US1 · Realm 4 PvP"), not by its recorded code.
+  const realmLabel = realmName ? realmDisplayName(realmName) : null;
+  const title = realmLabel ?? (rulesetName ? `${rulesetName} Auction House` : "Auction House");
   const trail: Crumb[] = [...trailFor(AH_PATH)!, ...(slug ? [{ name: title, path }] : [])];
   const showRealm = !slug;
 
@@ -248,13 +251,13 @@ export async function browseView({ slug, search }: { slug: string | null; search
     body = (
       <Card>
         <p className="text-fg-2" role="status">
-          {realmName} is not in {REGION_LABEL[otherRegion]}, so this region filter hides its prices.{" "}
+          {realmLabel} is not in {REGION_LABEL[otherRegion]}, so this region filter hides its prices.{" "}
           <Link href={here({ region: undefined })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Show its prices</Link>
         </p>
       </Card>
     );
   } else if (rows.length === 0) {
-    const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
+    const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmLabel ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
     body = slug
       ? <EmptyState count={stored.agreement(slug, q.house)} message={`No public prices in ${where} yet: a price shows once 3 players scan the same item there.`} />
       : <EmptyState message={q.house
@@ -310,6 +313,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <a href="/blizzard-auctions" className="btn">Browse current Blizzard prices</a>
             <Link href="/tools/auctions/report" className="btn">Community market report</Link>
             <a href="#market-deals" className="btn">AH Ledger deals</a>
+            <a href="/tools/auctions/activity" className="btn">Auction House activity</a>
           </nav>
         )}
         <ScansPaused state={state} now={now} className="mb-3" />

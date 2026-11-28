@@ -5,7 +5,8 @@
 --     character in the roster (roster.lua) with its professions and ranks.
 --   Ranks and trainers: per profession, the recipes a trainer teaches at or above the current rank, lowest first,
 --     with the rank, the cost and where: the trainer's name and zone (trainer_seen rows; name and map from the
---     matching npc_sighting row).
+--     matching npc_sighting row). A row's hover estimates its profit and training payback (U.TrainerLines) when the
+--     row has the recipe's spell ID and the client can read that recipe's schematic.
 --   Crafting costs: each recorded recipe of the character's professions with its reagents' cost, its product's
 --     market value and an estimated profit per craft, and what to buy for a chosen recipe and count, which a button
 --     adds to the active shopping list (modules/shopping.lua, saved in this install's file).
@@ -56,7 +57,9 @@ local NO_RECIPES = "No recipes with reagents recorded for your professions yet. 
 local NONE_PROFITABLE = "No recipe shows an estimated profit at these prices."
 local PER_ITEM = "Select a recipe for the cost and profit breakdown."
 local HELP_PROFIT = "Profit is the estimated sale value of a craft's average output, minus the auction house cut and "
-  .. "materials. If the output is unknown, the estimate assumes one. Unsold auction deposits are excluded."
+  .. "materials. If the output is unknown, the estimate assumes one. Unsold auction deposits are excluded. "
+  .. "Sell: vendor values the output at the game's vendor sell price instead, with no cut; an item without one has "
+  .. "no vendor profit."
 local HELP_COLOUR = "Green profit is a gain, red is a loss. Est. profitable only keeps the green ones."
 local HELP_SCANS = "Your scans: how the lowest buyout of what the recipe makes moved between your last two scans of this "
   .. "auction house, with bars for up to three scans. These are listings, not sales; hover a recipe for the numbers."
@@ -66,6 +69,7 @@ local FAILED = "The price file failed its checksum and is not used. Vendor price
 local NO_REALM = "The price file has no market values for this realm yet. Vendor prices you saw still count."
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 local ADD_TO_LIST = "Add reagents to shopping list"
+local ROUTE_BUY, ROUTE_CHEAPEST = "Route: buy all", "Route: cheapest"
 
 local refresh, buildCrafting
 
@@ -122,23 +126,34 @@ end
 
 -- The recipes a trainer teaches for one profession at or above the character's rank, lowest rank first. A recipe
 -- listed by two trainers at the same rank is one row, from the first trainer read.
+-- A row with the recipe's spell ID is that recipe: two recipes with one name stay two rows. A row read before the
+-- trainer's identity was readable is left out when a row with a spell ID has its name and rank; it never lends or
+-- borrows an ID.
+local function spellOf(r) return type(r.spellId) == "number" and r.spellId or nil end
 local function trainerRows(name, rank, names)
-  local rows, seen = {}, {}
+  local rows, seen, identified, listed = {}, {}, {}, {}
   for _, r in ipairs(E:Rows("trainer_seen")) do
     if type(r) == "table" and r.profession == name and type(r.requiredRank) == "number" and r.requiredRank >= rank
       and type(r.recipe) == "string" then
-      local key = r.recipe .. "|" .. r.requiredRank
-      if not seen[key] then
-        seen[key] = true
-        local who = names[r.trainerNpcId]
-        rows[#rows + 1] = { rank = r.requiredRank, recipe = r.recipe, cost = r.costCopper,
-          trainer = who and who.name, mapId = who and who.mapId }
-      end
+      listed[#listed + 1] = r
+      if spellOf(r) then identified[r.recipe .. "|" .. r.requiredRank] = true end
+    end
+  end
+  for _, r in ipairs(listed) do
+    local byName = r.recipe .. "|" .. r.requiredRank
+    local key = spellOf(r) and ("spell:" .. spellOf(r) .. "|" .. r.requiredRank) or byName
+    if not seen[key] and (spellOf(r) or not identified[byName]) then
+      seen[key] = true
+      local who = names[r.trainerNpcId]
+      rows[#rows + 1] = { rank = r.requiredRank, recipe = r.recipe, cost = r.costCopper,
+        trainer = who and who.name, mapId = who and who.mapId, spellId = spellOf(r),
+        itemId = type(r.productItemId) == "number" and r.productItemId or nil }
     end
   end
   table.sort(rows, function(a, b)
     if a.rank ~= b.rank then return a.rank < b.rank end
-    return a.recipe < b.recipe
+    if a.recipe ~= b.recipe then return a.recipe < b.recipe end
+    return (a.spellId or math.huge) < (b.spellId or math.huge)
   end)
   return rows
 end
@@ -209,6 +224,7 @@ local function drawSection(s, prof, limit, names)
   local last
   for i, line in ipairs(s.rows) do
     local r = i <= limit and rows[i]
+    line.service = r or nil
     if r then
       line.rank:SetText(tostring(r.rank))
       line.rank:SetTextColor(unpack(r.rank <= prof.rank and COLORS.text or COLORS.muted))
@@ -235,6 +251,28 @@ local function drawSection(s, prof, limit, names)
   s:SetSize(W, height)
   return height
 end
+
+-- A trainer row's hover: its profit and payback from its own recorded spell ID, never another row's.
+local function showService(line)
+  local r = line.service
+  if not (r and GameTooltip) then return end
+  GameTooltip:SetOwner(line, "ANCHOR_RIGHT")
+  GameTooltip:AddLine((r.recipe:gsub("|", "||")))
+  local te, why, checking
+  if r.spellId and E.Crafting and E.Crafting.TrainerEstimate then
+    local context, _
+    context, _, checking = U.CraftContext(E.CurrentRealm(), E:MarketHouse())
+    te, why = E.Crafting.TrainerEstimate({ spellId = r.spellId, trainingCostCopper = r.cost, name = r.recipe }, context)
+  else
+    why = r.itemId and "item" or "no spell ID"
+  end
+  for _, said in ipairs(U.TrainerLines(te, why, checking)) do
+    GameTooltip:AddLine(said, COLORS.text[1], COLORS.text[2], COLORS.text[3], true)
+  end
+  GameTooltip:Show()
+end
+
+local function hideService(line) if GameTooltip and GameTooltip:IsOwned(line) then GameTooltip:Hide() end end
 
 local function refreshTrainers(t, list)
   for _, cell in pairs(t.head) do if #list > 0 then cell:Show() else cell:Hide() end end
@@ -295,61 +333,6 @@ local function drawOthers(p, y)
 end
 
 -- Crafting costs ----------------------------------------------------------------------------------------------
-
--- What the crafting page reads, indexed once and then only for the rows stored since, as prices.lua indexes its own
--- rows: the newest reagent list of each known recipe, every item id this install saw for each item name (recipes name
--- their reagents, prices are by item id; a name seen with two ids is ambiguous and gets no price) and the lowest price
--- a vendor this install visited asked for each item. A kind with fewer rows than were read was cleared, and everything
--- is read again.
-local index
-local function resetIndex() index = { recipes = {}, ids = {}, vendor = {}, read = {} } end
-resetIndex()
-
-local INDEX_ROWS = {
-  recipe_observed = function(r)
-    if r.learned == false or type(r.profession) ~= "string" or type(r.recipe) ~= "string" or type(r.reagents) ~= "table" then return end
-    local reagents = {}
-    for _, g in ipairs(r.reagents) do
-      if type(g) == "table" and type(g.item) == "string" and type(g.count) == "number" and g.count >= 1 then
-        reagents[#reagents + 1] = { item = g.item, count = g.count }
-      end
-    end
-    -- A recipe whose slot takes several items is stored without reagents (professions.lua): it has no cost here.
-    if #reagents == 0 then return end
-    local key = r.profession .. "|" .. tostring(r.recipeId ~= nil and r.recipeId or r.recipe)
-    index.recipes[key] = { key = key, profession = r.profession, name = r.recipe, reagents = reagents, id = r.recipeId,
-      product = type(r.productItemId) == "number" and r.productItemId or nil }
-  end,
-  item_seen = function(r)
-    if type(r.itemId) ~= "number" or type(r.name) ~= "string" or r.name == "" then return end
-    local ids = index.ids[r.name] or { n = 0 }
-    if not ids[r.itemId] then ids[r.itemId] = true; ids.n = ids.n + 1; ids.id = r.itemId end
-    index.ids[r.name] = ids
-  end,
-  vendor = function(r)
-    if type(r.items) ~= "table" then return end
-    for _, o in ipairs(r.items) do
-      -- A price of 0 is an item bought with something other than money; it is not a gold cost.
-      if type(o) == "table" and type(o.itemId) == "number" and type(o.priceCopper) == "number" and o.priceCopper > 0 then
-        local low = index.vendor[o.itemId]
-        if not low or o.priceCopper < low then index.vendor[o.itemId] = o.priceCopper end
-      end
-    end
-  end,
-}
-
-local function indexRows()
-  for kind in pairs(INDEX_ROWS) do
-    if #E:Rows(kind) < (index.read[kind] or 0) then resetIndex(); break end
-  end
-  for kind, each in pairs(INDEX_ROWS) do
-    local rows = E:Rows(kind)
-    for i = (index.read[kind] or 0) + 1, #rows do
-      if type(rows[i]) == "table" then each(rows[i]) end
-    end
-    index.read[kind] = #rows
-  end
-end
 
 -- Snapshot parts carry UTC text; OwnScan's time is seconds since the epoch.
 local function scanTime(at)
@@ -435,115 +418,12 @@ local function marketChange(itemId, scans, public)
   return out
 end
 
--- One redraw's prices, each item looked up once: the price file's market value, or the lowest vendor price this
--- install saw when that is lower or the only one. A reagent named by a recipe gets its id from this install's item
--- rows, else from the client when it has the item loaded. A name this install saw with two ids stays ambiguous: the
--- client's lookup by name would only pick one of them.
-local AMBIGUOUS = "ambiguous"
-local function pricer(realm, own)
-  local ids, units, markets = {}, {}, {}
-  local scans
-  local P = {}
-  P.cut = E.SellCheck and math.floor(E.SellCheck.Cut(E:MarketHouse()) * 100 + 0.5) or 5
-  -- The item id for a reagent name, or nil and true when the name is ambiguous.
-  function P.id(name)
-    if ids[name] == nil then
-      local seen = index.ids[name]
-      if seen and seen.n > 1 then ids[name] = AMBIGUOUS
-      else ids[name] = seen and seen.id or (E.ItemIdFrom and E.ItemIdFrom(name)) or false end
-    end
-    if ids[name] == AMBIGUOUS then return nil, true end
-    return ids[name] or nil
-  end
-  function P.market(itemId)
-    if markets[itemId] == nil then
-      local row = realm and E.CommunityPrice and E:CommunityPrice(realm, itemId)
-      markets[itemId] = row or false
-    end
-    local row = markets[itemId]
-    local listing = own and own.items[itemId]
-    local observed = listing and row and E.DayNumber(row.day)
-    -- Community observations are dated to the day. Prefer a recent own scan on that day or later.
-    if listing and type(listing[5]) == "number" and listing[5] > 0
-      and (not observed or math.floor(own.at / 86400) >= observed) then
-      return listing[5], "scan"
-    end
-    if row and row.market then return row.market, "community", row.day end
-  end
-  function P.change(itemId)
-    scans = scans or keptScans(realm)
-    if itemId then P.market(itemId) end
-    return marketChange(itemId, scans, itemId and markets[itemId])
-  end
-  -- The price of one unit and whether it is a vendor's, or nil.
-  function P.unit(itemId)
-    if units[itemId] == nil then
-      local market, source, observed = P.market(itemId)
-      local vendor = index.vendor[itemId]
-      if vendor and (not market or vendor < market) then units[itemId] = { vendor, true }
-      elseif market then units[itemId] = { market, false, source, observed }
-      else units[itemId] = false end
-    end
-    local u = units[itemId]
-    if u then return u[1], u[2], u[3], u[4] end
-  end
-  return P
-end
-
-local function saleEstimate(row, count)
-  local sale = math.floor(row.value * row.yield * count)
-  local net = math.floor(sale * (100 - row.cut) / 100)
-  return sale, sale - net, net - row.cost * count
-end
-
--- A recipe's material cost, item price and estimated profit after the auction house cut.
-local function evaluate(recipe, P)
-  local out = { key = recipe.key, name = recipe.name, parts = {}, unpriced = 0, cut = P.cut, yield = 1 }
-  local output = recipe.output
-  if not recipe.live then output = recipe.id and EverlootDB.recipeOutput and EverlootDB.recipeOutput[recipe.id] end
-  if output and output.itemId == recipe.product then
-    out.output = output
-    out.yield = (output.minimum + output.maximum) / 2
-  end
-  local cost = 0
-  for _, g in ipairs(recipe.reagents) do
-    local id, ambiguous = g.id, g.ambiguous
-    if not id and not ambiguous then id, ambiguous = P.id(g.item) end
-    local unit, vendor, source, observed
-    if id then unit, vendor, source, observed = P.unit(id) end
-    out.parts[#out.parts + 1] = { item = g.item, id = id, count = g.count, unit = unit, vendor = vendor,
-      ambiguous = ambiguous, source = source, observed = observed }
-    if unit then cost = cost + unit * g.count else out.unpriced = out.unpriced + 1 end
-  end
-  if out.unpriced == 0 then out.cost = cost end
-  if recipe.product then out.value, out.source, out.observed = P.market(recipe.product) end
-  if not recipe.live then out.marketChange = P.change(recipe.product) end
-  if out.cost and out.value and (not recipe.live or out.output) then
-    local _, _, profit = saleEstimate(out, 1)
-    out.profit = profit
-  end
-  return out
-end
-
--- Profit first, highest first; then the recipes whose product has no price, then those whose cost is unknown.
-local function rankOf(r) return r.profit and 1 or (r.cost and 2 or 3) end
-local function byProfit(a, b)
-  local ra, rb = rankOf(a), rankOf(b)
-  if ra ~= rb then return ra < rb end
-  if a.profit and a.profit ~= b.profit then return a.profit > b.profit end
-  if a.name ~= b.name then return a.name < b.name end
-  return a.key < b.key
-end
-local function byName(a, b)
-  if a.name ~= b.name then return a.name < b.name end
-  return a.key < b.key
-end
-
 -- The recorded recipes of the character's professions (every profession when the client has no profession book).
 -- Recipe rows carry no character, so these are every recipe this install recorded under those profession names, by
 -- any of its characters.
-local function craftRows(P)
-  indexRows()
+local function craftRows(realm)
+  local context = U.CraftContext(realm, E:MarketHouse())
+  local scans
   local book = U.Professions()
   local mine
   if book then
@@ -551,10 +431,18 @@ local function craftRows(P)
     for _, prof in ipairs(book) do mine[prof.name] = true end
   end
   local rows = {}
-  for _, recipe in pairs(index.recipes) do
-    if not mine or mine[recipe.profession] then rows[#rows + 1] = evaluate(recipe, P) end
+  for _, recipe in pairs(E.Crafting.Recipes()) do
+    if not mine or mine[recipe.profession] then
+      local row = E.Crafting.Evaluate(recipe, context, 1)
+      row.recipe = recipe
+      -- Your scans: listing history beside the estimate, never an input to it.
+      scans = scans or keptScans(realm)
+      row.marketChange = marketChange(recipe.product, scans, recipe.product and context:Community(recipe.product))
+      row.valueLine = U.CraftValueLine(row, context)
+      rows[#rows + 1] = row
+    end
   end
-  return rows
+  return rows, context
 end
 
 local function plural(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
@@ -586,28 +474,189 @@ local function ageLine(realm)
     .. day .. " (" .. age .. "), " .. file.house .. " auction house; a vendor price when it is lower."
 end
 
+-- One quote policy for the native window and the Crafting costs page: a scan of this house under a day old (and not
+-- older than the community day) first, then the community price file, and a vendor price when it is lower. Returns
+-- the context, the price file's sentence for a hover and whether the file is still being checked.
+function U.CraftContext(realm, house)
+  local status, _, detail = ageLine(realm)
+  local context = E.Crafting.Context(realm, house, { scan = true, oldFile = status:find("^Old price file") ~= nil,
+    destination = E.Options and E.Options.CraftDestination and E.Options.CraftDestination() or "ah" })
+  local describe = U.CraftSourceLine(context)
+  if describe then detail = describe .. (context.priceSource.fallback and (" Fallback prices: " .. detail) or "")
+  elseif context.own then detail = "Community fallback: " .. detail end
+  return context, detail, status == CHECKING
+end
+
+--- The selected price source in a sentence (CraftingSources.Describe), or nil while it is Everloot's own.
+function U.CraftSourceLine(context)
+  local CS = E.CraftingSources
+  return CS and context and CS.Describe(context.priceSource) or nil
+end
+
+--- An external quote's label ("TSM AHDBMedianBuyout, age and market unknown"), or nil for Everloot's own sources.
+function U.CraftExternalLabel(source)
+  local CS = E.CraftingSources
+  return CS and CS.External(source) and CS.QuoteLabel(source) or nil
+end
+
+--- Why an Everloot price stands in, before its own source: "Everloot fallback, TSM not loaded".
+function U.CraftFallbackNote(priceSource, why)
+  local label = priceSource and priceSource.label or "the selected source"
+  if why == "no price" then return "Everloot fallback, no " .. label .. " price" end
+  return "Everloot fallback, " .. label .. " " .. tostring(why)
+end
+
+--- Why the selected source gave no price: "(TSM: not loaded)", or "".
+function U.CraftMissingNote(priceSource, why)
+  if not (priceSource and why) then return "" end
+  return " (" .. tostring(priceSource.label) .. ": " .. tostring(why) .. ")"
+end
+
+-- The prices behind a profit, in words: "community prices", "TSM AHDBMedianBuyout, age and market unknown".
+local function priceBasis(row)
+  local ps, CS = row.priceSource, E.CraftingSources
+  local base = row.external and CS and CS.QuoteLabel(ps.name)
+    or ((row.source == "scan" and "your scan" or "community") .. " prices")
+  if row.usedFallback then
+    base = base .. (row.external and ", some Everloot fallback" or (", Everloot fallback for " .. tostring(ps and ps.label)))
+  end
+  return base
+end
+
+--- "Your Alliance scan: 5 min ago" when the context prices from a fresh scan, else nil.
+function U.CraftScanInfo(context)
+  local own = context.own
+  if not own then return nil end
+  local age = time() - own.at
+  return "Your " .. tostring(context.house) .. " scan: " .. (age < 60 and "just now"
+    or (age < 3600 and (math.floor(age / 60) .. " min ago") or (math.floor(age / 3600) .. " h ago")))
+end
+
+--- Where a recipe's item value comes from, said with its scope and date: "Item value: 4s each (your Alliance scan)".
+function U.CraftValueLine(row, context)
+  if not row.value then return "Item value: no price" .. U.CraftMissingNote(row.priceSource, row.missing) end
+  local source = U.CraftExternalLabel(row.source) or (row.source == "scan" and ("your " .. tostring(context.house) .. " scan"))
+    or ((row.observed and E.ShortDay(row.observed)) and ("community " .. E.ShortDay(row.observed)) or "community")
+  if row.fallback then source = U.CraftFallbackNote(row.priceSource, row.fallback) .. ": " .. source end
+  return "Item value: " .. U.Money(row.value) .. " each (" .. source .. ")" .. (row.oldQuote and ", old prices" or "")
+end
+
+--- One destination's result for `count` crafts, in words: "At the AH: 18s - 5% cut: 90c - materials: 2s = 15s 10c
+--- profit" or "To a vendor: ...". A missing figure is said, never a zero.
+function U.CraftComparison(row, destination, count)
+  count = count or 1
+  local vendor = destination == "vendor"
+  local label = vendor and "To a vendor: " or "At the AH: "
+  if vendor and not row.vendorValue then
+    return label .. (row.vendorPending and "the game is still loading the item's sell price."
+      or "no verified sell price for the finished item.")
+  end
+  if not vendor and not row.value then return label .. "no auction price for the finished item." end
+  if not row.cost then return label .. "materials unpriced." end
+  if not (vendor and row.vendorProfit or (not vendor and row.ahProfit)) then return label .. "recipe yield unavailable." end
+  local sale, cut, profit = E.Crafting.Sale(row, count, destination)
+  return label .. U.Money(sale) .. (vendor and "" or (" - " .. row.cut .. "% cut: " .. U.Money(cut)))
+    .. " - materials: " .. U.Money(row.cost * count) .. " = " .. U.Money(profit) .. " profit for "
+    .. count .. (count == 1 and " craft" or " crafts")
+end
+
 -- The native window prices the current schematic directly. It does not depend on a saved recipe observation.
 function U.NativeCraftEstimate(recipe)
-  indexRows()
-  local realm = E.CurrentRealm()
-  local house = E:MarketHouse()
-  local own = house and E.OwnScan and E:OwnScan(realm, house)
-  local age = own and type(own.at) == "number" and time() - own.at
-  if not age or age < 0 or age > 86400 or own.house ~= house or not own.items then own = nil end
-  local row = evaluate(recipe, pricer(realm, own))
-  local status, _, detail = ageLine(realm)
-  local oldFile = status:find("^Old price file")
-  row.oldQuote = E.StaleDay(row.observed) or (oldFile and row.source == "community")
-  for _, part in ipairs(row.parts) do
-    row.oldQuote = row.oldQuote or E.StaleDay(part.observed) or (oldFile and part.source == "community")
+  local context, detail, checking = U.CraftContext(E.CurrentRealm(), E:MarketHouse())
+  local row = E.Crafting.Evaluate(recipe, context, 1)
+  if context.own then
+    row.listing = context.own.items[recipe.product]
+    row.scanInfo = U.CraftScanInfo(context)
   end
-  if own then
-    row.listing = own.items[recipe.product]
-    row.scanInfo = "Your " .. house .. " scan: " .. (age < 60 and "just now"
-      or (age < 3600 and (math.floor(age / 60) .. " min ago") or (math.floor(age / 3600) .. " h ago")))
-    detail = "Community fallback: " .. detail
+  -- Tags, sorting and the summary stay on buying every reagent for one craft; the cheapest route is a comparison.
+  row.plan = E.Crafting.Plan(recipe, context, 1, { strategy = "cheapest" })
+  return row, detail, checking
+end
+
+-- Why there is no training payback estimate, after "No payback estimate: ".
+local NO_ESTIMATE = {
+  ["no spell ID"] = "the trainer gave no recipe spell ID for it",
+  ["no identity"] = "the trainer gave no recipe spell ID for it",
+  item = "the trainer named an item, not the recipe's spell",
+  conflict = "the trainer's recipe IDs disagree",
+  ["no schematic"] = "the game shows its materials only with your profession window open: open it too",
+  ["other recipe"] = "the game answered with another recipe's materials",
+  ["no materials"] = "the game has not provided the recipe's material costs",
+}
+
+--- A trainer recipe's profit and training payback in lines, for the trainer window's hover and the Ranks and trainers
+--- page: TrainerEstimate's result (te, why), or nil and why. The profit says its count (per craft), destination, cut
+--- and price source; the payback appears only for a complete positive profit.
+function U.TrainerLines(te, why, checking)
+  if not te then return { "No payback estimate: " .. (NO_ESTIMATE[why] or "recipe unknown") .. "." } end
+  if checking then return { "No payback estimate yet: " .. CHECKING } end
+  local row, lines = te.row, {}
+  if te.profit then
+    local basis = row.destination == "vendor" and ("sold to a vendor at the game's sell price"
+      .. ((row.external or row.usedFallback) and (", materials at " .. priceBasis(row)) or ""))
+      or ("sold at the AH after its " .. row.cut .. "% cut, " .. priceBasis(row))
+    lines[1] = "Est. profit per craft: " .. (te.profit > 0 and "+" or "") .. U.Money(te.profit) .. " (" .. basis
+      .. (row.oldQuote and ", old prices" or "") .. ")"
+  else
+    lines[1] = U.CraftComparison(row, row.destination)
   end
-  return row, detail, status == CHECKING
+  if te.payback == 0 then lines[#lines + 1] = "Nothing to repay: training is free."
+  elseif te.payback then
+    lines[#lines + 1] = "Repays " .. U.Money(te.trainingCost) .. " training after " .. plural(te.payback, "profitable craft")
+  elseif te.why == "loss" then lines[#lines + 1] = "No payback: each craft loses " .. U.Money(-te.profit) .. "."
+  elseif te.why == "zero" then lines[#lines + 1] = "No payback: a craft only breaks even."
+  elseif te.why == "no cost" then lines[#lines + 1] = "No payback estimate: training cost unknown."
+  else lines[#lines + 1] = "No payback estimate: prices incomplete." end
+  return lines
+end
+
+-- Why a plan did not use some of the character's recipes, and where the search stopped, in words.
+local EXCLUDED = { capacity = "no cooldown evidence", cooldown = "cooldown not ready now",
+  ["not learned"] = "not learned", reagents = "reagents unknown", output = "output unknown", unknown = "recipe unknown",
+  cycle = "recipe loops back to its own product" }
+local LIMITED = { depth = "chain deeper than 12 steps", recipes = "over 500 recipes compared",
+  passes = "search stopped early", purchases = "over 50 items: some not listed" }
+
+--- One short line about a cheapest-route plan's exclusions, limits and leftovers, or "".
+function U.PlanNote(plan)
+  local said, seen, names = {}, {}, {}
+  for _, d in ipairs(plan.decisions) do names[d.itemId] = d.item end
+  local left = {}
+  for id, n in pairs(plan.leftovers) do left[#left + 1] = n .. " × " .. (names[id] or ("Item " .. id)) end
+  table.sort(left)
+  if #left > 0 then said[#said + 1] = "Left over: " .. table.concat(left, ", ") end
+  local reasons = {}
+  for _, x in ipairs(plan.exclusions) do
+    local why = EXCLUDED[x.reason]
+    if why and x.detail then why = why .. " (" .. x.detail .. ")" end
+    if why and not seen[why] then seen[why] = true; reasons[#reasons + 1] = why end
+  end
+  if #reasons > 0 then said[#said + 1] = "Recipes not used: " .. table.concat(reasons, ", ") end
+  -- Build-scoped evidence, said as such: never "unlimited".
+  if plan.basis then said[#said + 1] = "Assumes: " .. plan.basis:sub(1, 1):lower() .. plan.basis:sub(2) end
+  for _, l in ipairs(plan.limits) do
+    if LIMITED[l.kind] then said[#said + 1] = "Best found, not proven best: " .. LIMITED[l.kind]
+    elseif l.kind == "cooldown" then
+      said[#said + 1] = "Cooldown allows " .. l.capacity .. " now" .. (l.detail and (" (" .. l.detail .. ")") or "")
+    end
+  end
+  return table.concat(said, " · ")
+end
+
+--- The cheapest route for a plan in one line: "Cheapest route: 40c (buying all: 60c), make Wolf Meat: 1 craft".
+function U.PlanSummary(plan)
+  if not plan then return nil end
+  if not plan.cost then
+    return "Cheapest route: unknown" .. (#plan.unpriced > 0 and (" (" .. plural(#plan.unpriced, "item") .. " unpriced)") or "")
+  end
+  local made = {}
+  for i = #plan.decisions, 1, -1 do
+    local d = plan.decisions[i]
+    if d.crafts > 0 then made[#made + 1] = d.item .. ": " .. plural(d.crafts, "craft") end
+  end
+  if #made == 0 then return "Cheapest route: buy every reagent (" .. U.Money(plan.cost) .. ")" end
+  return "Cheapest route: " .. U.Money(plan.cost) .. (plan.buyCost and (" (buying all: " .. U.Money(plan.buyCost) .. ")") or "")
+    .. ", make " .. table.concat(made, ", ")
 end
 
 -- The hover on the source line and the note: where the prices come from and how to read the columns.
@@ -621,12 +670,92 @@ local function explain(owner, c)
   GameTooltip:Show()
 end
 
-local function buyLine(part, count)
+local function buyLine(part, count, priceSource)
   local need = part.count * count
   local s = need .. " × " .. part.item
-  if not part.unit then return s .. (part.ambiguous and " · unpriced (ambiguous name)" or " · no price") end
-  return s .. " · " .. U.Money(part.unit) .. " each" .. (part.vendor and " (vendor)" or "") .. " · "
-    .. U.Money(part.unit * need)
+  if not part.unit then
+    return s .. (part.ambiguous and " · unpriced (ambiguous name)" or (" · no price" .. U.CraftMissingNote(priceSource, part.missing)))
+  end
+  -- An external price names its addon; an Everloot price standing in for it says so (the line above says the rest).
+  local CS = E.CraftingSources
+  local from = part.vendor and " (vendor)" or (CS and CS.External(part.source) and (" (" .. CS.Label(part.source) .. ")"))
+    or (part.fallback and " (Everloot fallback)") or ""
+  return s .. " · " .. U.Money(part.unit) .. " each" .. from .. " · " .. U.Money(part.unit * need)
+end
+
+local function incomplete(plan)
+  if #plan.unpriced > 0 then return plural(#plan.unpriced, "item") .. " unpriced" end
+  if #plan.omitted > 0 then return plural(#plan.omitted, "item") .. " over the 50-item limit" end
+  for _, l in ipairs(plan.limits) do
+    if l.kind == "cooldown" then
+      return "the recipe's cooldown allows " .. l.capacity .. " now" .. (l.detail and (": " .. l.detail) or "")
+    end
+  end
+  if plan.cost == nil then return "the recipe's reagents are not all known" end
+  return "the route is not complete"
+end
+
+local function planLines(plan)
+  local lines = {}
+  for i = #plan.decisions, 1, -1 do
+    local d = plan.decisions[i]
+    if d.crafts > 0 then
+      lines[#lines + 1] = "Make " .. d.made .. " × " .. d.item .. ": " .. plural(d.crafts, "craft")
+        .. (d.bought > 0 and (", buy " .. d.bought .. " more") or "")
+    end
+  end
+  for _, p in ipairs(plan.purchases) do
+    local s = p.count .. " × " .. p.item
+    lines[#lines + 1] = p.unit and (s .. " · " .. U.Money(p.unit) .. " each" .. (p.vendor and " (vendor)" or "") .. " · "
+      .. U.Money(p.unit * p.count)) or (s .. " · no price")
+  end
+  for _, p in ipairs(plan.omitted) do lines[#lines + 1] = p.count .. " × " .. p.item .. " · not listed (over 50 items)" end
+  return lines
+end
+
+-- The selected count on the cheapest route: the make-and-buy list, its total beside buying everything, and the profit
+-- for that many crafts with the route's material cost.
+local function drawPlan(c, row, plan)
+  local b = c.buy
+  local lines = planLines(plan)
+  local n = #lines
+  b.offset = math.min(b.offset, math.floor(math.max(n - 1, 0) / BUY_LINES) * BUY_LINES)
+  for i, line in ipairs(b.lines) do
+    local s = lines[b.offset + i]
+    if s and not b.showDetails then line:SetText(s); line:Show() else line:Hide() end
+  end
+  if not b.showDetails and b.offset > 0 then b.up:Show() else b.up:Hide() end
+  if not b.showDetails and b.offset + BUY_LINES < n then b.down:Show() else b.down:Hide() end
+  if plan.cost then
+    b.total:SetText("Total: " .. U.Money(plan.cost)
+      .. ((plan.buyCost and plan.buyCost ~= plan.cost) and (" · buying all: " .. U.Money(plan.buyCost)) or ""))
+  elseif #plan.unpriced > 0 then
+    b.total:SetText("Total unknown: " .. plural(#plan.unpriced, "item") .. " unpriced")
+  else
+    b.total:SetText("Total unknown: the recipe's reagents are not all known")
+  end
+  local vendor = row.destination == "vendor"
+  local sale, cut, profit = E.Crafting.PlanSale(row, c.count, plan.cost)
+  local calculation
+  if profit then
+    calculation = (vendor and ("Vendor sale: " .. U.Money(sale))
+      or ("Sale: " .. U.Money(sale) .. " - " .. row.cut .. "% AH cut: " .. U.Money(cut)))
+      .. " - materials: " .. U.Money(plan.cost) .. " = " .. U.Money(profit) .. " profit for " .. plural(c.count, "craft")
+  elseif not plan.cost then
+    calculation = "Profit unknown: missing material prices."
+  elseif vendor and row.vendorPending then
+    calculation = "Profit unknown: the game is still loading the item's vendor sell price."
+  elseif vendor then
+    calculation = "Profit unknown: no verified vendor sell price for the finished item."
+  elseif row.value then
+    calculation = "Profit unknown: recipe yield unavailable."
+  else
+    calculation = "Profit unknown: no market price for the finished item."
+  end
+  b.math:SetText(calculation)
+  local note = U.PlanNote(plan)
+  b.alt:SetText(note ~= "" and note or "Cheapest route found by comparing buying with your own recipes.")
+  if b.showDetails then b.output:Show(); b.math:Show(); b.alt:Show() else b.output:Hide(); b.math:Hide(); b.alt:Hide() end
 end
 
 -- The reagents for `count` crafts of one recipe, a page at a time, and their total; a reagent without a price is
@@ -639,8 +768,9 @@ local function drawBuy(c, row)
     b.up:Hide(); b.down:Hide(); b.add:Hide(); b.details:Hide()
     b.count:Hide(); b.receipt:Hide()
     for _, step in ipairs(b.steps) do step:Hide() end
-    b.output:Hide(); b.math:Hide()
+    b.output:Hide(); b.math:Hide(); b.alt:Hide(); b.route:Hide()
     b.total:SetText("Choose a recipe in the list.")
+    b.plan = nil
     return
   end
   if E.Shopping then b.add:Show() else b.add:Hide() end
@@ -652,11 +782,28 @@ local function drawBuy(c, row)
   b.title:SetText("What to buy: " .. c.count .. " × " .. row.name)
   if row.key ~= b.key then b.key = row.key; b.offset = 0; b.showDetails = false end
   b.details:SetText(b.showDetails and "Reagents" or "Cost details")
+  -- Buy every reagent, or the cheapest route with this character's own recipes, for the selected count.
+  if E.CraftingPlan and row.recipe then b.route:Show() else b.route:Hide() end
+  b.route:SetText(c.strategy == "cheapest" and ROUTE_CHEAPEST or ROUTE_BUY)
+  local plan = c.strategy == "cheapest" and E.CraftingPlan and row.recipe and c.context
+    and E.Crafting.Plan(row.recipe, c.context, c.count, { strategy = "cheapest" }) or nil
+  b.plan = plan
+  local output = row.output
+  if output then
+    local amount = output.minimum == output.maximum and plural(output.minimum, "item")
+      or (output.minimum .. "-" .. output.maximum .. " items")
+    b.output:SetText("Makes " .. amount .. " per craft"
+      .. (row.cost and (" · " .. U.Money(math.floor(row.cost / row.yield)) .. " materials per item"
+        .. (output.minimum ~= output.maximum and " (avg.)" or "")) or ""))
+  else
+    b.output:SetText("Output unknown · no sale estimate until the profession window shows what it makes")
+  end
+  if plan then return drawPlan(c, row, plan) end
   local n = #row.parts
   b.offset = math.min(b.offset, math.floor(math.max(n - 1, 0) / BUY_LINES) * BUY_LINES)
   for i, line in ipairs(b.lines) do
     local part = row.parts[b.offset + i]
-    if part and not b.showDetails then line:SetText(buyLine(part, c.count)); line:Show() else line:Hide() end
+    if part and not b.showDetails then line:SetText(buyLine(part, c.count, row.priceSource)); line:Show() else line:Hide() end
   end
   if not b.showDetails and b.offset > 0 then b.up:Show() else b.up:Hide() end
   if not b.showDetails and b.offset + BUY_LINES < n then b.down:Show() else b.down:Hide() end
@@ -670,30 +817,30 @@ local function drawBuy(c, row)
     b.total:SetText("Total unknown: " .. plural(row.unpriced, "reagent") .. " unpriced"
       .. (row.unpriced < #row.parts and (" · the priced ones " .. U.Money(priced)) or ""))
   end
-  local output = row.output
-  if output then
-    local amount = output.minimum == output.maximum and plural(output.minimum, "item")
-      or (output.minimum .. "-" .. output.maximum .. " items")
-    b.output:SetText("Makes " .. amount .. " per craft"
-      .. (row.cost and (" · " .. U.Money(math.floor(row.cost / row.yield)) .. " materials per item"
-        .. (output.minimum ~= output.maximum and " (avg.)" or "")) or ""))
-  else
-    b.output:SetText("Output unknown · sale estimate assumes 1 item per craft")
-  end
+  -- The selected destination's calculation, then the other one for comparison.
+  local vendor = row.destination == "vendor"
   local calculation
   if row.profit then
-    local sale, cut, profit = saleEstimate(row, c.count)
-    calculation = "Sale: " .. U.Money(sale) .. " - " .. row.cut .. "% AH cut: " .. U.Money(cut)
+    local sale, cut, profit = E.Crafting.Sale(row, c.count)
+    calculation = (vendor and ("Vendor sale: " .. U.Money(sale))
+      or ("Sale: " .. U.Money(sale) .. " - " .. row.cut .. "% AH cut: " .. U.Money(cut)))
       .. " - materials: " .. U.Money(priced) .. " = " .. U.Money(profit) .. " profit"
-  elseif not row.cost and not row.value then
+  elseif not row.cost and not (vendor and row.vendorValue or (not vendor and row.value)) then
     calculation = "Profit unknown: missing material prices and sale estimate."
   elseif not row.cost then
     calculation = "Profit unknown: missing material prices."
+  elseif row.yieldUnknown then
+    calculation = "Profit unknown: recipe yield unavailable."
+  elseif vendor and row.vendorPending then
+    calculation = "Profit unknown: the game is still loading the item's vendor sell price."
+  elseif vendor then
+    calculation = "Profit unknown: no verified vendor sell price for the finished item."
   else
     calculation = "Profit unknown: no market price for the finished item."
   end
   b.math:SetText(calculation)
-  if b.showDetails then b.output:Show(); b.math:Show() else b.output:Hide(); b.math:Hide() end
+  b.alt:SetText(U.CraftComparison(row, vendor and "ah" or "vendor", c.count))
+  if b.showDetails then b.output:Show(); b.math:Show(); b.alt:Show() else b.output:Hide(); b.math:Hide(); b.alt:Hide() end
 end
 
 local function drawCraftRow(line, row, selected)
@@ -703,11 +850,13 @@ local function drawCraftRow(line, row, selected)
   -- An unknown cost says in its own column how many reagents have no price; the product's value still shows.
   line.cost:SetText(row.cost and U.MoneyShort(row.cost) or (row.unpriced .. " unpriced"))
   line.cost:SetTextColor(unpack(row.cost and COLORS.text or COLORS.muted))
-  line.value:SetText(row.value and U.MoneyShort(row.value) or "no price")
-  line.value:SetTextColor(unpack(row.value and COLORS.text or COLORS.muted))
+  -- The value at the selected destination: the auction value, or the vendor's sell price.
+  local value = row.destination == "vendor" and row.vendorValue or (row.destination ~= "vendor" and row.value)
+  line.value:SetText(value and U.MoneyShort(value) or (row.destination == "vendor" and row.vendorPending and "checking" or "no price"))
+  line.value:SetTextColor(unpack(value and COLORS.text or COLORS.muted))
   -- Profit per craft: a gain signed and green, a loss red, none muted.
   local profit = row.profit
-  line.profit:SetText(profit and ((profit > 0 and "+" or "") .. U.MoneyShort(profit)) or "-")
+  line.profit:SetText(profit and ((profit > 0 and "+" or "") .. U.MoneyShort(profit) .. (row.oldQuote and " old" or "")) or "-")
   line.profit:SetTextColor(unpack(not profit and COLORS.muted or (profit > 0 and COLORS.accent) or (profit < 0 and WARN) or COLORS.text))
   -- Your scans: the product's lowest buyout change since the previous scan of this house, in figures the font draws.
   -- A change that rounds to 0% is "0%", muted, not a coloured "+0%".
@@ -730,33 +879,45 @@ end
 
 local function refreshCrafting(c)
   local realm = E.CurrentRealm()
-  local all = craftRows(pricer(realm))
+  local all, context = craftRows(realm)
   local age, color, detail = ageLine(realm)
+  local checking = age == CHECKING
+  -- Another addon's prices: said first, with their unknown age and market; the price file stays the fallback's.
+  local CS = E.CraftingSources
+  local short = CS and CS.Short(context.priceSource)
+  local scanInfo = not short and U.CraftScanInfo(context)
+  if short then age = "Prices: " .. short .. " · " .. age
+  elseif scanInfo then age = scanInfo .. " · " .. age end
   c.age:SetText(age)
-  c.age:SetTextColor(unpack(color))
-  c.ageDetail = detail
-  if age == CHECKING and not c.waiting and C_Timer and C_Timer.After then
-    -- A large file is checked a slice per frame; draw again once it can be read.
+  c.age:SetTextColor(unpack(short and WARN or color))
+  local describe = U.CraftSourceLine(context)
+  c.ageDetail = describe and (describe .. " " .. detail) or detail
+  if c.sourceButton and E.Options and E.Options.CraftSourceText then c.sourceButton:SetText(E.Options.CraftSourceText()) end
+  local pending = checking
+  for _, row in ipairs(all) do if row.vendorPending then pending = true; break end end
+  if not pending then c.waitTries = 0 end
+  if pending and not c.waiting and C_Timer and C_Timer.After then
+    -- Price-file checks and delayed client sell prices finish without another click.
     c.waiting = true
-    C_Timer.After(0.5, function()
+    c.waitTries = (c.waitTries or 0) + 1
+    C_Timer.After(c.waitTries > 40 and 2 or 0.5, function()
       c.waiting = false
-      if c.page:IsShown() then redraw() end
+      U.RefreshCrafting()
     end)
   end
-  local rows = all
-  if c.profitable then
-    rows = {}
-    for _, r in ipairs(all) do if r.profit and r.profit > 0 then rows[#rows + 1] = r end end
-  end
-  table.sort(rows, c.sort == "name" and byName or byProfit)
+  local rows = E.Crafting.Rank(all, { sort = c.sort, profitableOnly = c.profitable })
   c.sortButton:SetText(c.sort == "name" and "Sort: name" or SORT_PROFIT)
   c.filterButton:SetText(c.profitable and "Show all" or PROFITABLE)
+  local vendor = context.destination == "vendor"
+  c.destButton:SetText(vendor and "Sell: vendor" or "Sell: AH")
+  c.head.value:SetText(vendor and "Vendor price" or "Item value")
 
   -- The chosen recipe stays chosen while it is filtered out of the list; without one, the first row is.
   local selected
   for _, r in ipairs(all) do if r.key == c.selected then selected = r end end
   if not selected then selected = rows[1]; c.selected = selected and selected.key or nil end
 
+  c.context = context
   local list = c.rows
   list.offset = math.min(list.offset, math.floor(math.max(#rows - 1, 0) / CRAFT_ROWS) * CRAFT_ROWS)
   for i, line in ipairs(list) do
@@ -841,7 +1002,7 @@ end
 -- mean under it, and under the list what to buy for the recipe chosen in it, with buttons for the count and, past
 -- five reagents, Up and Down for the rest of them.
 buildCrafting = function(parent)
-  local c = { sort = "profit", profitable = false, count = 1 }
+  local c = { sort = "profit", profitable = false, count = 1, strategy = "buy" }
   c.page = CreateFrame("Frame", nil, parent)
   c.page:SetPoint("TOPLEFT", 0, 0)
   c.page:SetSize(W, PAGE_H)
@@ -852,6 +1013,21 @@ buildCrafting = function(parent)
   c.sortButton:SetPoint("TOPLEFT", 0, -6)
   c.filterButton = button(c.page, PROFITABLE, 150, function() c.profitable = not c.profitable; c.rows.offset = 0 end)
   c.filterButton:SetPoint("TOPLEFT", 154, -6)
+  -- Where the crafted item is sold: the auction house (after its cut) or a vendor (the game's sell price).
+  c.destButton = button(c.page, "Sell: AH", 120, function()
+    if E.Options and E.Options.SetCraftDestination then
+      E.Options.SetCraftDestination(E.Options.CraftDestination() == "vendor" and "ah" or "vendor")
+    end
+    c.rows.offset = 0
+  end)
+  c.destButton:SetPoint("TOPLEFT", 308, -6)
+  -- Where auction prices come from: Everloot, or another addon's documented price, optionally with Everloot's as a
+  -- marked fallback. Saved as that choice only; it starts no scan.
+  c.sourceButton = button(c.page, "Prices: Everloot", 168, function()
+    if E.Options and E.Options.NextCraftSource then E.Options.NextCraftSource() end
+    c.rows.offset = 0
+  end)
+  c.sourceButton:SetPoint("TOPLEFT", 432, -6)
   -- The market status has a dedicated full-width line below the controls.
   c.age = text(c.page, 12, nil, COLORS.muted)
   c.age:SetPoint("TOPLEFT", 8, -30)
@@ -917,6 +1093,7 @@ buildCrafting = function(parent)
       if not (GameTooltip and self.row) then return end
       GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
       GameTooltip:AddLine(self.row.name)
+      GameTooltip:AddLine(self.row.valueLine, COLORS.text[1], COLORS.text[2], COLORS.text[3], true)
       for _, said in ipairs(self.row.marketChange.lines) do GameTooltip:AddLine(said, COLORS.text[1], COLORS.text[2], COLORS.text[3], true) end
       GameTooltip:Show()
     end)
@@ -972,15 +1149,53 @@ buildCrafting = function(parent)
   b.math = text(buy, 12, nil, COLORS.muted)
   b.math:SetPoint("TOPLEFT", 8, -56)
   b.math:SetWidth(W - 16)
+  b.alt = text(buy, 12, nil, COLORS.muted)
+  b.alt:SetPoint("TOPLEFT", 8, -70)
+  b.alt:SetWidth(W - 16)
   b.details = button(buy, "Cost details", 90, function() b.showDetails = not b.showDetails end)
   b.details:SetPoint("BOTTOMLEFT", 6, 5)
+  b.route = button(buy, ROUTE_BUY, 120, function()
+    c.strategy = c.strategy == "cheapest" and "buy" or "cheapest"
+    b.offset, c.added = 0, nil
+  end)
+  b.route:SetPoint("BOTTOMLEFT", 100, 5)
+  -- What the cheapest route assumes about cooldowns, and what the client files could not show.
+  b.route:SetScript("OnEnter", function(self)
+    if not GameTooltip then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine(ROUTE_CHEAPEST)
+    GameTooltip:AddLine("Compares buying each reagent with crafting it from this character's own recipes.", 1, 1, 1, true)
+    local ev = E.Crafting.CooldownEvidence and E.Crafting.CooldownEvidence()
+    if ev and ev.status == "match" then
+      GameTooltip:AddLine(ev.basis .. ". " .. ev.disclosure, 1, 1, 1, true)
+    elseif ev then
+      GameTooltip:AddLine("Recipes are used only with cooldown evidence: " .. (ev.status == "mismatch"
+        and ("the cooldown data is for build " .. tostring(ev.build) .. ", the game is " .. tostring(ev.running))
+        or ev.status) .. ".", 1, 1, 1, true)
+    end
+    GameTooltip:AddLine("Cooldown recipes count only while their profession window is open and ready.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  b.route:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   b.receipt = text(buy, 11, nil, COLORS.accent)
-  b.receipt:SetPoint("BOTTOMLEFT", 104, 4)
-  b.receipt:SetWidth(W - 328)
+  b.receipt:SetPoint("BOTTOMLEFT", 226, 4)
+  b.receipt:SetWidth(W - 450)
   b.receipt:SetJustifyV("BOTTOM")
   b.add = button(buy, ADD_TO_LIST, 214, function()
     if not (E.Shopping and b.row) then return end
-    local _, _, _, said = E.Shopping.AddReagents(b.row.parts, c.count)
+    -- The cheapest route adds what it buys, already for every craft; buying all adds the reagents per craft.
+    local plan = b.plan
+    local parts, crafts = b.row.parts, c.count
+    -- An incomplete route is not added: a partial list would look like everything needed.
+    if plan and not plan.complete then
+      c.added = "Not added: this route is incomplete (" .. incomplete(plan) .. ")."
+      return
+    end
+    if plan then
+      parts, crafts = {}, 1
+      for _, p in ipairs(plan.purchases) do parts[#parts + 1] = { id = p.id, item = p.item, count = p.count } end
+    end
+    local _, _, _, said = E.Shopping.AddReagents(parts, crafts)
     c.added = said
   end)
   b.add:SetPoint("BOTTOMRIGHT", -6, 5)
@@ -1025,6 +1240,9 @@ local function buildTrainers(parent)
       local line = CreateFrame("Frame", nil, s)
       line:SetPoint("TOPLEFT", 0, -(SECTION_HEAD + (j - 1) * ROW_H))
       line:SetSize(W, ROW_H)
+      if line.EnableMouse then line:EnableMouse(true) end
+      line:SetScript("OnEnter", showService)
+      line:SetScript("OnLeave", hideService)
       for _, col in ipairs(TRAIN_COLUMNS) do
         -- Ranks and costs in the narrow figures, words in Friz; the trainer in the muted colour.
         local figures = col[1] == "rank" or col[1] == "cost"
@@ -1117,6 +1335,12 @@ local function build(f, parent)
 end
 
 U.Views.professions = { build = build, refresh = refresh }
+
+function U.RefreshCrafting()
+  local frame = U.frame
+  local professions = frame and frame.professions
+  if frame and U.view == "professions" and frame:IsShown() and professions and professions.mode == "crafting" then redraw() end
+end
 
 function U.OpenCrafting()
   if not U.Open("professions") then return end

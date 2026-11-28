@@ -14,7 +14,8 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   Item: ["ClassID", "SubclassID", "InventoryType", "IconFileDataID"],
   SpellName: ["Name_lang"],
   SpellMisc: ["SpellID", "SpellIconFileDataID"],
-  SpellEffect: ["DifficultyID", "EffectTriggerSpell", "SpellID", "Effect", "EffectItemType"],
+  // Recipe outputs (client-recipes) read the create-item effect's quantity and the columns that would make it vary.
+  SpellEffect: ["DifficultyID", "EffectTriggerSpell", "SpellID", "Effect", "EffectItemType", "EffectIndex", "EffectBasePointsF", "Variance", "EffectRealPointsPerLevel", "EffectPointsPerResource", "EffectBonusCoefficient"],
   ItemClass: ["ClassID", "ClassName_lang"],
   ItemSubClass: ["ClassID", "SubClassID", "DisplayName_lang", "VerboseName_lang"],
   ItemSet: ["Name_lang", "ItemID"],

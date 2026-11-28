@@ -19,7 +19,7 @@ function askAhledger(path: string, timeoutMs: number) {
   });
 }
 
-export async function readAhledger(path: string, select: (body: unknown) => Record<string, unknown>) {
+export async function readAhledger(path: string, select: (body: unknown) => Record<string, unknown>, itemCreditUrl?: string) {
   try {
     const upstream = await askAhledger(path, 8000);
     if (!upstream.ok) {
@@ -30,7 +30,8 @@ export async function readAhledger(path: string, select: (body: unknown) => Reco
       });
     }
     const body: unknown = await upstream.json();
-    return NextResponse.json({ ok: true, ...select(body), credit: ahledgerCredit(body) }, { headers: upstreamCacheHeaders(upstream.headers.get("cache-control")) });
+    const credit = ahledgerCredit(itemCreditUrl ? { attribution: { url: itemCreditUrl } } : body);
+    return NextResponse.json({ ok: true, ...select(body), credit }, { headers: upstreamCacheHeaders(upstream.headers.get("cache-control")) });
   } catch {
     return proxyError("AH Ledger could not be read right now.", 502);
   }

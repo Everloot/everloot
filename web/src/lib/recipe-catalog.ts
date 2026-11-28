@@ -13,6 +13,7 @@ export function buildRecipeCatalog(p: ProfessionInfo, itemName: (id: number) => 
     yellow: r.yellow, grey: r.grey,
     recipeItems: (links[r.spellId] ?? []).map(itemId => ({ itemId, name: itemName(itemId), unconfirmed: isFiles(itemId), sources: [] })),
     reagents: r.reagents.map(x => ({ ...x, name: itemName(x.itemId), unconfirmed: isFiles(x.itemId) })),
+    ...(r.output ? { output: { itemId: r.output.itemId, minimum: r.output.minimum, maximum: r.output.maximum } } : {}),
   }));
 }
 
