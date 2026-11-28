@@ -4,6 +4,8 @@ export interface SearchRecipe {
   yellow: number | null; grey: number | null;
   recipeItems: RecipeItem[];
   reagents: { itemId: number; name: string; count: number; unconfirmed?: boolean }[];
+  /** The game files' output item and fixed quantity per craft; a null range is unavailable, never one. */
+  output?: { itemId: number; minimum: number | null; maximum: number | null };
 }
 
 export function filterRecipes(rows: SearchRecipe[], query: string, skill: number | null): SearchRecipe[] {

@@ -54,7 +54,10 @@ export function encodeProfessions(set: ProfessionsView, generatedAt: string): st
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) => Array.isArray(v[k]));
 
-/** Unknown or unreadable files fall back to the corpus. A `derived` list in an older file is ignored and worked out again. */
+/**
+ * Unknown or unreadable files fall back to the corpus. A `derived` list in an older file is ignored and worked out again.
+ * A file from before item-id vendor prices has none: they read as an empty list, never worked out from the name-keyed ones.
+ */
 export function parseProfessions(text: string): { generatedAt: string; set: ProfessionsView } | null {
   try {
     // No reviver (revive-json.ts); the file holds Maps only, so a `{"$set": [...]}` stays as written.
@@ -62,9 +65,11 @@ export function parseProfessions(text: string): { generatedAt: string; set: Prof
     if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
     const s = raw.set;
     if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !(arrays(s.facts, "sightings", "prices", "observations", "trainers") && isObject(s.facts) && s.facts.vendorPrices instanceof Map && Array.isArray(s.sightings))) return null;
+    const byId = (s.facts as Record<string, unknown>).vendorPricesById;
+    if (byId !== undefined && !(byId instanceof Map)) return null;
     if (s.gathering !== undefined && !arrays(s.gathering, "fishing", "skinning")) return null;
     const facts = s.facts as unknown as ProfessionsView["facts"];
-    return { generatedAt: raw.generatedAt, set: { ...(s as unknown as ProfessionsView), facts: { ...facts, derived: derivedSteps(facts.observations, facts.trainers) } } };
+    return { generatedAt: raw.generatedAt, set: { ...(s as unknown as ProfessionsView), facts: { ...facts, vendorPricesById: byId ?? new Map<number, number>(), derived: derivedSteps(facts.observations, facts.trainers) } } };
   } catch {
     return null;
   }

@@ -11,7 +11,7 @@ export interface AddonRelease {
  * Whether the addon has been checked in the live Forever client. Only a person who ran it there can say so, so this
  * is flipped by hand, never by date; the home page and the addon page both read it.
  */
-// Stable release 0.3.31 awaits an in-game check of its exact archive.
+// Alpha release 0.3.33 awaits an in-game check of its exact archive.
 export const ADDON_LIVE_VERIFIED = false;
 
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;

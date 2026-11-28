@@ -13,7 +13,7 @@
  */
 import recipesJson from "../../web/src/data/game-data/client-recipes.json" with { type: "json" };
 import { INDEPENDENT_INSTALLS } from "./drop-rollup.js";
-import { agreePrices, agreeVendorPricesByItem, formatCopper, median, mergeVendorPrices, professionFactsFromRecords, reagentKey, type AgreedRecipe, type PriceSighting, type Reagent } from "./profession-path.js";
+import { agreePrices, agreeVendorPricesById, agreeVendorPricesByItem, formatCopper, median, mergeVendorPrices, professionFactsFromRecords, reagentKey, type AgreedRecipe, type PriceSighting, type Reagent } from "./profession-path.js";
 
 /** Recipe spell id (the trade-skill recipe id) to the profession the game files list it under, by the files' English name. */
 const FILE_PROFESSIONS = new Map(recipesJson.professions.flatMap((p) => p.recipes.map((r) => [r[0] as number, p.name] as const)));
@@ -53,8 +53,14 @@ export function recipeFactsFromRecords(records: unknown[]): { observations: Reci
   return { observations: recipeObservationsFromRecords(records), prices: facts.prices, vendorPrices: facts.vendorPrices };
 }
 
-/** `trainerNpcId` and `skillLineId` are kept when the addon sent them; older addons send neither. */
-export interface TrainerRow { installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number; trainerNpcId?: number; skillLineId?: number; spellId?: number }
+/**
+ * `trainerNpcId`, `skillLineId`, `spellId` (the recipe spell the trainer teaches) and `productItemId` are kept when the
+ * addon sent them; older addons send none of them.
+ */
+export interface TrainerRow {
+  installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number; trainerNpcId?: number; skillLineId?: number;
+  spellId?: number; productItemId?: number;
+}
 
 export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
   const out: TrainerRow[] = [];
@@ -64,10 +70,11 @@ export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
       typeof r.recipe !== "string" || !Number.isInteger(r.requiredRank) || (r.requiredRank as number) < 1) continue;
     const cost = Number.isInteger(r.costCopper) && (r.costCopper as number) >= 0 ? (r.costCopper as number) : undefined;
     const id = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? { value: v as number } : null);
-    const npc = id(r.trainerNpcId), line = id(r.skillLineId), spell = id(r.spellId);
+    const npc = id(r.trainerNpcId), line = id(r.skillLineId), spell = id(r.spellId), product = id(r.productItemId);
     out.push({
       installId: r.installId, profession: r.profession, recipe: r.recipe, requiredRank: r.requiredRank as number, costCopper: cost,
-      ...(npc ? { trainerNpcId: npc.value } : {}), ...(line ? { skillLineId: line.value } : {}), ...(spell ? { spellId: spell.value } : {}),
+      ...(npc ? { trainerNpcId: npc.value } : {}), ...(line ? { skillLineId: line.value } : {}),
+      ...(spell ? { spellId: spell.value } : {}), ...(product ? { productItemId: product.value } : {}),
     });
   }
   return out;
@@ -81,44 +88,72 @@ const recipeKey = (profession: string, recipe: string) => `${profession.trim().t
  * Orange-only steps (design note 2026-10-10, option B): a published recipe with agreed reagents pays
  * one point per craft from its learn rank up to yellow.min, the first rank not known to be orange.
  * The learn rank is the trainer's, when three installs agree on one; else the lowest rank seen orange.
- * Trainer rows carry no recipe id, so they match the published profession and recipe name: English
- * trainer rows match a game-file recipe, other languages' rows match nothing and are left out.
+ * A trainer row with a spell id belongs to the recipe with that id, whatever language named it. A row without
+ * one (older addons) matches the published profession and recipe name, so English rows match a game-file
+ * recipe and other languages' rows are left out; and it counts only while no other spell id is listed under
+ * that name, so a same-name offering never lends a recipe its rank or training cost.
  */
 export function derivedSteps(observations: RecipeObservation[], trainers: TrainerRow[]): DerivedStep[] {
-  const trained = new Map<string, Map<number, Set<string>>>();
-  // Reputation discounts make prices differ, so cost is the median of each install's last price.
-  const costs = new Map<string, Map<string, number>>();
+  const byName = new Map<string, TrainerRow[]>(), bySpell = new Map<number, TrainerRow[]>(), idsByName = new Map<string, Set<number>>();
   for (const row of trainers) {
     const key = recipeKey(row.profession, row.recipe);
-    const ranks = trained.get(key) ?? new Map<number, Set<string>>();
-    ranks.set(row.requiredRank, (ranks.get(row.requiredRank) ?? new Set<string>()).add(row.installId));
-    trained.set(key, ranks);
-    if (row.costCopper !== undefined) costs.set(key, (costs.get(key) ?? new Map<string, number>()).set(row.installId, row.costCopper));
+    byName.set(key, byName.get(key) ?? []).get(key)!.push(row);
+    if (row.spellId !== undefined) {
+      bySpell.set(row.spellId, bySpell.get(row.spellId) ?? []).get(row.spellId)!.push(row);
+      idsByName.set(key, (idsByName.get(key) ?? new Set<number>()).add(row.spellId));
+    }
   }
   const out: DerivedStep[] = [];
-  for (const { thresholds: t, rows } of published(observations)) {
+  for (const { thresholds: t, rows, recipeId } of published(observations)) {
     if (!t.reagents || t.yellow.min === null) continue;
     const key = recipeKey(t.profession, t.recipe);
-    const [best, next] = [...(trained.get(key) ?? [])].sort((a, b) => b[1].size - a[1].size);
+    const named = [...(idsByName.get(key) ?? [])];
+    const matching = recipeId !== undefined
+      ? [...(bySpell.get(recipeId) ?? []), ...(named.every((id) => id === recipeId) ? (byName.get(key) ?? []).filter((r) => r.spellId === undefined) : [])]
+      : named.length <= 1 ? (byName.get(key) ?? []) : [];
+    const trained = new Map<number, Set<string>>();
+    // Reputation discounts make prices differ, so cost is the median of each install's last price.
+    const costs = new Map<string, number>();
+    for (const row of matching) {
+      trained.set(row.requiredRank, (trained.get(row.requiredRank) ?? new Set<string>()).add(row.installId));
+      if (row.costCopper !== undefined) costs.set(row.installId, row.costCopper);
+    }
+    const [best, next] = [...trained].sort((a, b) => b[1].size - a[1].size);
     const skillMin = best && best[1].size >= INDEPENDENT_INSTALLS && next?.[1].size !== best[1].size
       ? best[0]
       : Math.min(...rows.filter((o) => o.difficulty === "optimal").map((o) => o.rank));
     if (!(skillMin < t.yellow.min)) continue;
-    const prices = [...(costs.get(key)?.values() ?? [])];
+    const prices = [...costs.values()];
     const trainingCopper = prices.length >= INDEPENDENT_INSTALLS ? median(prices) : null;
     out.push({ profession: t.profession, recipe: t.recipe, skillMin, skillMax: t.yellow.min, points: 1, reagents: t.reagents, reporters: t.installs, trainingCopper });
   }
   return out;
 }
 
-/** Everything the profession path reads: reported recipes, prices, and steps derived from colours and trainers. */
+/**
+ * Training cost per recipe spell id, for joins on identity: the median of each install's last price, once three
+ * installs priced that spell id. Rows without a spell id never count, whatever their name.
+ */
+export function trainingCostBySpell(trainers: TrainerRow[]): Map<number, number> {
+  const costs = new Map<number, Map<string, number>>();
+  for (const row of trainers) {
+    if (row.spellId === undefined || row.costCopper === undefined) continue;
+    costs.set(row.spellId, (costs.get(row.spellId) ?? new Map<string, number>()).set(row.installId, row.costCopper));
+  }
+  return new Map([...costs].filter(([, byInstall]) => byInstall.size >= INDEPENDENT_INSTALLS).map(([spell, byInstall]) => [spell, median([...byInstall.values()])]));
+}
+
+/**
+ * Everything the profession path reads: reported recipes, prices, and steps derived from colours and trainers.
+ * `vendorPrices` is keyed by name for the levelling planner; `vendorPricesById` keys the same agreement by item ID.
+ */
 export function pathFactsFromRecords(records: unknown[]) {
   const byItem = agreeVendorPricesByItem(records);
   const { sightings, prices, vendorPrices } = professionFactsFromRecords(records, byItem);
   const observations = recipeObservationsFromRecords(records);
   const trainers = trainerRowsFromRecords(records);
   const vendorPricesByItem: ReadonlyMap<number, number> | undefined = byItem;
-  return { sightings, prices, vendorPrices, vendorPricesByItem, observations, trainers, derived: derivedSteps(observations, trainers) };
+  return { sightings, prices, vendorPrices, vendorPricesByItem, vendorPricesById: agreeVendorPricesById(records), observations, trainers, derived: derivedSteps(observations, trainers) };
 }
 
 /** The list the most installs saw, when at least three did and no other list ties it. */
@@ -156,7 +191,7 @@ function commonName(rows: RecipeObservation[]): string {
 }
 
 /** Each published recipe with the observations it was agreed from. */
-function published(observations: RecipeObservation[]): { thresholds: RecipeThresholds; rows: RecipeObservation[] }[] {
+function published(observations: RecipeObservation[]): { thresholds: RecipeThresholds; rows: RecipeObservation[]; recipeId?: number }[] {
   // A row without a recipe id (older addons) joins the id its profession and name were seen with, when
   // there is one; seen with several, it is ambiguous and left out; seen with none, it groups by name.
   const idsByName = new Map<string, Set<number>>();
@@ -172,7 +207,7 @@ function published(observations: RecipeObservation[]): { thresholds: RecipeThres
     group.rows.push(o);
     groups.set(key, group);
   }
-  const out: { thresholds: RecipeThresholds; rows: RecipeObservation[] }[] = [];
+  const out: { thresholds: RecipeThresholds; rows: RecipeObservation[]; recipeId?: number }[] = [];
   for (const { recipeId, rows } of groups.values()) {
     const installs = new Set(rows.map((r) => r.installId)).size;
     if (installs < INDEPENDENT_INSTALLS) continue;
@@ -186,7 +221,7 @@ function published(observations: RecipeObservation[]): { thresholds: RecipeThres
       profession: fileProfession ?? rows[0].profession, recipe: commonName(english.length > 0 ? english : rows),
       installs, observations: rows.length, yellow, green, grey, reagents: agreedReagents(english),
     };
-    out.push({ thresholds, rows });
+    out.push({ thresholds, rows, ...(recipeId !== undefined ? { recipeId } : {}) });
   }
   // The published ranges and trainer links use names. Two recipes agreed under one name cannot be told apart,
   // so neither is published rather than one standing in for the other in a range or a craft recommendation.

@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
 import {
+  agreeVendorPrices,
+  agreeVendorPricesById,
   handleProfessionPath,
   mergeVendorPrices,
   professionFactsFromRecords,
@@ -310,4 +312,39 @@ test("when several vendors agree on different prices for one item, the route use
     { kind: "item_seen", installId: "c", itemId: 3371, name: "Empty Vial" },
   ]);
   expect([...facts.vendorPrices.entries()]).toEqual([["empty vial", 15]]);
+});
+
+const vendorRow = (installId: string, items: { itemId: number; priceCopper: number }[], vendorNpcId = 1) => ({ kind: "vendor", installId, vendorNpcId, items });
+const three = ["install-a", "install-b", "install-c"];
+
+test("agreeVendorPricesById: item-ID identity, three installs, positive copper only, the lowest agreed price", () => {
+  const records = [
+    ...three.map((id) => vendorRow(id, [{ itemId: 2320, priceCopper: 10 }, { itemId: 2321, priceCopper: 0 }, { itemId: 2324, priceCopper: 25 }])),
+    // A second vendor sells 2320 cheaper, agreed by three installs; a third sells it cheaper still, seen by two.
+    ...three.map((id) => vendorRow(id, [{ itemId: 2320, priceCopper: 8 }], 2)),
+    ...three.slice(0, 2).map((id) => vendorRow(id, [{ itemId: 2320, priceCopper: 5 }], 3)),
+    // A negative or fractional price is never a price.
+    ...three.map((id) => vendorRow(id, [{ itemId: 2325, priceCopper: -4 }, { itemId: 2326, priceCopper: 1.5 }])),
+  ];
+  expect(agreeVendorPricesById(records)).toEqual(new Map([[2320, 8], [2324, 25]]));
+});
+
+test("agreeVendorPricesById: distinct items that share a name stay separate, and need no name", () => {
+  const records = [
+    ...three.map((id) => vendorRow(id, [{ itemId: 4470, priceCopper: 38 }, { itemId: 4471, priceCopper: 90 }])),
+    ...three.flatMap((id) => [4470, 4471].map((itemId) => ({ kind: "item_seen", installId: id, itemId, name: "Simple Wood" }))),
+  ];
+  expect(agreeVendorPricesById(records)).toEqual(new Map([[4470, 38], [4471, 90]]));
+  // The legacy name-keyed price folds them into one name, so it is kept for levelling only.
+  expect(agreeVendorPrices(records)).toEqual(new Map([["simple wood", 38]]));
+  expect(agreeVendorPricesById(records.filter((r) => r.kind === "vendor"))).toEqual(new Map([[4470, 38], [4471, 90]]));
+});
+
+test("agreeVendorPrices (by name, for the levelling planner) is unchanged", () => {
+  const records = [
+    ...three.map((id) => vendorRow(id, [{ itemId: 2321, priceCopper: 0 }])),
+    ...three.map((id) => ({ kind: "item_seen", installId: id, itemId: 2321, name: "Fine Thread" })),
+  ];
+  expect(agreeVendorPrices(records)).toEqual(new Map([["fine thread", 0]]));
+  expect(agreeVendorPricesById(records)).toEqual(new Map());
 });

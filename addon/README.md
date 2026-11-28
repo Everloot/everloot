@@ -7,7 +7,11 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.31. Select a recipe in WoW: Forever's Professions window for its materials cost and estimated profit. Details shows reagent quotes, price sources and age, and listing activity when a recent same-house scan includes the finished item. Exact release archive live verification is pending.
+**Status:** 0.3.33, Release channel: Alpha. Crafting profit and recipe plans in WoW: Forever's profession window, the Everloot window and the auction house (see Crafting profit and recipe plans). The contract tests pass; the live checks on the exact release archive have not been observed yet, so the in-game layout, live API reads and coexistence with other addons are unverified. See `docs/2026-11-27-profession-profit-acceptance.md`.
+
+Optional crafting prices can use Auctionator or TSM, with Everloot remaining the default. Only the source choice and explicit fallback setting are saved; external prices stay in memory and never enter observations, scan history or uploads. Their age and realm/house scope are unknown.
+
+Neither adapter is verified on Forever 1.60.1 (interface 16001). Auctionator's documented v1 call comes from the author's README shipped with retail version 327, whose TOC does not list that interface; the [current version 354 source repository](https://github.com/TheMouseNest/Auctionator) returned 404 at verification. TSM's signatures come from the [archived official API documentation generated December 21, 2022](https://web.archive.org/web/20251203084633id_/http://api.tradeskillmaster.com/addon/); the live documentation's TLS certificate was expired, so it was not used. Both addons are absent from the Forever validation install and report unavailable (not loaded). Runtime API checks report unsupported or failing sources explicitly; they do not establish price age, market scope or compatibility.
 
 ## Run it
 
@@ -108,6 +112,55 @@ With scans off, the first visit instead explains how to opt in. The scan action 
 **Scanning...** or **Ready in M:SS**, and is disabled while busy or cooling down. Last-scan age and saved-file
 status remain in the tab. The tab and settings use native WoW fonts, gold headings and standard controls.
 
+### Crafting profit and recipe plans
+
+Everloot's own crafting calculator, shared by every view below: one price policy (a scan of this house under a day
+old, then the price file's market value, then a vendor's price when a vendor you visited sells one unit for less) and
+one profit formula. Profit and margin are per craft; margin is profit divided by materials cost. A reagent without a
+price is unpriced, never zero, and so is any total or profit that needs it. An unknown output count gives no sale.
+
+- **Profession window.** Under the selected recipe: cost per craft, estimated profit and **Details** (each reagent's
+  unit and line cost with its source and age, the output range, the AH cut, both destinations, the cheapest route as a
+  comparison, listing depth and 7-day median from your own full scans, and the break-even price of the costliest
+  reagent). Recipe rows get a short signed tag (**Tags: gold**, **margin** or **both**). The **Everloot profit list**
+  docked beside the window sorts by profit (**Sort: profit** / **Sort: name**) and filters (**Profitable only**);
+  clicking a recipe opens it in the game's own list, which keeps Blizzard's order, categories and filters.
+- **Sell: AH / Sell: vendor.** One choice for every view. AH subtracts this house's cut (5%, 15% at the Neutral
+  house). Vendor uses the game's sell price for the finished item; a vendor's purchase price is never used as a sell
+  price, and without a sell price vendor profit is unavailable.
+- **Buy or make.** Buying every reagent is the default. The cheapest route also considers recipes this character has
+  proven it knows (read from its own profession window), by item and recipe ID, in whole crafts: three bolts from a
+  two-bolt recipe take two crafts and leave one over, and the leftover is not counted as sold. Variable yields plan on
+  the minimum. Cycles, unknown or ambiguous reagents and another character's recipes are never used as cheaper
+  routes, and the plan says why. A recipe with no cooldown recorded in the game files for the running build
+  (1.60.1.71139) is assumed to have none; encrypted file blocks and server changes are not covered by that data. A
+  recipe with a cooldown counts only for the crafts this character's profession window reports ready now (its charges,
+  or one), shared with recipes of the same cooldown category; on another build no recipe route is used.
+- **Recipe plans.** In the profession window choose a count with **-** and **+**, press **Add materials** to preview
+  this character's combined plan, and **Save plan** to keep it. Saving the same recipe again replaces its count; 0
+  removes it. A plan keeps the full requirement; what is still needed is worked out each time from this character's
+  bags, read fresh and never saved (bank, mail and other characters are not counted). Owned materials lower what you
+  buy, not the materials' value in the profit.
+- **At the auction house.** **Shopping list**, then **Source: recipe plans**, shows each plan item's need, its need
+  without bags and what your bags hold. **Route: buy all / Route: cheapest** is saved with this character's plans.
+  **Search needed** opens Blizzard's Buy search for the next item still needed, one item per press, under the same
+  throttle and scan rules as the manual lists. Another character's plan is shown in full and never searched. Manual
+  lists stay separate and keep their own counts.
+- **Trainers.** A trainer recipe's hover, and **Ranks and trainers**, show its estimated profit and how many crafts
+  repay the training cost, only with the recipe's exact spell ID, a complete schematic and a positive profit.
+- **Prices from other addons.** Auctionator or TSM can be chosen as the auction price source, with an explicit
+  Everloot fallback; see the note under Status. Neither is verified on Forever.
+
+All of this is local and display only. Recipe knowledge (`craftingKnown`), recipe plans (`craftingPlans`), own-scan
+depth and history, and merchant unit prices you saw as this character on this build (`vendorUnitPrices`, kept 14 days)
+stay in your saved file and are never records or uploads. Bag counts and other addons' prices are not saved. Nothing
+here buys, posts or crafts. It is off while the Everloot window is off (Collect data only). While CraftProfit is
+loaded it starts off for a character until you turn it on (**Profit in the profession window** in the settings, or
+**Show Everloot here**); your choice wins.
+
+Not included: market sold-per-day figures, confirmed sale prices, crafting with another character's recipes, bank,
+mail or alt inventory, automatic buying or crafting, and any paid price service.
+
 ### Crafting market changes
 
 In the Everloot window's Professions view, **Crafting costs** keeps each recipe's cost, value and estimated
@@ -130,7 +183,9 @@ Blizzard's Buy screen for the item's exact name and shows your wanted count, cap
 The search waits for a press while the house is ready. Clients without the native handoff keep **Search** and its
 first-page price summary. You choose the listing and confirm the purchase with Blizzard's usual controls.
 Lists are kept in your saved file only, never uploaded: up to 10 lists of 50 items, and
-the page says so. Wanted counts are your own numbers; your bags and bank are not read.
+the page says so. Wanted counts are your own numbers; your bags and bank are not read for manual lists.
+**Source: recipe plans** switches the page to this character's recipe plans (see Crafting profit and recipe plans);
+the two sources are searched separately and never merged.
 
 ## Commands
 
@@ -399,8 +454,9 @@ never larger than the screen); right-click the grip for the normal size. The siz
   name; profit per craft is green for a gain and red for a loss. One short line says which auction house's prices and
   how old the price file is. Choose a recipe and a craft count to see each reagent's unit price and subtotal, the output
   per craft, the materials cost per item, and estimated sales minus the auction-house cut and materials. Reopen your
-  in-game profession window to read the output of previously recorded recipes. The estimate assumes one item if the
-  output is unknown. A missing or ambiguous reagent price leaves the material total and profit unknown.
+  in-game profession window to read the output of previously recorded recipes; until then the recipe has a cost but
+  no sale or profit. A missing or ambiguous reagent price leaves the material total and profit unknown.
+  **Route: buy all / Route: cheapest** shows the make-and-buy list for the count (see Crafting profit and recipe plans).
   Use Up and Down past five reagents. Gold also has a **Crafting costs** shortcut to this screen.
   **Add to shopping list** adds those reagents to your active shopping list (see
   Shopping lists). Your bags and bank are not read.
@@ -690,6 +746,9 @@ addon/
 │   ├── ledger.lua      the gold ledger's local store for the window's Gold tab; never uploaded
 │   ├── auctions.lua    full auction-house scans you start (Forever); listed buyouts on older clients; on in a new install
 │   ├── gold.lua        your own gold: loot, quests, vendors, flights, mailed auction sales, postage, buyouts
+│   ├── crafting_plan.lua  recipes each of your characters has learned, buy-or-make routes and recipe plans; local only
+│   ├── recipe_cooldown_data.lua  recipe cooldowns from the 1.60.1.71139 game files; generated, unconfirmed
+│   ├── crafting_history.lua  listing depth and 7-day medians from your own full scans, for learned recipes; local only
 │   ├── professions.lua recipe colours at your rank (C_TradeSkillUI); required rank and cost from trainer windows
 │   ├── ask.lua         /ask stores a question; the Everloot Desktop App's answers show after /reload
 │   ├── link.lua        /everloot link: ties the character you play to your everloot.app account
@@ -716,9 +775,13 @@ addon/
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
 │   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+│   ├── crafting_sources.lua  optional Auctionator or TSM quotes in memory only; source choice and fallback are saved
+│   ├── crafting.lua    shared recipe valuation and price sources for native and Everloot profession views
 │   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
 │   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts, quest chains; display only
-│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes, crafting costs; display only
+│   ├── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes, crafting costs; display only
+│   ├── native_crafting.lua  the selected recipe's estimate, Details, count and Add materials; trainer hovers; display only
+│   └── native_recipes.lua  the profession window's recipe rows: profit tags and a docked Everloot profit list; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```

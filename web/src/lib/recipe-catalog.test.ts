@@ -30,3 +30,14 @@ test("a recipe item's taught item is the item its one recipe creates, from the c
  const p = CLIENT_PROFESSIONS.flatMap(x => x.recipes).find(r => r.itemId === null && teachingItemIds([r.spellId]).length);
  if (p) expect(taughtItemId(teachingItemIds([p.spellId])[0])).toBeNull();
 });
+
+test("a catalog recipe carries its game-file output item and quantity, unavailable where the files do not give one", () => {
+ const engineering = CLIENT_PROFESSIONS.find(p => p.slug === "engineering")!;
+ const rows = buildRecipeCatalog(engineering, n => `Item ${n}`, () => undefined);
+ // Crafted Light Shot makes 200; Coarse Dynamite's yield varies, so its range is unavailable rather than one.
+ expect(rows.find(r => r.spellId === 3920)?.output).toEqual({ itemId: 8067, minimum: 200, maximum: 200 });
+ expect(rows.find(r => r.spellId === 3931)?.output).toEqual({ itemId: 4365, minimum: null, maximum: null });
+ const enchant = CLIENT_PROFESSIONS.find(p => p.slug === "enchanting")!;
+ const made = buildRecipeCatalog(enchant, n => `Item ${n}`, () => undefined);
+ expect(made.filter(r => r.itemName === null).every(r => r.output === undefined)).toBe(true);
+});

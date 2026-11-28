@@ -155,3 +155,25 @@ test("a file with characters past U+00FF is parsed from one-byte ASCII text, to 
     parse.mockRestore();
   }
 });
+
+test("item-id vendor prices and trainer spell ids are stored beside the old fields; an older file reads with no item-id prices", () => {
+  const records = [
+    ...["a", "b", "c"].map((installId) => ({ kind: "vendor", installId, vendorNpcId: 1, items: [{ itemId: 2320, priceCopper: 10 }, { itemId: 2321, priceCopper: 0 }], capturedAt: asOf })),
+    ...["a", "b", "c"].map((installId) => ({ kind: "trainer_seen", installId, profession: "Alchemy", recipe: "Lesser Healing Potion", spellId: 2337, productItemId: 858, requiredRank: 55, costCopper: 250, capturedAt: asOf })),
+  ];
+  const set = buildProfessions({ records, dataAsOf: asOf });
+  expect(set.facts.vendorPricesById).toEqual(new Map([[2320, 10]]));
+  const body = encodeProfessions(set, asOf);
+  const read = parseProfessions(body)!.set;
+  expect(read).toEqual(set);
+  expect(read.facts.trainers[0]).toMatchObject({ spellId: 2337, productItemId: 858 });
+  // A file written before item-id prices existed: the old fields read as before, and item-id prices are unavailable, not guessed from names.
+  const old = JSON.parse(body);
+  delete old.set.facts.vendorPricesById;
+  const fallback = parseProfessions(JSON.stringify(old))!.set;
+  expect(fallback.facts.vendorPricesById).toEqual(new Map());
+  expect(fallback.facts.vendorPrices).toEqual(set.facts.vendorPrices);
+  // Anything else in that slot is not a price list.
+  old.set.facts.vendorPricesById = [[2320, 10]];
+  expect(parseProfessions(JSON.stringify(old))).toBeNull();
+});

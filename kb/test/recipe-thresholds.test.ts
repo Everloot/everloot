@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { formatThresholds, handleRecipeThresholds, inferThresholds, recipeFactsFromRecords, recipeObservationsFromRecords } from "../src/recipe-thresholds.js";
+import { formatThresholds, handleRecipeThresholds, inferThresholds, pathFactsFromRecords, recipeFactsFromRecords, recipeObservationsFromRecords, trainingCostBySpell } from "../src/recipe-thresholds.js";
 
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") =>
   ({ kind: "recipe_observed", installId, profession: "Alchemy", recipe, rank, difficulty, reagents: [] });
@@ -196,4 +196,56 @@ test("a vendor-sold reagent gets a cost per craft from vendor + item_seen rows a
   // Median Peacebloom 50c x 2 + vendor Empty Vial 4c.
   expect(text).toContain("Reagents: 2 Peacebloom, 1 Empty Vial. Estimated cost per craft: 1s 4c");
   expect(text).toContain("NPC vendor price");
+});
+
+// Spell 2152 is Leatherworking's Light Armor Kit in the game files; spell 9152 stands for another recipe a trainer lists
+// under the same English name.
+const armorKit = (installId: string, rank: number, difficulty: string) => ({
+  kind: "recipe_observed", installId, recipeId: 2152, profession: "Leatherworking", recipe: "Light Armor Kit", rank, difficulty,
+  reagents: [{ item: "Light Leather", count: 1 }],
+});
+const kitObserved = [armorKit("a", 10, "optimal"), armorKit("b", 15, "optimal"), armorKit("c", 30, "medium")];
+const kitTrainer = (installId: string, extra: Record<string, unknown> = {}) =>
+  ({ kind: "trainer_seen", installId, profession: "Leatherworking", recipe: "Light Armor Kit", requiredRank: 1, costCopper: 50, ...extra });
+
+test("trainer rows keep the spell and product item ids the addon sent", () => {
+  const { trainers } = pathFactsFromRecords([kitTrainer("a", { spellId: 2152, productItemId: 2304 }), kitTrainer("b", { spellId: 0, productItemId: 1.5 })]);
+  expect(trainers[0]).toMatchObject({ spellId: 2152, productItemId: 2304 });
+  expect(trainers[1]).not.toHaveProperty("spellId");
+  expect(trainers[1]).not.toHaveProperty("productItemId");
+});
+
+test("a same-name trainer offering for another spell id never gives a recipe its training cost or rank", () => {
+  const other = pathFactsFromRecords([...kitObserved, ...["a", "b", "c"].map((id) => kitTrainer(id, { spellId: 9152, costCopper: 900 }))]);
+  expect(other.derived).toEqual([expect.objectContaining({ recipe: "Light Armor Kit", skillMin: 10, trainingCopper: null })]);
+  const same = pathFactsFromRecords([...kitObserved, ...["a", "b", "c"].map((id) => kitTrainer(id, { spellId: 2152 }))]);
+  expect(same.derived[0]).toMatchObject({ skillMin: 1, trainingCopper: 50 });
+  // Rows from older addons carry no spell id: while another spell id is listed under that name, they could be either.
+  const mixed = pathFactsFromRecords([
+    ...kitObserved, ...["a", "b", "c"].map((id) => kitTrainer(id, { costCopper: 70 })), kitTrainer("d", { spellId: 9152, costCopper: 900 }),
+  ]);
+  expect(mixed.derived[0]).toMatchObject({ skillMin: 10, trainingCopper: null });
+});
+
+test("a recipe agreed by name only takes no training cost from a name two spell ids share", () => {
+  const byName = (installId: string, rank: number, difficulty: string) => ({ ...armorKit(installId, rank, difficulty), recipeId: undefined });
+  const records = [
+    byName("a", 10, "optimal"), byName("b", 15, "optimal"), byName("c", 30, "medium"),
+    kitTrainer("a", { spellId: 2152 }), kitTrainer("b", { spellId: 2152 }), kitTrainer("c", { spellId: 9152 }),
+  ];
+  expect(pathFactsFromRecords(records).derived[0]).toMatchObject({ skillMin: 10, trainingCopper: null });
+});
+
+test("trainingCostBySpell: the median of three installs' prices per spell id; rows without one never count", () => {
+  const trainers = pathFactsFromRecords([
+    kitTrainer("a", { spellId: 2152, costCopper: 45 }), kitTrainer("b", { spellId: 2152 }), kitTrainer("c", { spellId: 2152 }),
+    kitTrainer("a", { spellId: 9152, costCopper: 900 }), kitTrainer("b", { spellId: 9152, costCopper: 900 }),
+    ...["d", "e", "f"].map((id) => kitTrainer(id, { costCopper: 70 })),
+  ]).trainers;
+  expect(trainingCostBySpell(trainers)).toEqual(new Map([[2152, 50]]));
+});
+
+test("pathFactsFromRecords adds item-id vendor prices beside the name-keyed ones", () => {
+  const facts = pathFactsFromRecords(["a", "b", "c"].map((installId) => ({ kind: "vendor", installId, vendorNpcId: 1, items: [{ itemId: 2320, priceCopper: 10 }, { itemId: 2321, priceCopper: 0 }] })));
+  expect(facts.vendorPricesById).toEqual(new Map([[2320, 10]]));
 });
