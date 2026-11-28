@@ -318,8 +318,8 @@ function ChartTable<T>({ caption, columns, rows, rowKey }: { caption: string; co
         <span aria-hidden="true" className="hidden font-mono text-muted group-open:inline">−</span>
         Show as a table
       </summary>
-      <div className="mt-2 overflow-x-auto">
-        <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />
+      <div className="mt-2">
+        <DataTable dense stickyHeader={false} caption={caption} columns={columns} rows={rows} rowKey={rowKey} />
       </div>
     </details>
   );
