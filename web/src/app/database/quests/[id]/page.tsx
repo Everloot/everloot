@@ -14,6 +14,7 @@ import { agreementLabel, reportedLabel, Badge, DataTable, Tabs } from "@/compone
 import { EMPTY, EmptyTab, EntityPage, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import EntityMap from "../../EntityMap";
 import { entityMapZones, type MapMark } from "../../entity-map";
+import { plural } from "../../list-parts";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -182,7 +183,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <span className="block text-muted">{CLIENT_QUEST_STARTS.label} · build {CLIENT_QUEST_STARTS.build.version}</span>
         </> }] : []),
         { label: "End", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
-        { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },
+        { label: "Rewards", value: known(page.rewards.length ? plural(page.rewards.length, "item") : null) },
       ]}
       // The opening paragraph of the quest's lore archive page: the wiki's blurb, not the in-game objective, so its
       // heading names it and its source (the archive predates WoW: Forever). A paragraph of its own at the main

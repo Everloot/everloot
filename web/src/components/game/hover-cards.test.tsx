@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import HoverCards, { CARD_ID, forgetCards, linkFrame, Lru, RETRY_DELAY, SHOW_DELAY } from "./HoverCards";
+import HoverCards, { CARD_ID, forgetCards, Lru, nameOnly, RETRY_DELAY, SHOW_DELAY } from "./HoverCards";
 
 const THUNDERFURY = {
   type: "item", id: 19019, title: "Thunderfury, Blessed Blade of the Windseeker", quality: 5,
@@ -223,30 +223,29 @@ function held() {
   });
 }
 
-test("the frame shows at once with the name and quality colour the link shows, and the card fills it when it arrives", async () => {
+// QA round 12: a card with nothing but the name repeated the link and covered the next row or the "All prices" link.
+test("nothing opens until the card arrives (a frame would only repeat the link's name); then the card shows whole", async () => {
   const a = link("/database/items/19019");
   a.className = "text-q-legendary hover:underline";
   const answer = held();
   pointer("pointerover", a);
   await wait(SHOW_DELAY);
-  const frame = card()!;
-  expect(frame.querySelector("[data-tooltip-frame] p")!.textContent).toBe("Thunderfury");
-  expect(frame.querySelector("[data-tooltip-frame] p")!.className).toContain("text-q-legendary");
-  expect(frame.querySelector("img")).toBeNull();
-  expect(a.getAttribute("aria-describedby")).toBe(CARD_ID);
+  expect(card()).toBeNull();
+  expect(a.hasAttribute("aria-describedby")).toBe(false);
 
   await answer(THUNDERFURY);
+  expect(a.getAttribute("aria-describedby")).toBe(CARD_ID);
   expect(card()!.querySelector("[data-tooltip-frame] p")!.textContent).toBe(THUNDERFURY.title);
   expect(card()!.querySelector("img")!.getAttribute("src")).toBe(THUNDERFURY.icon);
   expect(card()!.textContent).toContain("Binds when picked up");
 });
 
-test("a link with no card (404) loses its frame when the answer comes, and shows nothing on the next hover", async () => {
+test("a link with no card (404) shows nothing when the answer comes, and nothing on the next hover", async () => {
   const a = link("/database/items/99999");
   const answer = held();
   pointer("pointerover", a);
   await wait(SHOW_DELAY);
-  expect(card()!.textContent).toBe("Item 99999");
+  expect(card()).toBeNull();
   await answer(null);
   expect(card()).toBeNull();
   expect(a.hasAttribute("aria-describedby")).toBe(false);
@@ -296,24 +295,45 @@ test("the visit's cards are a least-recently-used map: reading one keeps it, and
   expect(lru.get("missing")).toBeUndefined();
 });
 
-test("the frame takes the coloured name from a link that shows more than the name, and a plain link's whole text", async () => {
-  const row = document.createElement("a");
-  row.href = "/database/items/19019";
-  row.innerHTML = '<span class="min-w-0 text-q-epic">Thunderfury</span><span class="text-muted">Item 19019</span>';
-  expect(linkFrame(row)).toEqual({ title: "Thunderfury", quality: 4, icon: null, lines: [], foot: null });
-  const plain = document.createElement("a");
-  plain.innerHTML = "Hogger <span>(elite)</span>";
-  expect(linkFrame(plain)).toMatchObject({ title: "Hogger (elite)", quality: null });
-  expect(linkFrame(document.createElement("a"))).toBeNull();
+test("a card that only repeats the name the link shows never opens, by pointer or by keyboard; one with tooltip content does", async () => {
+  const BANDAGE = { type: "spell", id: 3275, title: "Linen Bandage", quality: null, icon: null, lines: [], foot: null };
+  container.innerHTML = '<a href="/database/spells/3275">Linen Bandage</a> <a href="/database/spells/3276">Spell 3276</a>';
+  fetcher.mockImplementation(async (url: string) => new Response(JSON.stringify({ ok: true, card: url.endsWith("/3275") ? BANDAGE : { ...BANDAGE, id: 3276 } }), { status: 200 }));
+  const a = link("/database/spells/3275");
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(card()).toBeNull();
+  expect(a.hasAttribute("aria-describedby")).toBe(false);
+  // From the visit's cards too.
+  pointer("pointerout", a, "mouse", document.body);
+  await act(async () => a.focus());
+  await wait(SHOW_DELAY);
+  expect(card()).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await act(async () => a.blur());
+  // A name the link does not show ("Spell 3276") is news: that card opens.
+  pointer("pointerover", link("/database/spells/3276"));
+  await wait(SHOW_DELAY);
+  expect(card()!.textContent).toBe("Linen Bandage");
 });
 
-test.each([["spells", "spell"], ["vendors", "vendor"]])("%s links use the frame, shared request and visit cache", async (page, type) => {
+test("a card is name-only when it has no icon, lines, evidence, missing note, taught item or foot", () => {
+  const bare = { title: "Linen Bandage", quality: null, icon: null, lines: [], foot: null };
+  expect(nameOnly(bare)).toBe(true);
+  expect(nameOnly({ ...bare, quality: 1 })).toBe(true);
+  for (const more of [{ icon: "x.webp" }, { lines: ["Heals 66"] }, { foot: "Found in game files" }, { missing: "No stats" },
+    { evidence: { summary: "3 installs", lines: [] } }, { taught: { id: 1, title: "A", quality: null, color: null, lines: [], at: 0 } }])
+    expect(nameOnly({ ...bare, ...more })).toBe(false);
+});
+
+test.each([["spells", "spell"], ["vendors", "vendor"]])("%s links use the shared request and visit cache", async (page, type) => {
   container.innerHTML = `<a href="/database/${page}/10">Shown name</a>`;
   const a = link(`/database/${page}/10`);
   const answer = held();
   pointer("pointerover", a);
   await wait(SHOW_DELAY);
-  expect(card()!.textContent).toBe("Shown name");
+  expect(card()).toBeNull();
   expect(fetcher).toHaveBeenCalledWith(`/card/${type}/10`);
   pointer("pointerout", a, "mouse", document.body);
   pointer("pointerover", a);

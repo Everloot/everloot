@@ -270,3 +270,39 @@ test("a dropdown choice is a 44 px tap target on a phone and keeps the dense 32 
   expect(rule).toContain("sm:min-h-8");
   expect(rule).not.toContain("min-h-8");
 });
+
+// QA round 12: Tab past the last choice of an open Class menu moved focus to Slot while the Class list stayed open
+// over "Sort" and the "Not listed" line.
+test("tabbing out of an open dropdown closes it; focus moving within it, or Escape, keeps the old behaviour", async () => {
+  const quality = menu("quality");
+  const klass = menu("class");
+  open(quality);
+  const [epic, rare] = quality.querySelectorAll("a");
+  await act(async () => epic.focus());
+  await act(async () => rare.focus());
+  expect(quality.open).toBe(true);
+  await act(async () => summaryOf(klass).focus());
+  expect(quality.open).toBe(false);
+  // Focus leaving for another field on the page closes it too.
+  open(quality);
+  await act(async () => rare.focus());
+  await act(async () => container.querySelector<HTMLInputElement>("#elsewhere-field")!.focus());
+  expect(quality.open).toBe(false);
+  expect(container.querySelector<HTMLDetailsElement>("#elsewhere")!.open).toBe(true);
+});
+
+test("the window losing focus leaves an open dropdown open", async () => {
+  const quality = menu("quality");
+  open(quality);
+  const link = quality.querySelector("a")!;
+  await act(async () => link.focus());
+  await act(async () => { link.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null })); });
+  expect(quality.open).toBe(true);
+});
+
+test("the name box's Filter button is in the tab order and shows itself when focused", () => {
+  const html = renderToStaticMarkup(<FilterBar {...props} />);
+  const button = html.match(/<button type="submit"[^>]*>Filter<\/button>/)![0];
+  expect(button).not.toContain("tabindex");
+  expect(button).toMatch(/class="[^"]*\bsr-only\b[^"]*\bfocus-visible:not-sr-only\b/);
+});

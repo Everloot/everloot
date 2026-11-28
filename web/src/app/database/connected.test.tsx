@@ -154,3 +154,9 @@ test("the lore sitemap answers 503, not a short list, when upload storage or the
   const { GET: missing } = await import("../lore-sitemap.xml/route");
   expect((await missing()).status).toBe(503);
 });
+
+test("a quest with one reward says 1 item in its quick facts, not 1 items", async () => {
+  const page = await questPage();
+  expect(page.split(">Rewards</dt>")[1]?.split("</dd>")[0]).toMatch(/>1 item$/);
+  expect(page).not.toContain("1 items");
+});

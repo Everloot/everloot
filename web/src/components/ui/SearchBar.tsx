@@ -205,11 +205,12 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setPicked(row.href)}
         onClick={() => setOpen(false)}
-        className={`flex h-11 items-center gap-3 px-3 text-cell sm:h-9 ${i === active ? "bg-canvas" : ""}`}
+        className={`flex min-h-11 items-center gap-3 px-3 py-1 text-cell sm:min-h-9 ${i === active ? "bg-canvas" : ""}`}
       >
         {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
         {row.faction && <span role="img" aria-label={row.faction} className={`h-2 w-2 shrink-0 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} />}
-        <span className={`min-w-0 flex-1 truncate ${labelColour(row)}`}>{row.label}</span>
+        {/* Two lines, not one cut short: two long names that start alike ("Thunderfury, Bless…") stay apart at 390 px. */}
+        <span className={`line-clamp-2 min-w-0 flex-1 break-words ${labelColour(row)}`}>{row.label}</span>
         <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
       </Link>
     </li>

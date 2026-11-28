@@ -87,8 +87,8 @@ function Controls({ search, controls, active, clearHref, nofollow }: FilterBarPr
             placeholder={search.placeholder}
             className={`ctl w-full min-w-0 border bg-panel px-3 text-fg placeholder:text-muted focus:border-accent focus:outline-none sm:w-44 ${search.value ? "border-accent" : "border-edge"}`}
           />
-          {/* Enter in the field submits; out of the tab order, so focus never lands on a ring around nothing. */}
-          <button type="submit" tabIndex={-1} className="sr-only">Filter</button>
+          {/* Enter in the field submits. Tab reaches the button too, and it shows while it has focus (the row stretches it to the field's height). */}
+          <button type="submit" className="sr-only text-fg focus-visible:not-sr-only focus-visible:ml-1 focus-visible:rounded-control focus-visible:border focus-visible:border-accent focus-visible:bg-panel focus-visible:px-3">Filter</button>
         </form>
       )}
       {controls.map((c) => c.type === "menu"

@@ -8,7 +8,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { hasConfirmed, publicZones, zoneContents, zoneHref, type ZoneContents, type ZoneSummary } from "@/lib/zones";
-import { byRank, nameMatches, Respelled, ListNote, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, paged, pageParams, sortRows, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, ListNote, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, paged, pageParams, plural, sortRows, type ListQuery, type Search } from "../list-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +92,8 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
           <ListNote>
             {noneConfirmed
               ? "Players have not confirmed anything in any zone yet, so there are no counts to show. "
-              : "A dash means nobody has confirmed anything of that kind in the zone yet. It does not mean there is none. "}
+              // Below 640 px the table folds to the zone and its meta line: the count columns, and their dashes, are not shown.
+              : <span className="hidden sm:inline">A dash means nobody has confirmed anything of that kind in the zone yet. It does not mean there is none. </span>}
             A fact appears when 3 installs agree on it.
           </ListNote>
         )}
@@ -113,7 +114,7 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
             rowKey={(z) => String(z.mapId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(z) => [z.continentName, z.contents?.entrances.length ? `${z.contents.entrances.length} dungeons and raids` : ""].filter(Boolean).join(" · ")}
+            meta={(z) => [z.continentName, z.contents?.entrances.length ? plural(z.contents.entrances.length, "dungeon or raid", "dungeons and raids") : ""].filter(Boolean).join(" · ")}
             empty={<NoMatches noun="zones" chips={q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : []} clearHref={META.path} />}
           />
         </div>
