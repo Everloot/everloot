@@ -2,8 +2,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { CURRENT_BUILD } from "@/data/game-data/raid";
-import { emptySlots, encodeRaid } from "@/lib/raid";
+import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
+import { emptySlots, encodeRaid, suggestNext, titleCase } from "@/lib/raid";
 import RaidBuilder from "./RaidBuilder";
 import { track } from "@/lib/analytics/track";
 
@@ -235,6 +235,20 @@ test("coverage: missing buffs as chips first, the full table behind a closed dis
   // The table and its legend are inside, intact.
   expect([...details.querySelectorAll("caption")].map((c) => c.textContent)).toEqual(["Buffs, per group", "Debuffs on the enemy"]);
   expect(details.querySelector("dl")!.textContent).toContain("No class you picked brings it.");
+});
+
+test("under the missing chips, a Suggested next line names the class that would bring the most of them", async () => {
+  await render();
+  expect(container.querySelector("[data-raid-suggest]")).toBeNull();
+  await dragTo(tile("Warrior"), slot(0));
+  const slots = emptySlots(20);
+  slots[0] = { class: "warrior", tree: 0 };
+  const next = suggestNext(slots, TABLES[CURRENT_BUILD]);
+  expect(next.classes.length).toBeGreaterThan(0);
+  const line = container.querySelector("[data-raid-suggest]")!.textContent!;
+  expect(line).toMatch(/^Suggested next: /);
+  for (const c of next.classes) expect(line).toContain(titleCase(c));
+  expect(line).toMatch(new RegExp(`brings? ${next.count} of the missing`));
 });
 
 test("a party buff in one group is missing only for the others, by group", async () => {

@@ -287,6 +287,19 @@ test("the guild directory sorts from its headers, reads well on a phone and keep
   } finally { directory.recruiting = false; }
 });
 
+test("on a phone the directory's region and ruleset filters show as chips, each a link that drops that filter alone", async () => {
+  on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); directory.recruiting = true;
+  try {
+    const page = await hub({ region: "us", rules: "normal", sort: "level-60" });
+    const row = /<p data-filter-chips[^>]*>([\s\S]*?)<\/p>/.exec(page);
+    expect(row).not.toBeNull();
+    expect(row![0]).toMatch(/class="[^"]*sm:hidden/);
+    expect(row![1]).toMatch(/<a href="\/guilds\?rules=normal&amp;sort=level-60"[^>]*>US<span aria-hidden="true">×<\/span><span class="sr-only">\(remove\)<\/span><\/a>/);
+    expect(row![1]).toMatch(/<a href="\/guilds\?region=us&amp;sort=level-60"[^>]*>Normal<span aria-hidden="true">×/);
+    expect(await hub()).not.toContain("data-filter-chips");
+  } finally { directory.recruiting = false; }
+});
+
 test("the guild directory's sort menu names the chosen order once", async () => {
   on(); vi.stubEnv("EVERLOOT_ARMORY", "1");
   const menu = (html: string) => html.slice(html.indexOf('data-filter="sort"'), html.indexOf("</summary>", html.indexOf('data-filter="sort"')));

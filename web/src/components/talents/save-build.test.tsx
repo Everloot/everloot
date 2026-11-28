@@ -185,6 +185,20 @@ test("signed out, Save offers sign-in and remembers the build for the way back",
   expect(window.location.hash).toMatch(/^#plan=EL1-mage-/);
 });
 
+test("a one-line hint under Save says where it keeps the build: the Everloot account, not this browser", async () => {
+  api("out");
+  await render();
+  const save = button(/^Save$/)!;
+  const hint = document.getElementById(save.getAttribute("aria-describedby")!)!;
+  expect(hint.textContent).toBe("Save keeps this build in your Everloot account. Sign in first.");
+  api("in", []);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await render();
+  const signedIn = document.getElementById(button(/^Save$/)!.getAttribute("aria-describedby")!)!;
+  expect(signedIn.textContent).toBe("Save keeps this build in your Everloot account.");
+});
+
 test("signed out, the calculator does not ask for the account's builds, so the console shows no 401", async () => {
   api("out");
   const asked: string[] = [];

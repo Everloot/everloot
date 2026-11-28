@@ -111,6 +111,16 @@ export function roleOf(slot: Slot): Role {
   return slot.tree === 0 ? "unknown" : roles[slot.tree - 1] ?? "unknown";
 }
 
+/**
+ * A talent tree's role (tree index 0 to 2, in the client's order) for a label beside its name: null when every tree of
+ * the class has the same role, which the label would only repeat, or when the tree does not settle it (Feral).
+ */
+export function treeRole(cls: ClassName, index: number): Exclude<Role, "unknown"> | null {
+  const roles = TREE_ROLES[cls];
+  const role = roles.length > 1 ? roles[index] : undefined;
+  return !role || role === "unknown" ? null : role;
+}
+
 export interface Roster {
   filled: number;
   classes: Record<ClassName, number>;
@@ -226,6 +236,33 @@ export function coverage(slots: Slots, table: BuffTable): Coverage {
   const summary: Record<State, number> = { covered: 0, cast: 0, possible: 0, unknown: 0, missing: 0 };
   for (const b of buffs) summary[b.raid]++;
   return { buffs, debuffs: all.filter((f) => f.family.kind === "debuff"), summary };
+}
+
+/**
+ * The class that would help most with what the raid is missing: each class is tried (any tree) in the first empty slot
+ * of each group with room, and scores the missing buffs and debuffs it would bring to at least one more group. Every
+ * class on the best score is named, in class order; none when nothing is missing or there is no room.
+ */
+export function suggestNext(slots: Slots, table: BuffTable): { classes: ClassName[]; count: number } {
+  const missingGroups = (c: Coverage) => new Map([...c.buffs, ...c.debuffs].filter((f) => f.raid === "missing").map((f) => [f.family.id, f.groups.filter((s) => s === "missing").length]));
+  const now = missingGroups(coverage(slots, table));
+  const rooms = groupsOf(slots).flatMap((group, g) => {
+    const i = group.indexOf(null);
+    return i < 0 ? [] : [g * GROUP_SIZE + i];
+  });
+  let classes: ClassName[] = [];
+  let count = 0;
+  if (now.size === 0) return { classes, count };
+  for (const cls of CLASSES) {
+    const score = Math.max(0, ...rooms.map((room) => {
+      const next = [...slots];
+      next[room] = { class: cls, tree: 0 };
+      const after = coverage(next, table);
+      return [...after.buffs, ...after.debuffs].filter((f) => now.has(f.family.id) && f.groups.filter((s) => s === "missing").length < now.get(f.family.id)!).length;
+    }));
+    if (score > count) { classes = [cls]; count = score; } else if (score > 0 && score === count) classes.push(cls);
+  }
+  return { classes, count };
 }
 
 export const STATE_LABEL: Record<State, string> = {

@@ -150,6 +150,27 @@ function directoryControls(d: GuildDirectoryQuery): FilterControl[] {
   ];
 }
 
+/**
+ * On a phone the menus fold into one "Filters (n)" button, so the region and ruleset that are on show under it as
+ * chips, each a link to the directory without that one filter (the item lists do the same).
+ */
+function DirectoryChips({ d }: { d: GuildDirectoryQuery }) {
+  const chips = [
+    ...(d.region ? [{ label: regionLabel(d.region), href: guildDirectoryHref({ ...d, page: 1, region: null }) }] : []),
+    ...(d.ruleset !== null ? [{ label: ARMORY_RULESETS.find((r) => r.id === d.ruleset)?.label ?? "", href: guildDirectoryHref({ ...d, page: 1, ruleset: null }) }] : []),
+  ];
+  if (!chips.length) return null;
+  return (
+    <p data-filter-chips className="flex flex-wrap items-center gap-2 sm:hidden">
+      {chips.map((c) => (
+        <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
+          {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
+        </Link>
+      ))}
+    </p>
+  );
+}
+
 /** The guild hide list, or null when it could not be read (then the directory lists no guild). */
 async function hiddenGuilds(): Promise<Set<string> | null> {
   try { return await playerStore().hiddenGuilds(); } catch { return null; }
@@ -252,6 +273,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                   <ResultStrip total={dir.total} noun={scanned && !scanned.complete ? "guilds found" : "guilds"} page={d.page} perPage={GUILD_DIRECTORY_PAGE} href={(page) => guildDirectoryHref({ ...d, page })} />
                 )}
               />
+              <DirectoryChips d={d} />
               {dir.state === "not-ready" && (
                 <p role="status" className="text-sm text-fg-2">
                   Counts and sorting start once the directory&apos;s database update is applied.
