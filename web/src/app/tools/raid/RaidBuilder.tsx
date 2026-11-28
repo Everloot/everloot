@@ -676,9 +676,10 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
           id="raid-coverage"
           note={
             <span role="status" aria-live="polite">
-              Buffs for the whole raid: {cov.summary.covered} of {cov.buffs.length} yes, {cov.summary.cast} by cast,{" "}
+              {/* Each effect counts in one part only (a buff by cast is not also a yes), so the parts add up to the total. */}
+              Buffs for the whole raid, {cov.buffs.length} in all: {cov.summary.covered} yes, {cov.summary.cast} by cast,{" "}
               {cov.summary.possible} if talented, {cov.summary.unknown} unknown reach, {cov.summary.missing} missing.
-              Debuffs: {debuffsCovered} of {cov.debuffs.length}, {debuffsPossible} if talented,{" "}
+              Debuffs, {cov.debuffs.length} in all: {debuffsCovered} yes, {debuffsPossible} if talented,{" "}
               {debuffsUnknown > 0 && `${debuffsUnknown} unknown reach, `}{debuffsMissing} missing.
             </span>
           }
