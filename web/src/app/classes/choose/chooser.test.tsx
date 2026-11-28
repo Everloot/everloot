@@ -153,7 +153,7 @@ describe("the chooser page", () => {
   test("is linked from no header, Tools menu, class index or hub while it is a draft", async () => {
     const hrefs = [false, true].flatMap((on) => phoneGroups(navItems({ guilds: on, players: on, profiles: on, savedBuilds: on })).flatMap((g) => g.links.map((l) => l.href)));
     expect(hrefs.filter((h) => h.startsWith("/classes"))).toEqual([]);
-    const pages = [renderToStaticMarkup(<ClassesPage />), renderToStaticMarkup(await ClassHubPage({ params: Promise.resolve({ class: "mage" }) }))];
+    const pages = [renderToStaticMarkup(await ClassesPage()), renderToStaticMarkup(await ClassHubPage({ params: Promise.resolve({ class: "mage" }) }))];
     for (const html of pages) expect(html).not.toContain("/classes/choose");
   });
 

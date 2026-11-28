@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ClassNavigation from "../../ClassNavigation";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
@@ -105,11 +106,11 @@ export default async function ClassSpellsPage({ params }: Params) {
         title={<><span className={CLASS_TEXT[slug]}>{name}</span> spells by level</>}
         lede={`${placed} ${name} spells have a level in the game files: ${count} listed by level, lowest first, ${apart.length} talents apart${repeats > 0 ? `, and ${repeats} that repeat a name and rank at one level, shown once` : ""}.`}
       />
+      <ClassNavigation slug={slug} current="abilities" />
       <ListNote files>
         {`The spells on the ${name}'s own skill lines in build ${SPELLS_BUILD}: ranks, passives and helper spells as the files have them, unconfirmed. Talents, which the files put at level 1, are listed apart at the end; runes, pet abilities and procs have none. Nothing in the files says which a trainer teaches or what it costs. `}
         {!names && "The spell names could not be read, so each spell is listed by number. "}
         {unleveled > 0 && <>{`${unleveled} more ${name} spells have no level in the files: `}<Link href={`/database/spells?class=${slug}`} className={LINK}>{`every ${name} spell`}</Link>{" lists them. "}</>}
-        <Link href={`/classes/${slug}`} className={LINK}>{`Back to the ${name}`}</Link>
       </ListNote>
       <div className="mt-6 space-y-6">
         {levels.map(({ level, spells }) => (

@@ -47,6 +47,14 @@ test("the history comes from the stored file and the corpus is not read", async 
   expect(html).toContain("2026-11-01  1s 50c  3 reporters");
 });
 
+test("a selected auction house cannot show the realm-wide legacy listing history", async () => {
+  store.stored.mockResolvedValue({ points: [{ day: "2026-11-01", copper: 150, reporters: 3 }], dataAsOf: "2026-11-09T11:50:00.000Z" });
+  const html = renderToStaticMarkup(await RealmItemPage({ params: Promise.resolve({ realm: "forever", itemId: "2589" }), searchParams: Promise.resolve({ house: "horde" }) }));
+  expect(html).toContain("Last 60 days, Horde auction house");
+  expect(html).not.toContain("Single listings seen while browsing");
+  expect(store.stored).not.toHaveBeenCalled();
+});
+
 test("with no stored file the history says unrecorded, not empty, and the corpus is still not read", async () => {
   store.stored.mockResolvedValue(null);
   const html = await page();

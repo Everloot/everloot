@@ -129,11 +129,11 @@ test("drops and auctions: the item's icon beside its link and the tooltip as its
   privateBucket();
   const fetcher = bucket();
   vi.stubGlobal("fetch", fetcher);
-  for (const [, page] of [["drops", () => DropsPage({})], ["auctions", () => AuctionsRealmPage({ params: Promise.resolve({ realm: "forever" }) })]] as const) {
+  for (const [kind, page] of [["drops", () => DropsPage({})], ["auctions", () => AuctionsRealmPage({ params: Promise.resolve({ realm: "forever" }) })]] as const) {
     const html = await render(page);
     expect(html).toContain(`src="${BASE}/icons/132889.webp"`);
     expect(html).toMatch(/<img[^>]*alt=""[^>]*aria-hidden="true"/);
-    expect(html).toMatch(/href="\/(database\/items|tools\/auctions\/forever)\/9"/);
+    expect(html).toMatch(kind === "drops" ? /href="\/database\/items\/9"/ : /href="\/tools\/auctions\/forever\/9\?house=(alliance|horde|neutral)"/);
     expect(html).toMatch(/aria-describedby="[^"]+"/);
     expect(html).toContain("Linen Cloth, Common");
     // Neither list carries a credit line of its own now: the site footer does (density spec, 2026-10-20).

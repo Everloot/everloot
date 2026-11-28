@@ -46,6 +46,11 @@ export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ instance: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+const prepSections = [
+  { id: "entrance", label: "Entrance" },
+  { id: "quests", label: "Quests" },
+  { id: "loot", label: "Loot" },
+];
 
 /** The instance's row, with what players reported when storage answers; null for an id the site does not show. */
 async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean; asOf?: Date } | null> {
@@ -134,6 +139,10 @@ export default async function InstancePage(props: Props) {
   const droppedIds = [...lootTables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
   const lootRows: InstanceLootRow[] = lootBosses.flatMap((b) => b.npcIds.flatMap((id) => (lootTables.get(id)?.rows ?? []).map((r) => ({ ...r, encounterId: b.encounterId }))));
   const look = droppedIds.length ? await loadItemLooks(assets, droppedIds) : null;
+  const auctionItems = look ? [...new Set(droppedIds)].filter((id) => {
+    const { tip } = look(id);
+    return tip && (tip.binding === 0 || tip.binding === 2 || tip.binding === 3);
+  }).slice(0, 50) : [];
   // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
   const terrain = instanceTerrain(row.instanceMapId);
   const gear = gearFor({ instance: row.instanceMapId });
@@ -284,6 +293,10 @@ export default async function InstancePage(props: Props) {
         : lootBosses.length === 0 ? <EmptyTab message={EMPTY.bossLoot} players={false} action={null} />
         : (
           <div className="space-y-4">
+            {auctionItems.length > 0 && <div className="flex flex-wrap items-center gap-2">
+              <a className="btn" href={`/blizzard-auctions?${new URLSearchParams({ items: auctionItems.join(",") })}`}>Price tradeable drops</a>
+              <span className="text-meta text-fg-2">Choose an auction house to see quotes for observed loot with a tradeable binding in the game files.</span>
+            </div>}
             <InstanceLootPanel
               rows={lootRows}
               title={title}
@@ -401,6 +414,12 @@ export default async function InstancePage(props: Props) {
         title,
         icon: <EntityIcon src={loading?.small?.url ?? loading?.url} cover />,
         meta: [kindLabel(row.raid), <span key="id" className="tabular-nums">Instance {row.instanceMapId}</span>],
+        aside: (
+          <nav aria-label="Run preparation" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {prep && <Link prefetch={false} href={wikiHref(prep.slug)} className="btn btn-primary">Prepare for this {prep.type === "raid" ? "raid" : "dungeon"}</Link>}
+            {prepSections.map(({ id, label }) => <a key={id} href={`#${id}`} className={`ctl inline-flex items-center px-1.5 ${link}`}>{label}</a>)}
+          </nav>
+        ),
         trail: [
           ...trailFor("/database/instances")!,
           { name: title, path: canonical },
@@ -408,15 +427,15 @@ export default async function InstancePage(props: Props) {
       }}
       box={loading && <EntityArt src={loading.url} alt={`Loading screen of ${title}`} width={loading.width} height={Math.round((loading.width * 9) / 16)} />}
       facts={facts}
-      notices={(prep || unreachable) && <>
-        {prep && (
-          <p className="mb-3 text-sm"><Link href={wikiHref(prep.slug)} className={link}>Prepare for this {prep.type === "raid" ? "raid" : "dungeon"}</Link></p>
-        )}
-        {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
-      </>}
+      notices={unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Player evidence is unavailable. Any entrance shown comes from the game files.</p>}
       summary={summary}
       main={
         <div className="space-y-6">
+          <div className="relative">
+            {/* Jump to the tab strip while its hash selects the requested panel. */}
+            {prepSections.map(({ id }) => <span key={id} id={id} aria-hidden="true" className="absolute top-0 scroll-mt-20" />)}
+            <Tabs label={`${title}: sections`} tabs={tabs} />
+          </div>
           <Disclosure as="h2" summary="How this is counted">
             <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one. Players is the group size the game files give those difficulties. The entrance is the one players confirmed, else the game files' own.</p>
             <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
@@ -424,8 +443,6 @@ export default async function InstancePage(props: Props) {
             <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows, gathered into one table with the highest chance first; the Bosses tab shows each boss's three most frequent drops, and its creature's level and picture when 3 installs agree on the level and the site has a model picture. Rates show from one install, marked reported at one, verified at two, confirmed at three or more.</p>
             <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
           </Disclosure>
-
-          <Tabs label={`${title}: sections`} tabs={tabs} />
         </div>
       }
       related={<LoreSection match={lore} />}

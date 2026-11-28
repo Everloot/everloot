@@ -30,7 +30,7 @@ export async function loadMarketBox(itemId: number, now: Date = new Date()): Pro
 export function MarketBox({ itemId, rows, paused }: { itemId: number; rows: MarketRow[]; paused: boolean }) {
   if (!rows.length) return null;
   const columns: Column<MarketRow>[] = [
-    { key: "realm", header: "Realm", nowrap: true, cell: (r) => <Link href={itemHref(r.realm, itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link> },
+    { key: "realm", header: "Realm", nowrap: true, cell: (r) => <Link href={itemHref(r.realm, itemId, r.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link> },
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><CoinText text={money(r.value.market)} /></span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.min)} /> },
@@ -43,7 +43,8 @@ export function MarketBox({ itemId, rows, paused }: { itemId: number; rows: Mark
         <Link href={crossRealmHref(itemId)} className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All prices</Link>
       </div>
       {paused && <ScansPausedNotice className="mb-2" />}
-      <DataTable dense caption="Auction House prices" columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`} />
+      <DataTable dense caption="Auction House prices" columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`}
+        meta={(r) => <>{r.house} · <CoinText text={formatCopper(r.value.min)} /> · {scanDayText(r.value.day)}</>} />
     </section>
   );
 }

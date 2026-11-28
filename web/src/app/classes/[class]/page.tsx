@@ -23,6 +23,7 @@ import { classFacts } from "@/lib/talents/facts";
 import { CENSUS_CLASSES } from "@kb/census";
 import type { GuideActivity, GuideRole } from "@kb/guides/guide";
 import GuidesEmpty from "../../guides/GuidesEmpty";
+import ClassNavigation from "../ClassNavigation";
 
 // Built once per deploy, one page per class; `dynamic = "error"` fails the build if the page ever reads the request.
 // The guides are read from kb/guides while the site builds: the function bundles do not carry that folder, so a page
@@ -131,6 +132,7 @@ export default async function ClassHubPage({ params }: Params) {
         lede={lede(name, guides.length)}
         meta={roles.length ? <span>{`Roles in its reviewed guides: ${roles.map((r) => ROLE[r]).join(", ")}`}</span> : undefined}
       />
+      <ClassNavigation slug={slug} current="overview" />
       <UseClassButton classSlug={slug} />
 
       <div className="mt-8 space-y-10">

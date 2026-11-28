@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
-import { crossRealmHref, houseParam, houseSlug, itemIdParam, realmHref, realmSlug, slugParam } from "@/lib/auction-house";
+import { crossRealmHref, houseParam, houseSlug, itemHref, itemIdParam, realmHref, realmSlug, slugParam } from "@/lib/auction-house";
 import { browseView } from "./browse-view";
 import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
 import { Container } from "@/components/ui";
@@ -34,7 +34,7 @@ export default async function AuctionHousePage(props: Props) {
   const legacyItem = itemIdParam(one(searchParams.item) || (realmText ? one(searchParams.q) : ""));
   const slug = realmText ? slugParam(realmSlug(realmText)) : null;
   const house = houseParam(one(searchParams.house) || undefined);
-  if (slug) redirect(legacyItem ? `${realmHref({ slug })}/${legacyItem}` : `${realmHref({ slug })}${house ? `?house=${houseSlug(house)}` : ""}`);
+  if (slug) redirect(legacyItem ? itemHref({ slug }, legacyItem, house) : `${realmHref({ slug })}${house ? `?house=${houseSlug(house)}` : ""}`);
   if (legacyItem) redirect(crossRealmHref(legacyItem));
   const view = await browseView({ slug: null, search: Object.fromEntries(Object.entries(searchParams).filter(([k]) => k !== "realm" && k !== "item")) });
   // The page has no lead line, so the application is described by the meta description. Its name is the H1.
@@ -44,7 +44,7 @@ export default async function AuctionHousePage(props: Props) {
       {view}
       <Container width="data">
         <div className="space-y-8 pb-8">
-          <AhledgerDeals />
+          <div id="market-deals" className="scroll-mt-24"><AhledgerDeals /></div>
           <AhledgerEconomySummary />
         </div>
       </Container>

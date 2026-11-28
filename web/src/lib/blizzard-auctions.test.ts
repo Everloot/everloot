@@ -98,6 +98,8 @@ const ALLOWED = [
   "web/src/app/blizzard-auctions/[id]/page.tsx",
   "web/src/app/blizzard-auctions/[id]/history.tsx",
   "web/src/app/blizzard-auctions/page.tsx",
+  "web/src/app/blizzard-auctions/cross-house/compare.ts",
+  "web/src/app/blizzard-auctions/cross-house/page.tsx",
   // Plain link to the ad-free document only; no Blizzard reader on the player-price page.
   "web/src/app/tools/auctions/browse-view.tsx",
   // The scans-paused notice's plain link to the ad-free page only; it reads nothing.
@@ -106,6 +108,7 @@ const ALLOWED = [
   "web/src/lib/breadcrumbs.ts",
   // Links to the page only; database/items/[id]/blizzard-link.test.tsx checks it reads nothing.
   "web/src/app/database/items/[id]/page.tsx",
+  "web/src/app/database/instances/[instance]/page.tsx",
   // Names the page's path in its matcher only, to answer client fetches of it without the page; reads nothing.
   "web/src/middleware.ts",
   // Names the page's path in the freshness table only, to keep it out of every shared cache; reads nothing.

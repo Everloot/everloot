@@ -1,7 +1,7 @@
 import { CoinText } from "@/components/ui/Coins";
 import { DataTable, type Column } from "@/components/ui";
 import type { BlizzardPrice, BlizzardRead } from "@/lib/blizzard-auctions";
-import { houseLabel, houseOrder } from "@/lib/blizzard-houses";
+import { BLIZZARD_HOUSES, blizzardMarketQuery, houseLabel, houseOrder } from "@/lib/blizzard-houses";
 import { formatCopper } from "@kb/market";
 
 const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
@@ -16,7 +16,7 @@ export function blizzardTime(iso: string): string {
  * snapshot shown, so "as of" holds for every row, and each row shows its own (a house's items and commodities are
  * published apart). A failed read says so, and is not shown as "no data yet". The page it sits on is ad-free.
  */
-export function BlizzardAuctions({ read }: { read: BlizzardRead }) {
+export function BlizzardAuctions({ read, itemId }: { read: BlizzardRead; itemId?: number }) {
   if (!read.ok) {
     return (
       <section aria-labelledby="item-blizzard-auctions" data-blizzard-auctions="unread" className="mt-6 mb-6 max-w-[640px]">
@@ -38,7 +38,9 @@ export function BlizzardAuctions({ read }: { read: BlizzardRead }) {
   const asOf = rows.reduce((oldest, r) => (r.snapshotAt < oldest ? r.snapshotAt : oldest), rows[0].snapshotAt);
   const columns: Column<BlizzardPrice>[] = [
     { key: "region", header: "Region", nowrap: true, cell: (r) => r.region.toUpperCase() },
-    { key: "house", header: "Auction house", nowrap: true, cell: (r) => houseLabel(r.houseId, r.houseName) },
+    { key: "house", header: "Auction house", nowrap: true, cell: (r) => itemId && BLIZZARD_HOUSES.has(r.houseId)
+      ? <a className="underline underline-offset-4" href={`/blizzard-auctions/${itemId}?${blizzardMarketQuery({ region: r.region, house: r.houseId })}`}>{houseLabel(r.houseId, r.houseName)}</a>
+      : houseLabel(r.houseId, r.houseName) },
     { key: "min", header: "Lowest buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.minUnit)} /> },
     { key: "typical", header: "Typical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.typicalUnit)} /> },
     { key: "quantity", header: "Listed", numeric: true, cell: (r) => r.quantity.toLocaleString("en-US") },

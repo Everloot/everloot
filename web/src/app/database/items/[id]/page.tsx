@@ -26,7 +26,7 @@ import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } f
 import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
 import { CLIENT_QUEST_STARTS, questStartedBy } from "@/data/game-data/client-quest-starts";
 import { itemTooltip } from "@/lib/item-tooltip";
-import { recipeBySpell } from "@/lib/professions";
+import { craftingLinks, recipeBySpell } from "@/lib/professions";
 import { taughtItemId } from "@/lib/recipe-catalog";
 import { itemSetOf, setBonusText } from "@/lib/item-sets";
 import { GameCard } from "@/components/game/GameCard";
@@ -138,6 +138,7 @@ export default async function ItemPage(props: Props) {
 
   const all = edgesFrom([...edges.observed, ...edges.client], "item", itemId);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
+  const recipesToPrice = rel("created_by").length ? craftingLinks(itemId).slice(0, 3) : [];
   // The clock the page's "last seen" lines are written against, and the newest date among the observed rows.
   const now = Date.now();
   const newestSeen = [...all]
@@ -419,6 +420,9 @@ export default async function ItemPage(props: Props) {
       summary={summary}
       main={<>
         <Tabs label={`${title}: relations`} tabs={tabs} />
+        {recipesToPrice.length > 0 && <div className="my-4 flex flex-wrap gap-2">
+          {recipesToPrice.map((recipe) => <Link key={recipe.key} href={recipe.href} className="btn">Price {recipe.profession} reagents</Link>)}
+        </div>}
         <DarkmoonItemNote name={name?.name} />
         {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
         <MarketBox itemId={itemId} {...auctions} />
