@@ -15,7 +15,8 @@ import { pendingForObject, pendingLine, pendingLootFromRecords, type PendingCoun
 /** `sightings`: where players saw objects on the minimap; `pending`: loot windows not yet in the rates. */
 export interface ObjectFacts { rates: PublicDropRate[]; measuredZeros: MeasuredZero[]; names: ItemNameRow[]; objects?: ObjectSpawnRow[]; sightings?: ObjectSpawnRow[]; pending?: PendingLoot; recheck?: readonly RecheckScope[] }
 
-export interface ObjectDrop { itemId: number; itemName: string | null; kills: number; drops: number; rate: number; reporters: number }
+/** `units`: every item of it counted, stacks too; absent on rates read before the rollup kept it. */
+export interface ObjectDrop { itemId: number; itemName: string | null; kills: number; drops: number; rate: number; reporters: number; units?: number }
 export interface ObjectPage {
   objectId: number;
   /** The name 3 installs agree on; null until then. */
@@ -45,7 +46,7 @@ export function objectPage(objectId: number, facts: ObjectFacts): ObjectPage {
   const zeros = facts.measuredZeros.filter((z) => z.sourceObjectId === objectId);
   const nameOf = (itemId: number) => itemPage(itemId, { rates: [], names: facts.names, npcs: [] }).name;
   const drops = mine.filter((r) => r.reporters > 0)
-    .map((r) => ({ itemId: r.itemId, itemName: nameOf(r.itemId), kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters }))
+    .map((r) => ({ itemId: r.itemId, itemName: nameOf(r.itemId), kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters, ...("units" in r && typeof r.units === "number" ? { units: r.units } : {}) }))
     .sort((a, b) => b.rate - a.rate || a.itemId - b.itemId);
   const zero = zeros.find((z) => z.reporters > 0);
   const pendingLoot = pendingForObject(facts.pending, objectId);
