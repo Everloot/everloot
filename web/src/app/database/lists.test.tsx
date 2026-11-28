@@ -208,7 +208,7 @@ test("an NPC known only as a quest giver or a vendor is listed too", async () =>
   ] });
   const page = await html(NpcList(search()));
   expect(rows(page, "npcs")).toEqual([74, 240]);
-  expect(page).toContain(">NPC 240<");
+  expect(page).toContain(">Unnamed NPC 240<");
   expect(page.split("<thead>")[1]!.split("</thead>")[0]).not.toContain(">Reaction<");
 });
 

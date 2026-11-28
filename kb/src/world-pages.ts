@@ -136,6 +136,7 @@ export type AgreedNpc = {
   pins: NpcPin[];
   /** `npcTraits`. */
   level: number | null;
+  levelRange?: { min: number; max: number } | null;
   reaction: NpcReaction | null;
   creatureType: string | null;
   rank: NpcRank | null;
@@ -385,14 +386,31 @@ export function npcPage(npcId: number, facts: WorldFacts): NpcPage {
  * from `npcPage`, so the page and the MCP answer built on it stay as they are. A reaction is as seen by the
  * reporting player, so Alliance and Horde reports can disagree; then there is no agreed one.
  */
-export function npcTraits(rows: NpcSightingRow[], recheck: readonly RecheckScope[] = NO_SCOPES): { level: number | null; reaction: NpcReaction | null; creatureType: string | null; rank: NpcRank | null } {
+export function npcTraits(rows: NpcSightingRow[], recheck: readonly RecheckScope[] = NO_SCOPES): { level: number | null; levelRange: { min: number; max: number } | null; reaction: NpcReaction | null; creatureType: string | null; rank: NpcRank | null } {
   const s = npcSince(rows, recheck);
-  const level = agreedNumber(rows.filter((row) => row.level !== undefined).map((row) => ({ installId: row.installId, value: row.level!, ...at(row) })), s);
+  const levelRows = rows.filter((row) => row.level !== undefined).map((row) => ({ installId: row.installId, value: row.level!, ...at(row) }));
+  const level = agreedNumber(levelRows, s);
+  const levelRange = level === null ? spawnRange(levelRows, s) : null;
   const reaction = agreedLabel(rows.filter((row) => row.reaction !== undefined).map((row) => ({ installId: row.installId, label: row.reaction!, ...at(row) })), s);
   // The type and rank are the game's own for the creature, the same for every player, and need the same 3 installs.
   const creatureType = agreedLabel(rows.filter((row) => row.creatureType !== undefined).map((row) => ({ installId: row.installId, label: row.creatureType!, ...at(row) })), s);
   const rank = agreedLabel(rows.filter((row) => row.rank !== undefined).map((row) => ({ installId: row.installId, label: row.rank!, ...at(row) })), s);
-  return { level, reaction: reaction as NpcReaction | null, creatureType, rank: rank as NpcRank | null };
+  return { level, levelRange, reaction: reaction as NpcReaction | null, creatureType, rank: rank as NpcRank | null };
+}
+
+/** The widest level spread one creature's spawns have (Mottled Boar 1-2, Kobold Vermin 1-3): a wider one is a bad report, not a range. */
+const SPAWN_SPREAD = 3;
+
+/**
+ * A creature whose spawns differ in level has no one level 3 installs agree on; its range is public instead once 3
+ * installs report a level and every level reported lies within `SPAWN_SPREAD` of the others. Null otherwise.
+ */
+function spawnRange(rows: (Timed & { value: number })[], since: string | null): { min: number; max: number } | null {
+  const kept = recheckRows(rows.filter((r) => r.installId.trim() && Number.isInteger(r.value)), since).rows;
+  if (new Set(kept.map((r) => r.installId.trim())).size < WORLD_AGREEMENT) return null;
+  const levels = kept.map((r) => r.value);
+  const min = Math.min(...levels), max = Math.max(...levels);
+  return min < max && max - min <= SPAWN_SPREAD ? { min, max } : null;
 }
 
 /** One NPC's agreed facts: the stored table's row, else worked out from its sightings; null when no upload saw it. */

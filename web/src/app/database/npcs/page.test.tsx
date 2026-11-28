@@ -53,7 +53,7 @@ test("the list is titled NPCs and links each NPC's page, a quest giver with no a
   expect(page).toContain(">NPCs<");
   expect(page).toContain('<a href="/database/npcs/101">Npc Alpha</a>');
   expect(page).toContain('<a href="/database/npcs/102">Npc Beta</a>');
-  expect(page).toContain('<a href="/database/npcs/202">NPC 202</a>');
+  expect(page).toContain('<a href="/database/npcs/202">Unnamed NPC 202</a>');
   expect(page).toContain('aria-label="NPC filters"');
 });
 
@@ -109,7 +109,7 @@ test("an NPC its own page names from the Warcraft Wiki is listed, searched and s
   store.npcs = [npc({ npcId: 103, drops: 4 }), npc({ npcId: 104, drops: 2 })];
   const page = await html();
   expect(page).toMatch(/<a href="\/database\/npcs\/103">Npc Gamma<\/a>(?:<[^>]*>)*\s*\(name from the warcraft wiki\)/);
-  expect(page).toContain('<a href="/database/npcs/104">NPC 104</a>');
+  expect(page).toContain('<a href="/database/npcs/104">Unnamed NPC 104</a>');
   const found = await html({ q: "gamma" });
   expect(found).toContain('<a href="/database/npcs/103">Npc Gamma</a>');
   expect(found).not.toContain('href="/database/npcs/104"');
@@ -162,4 +162,32 @@ test("each NPC menu notes the rows it cannot hold, those with no value recorded"
   const note = (out: string, menu: string) => /<li class="[^"]*">(Not recorded: [\d,]+)<\/li>/.exec(out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "")?.[1] ?? null;
   const page = await html();
   for (const menu of ["zone", "level", "react", "type", "rank"]) expect(note(page, menu)).toBe("Not recorded: 1");
+});
+
+test("QA round 14: an NPC with no agreed name reads Unnamed NPC, and Named only (?named=1) leaves those rows out", async () => {
+  store.npcs = [npc({ npcId: 4540, drops: 24 }), npc({ npcId: 101, name: "Npc Alpha", drops: 3 })];
+  const all = await html({ sort: "drops", dir: "desc" });
+  expect(all).toContain('<a href="/database/npcs/4540">Unnamed NPC 4540</a>');
+  expect(all).not.toMatch(/>NPC 4540</);
+  // The toggle is off by default and links the named-only list.
+  expect(all).toMatch(/href="\/database\/npcs\?[^"]*named=1[^"]*"[^>]*>(?:<[^>]*>)*Named only/);
+  const named = await html({ sort: "drops", dir: "desc", named: "1" });
+  expect(named).not.toContain("/database/npcs/4540");
+  expect(named).toContain('<a href="/database/npcs/101">Npc Alpha</a>');
+  await expect(html({ named: "yes" })).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("QA round 14: a level range 3 installs report shows as 5–7 instead of a dash", async () => {
+  store.npcs = [npc({ npcId: 101, name: "Npc Alpha", levelRange: { min: 5, max: 7 } })];
+  const page = await html();
+  expect(page).toMatch(/<td[^>]*>5–7<\/td>/);
+  expect(page).toContain("Level 5–7");
+});
+
+test("QA round 14: the Zone header sorts the list by zone name", async () => {
+  const zone = (mapId: number, name: string) => ({ mapId, name, continentId: 1, continentName: "Kalimdor" });
+  store.npcs = [npc({ npcId: 101, name: "Npc Alpha", zone: zone(1413, "The Barrens") }), npc({ npcId: 102, name: "Npc Beta", zone: zone(1411, "Durotar") })];
+  expect(await html()).toMatch(/<a href="\/database\/npcs\?[^"]*sort=zone[^"]*"[^>]*>Zone/);
+  const page = await html({ sort: "zone" });
+  expect(page.indexOf("Npc Beta")).toBeLessThan(page.indexOf("Npc Alpha"));
 });

@@ -417,7 +417,8 @@ test("the header says whose territory the game files make the zone, and the crea
   const header = (await html(ZonePage(props("1436-westfall")))).split("data-entity-header")[1]?.split("</header>")[0] ?? "";
   expect(header).toMatch(/text-faction-alliance[^>]*>Alliance territory</);
   // The guard's 55 is a townsperson's level, not the zone's.
-  expect(header).toMatch(/Creatures 11–14(?:<[^>]*>)*\s*\(agreed NPC levels\)/);
+  // The range says how many NPCs it rests on (QA round 14).
+  expect(header).toMatch(/Creatures 11–14(?:<[^>]*>)*\s*\(from 2 NPCs with agreed levels\)/);
   store.loadCorpus.mockResolvedValue(corpus([]));
   const contested = (await html(ZonePage(props("1434-stranglethorn-vale")))).split("data-entity-header")[1]?.split("</header>")[0] ?? "";
   expect(contested).toContain(">Contested territory<");
@@ -488,4 +489,48 @@ test("the zone index counts one entrance in the singular, and explains a dash on
   expect(page).toMatch(/[^0-9][2-9] dungeons and raids</);
   // Below 640 px the table shows only the zone and its meta line, so there is no dash to explain there.
   expect(page).toMatch(/<span class="hidden sm:inline">A dash means nobody has confirmed anything of that kind in the zone yet\. It does not mean there is none\. <\/span>/);
+});
+
+// QA round 14: the zone page lists the quests its quest log header names, says how many NPCs its level range rests on,
+// names a map dot on hover and focus, and opens a short terrain list.
+const filedQuest = (questId: number, title: string, category: string, giverNpcId: number) => installs.map((installId) => ({
+  kind: "quest", installId, eventId: `q:${installId}:${questId}`, capturedAt: "2026-10-10T00:00:00.000Z", questId, title, level: 3, giverNpcId, rewardItemIds: [], category,
+}));
+
+test("QA round 14: quests 3 installs file under the zone or one of its subzones are listed and linked, wherever their giver stands", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Gornek", 1411, 42, 68),
+    ...filedQuest(788, "Cutting Teeth", "Valley of Trials", 999),
+    ...filedQuest(791, "Carry Your Weight", "Durotar", 998),
+    ...filedQuest(792, "Elsewhere", "The Barrens", 997),
+    ...filedQuest(793, "Two Only", "Durotar", 996).slice(0, 2),
+  ]));
+  const page = await html(ZonePage(props("1411-durotar")));
+  const quests = page.split('data-tab-panel="quests"')[1]?.split("data-tab-panel")[0] ?? "";
+  expect(quests).toMatch(/href="\/database\/quests\/788"[^>]*>Cutting Teeth</);
+  expect(quests).toMatch(/href="\/database\/quests\/791"[^>]*>Carry Your Weight</);
+  expect(quests).not.toContain("/database/quests/792");
+  expect(quests).not.toContain("/database/quests/793");
+  expect((await generateMetadata(props("1411-durotar"))).title).toBe("Durotar – WoW Forever Zone: Quests, NPCs and Map");
+});
+
+test("QA round 14: each map dot names its NPC on hover and keyboard focus", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
+  const rect = { left: 0, top: 0, right: 1, bottom: 1 };
+  art.assets = { maps: [{ uiMapId: 1436, kind: "zone", name: "Westfall", continentId: 0, heldBack: false, url: "https://a.test/maps/1436.webp", smallUrl: "https://a.test/maps/1436-small.webp", rect }] };
+  const map = (await html(ZonePage(props("1436-westfall")))).split('data-slot="map"')[1] ?? "";
+  // A focusable dot with its name as its label, and the name drawn beside it while hovered or focused.
+  expect(map).toMatch(/<span[^>]*tabindex="0"[^>]*aria-label="Guard Orin · 40, 50"/);
+  expect(map).toMatch(/data-mark-label[^>]*group-hover:block[^>]*group-focus-visible:block[^>]*>Guard Orin</);
+  art.assets = null;
+});
+
+test("QA round 14: a terrain list of 3 rows or fewer starts open; a longer one stays closed", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  // Durotar's gear list is 3 rows, Westfall's is longer.
+  const short = (await html(ZonePage(props("1411-durotar")))).split("data-zone-terrain")[1] ?? "";
+  expect(short).toMatch(/Terrain: 3 items whose effect works here/);
+  expect(short).toMatch(/<details[^>]*id="terrain"[^>]*open=""/);
+  const long = (await html(ZonePage(props("1436-westfall")))).split("data-zone-terrain")[1] ?? "";
+  expect(long).not.toMatch(/<details[^>]*open/);
 });

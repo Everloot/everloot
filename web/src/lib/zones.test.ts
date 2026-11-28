@@ -156,8 +156,8 @@ describe("zoneContents", () => {
 
   test("the creature levels are the agreed levels of the NPCs that are not friendly, and none without one", () => {
     const npc = (level: number | null, reaction: "friendly" | "neutral" | "hostile" | null) => ({ npcId: 1, name: null, x: 0, y: 0, reporters: 3, vendor: false, level, rank: null, reaction });
-    expect(creatureLevels([npc(5, "hostile"), npc(12, "neutral"), npc(55, "friendly"), npc(8, null), npc(null, "hostile")])).toEqual({ min: 5, max: 12 });
-    expect(creatureLevels([npc(7, "hostile")])).toEqual({ min: 7, max: 7 });
+    expect(creatureLevels([npc(5, "hostile"), npc(12, "neutral"), npc(55, "friendly"), npc(8, null), npc(null, "hostile")])).toEqual({ min: 5, max: 12, count: 2 });
+    expect(creatureLevels([npc(7, "hostile")])).toEqual({ min: 7, max: 7, count: 1 });
     expect(creatureLevels([npc(55, "friendly"), npc(null, "hostile")])).toBeNull();
   });
 
