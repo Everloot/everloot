@@ -122,6 +122,7 @@ end
 --- Removes one character from the roster.
 function R.Forget(key)
   if E.Inventory then E.Inventory.Forget(key) end
+  if E.Cooldowns then E.Cooldowns.Forget(key) end
   if EverlootDB and EverlootDB.roster then EverlootDB.roster[key] = nil end
   R.revision = R.revision + 1
 end

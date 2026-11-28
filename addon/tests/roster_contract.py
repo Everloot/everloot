@@ -139,7 +139,7 @@ assert(EverlootDB.roster == nil, 'no roster table when off')
 local rowsByKey, order = {}, {}
 for i, row in ipairs(Everloot.Options.ROWS) do rowsByKey[row.key] = row; order[row.key] = i end
 assert(rowsByKey.roster and rowsByKey.roster.label == 'Your characters' and order.roster == order.gold + 1, 'options row after Your gold')
-assert(rowsByKey.roster.text == "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded.", 'options text')
+assert(rowsByKey.roster.text == "Name, realm, class, level, faction, gold, professions and profession cooldowns of each character you log in with. Stays in this file; never uploaded.", 'options text')
 """)
 print("roster contract: PASS")
 

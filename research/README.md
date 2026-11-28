@@ -12,6 +12,7 @@ This directory is the canonical home for dated Everloot research produced by app
 
 ## Current research
 
+- [2026-11-27 Forever profession add-on comparison](2026-11-27-forever-profession-addon-comparison.md) — published logic, all 17 gallery screenshots, Everloot overlap and priorities for cooldowns and in-game leveling.
 - [`2026-10-18-source-maximization-deep-research.md`](2026-10-18-source-maximization-deep-research.md) — broad source landscape, WoWDBDefs table candidates, ecosystem/community projects, and expansion backlog.
 - [`2026-10-18-competitor-mechanics-reverse-engineering.md`](2026-10-18-competitor-mechanics-reverse-engineering.md) — clean-room product mechanics and parity matrix.
 - [`2026-10-18-warcraft-tavern-raiderio-forever-competitor-analysis.md`](2026-10-18-warcraft-tavern-raiderio-forever-competitor-analysis.md) — competitor coverage, contribution, freshness, and positioning.

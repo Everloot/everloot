@@ -832,6 +832,17 @@ list and stays empty while everloot.app has Dungeon Progress turned off.
 - The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 
+## [0.3.34] - 2026-11-28
+
+A compact tracker below the minimap shows individual profession cooldowns across the characters you play on this installation.
+
+### Added
+
+- Click the tracker to expand active timers. It shows each observed recipe separately, including different transmutes. Open a profession window on a character to discover additional cooldown recipes.
+- Drag the tracker to move it. Use Tracker in Everloot's Professions view to show or hide it. Timers, position and visibility are saved locally.
+
+Works with WoW: Forever 1.60.1. Live verification of this exact archive is pending.
+
 ## [0.3.33] - 2026-11-28
 
 Release channel: Alpha

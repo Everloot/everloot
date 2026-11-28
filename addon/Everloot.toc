@@ -6,7 +6,7 @@
 ## Category: Auction & Economy
 ## X-Website: https://everloot.app
 ## X-Curse-Project-ID: 1762765
-## Version: 0.3.33
+## Version: 0.3.34
 ## X-License: AGPL-3.0
 ## SavedVariables: EverlootDB
 ## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds, EverlootProgress
@@ -27,6 +27,7 @@ modules\recipe_cooldown_data.lua
 modules\crafting_plan.lua
 modules\crafting_history.lua
 modules\professions.lua
+modules\cooldowns.lua
 modules\ask.lua
 modules\addons.lua
 modules\mapbounds.lua

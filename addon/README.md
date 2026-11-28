@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.33, Release channel: Alpha. Crafting profit and recipe plans in WoW: Forever's profession window, the Everloot window and the auction house (see Crafting profit and recipe plans). The contract tests pass; the live checks on the exact release archive have not been observed yet, so the in-game layout, live API reads and coexistence with other addons are unverified. See `docs/2026-11-27-profession-profit-acceptance.md`.
+**Status:** 0.3.34. Click the tracker below the minimap to see individual profession cooldowns across your characters. Crafting profit and recipe plans in WoW: Forever's profession window, the Everloot window and the auction house (see Crafting profit and recipe plans). The contract tests pass; the live checks on the exact release archive have not been observed yet, so the in-game layout, live API reads and coexistence with other addons are unverified. See `docs/2026-11-27-profession-profit-acceptance.md`.
 
 Optional crafting prices can use Auctionator or TSM, with Everloot remaining the default. Only the source choice and explicit fallback setting are saved; external prices stay in memory and never enter observations, scan history or uploads. Their age and realm/house scope are unknown.
 

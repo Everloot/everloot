@@ -1,4 +1,4 @@
--- Everloot window, Professions: three screens behind two buttons at the bottom.
+-- Everloot window, Professions: three screens, plus a shortcut to the on-screen cooldown tracker.
 --   Professions: each profession in the character's profession book with its rank bar, how many recipes the addon
 --     has recorded for it in each difficulty colour (professions.lua writes them, read here through Everloot:Rows),
 --     the day they were last read, and one line for the next recipe a trainer teaches. Under the blocks, every other
@@ -38,11 +38,11 @@ local NONE_LEARNED = "No professions learned yet."
 local FOOTER = "Planner: everloot.app/tools/profession-planner"
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
--- The screens, and the two the buttons at the bottom open from each: the left one, then the right one.
+-- The two screens the navigation buttons open from each screen, left then right.
 local TO_LIST, TO_CRAFTING, TO_RANKS = "Professions", "Crafting costs", "Ranks and trainers"
 local SCREENS = { list = TO_LIST, crafting = TO_CRAFTING, trainers = TO_RANKS }
 local GO = { list = { "trainers", "crafting" }, crafting = { "list", "trainers" }, trainers = { "list", "crafting" } }
-local NAV_W = 136
+local NAV_W, COOLDOWN_NAV_W = 112, 84
 
 -- The ranks and trainers page: a heading row, then a box per profession with its rows.
 local TRAIN_ROWS, TRAIN_HEAD, SECTION_HEAD, ROW_H = 5, 20, 26, 16
@@ -1315,9 +1315,9 @@ local function build(f, parent)
     p.other[i] = line
   end
   p.footer = text(parent, 12, nil, COLORS.muted)
-  -- At the bottom of the view, under every screen; the two buttons beside it.
+  -- At the bottom of the view, under every screen.
   p.footer:SetPoint("BOTTOMLEFT", 8, 8)
-  p.footer:SetWidth(W - 2 * NAV_W - 20)
+  p.footer:SetWidth(W - 2 * NAV_W - COOLDOWN_NAV_W - 20)
   if p.footer.SetWordWrap then p.footer:SetWordWrap(false) end
   p.footer:SetText(FOOTER)
   -- Beside the footer: the other two screens, named on the buttons (GO).
@@ -1326,6 +1326,10 @@ local function build(f, parent)
   p.nav:SetPoint("BOTTOMRIGHT", -(NAV_W + 4), 2)
   p.toggle = button(parent, TO_CRAFTING, NAV_W, function() p.mode = GO[p.mode][2] end)
   p.toggle:SetPoint("BOTTOMRIGHT", 0, 2)
+  p.cooldownNav = button(parent, "Tracker", COOLDOWN_NAV_W, function()
+    if E.Cooldowns then E.Cooldowns.ToggleTracker() end
+  end)
+  p.cooldownNav:SetPoint("BOTTOMRIGHT", -2 * (NAV_W + 4), 2)
   p.craft = buildCrafting(parent)
   p.trainers = buildTrainers(parent)
 end
