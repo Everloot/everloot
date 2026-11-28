@@ -70,7 +70,7 @@ test("a page change closes the open menu, so a suggestion picked in it never lea
 test("Tools opens its menu and says so; opening another menu closes it", async () => {
   await act(async () => toolsButton().click());
   expect(toolsButton().getAttribute("aria-expanded")).toBe("true");
-  expect(Array.from(menu()!.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/tools/auctions", "/tools/bags", "/tools/disenchanting", "/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
+  expect(Array.from(menu()!.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/tools/auctions", "/tools/bags", "/tools/disenchanting", "/tools/raid", "/tools/talents", "/tools"]);
   const profile = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Profile")!;
   await act(async () => profile.click());
   expect(menu()).toBeNull();

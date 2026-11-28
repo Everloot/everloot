@@ -260,7 +260,7 @@ export function expectedValue(rows: readonly YieldRow[], price: (itemId: number)
 }
 
 /** The house's cut of a sale: 5% on the faction houses (as the addon's gold-per-hour tracker takes it), 15% on the neutral one. */
-export const auctionCut = (house: string | null) => (house === "Neutral" ? 0.15 : 0.05);
+export { auctionCut } from "./auction-fees.js";
 
 const QUALITY_WORD: Record<number, string> = { 2: "Uncommon", 3: "Rare", 4: "Epic" };
 

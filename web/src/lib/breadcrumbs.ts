@@ -92,7 +92,7 @@ const NAMES: Record<string, string> = {
   "/tools/bags": "Bag upgrades",
   "/tools/disenchanting": "Disenchanting",
   "/tools/gold-ledger": "Gold ledger",
-  "/tools/professions": "Profession hubs",
+  "/tools/professions": "Profession guides",
   "/tools/professions/herbalism": "Herbalism",
   "/tools/professions/herbalism/gathering": "Gathering",
   "/tools/farming-routes": "Farming",

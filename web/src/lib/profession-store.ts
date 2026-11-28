@@ -5,6 +5,7 @@ import { reviveMapsAndSets } from "./revive-json";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { derivedSteps, pathFactsFromRecords } from "@kb/recipe-thresholds";
 import { objectSpawnRowsFromRecords } from "@kb/object-spawns";
+import { buildGatheringEvidence, type GatheringEvidence } from "./gathering-guide";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
@@ -12,9 +13,16 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  * the reported rows only: `facts.derived` depends on the game-file recipe list bundled with the build, so it is worked
  * out again on read, and a deploy that changes the list shows at once instead of after the next upload.
  */
-export interface ProfessionsView { dataAsOf: string | null; facts: ReturnType<typeof pathFactsFromRecords>; sightings: ReturnType<typeof objectSpawnRowsFromRecords>; }
+export interface ProfessionsView {
+  dataAsOf: string | null;
+  facts: ReturnType<typeof pathFactsFromRecords>;
+  sightings: ReturnType<typeof objectSpawnRowsFromRecords>;
+  /** Absent on snapshots written before fishing and skinning were included. */
+  gathering?: GatheringEvidence;
+}
 
 export const PROFESSIONS_KEY = "snapshots/professions.json";
+export const PROFESSIONS_REVISION = "gathering-v1";
 /** How long one server instance keeps the file before asking for it again: the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS. */
@@ -30,12 +38,17 @@ const r2Url = (cloud: R2Config) => `https://${cloud.r2AccountId}.r2.cloudflarest
 const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
 
 export function buildProfessions(corpus: { records: unknown[]; dataAsOf?: string | null }): ProfessionsView {
-  return { dataAsOf: corpus.dataAsOf ?? null, facts: pathFactsFromRecords(corpus.records), sightings: objectSpawnRowsFromRecords(corpus.records) };
+  return {
+    dataAsOf: corpus.dataAsOf ?? null,
+    facts: pathFactsFromRecords(corpus.records),
+    sightings: objectSpawnRowsFromRecords(corpus.records),
+    gathering: buildGatheringEvidence(corpus.records),
+  };
 }
 
 export function encodeProfessions(set: ProfessionsView, generatedAt: string): string {
   const { derived: _derived, ...facts } = set.facts;
-  return JSON.stringify({ version: 1, generatedAt, set: { ...set, facts } }, (_, value: unknown) => value instanceof Map ? { $map: [...value] } : value);
+  return JSON.stringify({ version: 1, revision: PROFESSIONS_REVISION, generatedAt, set: { ...set, facts } }, (_, value: unknown) => value instanceof Map ? { $map: [...value] } : value);
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -49,6 +62,7 @@ export function parseProfessions(text: string): { generatedAt: string; set: Prof
     if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
     const s = raw.set;
     if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !(arrays(s.facts, "sightings", "prices", "observations", "trainers") && isObject(s.facts) && s.facts.vendorPrices instanceof Map && Array.isArray(s.sightings))) return null;
+    if (s.gathering !== undefined && !arrays(s.gathering, "fishing", "skinning")) return null;
     const facts = s.facts as unknown as ProfessionsView["facts"];
     return { generatedAt: raw.generatedAt, set: { ...(s as unknown as ProfessionsView), facts: { ...facts, derived: derivedSteps(facts.observations, facts.trainers) } } };
   } catch {
@@ -74,9 +88,9 @@ export async function writeProfessions(opts: { added: number; rebuild?: boolean;
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored professions need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, PROFESSIONS_REVISION)) return { written: false };
   const body = encodeProfessions(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf, PROFESSIONS_REVISION) } }));
   if (!put.ok) throw new Error(`professions write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }
