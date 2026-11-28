@@ -133,6 +133,9 @@ test("a category title with a slot filter names the slot", async () => {
   const two = await subclassMetadata(sub("armor", "plate", { slot: "hands,feet" }));
   expect(two.title).toMatch(/^WoW Forever Plate (?:Hands and Feet|Feet and Hands) \(Armor\): [\d,]+ Items?$/);
   expect((await subclassMetadata(sub("armor", "plate"))).title).toMatch(/^WoW Forever Plate \(Armor\): [\d,]+ Items$/);
+  // The heading names the slot as the title does.
+  expect(await html(SubclassPage(sub("armor", "plate", { slot: "feet" })))).toMatch(/<h1[^>]*>Plate Feet<\/h1>/);
+  expect(await html(SubclassPage(sub("armor", "plate")))).toMatch(/<h1[^>]*>Plate<\/h1>/);
 });
 
 test("category titles lead with WoW Forever and the item count; descriptions carry no build or source wording", async () => {
