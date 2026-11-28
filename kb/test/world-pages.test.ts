@@ -221,3 +221,13 @@ test("a kill loot window with a place adds one kill place per install, NPC and m
   ]);
   expect(worldFactsFromRecords([{ ...kill, mapId: undefined }])).not.toHaveProperty("kills");
 });
+
+test("QA round 14: a mob whose spawns differ in level gets the range 3 installs report, when it is a narrow one", () => {
+  const sight = (installId: string, level: number) => ({ kind: "npc_sighting", installId, npcId: 7, name: "Mottled Boar", mapId: 12, x: 1, y: 1, level });
+  const spread = worldFactsFromRecords([sight("a", 5), sight("b", 6), sight("c", 7), sight("a", 6)]);
+  expect(npcTraits(spread.npcs)).toMatchObject({ level: null, levelRange: { min: 5, max: 7 } });
+  // Two installs are no range; an agreed level needs none; a 60 among 5s is no spawn range but a bad report.
+  expect(npcTraits(spread.npcs.filter((r) => r.installId !== "c")).levelRange).toBeNull();
+  expect(npcTraits(worldFactsFromRecords([sight("a", 5), sight("b", 5), sight("c", 5), sight("d", 6)]).npcs)).toMatchObject({ level: 5, levelRange: null });
+  expect(npcTraits(worldFactsFromRecords([sight("a", 5), sight("b", 6), sight("c", 60)]).npcs).levelRange).toBeNull();
+});

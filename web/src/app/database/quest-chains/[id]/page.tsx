@@ -66,7 +66,7 @@ export default async function QuestChainPage(props: Props) {
   const [what, observed, name] = entry ? entitySummary({
     identity: entry.truncated
       ? `A quest chain in WoW: Forever of more than ${entry.questIds.length} quests; the first ${entry.questIds.length} are listed.`
-      : `A quest chain in WoW: Forever of ${entry.questIds.length} ${entry.questIds.length === 1 ? "quest" : "quests"}.`,
+      : `A ${entry.questIds.length === 1 ? "one" : entry.questIds.length}-quest chain in WoW: Forever.`,
     observed: entry.confirmed
       ? `Players reported it, three installs agreeing${asOf ? ` (${asOf})` : ""}.`
       : catalog?.confirmations

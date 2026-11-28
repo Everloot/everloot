@@ -67,6 +67,8 @@ export function CharacterFacts({ character: c, lastRead, now, computed }: {
     withheld ? `Item levels are known for ${computed!.slots} of 17 slots: Ranked item level and Gear Score need at least ${MIN_KNOWN_SLOTS}, as Blizzard's armory no longer sends item levels and the game files lack some items.` : null,
     c.itemLevel !== null && c.averageItemLevel !== null ? "Ranked item level uses Everloot's 17-slot formula; Blizzard's average item level counts what Blizzard counts." : null,
     c.gearScore !== null ? "Gear Score is Everloot's weighted item level, not the GearScore addon's number." : null,
+    // The two read the same 17 levels, so close levels round to the same number: said, so two equal tiles do not read as a bug.
+    c.gearScore !== null && c.gearScore !== 0 && c.gearScore === c.itemLevel ? "Gear Score weighs the same 17 item levels by each slot's stat budget, so it matches the ranked item level when the gear's levels are close." : null,
   ].filter((n): n is string => n !== null);
   // Counts in mono with tabular figures; the read age is words ("3 days ago"), so it is sans (docs/design/direction.md).
   return (<>

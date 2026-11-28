@@ -163,3 +163,10 @@ test("each quest menu notes the rows it cannot hold, those with no value recorde
   store.quests = [quest({ questId: 301, title: "Quest Alpha", level: 5, category: "Synthetic Vale", side: "alliance" })];
   expect(note(await html(), "level")).toBeNull();
 });
+
+test("the Level menu has a top bracket for quests above level 60", async () => {
+  store.wiki = null;
+  store.quests = [quest({ questId: 301, title: "Quest Alpha", level: 5 }), quest({ questId: 302, title: "Quest Beta", level: 62 })];
+  const menu = (await html()).split('data-filter="level"')[1]?.split("</details>")[0] ?? "";
+  expect(menu).toMatch(/>61\+<\/span><span class="tabular-nums text-muted">1</);
+});

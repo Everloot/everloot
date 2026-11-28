@@ -482,7 +482,8 @@ function ActivityStrip({ members, asOf, readDay, href }: { members: readonly Arm
   const counts = new Map<Activity | null, number>();
   for (const m of members) { const a = activityOf(m, asOf); counts.set(a, (counts.get(a) ?? 0) + 1); }
   const rows = ACTIVITY_ROWS.map((r) => ({ label: r.label, colour: r.colour, count: counts.get(r.key) ?? 0, href: r.key ? href(r.key) : null }));
-  return <CountStrip kind="activity" title={readDay ? `Last login from each character's latest read, counted back from the ${readDay} roster read; a login after that read counts in the last 7 days` : "Last login"} total={members.length} rows={rows} />;
+  return <CountStrip kind="activity" title={readDay ? `Last login, counted back from the ${readDay} roster read` : "Last login"}
+    note={readDay ? "Last login is each member's newest read, which can be after the roster read." : undefined} total={members.length} rows={rows} />;
 }
 
 /** Members by level band as one bar, highest band first; each band with members links the roster filtered to it. */
@@ -496,7 +497,7 @@ function LevelStrip({ members, summary, href }: { members: readonly ArmoryMember
 }
 
 /** One stacked bar of counts, then each count named beside its colour, linking the roster filtered to it when it can. */
-function CountStrip({ kind, title, total, rows }: { kind: "activity" | "levels"; title: string; total: number; rows: { label: string; colour: string; count: number; href: string | null }[] }) {
+function CountStrip({ kind, title, note, total, rows }: { kind: "activity" | "levels"; title: string; note?: string; total: number; rows: { label: string; colour: string; count: number; href: string | null }[] }) {
   return (
     <div data-guild-activity={kind === "activity" ? "" : undefined} data-guild-levels={kind === "levels" ? "" : undefined} className="space-y-2">
       <div role="img" aria-label={`${title}: ${rows.map((r) => `${r.label.toLowerCase()} ${r.count}`).join(", ")}`} className="flex h-2 gap-px overflow-hidden rounded-full bg-panel">
@@ -511,6 +512,7 @@ function CountStrip({ kind, title, total, rows }: { kind: "activity" | "levels";
             : <span key={r.label}>{body}</span>;
         })}
       </p>
+      {note && <p className="text-meta text-muted">{note}</p>}
     </div>
   );
 }

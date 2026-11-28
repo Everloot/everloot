@@ -66,8 +66,9 @@ export function CharacterBoards({ board, region }: { board: CharacterBoard; regi
 function GuildItemLevel({ guild: g }: { guild: ArmoryGuildRow }) {
   if (g.averageItemLevel === null) return muted("Not read");
   const when = readAt(g.fetchedAt);
-  const covers = `Average across the members the armory has read${when ? ` (${when})` : `. ${readLine(g.fetchedAt)}`}.`;
-  return <Tooltip label={`Average item level: ${metricValue("item-level", g.averageItemLevel)}. ${covers}`}>{metricValue("item-level", g.averageItemLevel)}</Tooltip>;
+  const value = metricValue("item-level", g.averageItemLevel);
+  const label = `Average item level ${value} across the members the armory has read${when ? ` (${when})` : `. ${readLine(g.fetchedAt)}`}.`;
+  return <Tooltip label={label}>{value}</Tooltip>;
 }
 
 const gearColumns: Column<ArmoryGuildRow>[] = [

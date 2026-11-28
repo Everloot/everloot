@@ -77,6 +77,12 @@ function slotWords(slugs: readonly string[] | undefined): string {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names.join("");
 }
 
+/** What a category page lists, its heading and its title's lead: "Plate", or "Plate Feet" with a slot filter. */
+function categoryKind(label: string, slot: readonly string[] | undefined): string {
+  const slots = slotWords(slot);
+  return slots ? `${label} ${slots}` : label;
+}
+
 export async function categoryMetadata(classSlug: string | undefined, subclassKey: string | undefined, search: Search): Promise<Metadata> {
   const r = resolve(classSlug, subclassKey, search);
   if (!r) return { robots: { index: false, follow: true } };
@@ -96,8 +102,7 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
     };
   }
   // A slot filter names its slots, so a count of plate feet never reads as every plate item.
-  const slots = slotWords(r.q.slot);
-  const kind = slots ? `${r.sub ? subclassLabel(r.sub).label : r.cls.label} ${slots}` : r.sub ? subclassLabel(r.sub).label : r.cls.label;
+  const kind = categoryKind(r.sub ? subclassLabel(r.sub).label : r.cls.label, r.q.slot);
   const name = r.sub ? `${kind} (${r.cls.label})` : kind;
   // What the list under it shows: the same filters, the same development leftovers and unnamed items left out.
   const total = (await listOf(classSlug, subclassKey, search))!.rows.length;
@@ -221,7 +226,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The icon column, with the game's question mark where a row has no icon, only with the asset files.
   const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || iconOnly.has(row[0]) || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
   const here = (over: Partial<CategoryQuery>) => link(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
-  const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
+  const title = sub || cls ? categoryKind(sub ? subclassLabel(sub).label : cls!.label, q.slot) : "Items";
 
   const trail: Crumb[] = [
     ...trailFor("/database/items")!,
@@ -374,14 +379,16 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     ...(q.set ? [{ label: "Set piece", href: here({ set: undefined }) }] : []),
     ...(q.seen ? [{ label: "Seen by players", href: here({ seen: undefined }) }] : []),
   ];
+  // Each chip is a link to the list without that one filter.
+  const chipLinks = chips.map((c) => (
+    <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
+      {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
+    </Link>
+  ));
   const empty = active > 0 ? (
     <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
       <span>No items match these filters.</span>
-      {chips.map((c) => (
-        <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
-          {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
-        </Link>
-      ))}
+      {chipLinks}
       <Link href={link(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   ) : <p className="py-4 text-cell text-fg-2">{context ? `No items in this category a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}.` : "No items in this category."}</p>;
@@ -406,6 +413,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           active={active}
           clearHref={link(cls?.slug, sub?.slug)}
         />
+        {/* On a phone the menus fold into one "Filters (n)" button, so the filters that are on show here, each removable. */}
+        {rows.length > 0 && chips.length > 0 && <p data-filter-chips className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">{chipLinks}</p>}
         <ClassContextChip read={read} here={withoutClassContext(itemsHref(cls?.slug, sub?.slug), search)}>
           {context && (
             <span>

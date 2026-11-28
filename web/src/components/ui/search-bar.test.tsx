@@ -389,16 +389,16 @@ test("suggestion rows are at least 44 px tall on phones and 36 px from 640 px, t
   for (const link of links) expect(link.className.split(" ")).toEqual(expect.arrayContaining(["min-h-11", "sm:min-h-9"]));
 });
 
-// At 390 px "Thunderfury, Blessed Blade of the Windseeker" and its namesake both cut to "Thunderfury, Bless…". QA round 13:
-// two lines still cut it to "Thunderfury, Blessed Blade of…" beside the ID, so a name gets three.
-test("a long suggestion name wraps to three lines instead of being cut short", async () => {
+// At 390 px "Thunderfury, Blessed Blade of the Windseeker" and its namesake both cut to "Thunderfury, Bless…". QA rounds 13
+// and 14: two and then three lines still cut it beside the ID, so a name wraps to as many lines as it needs.
+test("a long suggestion name wraps whole instead of being cut short", async () => {
   await type("thunderfury");
   await answer("thunderfury", [suggestion(19019, "Thunderfury, Blessed Blade of the Windseeker")]);
   const name = [...container.querySelectorAll("[role=option] a span")].find((s) => s.textContent === "Thunderfury, Blessed Blade of the Windseeker")!;
   const classes = name.className.split(" ");
-  expect(classes).toContain("line-clamp-3");
-  expect(classes).not.toContain("line-clamp-2");
+  expect(classes.filter((c) => c.startsWith("line-clamp"))).toEqual([]);
   expect(classes).not.toContain("truncate");
+  expect(classes).toContain("break-words");
   // The ID beside it stays on its own, whole.
   expect(name.nextElementSibling!.className.split(" ")).toContain("shrink-0");
   // A row that wraps grows, so it has no fixed height.

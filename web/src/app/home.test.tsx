@@ -85,6 +85,12 @@ test("the hero searches with the header's field, a GET form to /search, the one 
   expect(input).toContain('role="combobox"');
   expect(hero).toMatch(/<label for="home-search" class="sr-only">/);
   expect(hero.match(/btn-primary/g)).toHaveLength(1);
+  // The suggestions drop under the whole field group, input and button, not the input alone (255 px at 390 in QA round 14):
+  // the form is the list's positioned box and the field's own wrapper is not.
+  expect(form).toMatch(/class="[^"]*\brelative\b/);
+  const wrapper = hero.slice(hero.indexOf(form) + form.length).match(/<div [^>]*>/)?.[0] ?? "";
+  expect(wrapper).toContain("flex-1");
+  expect(wrapper).not.toMatch(/\brelative\b/);
   const chips = hero.slice(hero.indexOf('aria-label="Examples"'));
   expect([...chips.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(["/database/items", "/database/quests", "/chat"]);
 });

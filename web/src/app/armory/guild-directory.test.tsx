@@ -316,7 +316,10 @@ describe("the guild activity strip", () => {
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*8 to 30 days/);
     expect(s).toMatch(/>0<\/span>\s*(?:\s*<[^>]*>)*\s*Longer/);
     // QA round 11: a login comes from the character's own read, which can be later than the roster read.
-    expect(s).toContain("Last login from each character&#x27;s latest read, counted back from the Nov 9, 2026 roster read; a login after that read counts in the last 7 days");
+    // QA round 14: the label stays short; the note under it says where a login comes from.
+    expect(s).toContain("Last login, counted back from the Nov 9, 2026 roster read");
+    expect(s).toContain("Last login is each member&#x27;s newest read, which can be after the roster read.");
+    expect(s).not.toContain("a login after that read counts");
     expect(s).not.toContain("as of the 2026-11-09 roster read");
     const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
     expect(recent).toContain("Velkara Duskmantle</a>");

@@ -170,6 +170,12 @@ export function countBy<T, V>(rows: readonly T[], key: (row: T) => V): Map<V, nu
 /** The level brackets the level menus offer; any other range still works typed into the URL. */
 export const LEVEL_BRACKETS = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 50], [51, 60]].map(([min, max]) => ({ min, max }));
 
+/**
+ * The level brackets of a counted Level menu (NPCs, quests), labelled: LEVEL_BRACKETS and a top "61+" bracket, so the
+ * few rows above level 60 have a choice and the counts with the "Not recorded" note add up to the list.
+ */
+export const COUNTED_LEVEL_BRACKETS = [...LEVEL_BRACKETS.map((b) => ({ ...b, label: `${b.min}–${b.max}` })), { min: 61, max: 999, label: "61+" }];
+
 /** A list URL with its parameters in the given order, empty ones left out. */
 export function listHref(path: string, params: [string, string | undefined][]): string {
   const s = new URLSearchParams(params.filter((p): p is [string, string] => Boolean(p[1]))).toString().replace(/%2C/g, ",");

@@ -17,9 +17,9 @@ import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTi
 import { PLACEHOLDER } from "@/lib/item-names";
 import { npcNames } from "@/lib/names";
 import { loadInstanceClears } from "@/lib/progression";
-import { dayLabel } from "@/lib/report-labels";
 import { loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
+import { utcDay } from "@/lib/time";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { EmptyTab, EntityArt, EntityPage, known, LINK, ModelPicture, Unreachable } from "../../entity";
 import { lootPage, NpcLootPanel } from "../../loot-tables";
@@ -115,11 +115,11 @@ export default async function BossPage(props: Props) {
     { label: "Difficulty", value: difficulty },
     ...(level !== null ? [{ label: "Level", value: level, numeric: true }] : []),
     // The addon's count from every install, apart from the linked characters' kills the Kills tab lists.
-    { label: "Kills reported by the addon", value: unreachable ? PLACEHOLDER : known(reported ? reported.kills.toLocaleString("en-US") : null, boss.row.reported), numeric: Boolean(reported) },
-    ...(reported ? [
-      { label: "Installs", value: <AgreementMeter count={reported.reporters} /> },
-      { label: "Last seen", value: dayLabel(reported.lastSeen), numeric: true },
-    ] : []),
+    // The installs that agree sit beside the count, so the two-column list never strands them under a label of their own.
+    { label: "Kills reported by the addon", value: unreachable ? PLACEHOLDER : reported
+      ? <span className="inline-flex items-center gap-2"><span>{reported.kills.toLocaleString("en-US")}</span><AgreementMeter count={reported.reporters} /></span>
+      : known(null, boss.row.reported), numeric: Boolean(reported) },
+    ...(reported ? [{ label: "Last seen", value: utcDay(reported.lastSeen) ?? PLACEHOLDER, numeric: true }] : []),
     { label: npcIds.length === 1 ? "Creature" : "Creatures", value: npcIds.length ? <span>{npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}{creature(id)}</span>)}</span> : unreachable ? PLACEHOLDER : known(null, boss.row.reported) },
     { label: "Encounter ID", value: boss.id, numeric: true },
   ];
@@ -189,7 +189,7 @@ export default async function BossPage(props: Props) {
             ? `${killsHere.characters.toLocaleString("en-US")} linked ${killsHere.characters === 1 ? "character has" : "characters have"} killed this boss${killsHere.kills === null ? "." : `, ${killsHere.kills.toLocaleString("en-US")} ${killsHere.kills === 1 ? "kill" : "kills"} in all.`}`
             : "No linked character has a synced kill of this boss yet."}
         </p>
-        {killsHere?.firstKillDay && <p className="mt-1 text-sm tabular-nums text-fg-2">First synced kill {dayLabel(killsHere.firstKillDay)}</p>}
+        {killsHere?.firstKillDay && <p className="mt-1 text-sm tabular-nums text-fg-2">First synced kill {utcDay(killsHere.firstKillDay) ?? PLACEHOLDER}</p>}
       </>,
     }] : []),
     {

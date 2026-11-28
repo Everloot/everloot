@@ -66,6 +66,8 @@ test("history reads the realm's initial market, renders both lines and band, and
   expect(container.querySelectorAll("[data-history-line]")).toHaveLength(2);
   expect(container.querySelector("[data-history-band]")).not.toBeNull();
   expect(container.querySelector("linearGradient")).toBeNull();
+  // The 30 days the chart spans, in the site's day form.
+  expect(container.textContent).toContain("Oct 16, 2026 to Nov 15, 2026");
   expect(container.textContent).toContain("7-day median"); expect(container.textContent).toContain("30-day median");
   // Sales a day round to a whole number.
   expect(container.textContent).toContain("4 (7-day window)");
