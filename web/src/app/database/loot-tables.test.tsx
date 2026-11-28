@@ -77,7 +77,7 @@ test("partial drops show their tier while heading names keep their threshold", a
   const { Npc, Item } = await pages();
   const npc = text(await html(Npc(props("40"))));
   expect(npc).toMatch(/Reported name 1 of 3 /);
-  expect(npc).toContain("verified by 2 installs");
+  expect(npc).toContain("verified by 2 players");
   expect(npc).not.toContain("Synthetic Boar");
   const item = text(await html(Item(props("750"))));
   expect(item).toMatch(/Reported name 1 of 3 /);
@@ -92,10 +92,10 @@ test("two installs: the pages show the rate and source with a verified label", a
   ]));
   const { Npc, Item } = await pages();
   const npc = text(await html(Npc(props("40"))));
-  expect(npc).toContain("verified by 2 installs");
+  expect(npc).toContain("verified by 2 players");
   expect(npc).toContain("66.7%");
   const item = await html(Item(props("750")));
-  expect(text(item)).toContain("verified by 2 installs");
+  expect(text(item)).toContain("verified by 2 players");
   expect(item).toContain("/database/npcs/40");
   expect(item).toContain("66.7%");
 });

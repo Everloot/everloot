@@ -47,7 +47,7 @@ test("an object with loot from 3 installs lists its drops; the list page links i
 test("two installs show verified drops; storage down reads unavailable, never zero", async () => {
   store.loadCorpus.mockResolvedValue(corpus([loot("install-a", 1618, [765]), loot("install-b", 1618, [765])]));
   const queued = await html(ObjectPage(props("1618")));
-  expect(queued).toContain("verified by 2 installs");
+  expect(queued).toContain("verified by 2 players");
   // The partial row is visible while the object list and indexing still require confirmed drops.
   expect(queued).toContain('href="/database/items/765"');
   expect(queued).not.toContain("data-empty-state");

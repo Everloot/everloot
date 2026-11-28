@@ -103,8 +103,8 @@ test("three installs confirm an empty source; two installs show a verified rate"
   expect(drops).toContain("No items observed");
   expect(drops).toContain("NPC 42");
   expect(drops).toContain("NPC 77");
-  expect(drops).toContain("verified by 2 installs");
-  expect(drops).toContain("confirmed by 3 installs");
+  expect(drops).toContain("verified by 2 players");
+  expect(drops).toContain("confirmed by 3 players");
   expect(drops).toContain("Item 9");
 });
 

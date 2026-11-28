@@ -19,8 +19,7 @@ export function dropTier(reporters: number): DropTier {
   return reporters >= INDEPENDENT_INSTALLS ? "confirmed" : reporters === 2 ? "verified" : "reported";
 }
 export function dropTierLabel(reporters: number): string {
-  // Installs, as the site counts them everywhere else ("confirmed by three installs").
-  return `${dropTier(reporters)} by ${reporters} ${reporters === 1 ? "install" : "installs"}`;
+  return `${dropTier(reporters)} by ${reporters} ${reporters === 1 ? "player" : "players"}`;
 }
 
 export interface LootRow {

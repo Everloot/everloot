@@ -9,7 +9,7 @@ test.each([1, 2, 3, 4])("%i distinct installs set the tier without promoting con
   const zero = rollupDrops(windows.map((w) => ({ ...w, items: [] }))).measuredZeros[0]!;
   expect(publicDropRate(rate)).toMatchObject({ tier, reporters: n, public: n >= 3 });
   expect(publicMeasuredZero(zero)).toMatchObject({ tier, reporters: n, public: n >= 3 });
-  expect(dropTierLabel(n)).toBe(`${tier} by ${n} ${n === 1 ? "install" : "installs"}`);
+  expect(dropTierLabel(n)).toBe(`${tier} by ${n} ${n === 1 ? "player" : "players"}`);
   expect(publicDropRate(rate)).not.toHaveProperty("units");
 });
 

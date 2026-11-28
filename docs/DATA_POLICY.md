@@ -181,7 +181,7 @@ installs report the same one; an object's spawn point needs three installs withi
 name is shown only when three installs report the same one; otherwise it is "Object" and its id.
 
 **2026-11-19 owner decision: drop tiers.** Drop rates and measured zeros appear from one distinct
-install's reports, labelled *reported by 1 install*, *verified by 2 installs* or *confirmed by N installs*
+install's reports, labelled *reported by 1 player*, *verified by 2 players* or *confirmed by N players*
 at three or more distinct installs. Three remains the bar for confirmed. A drop source's name appears
 from one install's name report when every counted name report agrees exactly; disagreeing reports show
 no name. Names carry their own reported, verified or confirmed tier, with confirmed names first.
