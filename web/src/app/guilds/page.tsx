@@ -123,6 +123,7 @@ function directoryMeta(g: ArmoryGuildRow, counted: boolean): string {
     `${regionLabel(g.region)} ${g.ruleset}`, g.faction,
     counted ? `${number(g.membersRead)} of ${number(g.memberCount)} read` : `${number(g.memberCount)} on the roster`,
     counted && g.averageItemLevel !== null ? `ilvl ${metricValue("item-level", g.averageItemLevel)}` : "",
+    counted && utcDay(g.fetchedAt) ? `newest read ${utcDay(g.fetchedAt)}` : "",
   ].filter(Boolean).join(" · ");
 }
 
