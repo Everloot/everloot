@@ -31,6 +31,8 @@ export function publicNpcs(facts: WorldFacts): NpcPage[] {
 /** One row of the NPC list: the page's facts, the level and reaction 3 installs agree on, its zone and its public drops. */
 export interface NpcRow extends NpcPage {
   level: number | null;
+  /** With no agreed level, the narrow range 3 installs report (a creature whose spawns differ in level), else null. */
+  levelRange: { min: number; max: number } | null;
   reaction: NpcReaction | null;
   /** The creature type (Beast, Undead...) and rank (normal, elite, rare...) 3 installs agree on. */
   creatureType: string | null;
@@ -53,10 +55,10 @@ export function npcRows(facts: WorldFacts, rates: readonly { sourceNpcId?: numbe
   const zones = new Map(publicZones().map((z) => [z.mapId, z]));
   return ids.map((id) => {
     const page = npcPage(id, table);
-    const { level, reaction, creatureType, rank } = table.agreedNpcs!.get(id) ?? npcTraits([]);
+    const { level, levelRange = null, reaction, creatureType, rank } = table.agreedNpcs!.get(id) ?? npcTraits([]);
     const zone = page.pins.map((p) => zones.get(p.mapId)).find(Boolean) ?? null;
-    return { ...page, level, reaction, creatureType, rank, zone, drops: drops.get(id)?.size ?? 0 };
-  }).filter((r) => r.name !== null || r.pins.length > 0 || r.level !== null || r.reaction !== null || r.drops > 0);
+    return { ...page, level, levelRange, reaction, creatureType, rank, zone, drops: drops.get(id)?.size ?? 0 };
+  }).filter((r) => r.name !== null || r.pins.length > 0 || r.level !== null || r.levelRange !== null || r.reaction !== null || r.drops > 0);
 }
 
 /** One row of the quest list: the page's facts and the category, side, group size and tag 3 installs agree on. */

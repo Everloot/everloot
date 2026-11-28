@@ -35,7 +35,7 @@ import {
   type ZoneEntrance, type ZoneFaction, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { SIDE_LABEL, SIDE_TONE } from "@/lib/world-lists";
-import type { NpcRank } from "@kb/world-pages";
+import { agreedNpcsOf, type NpcRank } from "@kb/world-pages";
 import type { Fact } from "@/components/ui/Facts";
 import { zoneLore } from "@/lib/zone-lore";
 import { gearFor, TERRAIN_BUILD, TERRAIN_PATH, zoneTerrain } from "@/lib/terrain";
@@ -315,7 +315,8 @@ export default async function ZonePage(props: Props) {
 
   // The zone at a glance. The game files give its entrances and flight masters; the counts are what 3 installs agreed on,
   // a row only for a kind with one (no row is not "none"), and none at all while storage is down.
-  const levels = creatureLevels(npcs);
+  // Every NPC whose sightings place it in the zone, pinned or not: a mob seen only while fighting still has an agreed level.
+  const levels = facts.unreachable ? null : creatureLevels([...agreedNpcsOf(facts).values()].filter((n) => n.zone === zone.mapId));
   const counted = facts.unreachable ? [] : ([["NPCs", npcs.length], ["Vendors", vendors.length], ["Quests", quests.length], ["Objects", treasures.length]] as const).filter(([, n]) => n > 0);
   const quickFacts: Fact[] = [
     ...(entrances.length ? [{ label: "Dungeons and raids", value: (
@@ -356,7 +357,7 @@ export default async function ZonePage(props: Props) {
           <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
           zone.faction ? <span key="territory" className={TERRITORY[zone.faction].tone}>{TERRITORY[zone.faction].label}</span> : null,
           // The game files give a zone no level range; this is the creatures' levels players agree on, and says so.
-          levels ? <span key="levels">{`Creatures ${levels.min === levels.max ? levels.min : `${levels.min}–${levels.max}`}`}<span className="text-muted"> (agreed NPC levels)</span></span> : null,
+          levels ? <span key="levels">{`Creatures ${levels.min === levels.max ? levels.min : `${levels.min}–${levels.max}`}`}<span className="text-muted">{` (from ${levels.count} ${levels.count === 1 ? "NPC" : "NPCs"} with agreed levels)`}</span></span> : null,
           <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
           wiki ? <Link key="wiki" href={wikiHref(wiki.slug)} className={link}>Wiki</Link> : null,
         ],
@@ -416,8 +417,9 @@ export default async function ZonePage(props: Props) {
 
         {(terrain.length > 0 || gear.length > 0) && (
           <section aria-label="Terrain" data-zone-terrain>
-            {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. */}
-            <Disclosure as="h2" id="terrain" wide summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
+            {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. A list of
+                3 rows or fewer is open, as it takes less room than the question. */}
+            <Disclosure as="h2" id="terrain" wide open={gear.length <= 3} summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
               <p className="text-meta text-fg-2">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
               {terrain.length > 0 && (
                 <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">

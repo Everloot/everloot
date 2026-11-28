@@ -8,6 +8,7 @@ import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
 import { qualityColor } from "@/lib/item-names";
+import { itemSetHref, itemSetOf } from "@/lib/item-sets";
 import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, rankable, rankText, slotLabel, type ArmoryMetric } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
@@ -31,14 +32,25 @@ const ICON = 40;
  * a phone it comes first and the slots follow as one list. The right column mirrors the left from a wide screen up.
  * `heading={false}` inside a tab, whose label names it already. An item in `unknown` (the game files carry nothing for
  * it, lib/equipped-item-tips.ts) has a nameless database page and a hover card that would 404, so it gets no link and
- * a tooltip from what Blizzard's armory read (name, quality, item level, slot) instead.
+ * a tooltip from what Blizzard's armory read (name, quality, item level, slot) instead. With `setNames`, the item sets
+ * the worn pieces belong to (as the game files list them) are counted under the heading: "Name 3/8".
  */
-export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center, fromFiles }: {
+export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center, fromFiles, setNames }: {
   character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; unknown?: ReadonlySet<number>; heading?: boolean; center?: ReactNode;
   /** The slots whose level is the game files', not the armory read's (lib/armory-file-levels.ts). */
   fromFiles?: ReadonlySet<string>;
+  /** The set names file's name for a set id (lib/game-assets loadItemSetNames); a set without one reads "Item set N". */
+  setNames?: (id: number) => string | undefined;
 }) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
+  // Each set worn, with its distinct pieces worn out of the pieces the files list, most pieces first.
+  const worn = new Map<number, { total: number; pieces: Set<number> }>();
+  for (const item of c.equipment) {
+    const set = itemSetOf(item.itemId);
+    if (set) worn.set(set.id, { total: new Set(set.items).size, pieces: (worn.get(set.id)?.pieces ?? new Set()).add(item.itemId) });
+  }
+  const sets = setNames ? [...worn].map(([id, w]) => ({ id, name: setNames(id) ?? `Item set ${id}`, worn: w.pieces.size, total: w.total }))
+    .sort((a, b) => b.worn - a.worn || a.name.localeCompare(b.name)) : [];
   const slot = (key: string, mirror: boolean) => {
     const item = equipped.get(key);
     const known = item ? tips.get(item.itemId) : undefined;
@@ -70,6 +82,9 @@ export function Equipment({ character: c, tips, unknownIcon = null, unknown: unk
   return <section aria-labelledby={heading ? "armory-gear" : undefined} aria-label={heading ? undefined : "Equipment"} className="space-y-3">
     {heading && <SectionHeading id="armory-gear">Equipment</SectionHeading>}
     {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
+    {sets.length > 0 && <p data-item-sets className="text-meta text-fg-2">
+      Sets:{" "}{sets.map((s, i) => <span key={s.id}>{i > 0 && " · "}<Link href={itemSetHref(s.id)} className={link}>{s.name}</Link> <span className="font-mono tabular-nums">{s.worn}/{s.total}</span></span>)}
+    </p>}
     {fromFiles && fromFiles.size > 0 && <p data-file-levels className="text-meta text-muted">
       Blizzard&apos;s armory no longer sends item levels, so the levels underlined with dots are the game files&apos; levels for the same items.
     </p>}

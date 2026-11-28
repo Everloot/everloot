@@ -18,7 +18,7 @@ import type { R2Config } from "./upload-store";
 
 export const NPC_FACTS_KEY = "snapshots/npc-facts.json";
 /** The table's shape in the file's stamp. Change it when a row changes shape, so the next job run rewrites the file. */
-export const NPC_FACTS_REVISION = "npc-facts-1";
+export const NPC_FACTS_REVISION = "npc-facts-2";
 const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 60_000;
 
@@ -27,7 +27,7 @@ export interface StoredNpcFacts { dataAsOf: string | null; npcs: ReadonlyMap<num
 
 /** A row's fields that hold nothing are left out of the file and filled back in on reading; `listName` is always kept as it is. */
 const emptyRow = (): Omit<AgreedNpc, "npcId"> => ({
-  name: null, pins: [], level: null, reaction: null, creatureType: null, rank: null, zone: null, dropName: null,
+  name: null, pins: [], level: null, levelRange: null, reaction: null, creatureType: null, rank: null, zone: null, dropName: null,
   nameReporters: 0, reportedName: null, pinDates: [],
 });
 const isEmpty = (k: string, v: unknown) => v === null || (Array.isArray(v) && v.length === 0) || (k === "nameReporters" && v === 0);
@@ -48,7 +48,8 @@ const text = (v: unknown) => v === null || typeof v === "string";
 const int = (v: unknown) => Number.isInteger(v);
 const isPin = (v: unknown) => isObject(v) && int(v.mapId) && Number.isFinite(v.x) && Number.isFinite(v.y) && int(v.reporters);
 const isRow = (n: Record<string, unknown>) => int(n.npcId) && text(n.name) && Array.isArray(n.pins) && n.pins.every(isPin)
-  && (n.level === null || Number.isFinite(n.level)) && (n.reaction === null || NPC_REACTIONS.includes(n.reaction as never))
+  && (n.level === null || Number.isFinite(n.level))
+  && (n.levelRange === null || (isObject(n.levelRange) && int(n.levelRange.min) && int(n.levelRange.max))) && (n.reaction === null || NPC_REACTIONS.includes(n.reaction as never))
   && text(n.creatureType) && (n.rank === null || NPC_RANKS.includes(n.rank as never)) && (n.zone === null || int(n.zone))
   && (n.listName === undefined || text(n.listName)) && (n.dropName === null || (isObject(n.dropName) && typeof n.dropName.name === "string" && typeof n.dropName.tier === "string"))
   && int(n.nameReporters) && text(n.reportedName)
