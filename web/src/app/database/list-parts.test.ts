@@ -30,3 +30,17 @@ test("a menu's note counts the rows with no value recorded for it, and says noth
   expect(unrecordedNote(Array.from({ length: 2829 }, () => ({ level: null })), (r) => r.level !== null)).toBe("Not recorded: 2,829");
   expect(unrecordedNote([{ level: 5 }], (r) => r.level !== null)).toBeUndefined();
 });
+
+test("twinDetails tells repeated names apart by the first detail that differs among them, else by ID", async () => {
+  const { twinDetails } = await import("./list-parts");
+  const items = [
+    { id: 1, name: "Greaves", ilvl: 50 }, { id: 2, name: "Greaves", ilvl: 60 }, { id: 3, name: "Greaves", ilvl: 60 },
+    { id: 4, name: "Helm", ilvl: 50 }, { id: 5, name: "Boots", ilvl: 40 }, { id: 6, name: "Boots", ilvl: 45 },
+  ];
+  const out = twinDetails(items, (r) => r.name, (r) => r.id, [(r) => `Item level ${r.ilvl}`]);
+  expect(out.get(5)).toBe("Item level 40");
+  expect(out.get(6)).toBe("Item level 45");
+  // Two of the three share an item level: the IDs tell them apart.
+  expect([out.get(1), out.get(2), out.get(3)]).toEqual(["ID 1", "ID 2", "ID 3"]);
+  expect(out.has(4)).toBe(false);
+});

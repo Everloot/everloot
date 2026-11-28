@@ -9,6 +9,13 @@ const data = vi.hoisted(() => ({
   tips: new Map<number, { name: string; icon: string | null; quality: string; color: string }>(),
   starters: [] as number[],
   shown: new Set<number>(),
+  rewardEdges: [] as number[],
+}));
+vi.mock("@/lib/edges", () => ({
+  loadEdges: async () => ({
+    observed: data.rewardEdges.map((itemId) => ({ fromKind: "item", fromId: itemId, rel: "reward_from", toKind: "quest", toId: 8, evidence: "observed", build: null, installs: 3, firstSeen: null, lastSeen: null })),
+    client: [], unreachable: false, dataAsOf: null,
+  }),
 }));
 vi.mock("@/data/game-data/client-quest-starts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/data/game-data/client-quest-starts")>()),
@@ -30,8 +37,11 @@ vi.mock("@/lib/names", async (importOriginal) => ({ ...(await importOriginal<typ
 vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => data.facts, loadItemFacts: async () => ({ unreachable: true }) }));
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 // The lore archive's match for the quest: none unless a test hands one in.
-const lore = vi.hoisted(() => ({ match: null as unknown }));
-vi.mock("@/lib/lore-links", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore-links")>()), loreFor: async () => lore.match }));
+const lore = vi.hoisted(() => ({ match: null as unknown, asked: [] as string[] }));
+vi.mock("@/lib/lore-links", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/lore-links")>()),
+  loreForShownQuest: async (_id: number, shown: { name: string; source: string } | null) => (shown ? (lore.asked.push(shown.source), lore.match) : null),
+}));
 
 import QuestPage from "./page";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -48,6 +58,8 @@ beforeEach(() => {
   data.starters = [];
   data.shown = new Set();
   lore.match = null;
+  lore.asked = [];
+  data.rewardEdges = [];
   data.facts ={ npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" };
 });
 
@@ -250,4 +262,20 @@ test("the Warcraft Wiki blurb is its own full-width paragraph under a small head
   // Shown once: the Lore block keeps its source line and archive link, not the paragraph again.
   expect(out.split(intro)).toHaveLength(2);
   expect(out).toContain("Read A quest in the lore archive");
+});
+
+test("a quest titled only by the Warcraft Wiki still shows the wiki's blurb, asked for by that title", async () => {
+  const intro = "Slaughter 6 Mottled Boars, then return to Grull Hawkwind.";
+  lore.match = { extId: "x", name: "A quest", intro, sourceId: "wiki" };
+  const out = await html();
+  expect(lore.asked).toEqual(["wiki"]);
+  expect(out).toMatch(/<section[^>]*data-quest-about[^>]*>[\s\S]*?Slaughter 6 Mottled Boars/);
+});
+
+test("an item that names this quest as its reward source is listed and linked on the quest's Rewards tab", async () => {
+  data.facts.quests = ["a", "b", "c"].map((installId) => ({ installId, questId: 8, title: "A quest", level: 1, giverNpcId: 10, rewardItemIds: [] }));
+  data.rewardEdges = [19019];
+  const out = await html();
+  expect(out).toContain('href="/database/items/19019"');
+  expect(fact(out, "Rewards")).toContain("1 item");
 });

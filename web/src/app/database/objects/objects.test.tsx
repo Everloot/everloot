@@ -193,3 +193,36 @@ test("the list counts read in the singular for one: 1 item, not 1 items", async 
   expect(list).toContain("3 loot windows · 1 item · 3 install IDs");
   expect(list).not.toContain("1 items");
 });
+
+test("two objects sharing a name say their zone, or their ID when the zone does not tell them apart", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...["a", "b", "c"].map((i) => gathered(`install-${i}`, 2843, "chest", { sourceObjectName: "Battered Chest" })),
+    ...["a", "b", "c"].map((i) => gathered(`install-${i}`, 106318, "chest", { sourceObjectName: "Battered Chest" })),
+    ...["a", "b", "c"].map((i) => gathered(`install-${i}`, 1617, "herb", { gatherSkill: 5 })),
+  ]));
+  const list = await html(ObjectsPage({}));
+  const row = (id: number) => list.split("<tr").find((r) => r.includes(`href="/database/objects/${id}"`)) ?? "";
+  // Both stand in Elwynn Forest here, so the zone tells them nothing: each says its ID beside the name.
+  expect(row(2843)).toMatch(/>Battered Chest<\/a><span[^>]*>ID 2843<\/span>/);
+  expect(row(106318)).toMatch(/>Battered Chest<\/a><span[^>]*>ID 106318<\/span>/);
+  expect(row(1617)).not.toContain("ID 1617</span>");
+});
+
+test("a herb links its profession page, and agreed loot says how many items a loot window held on average", async () => {
+  const window = (installId: string, items: { itemId: number; count: number }[]) => ({ ...gathered(installId, 1617, "herb"), items });
+  store.loadCorpus.mockResolvedValue(corpus([
+    window("install-a", [{ itemId: 2447, count: 2 }]), window("install-b", [{ itemId: 2447, count: 3 }, { itemId: 765, count: 1 }]), window("install-c", [{ itemId: 2447, count: 1 }]),
+  ]));
+  const page = await html(ObjectPage(props("1617")));
+  expect(fact(page, "Profession")).toContain('href="/tools/professions/herbalism"');
+  // 7 items over 3 loot windows.
+  expect(fact(page, "Items per loot window")).toBe("2.3");
+  // Short of 3 installs, no average.
+  store.loadCorpus.mockResolvedValue(corpus([window("install-a", [{ itemId: 2447, count: 2 }]), window("install-b", [{ itemId: 2447, count: 3 }])]));
+  expect(await html(ObjectPage(props("1617")))).not.toContain(">Items per loot window<");
+});
+
+test("a chest has no profession row", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(["a", "b", "c"].map((i) => gathered(`install-${i}`, 2843, "chest", { sourceObjectName: "Battered Chest" }))));
+  expect(await html(ObjectPage(props("2843")))).not.toContain(">Profession<");
+});

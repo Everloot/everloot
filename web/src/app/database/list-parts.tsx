@@ -269,3 +269,29 @@ export const noneListed = (noun: string): string =>
 export function ConfirmationsUnread() {
   return <p data-confirmations-unread className="py-2 text-cell text-fg-2">Player confirmations could not be read just now, so the Confirmed column is unrecorded.</p>;
 }
+
+/**
+ * A short detail for each row whose name repeats among the rows (Battered Chest twice, three Defiler's Lamellar
+ * Greaves), keyed by id: the first detail every twin has and no two twins share, else "ID n". A name that does not
+ * repeat gets none. The spell list's rule (#1653), with the details a list has to offer first.
+ */
+export function twinDetails<T>(rows: readonly T[], name: (row: T) => string | undefined, id: (row: T) => number, details: ((row: T) => string | null)[] = []): Map<number, string> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const n = name(row)?.trim().toLowerCase();
+    if (n) groups.set(n, [...(groups.get(n) ?? []), row]);
+  }
+  const out = new Map<number, string>();
+  for (const twins of groups.values()) {
+    if (twins.length < 2) continue;
+    const telling = details.find((detail) => {
+      const values = twins.map(detail);
+      return values.every(Boolean) && new Set(values).size === twins.length;
+    });
+    for (const row of twins) out.set(id(row), telling?.(row) ?? `ID ${id(row)}`);
+  }
+  return out;
+}
+
+/** The twin detail beside a repeated name, in the spell list's style. */
+export const TwinDetail = ({ children }: { children: ReactNode }) => <span className="text-meta text-fg-2">{children}</span>;

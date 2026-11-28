@@ -115,6 +115,29 @@ describe("an item by the name its page shows", () => {
   });
 });
 
+describe("a quest by the title its page shows", () => {
+  const wiki = (entries: [number, string][]) => new Map(entries.map(([id, name]) => [id, { name }]));
+
+  test("a title from the Warcraft Wiki links its lore page though nobody has reported the quest", async () => {
+    const { loreForShownQuest } = await links();
+    expect(await loreForShownQuest(12, { name: "100% Done", source: "wiki" }, wiki([[12, "100% Done"]]), sets())).toMatchObject({ extId: "8" });
+  });
+
+  test("no link for a wiki title another quest has agreed or the wiki gives twice, or for no title", async () => {
+    const { loreForShownQuest } = await links();
+    const shown = { name: "100% Done", source: "wiki" as const };
+    expect(await loreForShownQuest(12, shown, wiki([[12, "100% Done"]]), sets({ quests: new Map([[13, "100% Done"]]) }))).toBeNull();
+    expect(await loreForShownQuest(12, shown, wiki([[12, "100% Done"], [14, "100% Done"]]), sets())).toBeNull();
+    expect(await loreForShownQuest(12, shown, undefined, sets())).toBeNull();
+    expect(await loreForShownQuest(12, null, wiki([]), sets())).toBeNull();
+  });
+
+  test("a title players agreed on follows the shared rule", async () => {
+    const { loreForShownQuest } = await links();
+    expect(await loreForShownQuest(12, { name: "100% Done", source: "players" }, undefined, sets({ quests: new Map([[12, "100% Done"]]) }))).toMatchObject({ extId: "8" });
+  });
+});
+
 describe("a lore page leads to its database page", () => {
   const page = (type: Type, name: string, sourceId = "warcraft-wiki-2023") => ({ sourceId, type, name });
 
