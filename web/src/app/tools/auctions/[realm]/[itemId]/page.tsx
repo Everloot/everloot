@@ -30,10 +30,9 @@ import { realmDisplayName } from "../../RealmName";
 
 type Props = { params: Promise<{ realm: string; itemId: string }>; searchParams?: Promise<{ house?: string | string[] }> };
 
+// No static params list: the page reads `?house=`, and a page rendered once and kept (ISR) that reads the query
+// string answers 500 in production (static-params-guard.test.ts).
 export const revalidate = 300;
-export async function generateStaticParams() {
-  return [];
-}
 
 // generateMetadata and the page both load this; one request reads the rollup and the item's art and names once, not twice.
 // Keyed by the two path strings (the params promises are not the same object in both calls).
