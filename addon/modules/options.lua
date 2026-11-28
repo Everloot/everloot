@@ -40,7 +40,7 @@ O.ROWS = {
   { key = "gold", group = "data", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page. Also your character's lifetime gold statistics, which never go in an upload; only the Desktop App's private sync sends them, for a character you linked. Off deletes the lifetime statistics." },
   { key = "roster", group = "data", label = "Your characters",
-    text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
+    text = "Name, realm, class, level, faction, gold, professions and profession cooldowns of each character you log in with. Stays in this file; never uploaded." },
   { key = "inventoryCapture", group = "data", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
     text = "Counts of items in your bags, opened bank and opened mail, with a separate observation time for each. Stays in this file; never uploaded or synced. Off deletes these snapshots." },
   { key = "guild", group = "data", label = "Guild",

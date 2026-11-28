@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: Professions shows local cooldowns across your characters for transmutes, Mooncloth and Salt Shaker. Ready timers appear first.
 - Site: item tooltips show how many fit in a stack, and a recipe's tooltip shows the item it teaches underneath, as in the game (#1597).
 - Site: zone maps place their flight masters and each one links to its spot on the world map; spell pages name the items a recipe makes and uses, with reagent counts, and link the profession that teaches it with its skill ranks (#1591).
 - Site: item set pages show every piece's icon and where players got it (drop, vendor, quest, crafted), and mount and companion pet pages name the spell that teaches or summons them, with its icon and, for a few mounts, the item that casts it (#1593).

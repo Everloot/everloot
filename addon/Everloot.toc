@@ -24,6 +24,7 @@ modules\roster.lua
 modules\ledger.lua
 modules\inventory.lua
 modules\professions.lua
+modules\cooldowns.lua
 modules\ask.lua
 modules\addons.lua
 modules\mapbounds.lua

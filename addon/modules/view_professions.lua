@@ -1,4 +1,4 @@
--- Everloot window, Professions: three screens behind two buttons at the bottom.
+-- Everloot window, Professions: four screens behind the buttons at the bottom.
 --   Professions: each profession in the character's profession book with its rank bar, how many recipes the addon
 --     has recorded for it in each difficulty colour (professions.lua writes them, read here through Everloot:Rows),
 --     the day they were last read, and one line for the next recipe a trainer teaches. Under the blocks, every other
@@ -9,6 +9,7 @@
 --   Crafting costs: each recorded recipe of the character's professions with its reagents' cost, its product's
 --     market value and an estimated profit per craft, and what to buy for a chosen recipe and count, which a button
 --     adds to the active shopping list (modules/shopping.lua, saved in this install's file).
+--   Cooldowns: long profession cooldowns for your characters, read from the local cooldown tracker.
 -- Otherwise display only: it registers no events and records nothing; the window builds it the first time
 -- Professions is opened.
 
@@ -37,11 +38,12 @@ local NONE_LEARNED = "No professions learned yet."
 local FOOTER = "Planner: everloot.app/tools/profession-planner"
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
--- The screens, and the two the buttons at the bottom open from each: the left one, then the right one.
+-- The existing navigation stays in place. A third button opens cooldowns or returns to the profession list.
 local TO_LIST, TO_CRAFTING, TO_RANKS = "Professions", "Crafting costs", "Ranks and trainers"
 local SCREENS = { list = TO_LIST, crafting = TO_CRAFTING, trainers = TO_RANKS }
-local GO = { list = { "trainers", "crafting" }, crafting = { "list", "trainers" }, trainers = { "list", "crafting" } }
-local NAV_W = 136
+local GO = { list = { "trainers", "crafting" }, crafting = { "list", "trainers" }, trainers = { "list", "crafting" },
+  cooldowns = { "trainers", "crafting" } }
+local NAV_W, COOLDOWN_NAV_W = 112, 84
 
 -- The ranks and trainers page: a heading row, then a box per profession with its rows.
 local TRAIN_ROWS, TRAIN_HEAD, SECTION_HEAD, ROW_H = 5, 20, 26, 16
@@ -68,6 +70,7 @@ local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 local ADD_TO_LIST = "Add reagents to shopping list"
 
 local refresh, buildCrafting
+local COOLDOWN_ROWS = 12
 
 -- A click redraws the view; an error closes the window as any other view error does.
 local function redraw()
@@ -771,15 +774,59 @@ local function refreshCrafting(c)
   drawBuy(c, selected)
 end
 
+local function cooldownStatus(row)
+  if row.state == "ready" then return "Ready" end
+  if row.state == "unknown" then return "Unknown" end
+  local minutes = math.ceil(row.remaining / 60)
+  if minutes < 60 then return string.format("%dm", minutes) end
+  if minutes < 1440 then return string.format("%dh %02dm", math.floor(minutes / 60), minutes % 60) end
+  return string.format("%dd %dh", math.floor(minutes / 1440), math.floor(minutes / 60) % 24)
+end
+
+local function refreshCooldowns(c)
+  local rows = E.Cooldowns and E.Cooldowns.Rows() or {}
+  local lastPage = math.max(0, math.ceil(#rows / COOLDOWN_ROWS) - 1)
+  c.offset = math.min(c.offset, lastPage)
+  for i, line in ipairs(c.rows) do
+    local row = rows[c.offset * COOLDOWN_ROWS + i]
+    if row then
+      local location = row.realm and (" (" .. row.realm .. ")") or ""
+      line.character:SetText(row.character .. location)
+      line.name:SetText(row.name)
+      line.status:SetText(cooldownStatus(row))
+      line.status:SetTextColor(unpack(row.state == "ready" and COLORS.accent or COLORS.muted))
+      line:Show()
+    else
+      line:Hide()
+    end
+  end
+  if #rows == 0 then
+    c.empty:SetText(E:IsEnabled("roster") and "No cooldowns seen yet. Log in on a character with a tracked spell or item."
+      or 'Enable "Your characters" to track profession cooldowns.')
+    c.empty:Show()
+  else
+    c.empty:Hide()
+  end
+  if c.offset > 0 then c.prev:Show() else c.prev:Hide() end
+  if c.offset < lastPage then c.next:Show() else c.next:Hide() end
+end
+
 function refresh(f)
   local p = f.professions
   local go = GO[p.mode]
   p.nav:SetText(SCREENS[go[1]])
   p.toggle:SetText(SCREENS[go[2]])
+  p.cooldownNav:SetText(p.mode == "cooldowns" and TO_LIST or "Cooldowns")
+  p.cooldowns.page:Hide()
   for _, block in ipairs(p.blocks) do block:Hide() end
   p.empty:Hide(); p.others:Hide()
   for _, line in ipairs(p.other) do line:Hide() end
   p.craft.page:Hide(); p.trainers.page:Hide()
+  if p.mode == "cooldowns" then
+    p.cooldowns.page:Show()
+    refreshCooldowns(p.cooldowns)
+    return
+  end
   if p.mode == "crafting" then
     p.craft.page:Show()
     refreshCrafting(p.craft)
@@ -819,6 +866,50 @@ local function box(parent, x, y, w, h)
   b:SetPoint("TOPLEFT", x, y)
   b:SetSize(w, h)
   return surface(b)
+end
+
+local function buildCooldowns(parent)
+  local page = CreateFrame("Frame", nil, parent)
+  page:SetPoint("TOPLEFT", 0, 0)
+  page:SetSize(W, PAGE_H)
+  local c = { page = page, rows = {}, offset = 0 }
+  local title = text(page, 14)
+  title:SetPoint("TOPLEFT", 8, -8)
+  title:SetText("Profession cooldowns")
+  local summary = text(page, 12, nil, COLORS.muted)
+  summary:SetPoint("TOPLEFT", 8, -31)
+  summary:SetText("Other characters show the cooldowns last seen on this device.")
+  c.empty = text(page, 12)
+  c.empty:SetPoint("TOPLEFT", 8, -66)
+  c.empty:SetWidth(W - 16)
+  for i = 1, COOLDOWN_ROWS do
+    local row = box(page, 0, -54 - (i - 1) * 23, W, 22)
+    row.character = text(row, 12)
+    row.character:SetPoint("LEFT", 8, 0)
+    row.character:SetWidth(334)
+    row.character:SetJustifyH("LEFT")
+    if row.character.SetWordWrap then row.character:SetWordWrap(false) end
+    row.name = text(row, 12)
+    row.name:SetPoint("LEFT", 350, 0)
+    row.status = text(row, 12, NARROW)
+    row.status:SetPoint("RIGHT", -8, 0)
+    c.rows[i] = row
+  end
+  c.prev = button(page, "Previous", 84, function() c.offset = math.max(0, c.offset - 1) end)
+  c.next = button(page, "Next", 84, function() c.offset = c.offset + 1 end)
+  c.prev:SetPoint("BOTTOMLEFT", 0, 3)
+  c.next:SetPoint("BOTTOMRIGHT", 0, 3)
+  local elapsed = 0
+  page:SetScript("OnUpdate", function(_, dt)
+    elapsed = elapsed + dt
+    if elapsed >= 1 then
+      elapsed = 0
+      local ok, err = pcall(refreshCooldowns, c)
+      if not ok then U.Fail(err) end
+    end
+  end)
+  page:Hide()
+  return c
 end
 
 -- Recipe 4..200, cost 206..296, value 302..392, profit 398..502, your scans from 510 (the change, then three bars);
@@ -1097,9 +1188,9 @@ local function build(f, parent)
     p.other[i] = line
   end
   p.footer = text(parent, 12, nil, COLORS.muted)
-  -- At the bottom of the view, under every screen; the two buttons beside it.
+  -- At the bottom of the view, under every screen.
   p.footer:SetPoint("BOTTOMLEFT", 8, 8)
-  p.footer:SetWidth(W - 2 * NAV_W - 20)
+  p.footer:SetWidth(W - 2 * NAV_W - COOLDOWN_NAV_W - 20)
   if p.footer.SetWordWrap then p.footer:SetWordWrap(false) end
   p.footer:SetText(FOOTER)
   -- Beside the footer: the other two screens, named on the buttons (GO).
@@ -1108,8 +1199,13 @@ local function build(f, parent)
   p.nav:SetPoint("BOTTOMRIGHT", -(NAV_W + 4), 2)
   p.toggle = button(parent, TO_CRAFTING, NAV_W, function() p.mode = GO[p.mode][2] end)
   p.toggle:SetPoint("BOTTOMRIGHT", 0, 2)
+  p.cooldownNav = button(parent, "Cooldowns", COOLDOWN_NAV_W, function()
+    p.mode = p.mode == "cooldowns" and "list" or "cooldowns"
+  end)
+  p.cooldownNav:SetPoint("BOTTOMRIGHT", -2 * (NAV_W + 4), 2)
   p.craft = buildCrafting(parent)
   p.trainers = buildTrainers(parent)
+  p.cooldowns = buildCooldowns(parent)
 end
 
 U.Views.professions = { build = build, refresh = refresh }
