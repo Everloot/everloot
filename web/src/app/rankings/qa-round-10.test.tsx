@@ -51,7 +51,7 @@ const series: ChartSeries[] = [
 const axisLabels = (svg: Element) => [...svg.querySelectorAll("text.font-mono")].map((t) => t.textContent).filter((t) => t?.endsWith("%"));
 
 test("QA round 10: a ranking's trend chart draws at its own width, so its labels keep their size on a phone", async () => {
-  const div = await render(<WeeklyChart weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
+  const div = await render(<WeeklyChart noun="Class" weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
   const svg = div.querySelector("[data-weekly-chart] svg")!;
   expect(svg.getAttribute("viewBox")).toBe("0 0 326 300");
   expect(svg.getAttribute("width")).toBe("326");
@@ -62,7 +62,7 @@ test("QA round 10: a ranking's trend chart draws at its own width, so its labels
 
 test("QA round 10: at 1440 the trend chart is as wide as its card, still one viewBox unit a pixel", async () => {
   laidOut = 1100;
-  const div = await render(<WeeklyChart weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
+  const div = await render(<WeeklyChart noun="Class" weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
   const svg = div.querySelector("[data-weekly-chart] svg")!;
   expect(svg.getAttribute("viewBox")).toBe("0 0 1100 300");
   // Four lines or fewer are named at their ends, inside the picture.
@@ -71,7 +71,7 @@ test("QA round 10: at 1440 the trend chart is as wide as its card, still one vie
 });
 
 test("QA round 10: the trend chart's percent axis labels equal its gridlines (8% is drawn at 8%, not 7.5%)", async () => {
-  const div = await render(<WeeklyChart weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
+  const div = await render(<WeeklyChart noun="Class" weeks={weeks} series={series} title="Classes: share of each week's characters, top 2" />);
   const svg = div.querySelector("[data-weekly-chart] svg")!;
   expect(axisLabels(svg)).toEqual(["0%", "8%", "16%"]);
   const grid = [...svg.querySelectorAll("line")].slice(0, 3).map((l) => Number(l.getAttribute("y1")));

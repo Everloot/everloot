@@ -58,7 +58,7 @@ test("QA round 9: the share-by-class chart draws at its own width, so its 100% i
     { key: "mage", label: "Mage", classToken: "MAGE", points: [0.5, 0.4, 0.45] },
     { key: "rogue", label: "Rogue", classToken: "ROGUE", points: [0.5, 0.6, 0.55] },
   ];
-  const div = await render(<StackedWeeks weeks={weeks} series={series} title="Share of each week's characters by class, 2 classes" />);
+  const div = await render(<StackedWeeks noun="Class" weeks={weeks} series={series} title="Share of each week's characters by class, 2 classes" />);
   const svg = div.querySelector("[data-stacked-chart] svg")!;
   expect(svg.getAttribute("viewBox")).toBe("0 0 326 300");
   expect(svg.getAttribute("width")).toBe("326");
