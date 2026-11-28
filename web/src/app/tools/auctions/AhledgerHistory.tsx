@@ -3,6 +3,7 @@
 import { useId } from "react";
 import Coins from "@/components/ui/Coins";
 import { salesText, type AhledgerHistory as History, type AhledgerPoint } from "@/lib/ahledger";
+import { utcDay } from "@/lib/time";
 import { AhledgerMarketPicker, AhledgerPanel, useAhledger, useAhledgerMarket } from "./AhledgerPanel";
 
 /**
@@ -52,7 +53,7 @@ export function HistoryChart({ series }: { series: AhledgerPoint[] }) {
       </g>))}
     </svg>
     <figcaption className="flex flex-wrap justify-between gap-2 text-meta text-fg-2">
-      <span>{new Date(first).toISOString().slice(0, 10)} to {points.at(-1)!.t.slice(0, 10)} · dashed: minimum · solid: median · band: p25–p75</span>
+      <span>{utcDay(new Date(first).toISOString())} to {utcDay(points.at(-1)!.t)} · dashed: minimum · solid: median · band: p25–p75</span>
       <span><Coins copper={low} /> to <Coins copper={high} /></span>
       {clipped > 0 && <span className="w-full">{clipped} {clipped === 1 ? "value lies" : "values lie"} beyond the axis, drawn on its edge (a hollow dot on a line) so one outlier does not flatten the rest.</span>}
     </figcaption>

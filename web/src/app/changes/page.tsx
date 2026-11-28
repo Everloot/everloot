@@ -13,6 +13,7 @@ import { pageMetadata } from "@/lib/seo";
 import { mentionIndex, siteSpellNames } from "@/lib/spell-mentions";
 import { listHref, listQuery, NoMatches, PER_PAGE, sortParam, type ListQuery, type Search } from "../database/list-parts";
 import WithSpells from "./with-spells";
+import { utcDay, utcStamp } from "@/lib/time";
 
 export const metadata: Metadata = {
   ...pageMetadata({ title: "WoW Forever Patch Notes and Blizzard Posts", description: "New WoW: Forever builds, hotfixes and Blizzard blue posts, newest first. Each post has a page linking the original; builds are dated as Everloot first saw them.", path: "/changes", image: "/changes/opengraph-image" }),
@@ -148,10 +149,10 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
           <p className="flex flex-wrap items-center gap-2 text-cell-2 text-fg-2">
             <time
               dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at}
-              title={e.source === "manual" ? e.at.slice(0, 10) : e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
+              title={e.source === "manual" ? utcDay(e.at) ?? undefined : e.type === "build" ? `${utcStamp(e.at)}, when Everloot first saw it` : utcStamp(e.at) ?? undefined}
               className="font-mono tabular-nums"
             >
-              {postDay(e)}
+              {utcDay(postDay(e)) ?? postDay(e)}
             </time>
             <span data-type><Badge tone="neutral">{typeLabel(e)}</Badge></span>
             {posts.length > 1 && <span data-posts className="text-muted">{posts.length} posts</span>}

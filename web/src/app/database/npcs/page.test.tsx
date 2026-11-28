@@ -164,6 +164,24 @@ test("each NPC menu notes the rows it cannot hold, those with no value recorded"
   for (const menu of ["zone", "level", "react", "type", "rank"]) expect(note(page, menu)).toBe("Not recorded: 1");
 });
 
+test("the Level menu has a top bracket for NPCs above level 60, so its counts and the note add up to the list", async () => {
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", level: 61 }),
+    npc({ npcId: 103, name: "Npc Gamma", level: 62 }),
+    npc({ npcId: 104, name: "Npc Delta", level: null }),
+  ];
+  const page = await html();
+  const menu = page.split('data-filter="level"')[1]?.split("</details>")[0] ?? "";
+  expect(menu).toMatch(/>61\+<\/span><span class="tabular-nums text-muted">2</);
+  expect(menu).toContain('href="/database/npcs?level=61-999"');
+  // The top bracket filters the list.
+  const top = await html({ level: "61-999" });
+  expect(top).toContain('href="/database/npcs/102"');
+  expect(top).not.toContain('href="/database/npcs/101"');
+});
+
 test("QA round 14: an NPC with no agreed name reads Unnamed NPC, and Named only (?named=1) leaves those rows out", async () => {
   store.npcs = [npc({ npcId: 4540, drops: 24 }), npc({ npcId: 101, name: "Npc Alpha", drops: 3 })];
   const all = await html({ sort: "drops", dir: "desc" });

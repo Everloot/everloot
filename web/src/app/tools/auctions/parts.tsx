@@ -105,7 +105,11 @@ export function RulesetSummaryTable({ rows, names, href }: { rows: RulesetSummar
  * and never shows them: those pages are ad-free, this one is not.
  */
 export function ScansPaused({ state, now, className }: { state: MarketState | null; now: Date; className?: string }) {
-  if (!scansPaused(state, now)) return null;
+  return scansPaused(state, now) ? <ScansPausedNotice className={className} /> : null;
+}
+
+/** The scans-paused line itself, for a page that already knows scans are paused. */
+export function ScansPausedNotice({ className }: { className?: string }) {
   return (
     <Card className={className}>
       <p className="text-fg-2" role="status">
@@ -215,13 +219,13 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
   const step = axisStep(Math.max(...kept));
   const days = points.map((p) => ({
     day: p.day, value: p.market, outlier: trimmed.has(p),
-    label: `${p.day}: ${formatCopper(p.market)}${trimmed.has(p) ? ", trimmed as an outlier" : ""}`,
+    label: `${scanDayText(p.day)}: ${formatCopper(p.market)}${trimmed.has(p) ? ", trimmed as an outlier" : ""}`,
   }));
   return (
     <figure className="space-y-2">
       <PriceLine days={days} step={step} axis={["0", coinAxis(step), coinAxis(step * 2)]} title={`Market value per public day, last ${HISTORY_DAYS} days: ${formatCopper(low)} to ${formatCopper(high)}`} />
       <figcaption className="flex flex-wrap justify-between gap-x-4 text-xs text-muted">
-        <span>{points[0]!.day} to {points.at(-1)!.day}</span>
+        <span>{scanDayText(points[0]!.day)} to {scanDayText(points.at(-1)!.day)}</span>
         <span className="font-mono tabular-nums"><CoinText text={formatCopper(low)} /> to <CoinText text={formatCopper(high)} /></span>
         {trimmed.size > 0 && <span>Hollow dots are days trimmed as outliers.</span>}
       </figcaption>
@@ -245,7 +249,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
     { key: "historical", header: "Historical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.historical)} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
-    { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
+    { key: "day", header: "Day", numeric: true, cell: (r) => scanDayText(r.value.day) },
   ];
   return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`} empty={<EmptyState framed={false} message={empty} />} />;
 }
@@ -253,7 +257,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
 /** The public days behind one price, newest first. */
 export function DayTable({ points, caption }: { points: PublicDay[]; caption: string }) {
   const columns: Column<PublicDay>[] = [
-    { key: "day", header: "Day", numeric: true, cell: (p) => p.day },
+    { key: "day", header: "Day", numeric: true, cell: (p) => scanDayText(p.day) },
     { key: "value", header: "Value", numeric: true, cell: (p) => <CoinText text={formatCopper(p.market)} /> },
     { key: "min", header: "Min buyout", numeric: true, cell: (p) => <CoinText text={formatCopper(p.min)} /> },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },

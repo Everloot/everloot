@@ -64,6 +64,12 @@ const text = (html: string) => {
   document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
   return (document.body.textContent ?? "").replace(/[<>]/g, "").replace(/ gold/g, "g").replace(/ silver/g, "s").replace(/ copper/g, "c");
 };
+// The text a reader sees: the markup's text without its scripts (the Dataset JSON-LD keeps ISO days).
+const shownText = (html: string) => {
+  const document = new JSDOM(html).window.document;
+  document.querySelectorAll("script").forEach((el) => el.remove());
+  return document.body.textContent ?? "";
+};
 // The newest scan day as every Auction House page writes it: "27 Nov".
 const todayText = today.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const hub = async (searchParams: Record<string, string>) =>
@@ -256,6 +262,9 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(html).toContain("/api/market/prices?realm=Forever&house=horde");
   // The day list: three days ago the value was 1s 90c.
   expect(text(html)).toContain("1s 90c");
+  // Days read in the site's day form everywhere on the page: tiles, the chart range, the day list.
+  expect(words).toContain(`On ${todayText}`);
+  expect(shownText(html)).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect(html).toContain('"@type":"Dataset"');
   expect(html).not.toMatch(/"@type":"(Product|Offer|AggregateRating|Review)"/);
   const meta = await itemMetadata(item("forever", "2589"));
@@ -298,6 +307,9 @@ test("the cross-realm page compares every realm with a price", async () => {
   expect(html).toContain("Lowest market value1s 98cForever, Horde");
   expect(html).toContain("Highest market value3sMal'Ganis, Horde");
   expect(html).toContain("Mal'Ganis");
+  // The all-realms table's day is in the site's day form.
+  expect(html).toContain(todayText);
+  expect(shownText(renderToStaticMarkup(await CrossRealmItemPage(props)))).not.toMatch(/20\d\d-\d\d-\d\d/);
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
 });
@@ -319,20 +331,23 @@ test("an unnamed item's price pages say why the name is missing and still link t
 });
 
 test("the item database page gets a small Auction House box only when a price is public", async () => {
-  const rows = await loadMarketBox(2589, today);
+  const { rows } = await loadMarketBox(2589, today);
   expect(rows.map((r) => [r.realm.name, r.house, r.value.market])).toEqual([["Forever", "Horde", 198], ["Mal'Ganis", "Horde", 300]]);
-  const box = renderToStaticMarkup(<MarketBox itemId={2589} rows={rows} />);
+  const box = renderToStaticMarkup(<MarketBox itemId={2589} rows={rows} paused={false} />);
   expect(text(box)).toContain("Auction House");
+  // Each price says the day it was scanned.
+  expect(box).toMatch(/<th[^>]*>(?:<[^>]*>)*Scanned</);
+  expect(text(box)).toContain(todayText);
   expect(box).toContain('href="/tools/auctions/item/2589"');
   expect(box).toContain('href="/tools/auctions/forever/2589"');
-  expect(await loadMarketBox(9999, today)).toEqual([]);
-  expect(renderToStaticMarkup(<MarketBox itemId={9999} rows={[]} />)).toBe("");
+  expect((await loadMarketBox(9999, today)).rows).toEqual([]);
+  expect(renderToStaticMarkup(<MarketBox itemId={9999} rows={[]} paused={false} />)).toBe("");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "765" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "4306" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2592" }) }))).not.toContain("data-market-box");
   store.loadMarket.mockRejectedValue(new Error("down"));
-  expect(await loadMarketBox(2589, today)).toEqual([]);
+  expect(await loadMarketBox(2589, today)).toEqual({ rows: [], paused: false });
 });
 
 test("the browse page's realm and house picker: realms keep the filters, houses keep the realm, and ?realm= still lands on the realm", async () => {
@@ -382,7 +397,7 @@ test("every price names its house: All houses lists each house's price apart, an
   expect(item).toMatch(/Houses \(2\)/);
   expect(item).toMatch(/Alliance1s1s[\s\S]*Horde9s9s/);
   expect(item).not.toMatch(/(?<!\d)50?s(?! \d+c)/);
-  const box = await loadMarketBox(2589, today);
+  const { rows: box } = await loadMarketBox(2589, today);
   expect(box.map((r) => [r.house, r.value.market])).toEqual([["Alliance", 100], ["Horde", 900]]);
 });
 
@@ -462,7 +477,7 @@ test("the 60-day chart fits its axis to the public days, so the line runs end to
   const grid = /<line data-gridline="0" x1="([\d.]+)" x2="([\d.]+)"/.exec(html)!;
   expect(xs[0]).toBe(Number(grid[1]));
   expect(xs.at(-1)).toBe(Number(grid[2]));
-  expect(text(html)).toContain("2026-11-05 to 2026-11-20");
+  expect(text(html)).toContain("Nov 5, 2026 to Nov 20, 2026");
 });
 
 test("the 60-day chart scales to the days the market value keeps, labels a round y-axis, and gives each day's value on hover", () => {
@@ -473,8 +488,8 @@ test("the 60-day chart scales to the days the market value keeps, labels a round
   const labels = [...html.matchAll(/<text data-axis-label[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
   expect(labels).toEqual(["0", "60c", "1s 20c"]);
   // Each day is a hover and focus target carrying its value; the outlier says it was trimmed and is drawn at the top.
-  expect(html).toMatch(/<rect[^>]*aria-label="2026-11-01: 1s 0c"/);
-  expect(html).toMatch(/<rect[^>]*aria-label="2026-11-04: 48s 0c, trimmed as an outlier"/);
+  expect(html).toMatch(/<rect[^>]*aria-label="Nov 1, 2026: 1s 0c"/);
+  expect(html).toMatch(/<rect[^>]*aria-label="Nov 4, 2026: 48s 0c, trimmed as an outlier"/);
   expect(html).toMatch(/<circle data-point="2026-11-04" data-outlier/);
 });
 
@@ -509,6 +524,8 @@ test("with no scan for 3 days, every page that names the newest scan says scans 
     await realmHtml("forever"),
     renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))),
     renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) })),
+    // The database item page's Auction House box too.
+    renderToStaticMarkup(<MarketBox itemId={2589} {...await loadMarketBox(2589, today)} />),
   ];
   // Today's scans: nothing to say.
   for (const html of await pages()) expect(html).not.toContain("Community scans are paused");

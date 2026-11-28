@@ -108,7 +108,7 @@ test("the hub's headline tiles, weekly totals and top movers, each row linking t
   const words = text(page);
   // 149 characters last week round to 150; 201 this week round to 200.
   expect(page).toContain("data-metric-tiles");
-  expect(words).toContain("Characters counted 200 This week so far (from 2026-11-16)");
+  expect(words).toContain("Characters counted 200 This week so far (from Nov 16, 2026)");
   // The week is still running: it is compared with the same days of last week.
   expect(words).toContain("Against the same days last week +50 +33% characters");
   // Mage and Warlock are hidden this week, so the tile names the leader among published classes and says why.
@@ -116,7 +116,7 @@ test("the hub's headline tiles, weekly totals and top movers, each row linking t
   expect(words).not.toContain("Most played class");
   expect(words).toContain("Reporting installs 3");
   expect(page).toContain("data-weekly-totals");
-  expect(words).toMatch(/Week of 2026-11-09 150 This week so far \(from 2026-11-16\) 200/);
+  expect(words).toMatch(/Week of Nov 9, 2026 150 This week so far \(from Nov 16, 2026\) 200/);
   const movers = page.match(/<ol data-movers[\s\S]*?<\/ol>/)![0];
   expect(text(movers)).toMatch(/▲2 up 2 Warrior Classes by players/);
   expect(movers).toContain('href="/census?class=warrior"');
