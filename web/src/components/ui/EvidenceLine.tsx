@@ -1,4 +1,4 @@
-import { timeAgo } from "@/lib/time";
+import { timeAgo, utcStamp } from "@/lib/time";
 import type { Edge } from "@kb/edges";
 
 /**
@@ -14,5 +14,6 @@ export default function EvidenceLine({ rows, now }: { rows: readonly Edge[]; now
   const min = Math.min(...counts), max = Math.max(...counts);
   const agree = min === max ? `${min} ${min === 1 ? "install agrees" : "installs agree"} on each row` : `At least ${min} installs agree on each row`;
   const seen = observed.map((e) => e.lastSeen).filter((t): t is string => Boolean(t)).sort().at(-1);
-  return <p className="mb-2 text-meta text-fg-2">{seen ? `${agree} · last seen ${timeAgo(Date.parse(seen), now)}` : agree}</p>;
+  // The relative time only beside the absolute one, in its title; the rows below give the day.
+  return <p className="mb-2 text-meta text-fg-2">{seen ? <>{agree} · last seen <time dateTime={seen} title={utcStamp(seen) ?? undefined}>{timeAgo(Date.parse(seen), now)}</time></> : agree}</p>;
 }

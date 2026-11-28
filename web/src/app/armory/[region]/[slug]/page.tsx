@@ -23,7 +23,8 @@ import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
 import { compareHref } from "../../compare/sides";
-import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
+import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
+import { utcDay } from "@/lib/time";
 
 /** Read on every request, so a hidden character is gone at once. */
 export const dynamic = "force-dynamic";
@@ -114,7 +115,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     limit: "Too many requests from this connection. Try again later.",
     storage: "We could not queue a refresh. Try again in a moment.",
   };
-  const lastLogin = day(c.lastLogin);
+  const lastLogin = utcDay(c.lastLogin);
   const lastRead = newest(readTimes(c));
   const rankBadges = badgesOf(c, ranks);
   const unknownIcon = assets ? unknownItemIcon(assets.base) : null;

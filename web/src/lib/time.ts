@@ -7,3 +7,19 @@ export function timeAgo(at: number, now: number): string {
   if (hours < 48) return `${hours} h ago`;
   return `${Math.floor(hours / 24)} days ago`;
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const utcDate = (at: string | null | undefined): Date | null => (at && Number.isFinite(Date.parse(at)) ? new Date(at) : null);
+
+/** "Nov 28, 2026": a day, the site's one day form, in UTC. Takes an ISO time or a bare "2026-11-28"; null when unreadable. */
+export function utcDay(at: string | null | undefined): string | null {
+  const d = utcDate(at);
+  return d && `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+}
+
+/** "Nov 28, 2026, 03:11 UTC": a moment, the site's one timestamp form; null when unreadable. */
+export function utcStamp(at: string | null | undefined): string | null {
+  const d = utcDate(at);
+  return d && `${utcDay(at)}, ${d.toISOString().slice(11, 16)} UTC`;
+}

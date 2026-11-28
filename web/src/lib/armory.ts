@@ -1,3 +1,4 @@
+import { utcStamp } from "./time";
 
 /**
  * The armory (plan docs/superpowers/plans/2026-11-09-armory-blizzard-intake.md): a page for every WoW: Forever
@@ -266,12 +267,8 @@ export function boardValue(
   }
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 /** "Read Nov 9, 2026, 14:05 UTC": when the crawler last read the row, or that it is unrecorded. The one read-time form. */
 export function readLine(at: string | null | undefined): string {
-  if (!at || !Number.isFinite(Date.parse(at))) return "Read time unrecorded";
-  const d = new Date(at);
-  const hm = d.toISOString().slice(11, 16);
-  return `Read ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}, ${hm} UTC`;
+  const stamp = utcStamp(at);
+  return stamp ? `Read ${stamp}` : "Read time unrecorded";
 }

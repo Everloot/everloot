@@ -62,7 +62,7 @@ test("at launch, with nothing reported, the page is collecting: no table, no num
 test("the top sentence says how many characters, from how many installs, in which window, and links how we count", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = text(await html());
-  expect(page).toContain("About 110 characters were seen in the last 7 days (2026-11-10 to 2026-11-16, UTC), counted from 3 installs");
+  expect(page).toContain("About 110 characters were seen in the last 7 days (Nov 10, 2026 to Nov 16, 2026, UTC), counted from 3 installs");
   expect(page).toContain("Coverage reflects where participating players play.");
   expect(page).toContain("How we count");
 });
@@ -110,14 +110,14 @@ test("since launch is a second window, linked from the first and marked as the c
   expect(week).toMatch(/<a href="\/census" [^>]*aria-current="page"/);
   const launch = await html("launch");
   expect(launch).toMatch(/<a href="\/census\?window=launch" [^>]*aria-current="page"/);
-  expect(text(launch)).toContain("About 140 characters were seen since launch (2026-11-04 to 2026-11-16, UTC)");
+  expect(text(launch)).toContain("About 140 characters were seen since launch (Nov 4, 2026 to Nov 16, 2026, UTC)");
 });
 
 test("the 7-day trend lists each day, and the bias line says how many were seen and how many are uploaders' own", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const words = text(await html("launch"));
-  expect(words).toContain("2026-11-15 110");
-  expect(words).toMatch(/2026-11-10 not enough reports/);
+  expect(words).toContain("Nov 15, 2026 110");
+  expect(words).toMatch(/Nov 10, 2026 not enough reports/);
   expect(words).toContain("79% players seen by uploaders, 21% uploaders' own characters");
 });
 
@@ -132,7 +132,7 @@ test("no character key, install id or event id reaches the page", async () => {
 test("before launch the page says the game has not launched: no window, no dates, no collecting", async () => {
   store.loadCensus.mockResolvedValue({ rows: crowd(30, "z1", { capturedAt: "2026-10-18T10:00:00.000Z" }), dataAsOf: "2026-10-18T12:00:00.000Z" });
   const page = await html();
-  expect(text(page)).toContain("WoW: Forever hasn't launched yet. The census starts counting at launch, 2026-11-04 at 23:00 UTC");
+  expect(text(page)).toContain("WoW: Forever hasn't launched yet. The census starts counting at launch, Nov 4, 2026, 23:00 UTC");
   expect(text(page)).toContain("Not launched yet");
   expect(page).not.toContain("Still collecting");
   expect(page).not.toContain("<table");
@@ -355,7 +355,7 @@ test("QA round 7: today's day is drawn and labelled as partial, so it never read
 test("QA round 7: the page marks today's day as so far in the chart and the table", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = await html("launch");
-  expect(page).toMatch(/2026-11-16<\/span><span[^>]*> \(so far\)/);
+  expect(page).toMatch(/Nov 16, 2026<\/span><span[^>]*> \(so far\)/);
   expect(page).not.toMatch(/2026-11-15<\/span><span[^>]*> \(so far\)/);
 });
 

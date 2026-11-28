@@ -51,13 +51,13 @@ export function Sparkline({ points, now }: { points: PublicDay[]; now: Date }) {
 }
 
 /** One item on one realm in each auction house: market value, minimum, units and its newest scan day. */
-export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption: string; now: Date }) {
+export function HousePrices({ rows, caption }: { rows: MarketRow[]; caption: string }) {
   const columns: Column<MarketRow>[] = [
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><ClientCoins copper={r.value.market} /></span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => <ClientCoins copper={r.value.min} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
-    { key: "updated", header: "Newest scan", numeric: true, cell: (r) => scanDayText(r.value.day, now) },
+    { key: "updated", header: "Newest scan", numeric: true, cell: (r) => scanDayText(r.value.day) },
   ];
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house} />;
 }
@@ -66,7 +66,7 @@ export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption
  * One line per ruleset: realms, items priced, the newest scan day and the week's biggest moves, across every house. A
  * ruleset with nothing says why: no realm is mapped to it yet, or its realms have no public prices yet.
  */
-export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetSummary[]; now: Date; names: ItemNames; href: (r: RulesetSlug) => string }) {
+export function RulesetSummaryTable({ rows, names, href }: { rows: RulesetSummary[]; names: ItemNames; href: (r: RulesetSlug) => string }) {
   const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
   const columns: Column<RulesetSummary>[] = [
     {
@@ -79,7 +79,7 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
       key: "updated", header: "Newest scan", nowrap: true,
       cell: (r) => (!r.mapped ? <span className="text-muted">Not mapped yet</span>
         : !r.items || r.newestDay === null ? <span className="text-muted">No public prices yet</span>
-        : scanDayText(r.newestDay, now)),
+        : scanDayText(r.newestDay)),
     },
     {
       key: "moves", header: "Biggest moves, 7 days",

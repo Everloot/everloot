@@ -150,6 +150,16 @@ export function facetRows<T, K extends string>(rows: readonly T[], tests: Record
   return { matched, without };
 }
 
+/**
+ * The note under a menu whose options leave rows out: how many of `rows` (a facet's `without`) have no value for it,
+ * so the options adding to less than the list says why. Undefined when every row has one.
+ */
+export function unrecordedNote<T>(rows: readonly T[], has: (row: T) => boolean): string | undefined {
+  let n = 0;
+  for (const row of rows) if (!has(row)) n++;
+  return n ? `Not recorded: ${n.toLocaleString("en-US")}` : undefined;
+}
+
 /** How many of `rows` each key holds, in one pass. */
 export function countBy<T, V>(rows: readonly T[], key: (row: T) => V): Map<V, number> {
   const out = new Map<V, number>();

@@ -49,5 +49,5 @@ test("the headline reads as plain prose: what fell or rose, of how many items, a
  expect(r.headline).toBe("1 good with public asking prices across 1 scanned house.");
 });
 test("report times read as a day and a UTC time, not raw ISO", () => {
- expect(reportTime("2026-11-20T04:21:05.000Z")).toBe("20 Nov, 04:21 UTC");
+ expect(reportTime("2026-11-20T04:21:05.000Z")).toBe("Nov 20, 2026, 04:21 UTC");
 });

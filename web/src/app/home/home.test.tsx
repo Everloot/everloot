@@ -351,7 +351,7 @@ test("since you last played: the Forever blue posts after the hero's last login,
   expect(at).toBeGreaterThan(-1);
   const since = html.slice(at, html.indexOf("</section>", at));
   expect(since).toContain("Since you last played");
-  expect(since).toContain('<time dateTime="2026-10-17T08:00:00Z">2026-10-17</time>');
+  expect(since).toContain('<time dateTime="2026-10-17T08:00:00Z">Oct 17, 2026</time>');
   // Entry 2 (10-18) and Entry 3 (10-17 10:00) are Forever blue posts after the login; Entry 0 is a build, Entry 1 Classic.
   expect(since).toMatch(/<a href="\/changes\/us-2-entry-2"[^>]*>Entry 2</);
   expect(since).toContain("Entry 3<");

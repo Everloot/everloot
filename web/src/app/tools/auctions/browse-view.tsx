@@ -295,9 +295,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <Facts items={[
               // With no prices to show, the time says when the rollup was last read, not that anything changed.
               ...(slug
-                ? [otherRegion ? `This realm isn't in ${REGION_LABEL[otherRegion]}` : newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet"]
+                ? [otherRegion ? `This realm isn't in ${REGION_LABEL[otherRegion]}` : newest ? `Newest scan ${scanDayText(newest)}` : "No public scan yet"]
                 : rebuilt === null ? ["Rebuild time unrecorded"]
-                : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest, now)}`}</>]),
+                : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest)}`}</>]),
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
               ...(!slug && realmsHere.length ? [count(realmsHere.length, "realm")] : []),
             ]} />
@@ -324,7 +324,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <p className="mt-2 text-meta text-fg-2">Ruleset counts are totals across every house; the filters below do not change them.</p>
             {summaryRows.length > 0 && (
               <div className="mt-3 mb-4">
-                <RulesetSummaryTable rows={summaryRows} now={now} names={names} href={(r) => here({ ruleset: r })} />
+                <RulesetSummaryTable rows={summaryRows} names={names} href={(r) => here({ ruleset: r })} />
               </div>
             )}
           </>

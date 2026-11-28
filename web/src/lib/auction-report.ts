@@ -1,6 +1,7 @@
 import { itemListings, type MarketState } from "@kb/market";
 import { realmBoards, solidDays } from "./auction-house";
 import { realmRegion, REGION_LABEL, RULESET_LABEL } from "./realms";
+import { utcStamp } from "./time";
 
 export const reportRegion = (s: string) => REGION_LABEL[s as keyof typeof REGION_LABEL] ?? s;
 export const reportRuleset = (s: string) => RULESET_LABEL[s as keyof typeof RULESET_LABEL] ?? s;
@@ -14,9 +15,8 @@ export interface AuctionReport {
  risers: ReportGood[]; fallers: ReportGood[]; mostListed: ReportGood[];
  categories: { name: string; up: number; down: number; total: number }[]; spreads: ReportSpread[];
 }
-const UTC_TIME = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 /** A report time as the pages write it: "20 Nov, 04:21 UTC". */
-export const reportTime = (iso: string) => `${UTC_TIME.format(new Date(iso))} UTC`;
+export const reportTime = (iso: string) => utcStamp(iso) ?? iso;
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 /**
  * The report's lede, from its categories, goods and houses: the leading category's moves in plain words, or what the

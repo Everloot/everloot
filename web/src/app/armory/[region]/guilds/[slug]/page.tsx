@@ -25,6 +25,7 @@ import { className, classText } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
 import { CENSUS_MEDIA, censusIcons, type CensusIcons } from "@/lib/census-media";
 import { ArmoryCredit, armoryMetadata, day, link, NOT_FOUND_METADATA, RegionChip, Unreachable } from "../../../parts";
+import { utcDay } from "@/lib/time";
 
 /** Read on every request, so a hidden character leaves the roster, and a hidden guild the site, at once. */
 export const dynamic = "force-dynamic";
@@ -184,9 +185,9 @@ function rosterColumns(region: string, ranks: RankNames, icons: CensusIcons): Co
     {
       key: "last-login", header: "Last login", numeric: true, sortable: true,
       cell: (r) => {
-        const login = day(r.m.lastLogin ?? null);
+        const login = utcDay(r.m.lastLogin ?? null);
         if (login) return login;
-        return r.seen ? <>{r.seen} <span className="text-cell-2 text-muted">seen</span></> : muted("Not known");
+        return r.seen ? <>{utcDay(r.seen) ?? r.seen} <span className="text-cell-2 text-muted">seen</span></> : muted("Not known");
       },
     },
   ];
@@ -301,7 +302,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
         <GuildHeader guild={g} crest={crest} path={path} rosterSize={roster.length} />
         <SummaryStrip guild={g} members={roster} summary={summary} activity={<>
           <LevelStrip members={roster} summary={summary} href={(level) => href({ level })} />
-          <ActivityStrip members={roster} asOf={asOf} readDay={day(g.fetchedAt)} href={(active) => href({ active })} />
+          <ActivityStrip members={roster} asOf={asOf} readDay={utcDay(g.fetchedAt)} href={(active) => href({ active })} />
         </>} />
         <GuildProfile guild={g} profile={profileRead} />
         <TopItemLevels region={g.region} rows={rows} />
@@ -336,7 +337,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
         <footer className="space-y-3 text-sm">
           {guildReadDue(g.checkedAt)
             ? <Link href={guildSubmitHref(g)} className={link}>Refresh this guild</Link>
-            : <p className="text-muted">Last read {day(g.checkedAt) ?? "date unrecorded"}. A new read can be requested after {ARMORY_RECHECK_DAYS} days.</p>}
+            : <p className="text-muted">Last read {utcDay(g.checkedAt) ?? "date unrecorded"}. A new read can be requested after {ARMORY_RECHECK_DAYS} days.</p>}
           <p><Link href={guildSubmitHref(g)} className={link}>Your guild is missing or out of date? Ask for a read</Link> · <Link href={GUILD_DIRECTORY_PATH} className={link}>Find another guild</Link></p>
           <ArmoryCredit at={g.fetchedAt} />
         </footer>
@@ -347,7 +348,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
 
 /** The guild's name with its crest (or faction emblem), faction, region and ruleset, roster size and the day it was made. */
 function GuildHeader({ guild: g, crest, path, rosterSize }: { guild: ArmoryGuild; crest: ReactNode; path: string; rosterSize: number }) {
-  const created = day(g.createdAt);
+  const created = utcDay(g.createdAt);
   const tone = g.faction === "Alliance" ? "text-faction-alliance" : g.faction === "Horde" ? "text-faction-horde" : "text-fg-2";
   return (
     <div data-guild-header className="flex items-center gap-4 sm:gap-6 [&_[data-page-header]]:mb-0">
@@ -460,7 +461,7 @@ function SummaryStrip({ guild: g, members, summary: s, activity }: { guild: Armo
           numeric: s.averageItemLevel !== null,
         },
         ...(average60 === null ? [] : [{ label: "Average item level at 60", value: averageRead(average60, at60.length), numeric: true }]),
-        { label: "Roster read", value: day(g.fetchedAt) ?? "Not known", numeric: true },
+        { label: "Roster read", value: utcDay(g.fetchedAt) ?? "Not known", numeric: true },
       ]} />
       {s.classes.length > 0 && <ClassBar total={members.length} classes={s.classes} />}
       {activity}

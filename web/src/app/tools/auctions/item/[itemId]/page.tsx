@@ -91,7 +91,7 @@ export default async function CrossRealmItemPage(props: Props) {
         title={label}
         quality={itemQuality(itemId, tip, names.has(itemId)) ?? undefined}
         lede="Auction House prices on every realm with public scans, each auction house apart."
-        meta={rows.length > 0 && <Facts items={[count(realmCount(rows), "realm"), `Newest scan ${scanDayText(days.at(-1)!, now)}`]} />}
+        meta={rows.length > 0 && <Facts items={[count(realmCount(rows), "realm"), `Newest scan ${scanDayText(days.at(-1)!)}`]} />}
         actions={<Link href={`/database/items/${itemId}`} className="btn">Item details</Link>}
       />
 

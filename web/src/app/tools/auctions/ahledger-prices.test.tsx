@@ -49,7 +49,7 @@ test("each market's row links to AH Ledger's item page; a market without a price
   expect(text).not.toContain("18,095.4");
   const alliance = [...container.querySelectorAll("tbody tr")].find((tr) => tr.textContent?.includes("PvP Alliance"))!;
   expect([...alliance.querySelectorAll("td")].slice(2).map((td) => td.textContent)).toEqual(["—", "—", "—", "—"]);
-  expect(text).toContain("15 Nov, 15:03 UTC");
+  expect(text).toContain("Nov 15, 2026, 15:03 UTC");
   expect(container.querySelector('a[href="https://ahledger.com/items/2589/forever.pvp.horde.us"]')).not.toBeNull();
   expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AH Ledger");
 
