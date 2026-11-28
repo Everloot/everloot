@@ -524,6 +524,16 @@ describe("QA round 1: rosters and the directory", () => {
     expect(guild).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
   });
 
+  test("QA round 15: the directory's date is the newest read of the roster or a member, and says so beside the guild page's Roster read", async () => {
+    const dir = await html(pages.directory());
+    expect(dir).not.toContain("Last read");
+    expect(dir).toMatch(/<th[^>]*>(?:<[^>]*>)*Newest read(?:<[^>]*>)*<\/th>/);
+    const fold = /<details[^>]*data-disclosure[^>]*>([\s\S]*?)<\/details>/.exec(dir.slice(dir.indexOf('id="directory"')))?.[1] ?? "";
+    expect(fold).toContain("Newest read is the latest day the armory read the guild&#x27;s roster or any of its members; the guild page&#x27;s Roster read is the roster&#x27;s own day, so it can be older.");
+    const guild = await html(pages.guild("eu", "ember-wardens"));
+    expect(guild).toMatch(/Roster read<\/dt>/);
+  });
+
   test("QA round 11: the directory note is one line; how each count works sits behind a closed disclosure", async () => {
     const dir = await html(pages.directory());
     const heading = /^[^>]*>[^<]*<\/h2>(?:<\/div>)?<p[^>]*>([^<]*)<\/p>/.exec(dir.slice(dir.indexOf('id="directory"')));
