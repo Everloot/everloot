@@ -77,9 +77,11 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   const zones = traits?.zones ?? [];
   // The profession that gathers it, by the kind 3 installs agree on: its page on the site.
   const profession = traits?.kind ? professionByName(GATHER_PROFESSION[traits.kind] ?? "") : undefined;
-  // Items a loot window held on average, stacks counted, once every item's rate is public (3 installs).
-  const agreedDrops = !facts.unreachable && page.drops.length && page.drops.every((d) => d.reporters >= INDEPENDENT_INSTALLS && d.units !== undefined) ? page.drops : null;
-  const perWindow = agreedDrops && windows ? (agreedDrops.reduce((sum, d) => sum + d.units!, 0) / windows).toFixed(1) : null;
+  // Items a loot window held on average, stacks counted (the rollup's units), once every item's rate is public (3 installs).
+  const rates = facts.unreachable ? [] : facts.rates.filter((r) => r.sourceObjectId === page.objectId && r.reporters > 0);
+  const units = rates.flatMap((r) => ("units" in r && typeof r.units === "number" ? [r.units] : []));
+  const perWindow = rates.length && windows && units.length === rates.length && rates.every((r) => r.reporters >= INDEPENDENT_INSTALLS)
+    ? (units.reduce((sum, u) => sum + u, 0) / windows).toFixed(1) : null;
   const zoneLinks = zones.length ? <span>{zones.map((z, i) => <span key={z.mapId}>{i > 0 && ", "}<Link href={zoneHref(z.mapId, z.name)} className={LINK}>{z.name}</Link></span>)}</span> : null;
   const assets = pins.length || page.drops.length ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.drops.map((d) => d.itemId));
