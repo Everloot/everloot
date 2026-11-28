@@ -14,6 +14,7 @@ import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
+import { auctionActivityHref } from "@/lib/auction-activity-link";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
   AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseParam, houseSlug, indexable, itemHref, itemIdParam,
@@ -210,6 +211,7 @@ export default async function RealmItemPage(props: Props) {
           />
         )}
         {houseMarket && <AhledgerHistory key={houseMarket} itemId={itemId} defaultMarket={houseMarket} />}
+        <a className="btn" href={auctionActivityHref(itemId, names.get(itemId), houseMarket)}>Auction activity for this item</a>
 
         <Contribute />
 

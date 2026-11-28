@@ -11,6 +11,7 @@ import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
+import { auctionActivityHref } from "@/lib/auction-activity-link";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import {
   AH_PATH, crossRealmHref, indexable, itemIdParam, itemLabel, itemRows, scanDayText, type MarketRow,
@@ -124,6 +125,7 @@ export default async function CrossRealmItemPage(props: Props) {
 
         <AhledgerPrices itemId={itemId} regions={[{ label: "US", markets: ahledgerRegionMarkets("us") }, { label: "EU", markets: ahledgerRegionMarkets("eu") }]} />
         <AhledgerHistory itemId={itemId} />
+        <a className="btn" href={auctionActivityHref(itemId, names.get(itemId))}>Auction activity for this item</a>
 
         <Contribute />
 
