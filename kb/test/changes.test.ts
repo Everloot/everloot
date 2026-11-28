@@ -5,7 +5,7 @@ import { emptyStore, loadStore, mergePosts, parseBlueskyFeed, type BluePost } fr
 import { blueThreads, buildTimeline, filterTimeline, foldTitleDay, forumRegions, fullerCopy, groupAnnouncements, handleRecentChanges, manualEntries, parseFilter, postDay, renderFeed, sameAnnouncement, sameBody, sanitizePost, type BuildLike } from "../src/changes.js";
 import { clampExcerpt, safeHttpUrl } from "../src/text-safety.js";
 import { postPath } from "../src/changes.js";
-import { storedHotfixExcerpt } from "../src/blue-forum.js";
+import { storedExcerpt } from "../src/blue-forum.js";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/blue/${name}`, import.meta.url), "utf8"));
 const seen = new Date("2026-10-17T12:00:00Z");
@@ -214,7 +214,7 @@ test("the committed blue-posts.json is clean: unique ids, every forum post has i
   }
   // Nothing is widened on the way in: what is stored is what the site shows, a hotfix stored before #1658 without its headings.
   for (const [i, p] of raw.entries()) {
-    const shown = p.kind === "hotfix" && p.source === "forum" ? clampExcerpt(storedHotfixExcerpt(String(p.excerpt))) : p.excerpt;
+    const shown = p.source === "forum" ? clampExcerpt(storedExcerpt(String(p.excerpt), p.kind === "hotfix" ? "hotfix" : "post")) : p.excerpt;
     expect(stored[i].excerpt, String(p.id)).toBe(shown);
   }
 });
@@ -481,4 +481,58 @@ test("a hotfix excerpt stored before headings were left out reads as sentences: 
   expect(sanitizePost({ ...stored, excerpt: "November 25, 2026 Items that drop from chests are now soulbound." })!.excerpt).toBe("November 25, 2026: Items that drop from chests are now soulbound.");
   expect(sanitizePost({ ...stored, kind: "post" })!.excerpt).toBe(stored.excerpt);
   expect(sanitizePost({ ...stored, excerpt: "November 25, 2026: Hurricane now correctly lands its final hit." })!.excerpt).toBe("November 25, 2026: Hurricane now correctly lands its final hit.");
+});
+
+// Excerpts exactly as stored on 2026-11-27 (live changes/blue-posts.json), each with what /changes should show.
+const r11Hotfix = { id: "forum:30863849", source: "forum", region: "us", title: "WoW: Forever Hotfixes - November 25, 2026", postedAt: "2026-11-12T20:00:00Z", game: "forever", kind: "hotfix" };
+const shownAs = (excerpt: string, kind = "hotfix") => sanitizePost({ ...r11Hotfix, kind, excerpt })!.excerpt;
+
+test("a class heading at a sentence start is left out of a stored hotfix excerpt, with the spec heading right under it", () => {
+  expect(shownAs("November 23, 2026: The 4-piece Feralheart set for Druids now correctly grants 4 Energy regeneration every 1 second for 5 seconds. Priest Mind Vision should no longer proc effects."))
+    .toBe("November 23, 2026: The 4-piece Feralheart set for Druids now correctly grants 4 Energy regeneration every 1 second for 5 seconds. Mind Vision should no longer proc effects.");
+  expect(shownAs("November 11, 2026: Feral Rend and Tear now works on Pounce Bleed. Hunter Fixed an issue where Volley was activating procs."))
+    .toBe("November 11, 2026: Feral Rend and Tear now works on Pounce Bleed. Fixed an issue where Volley was activating procs.");
+  expect(shownAs("November 20, 2026: Combat Blade Flurry will now correctly cause Shank’s damage to hit an additional target. Warlock Demonology Fixed a bug where the effects of the Demonic Aegis talent could be snapshotted into your Demon Armor or Demon Skin and then untalented to retain the effects."))
+    .toBe("November 20, 2026: Combat Blade Flurry will now correctly cause Shank’s damage to hit an additional target. Fixed a bug where the effects of the Demonic Aegis talent could be snapshotted into your Demon Armor or Demon Skin and then untalented to retain the effects.");
+  // The rolling thread's first post, stored with its "Hotfixes" title heading before the day.
+  expect(shownAs("Hotfixes November 25, 2026 Classes Druid Hurricane now correctly lands its final hit. Balance Improved Wrath is now renamed Starlight Wrath."))
+    .toBe("November 25, 2026: Hurricane now correctly lands its final hit. Balance Improved Wrath is now renamed Starlight Wrath.");
+  // A spec word on its own may be a spell's first word ("Feral Charge"), so it stays; so does a spell under a class heading.
+  expect(shownAs("November 10, 2026: Fixed an issue where Omen of Clarity could not activate after swapping specializations. Restoration Nature’s Swiftness now also makes Wild Growth instant."))
+    .toBe("November 10, 2026: Fixed an issue where Omen of Clarity could not activate after swapping specializations. Restoration Nature’s Swiftness now also makes Wild Growth instant.");
+  expect(shownAs("November 2, 2026: Mage Frost Nova now has a 25 second cooldown. Druid Feral Charge now roots for 4 seconds."))
+    .toBe("November 2, 2026: Frost Nova now has a 25 second cooldown. Feral Charge now roots for 4 seconds.");
+  expect(shownAs("November 2, 2026: Mage Armor now lasts 30 minutes. Druid talents were reset.")).toBe("November 2, 2026: Mage Armor now lasts 30 minutes. Druid talents were reset.");
+});
+
+test("Camping and Cooldown Manager section headings are left out of a stored hotfix excerpt", () => {
+  expect(shownAs("November 19, 2026: Camping Seed Hybridizer has been re-enabled. Seed Hybridization now has adjusted values, as well as a chance of failure when combining seeds."))
+    .toBe("November 19, 2026: Seed Hybridizer has been re-enabled. Seed Hybridization now has adjusted values, as well as a chance of failure when combining seeds.");
+  expect(shownAs("November 16, 2026: Camping The Fishing Rack now provides lures for everyone. Bloated Fish caught from the Fishing Rack effect have had their drop chance increased and their loot tables adjusted accordingly."))
+    .toBe("November 16, 2026: The Fishing Rack now provides lures for everyone. Bloated Fish caught from the Fishing Rack effect have had their drop chance increased and their loot tables adjusted accordingly.");
+  expect(shownAs("November 6, 2026: Fixed an issue with the Quick and the Dead Legacy Talent where it sometimes did not work as intended. Cooldown Manager The Cooldown Manager will now correctly display the duration of crowd control spells at all times, even when diminishing returns or mechanic reductions…"))
+    .toBe("November 6, 2026: Fixed an issue with the Quick and the Dead Legacy Talent where it sometimes did not work as intended. The Cooldown Manager will now correctly display the duration of crowd control spells at all times, even when diminishing returns or mechanic reductions…");
+  // "The Cooldown Manager" in a sentence is not a heading.
+  expect(shownAs("November 9, 2026: The Cooldown Manager no longer shows Berserk, and now correctly shows Lacerate when learned. Idol of Ferocity no longer lists Mangle as an ability it discounts."))
+    .toBe("November 9, 2026: The Cooldown Manager no longer shows Berserk, and now correctly shows Lacerate when learned. Idol of Ferocity no longer lists Mangle as an ability it discounts.");
+});
+
+test("a stored hotfix excerpt starts at its first change, not at a deployment notice; a notice with nothing stored after it stays", () => {
+  const shown = (posts: object[]) => groupAnnouncements(buildTimeline(posts, [])).map((e) => e.excerpt);
+  const eu = { ...r11Hotfix, id: "forum:eu:6497741", region: "eu", topicId: 639885, postNumber: 7,
+    excerpt: "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 19:45 CET today. Classes Shaman Weapon imbues and Weapon totems can now be used at the same time." };
+  const us = { ...r11Hotfix, id: "forum:30876030", topicId: 2403040, postNumber: 9,
+    excerpt: "Please note: Due to an unexpected delay in deployment, the following changes went live to all regions at 10:45 a.m. PST today." };
+  expect(shown([eu])).toEqual(["Weapon imbues and Weapon totems can now be used at the same time."]);
+  // The US copy holds only the notice, so it stays; the two copies are still one announcement.
+  expect(shown([eu, us])).toEqual([us.excerpt]);
+  const auction = "We’ve temporarily removed Auction House changes from yesterday’s update, as they will go live with scheduled weekly maintenance on November 17. They will appear again in the hotfixes update thereafter.";
+  expect(shown([{ ...us, excerpt: auction }])).toEqual([auction]);
+});
+
+test("a forum blue post leaves out a Classes heading and its class, as a hotfix does", () => {
+  expect(shownAs("With changes that are now live, we’ve adjusted Druid talents to improve the talent flow and experience for players as they’re leveling up Balance. Classes Druid Improved Wrath is now renamed Starlight Wrath.", "post"))
+    .toBe("With changes that are now live, we’ve adjusted Druid talents to improve the talent flow and experience for players as they’re leveling up Balance. Improved Wrath is now renamed Starlight Wrath.");
+  // A post keeps a bare class or section word: only a hotfix post is laid out under those headings.
+  expect(shownAs("Hunter Pets are being looked at. Camping Gear is next.", "post")).toBe("Hunter Pets are being looked at. Camping Gear is next.");
 });
