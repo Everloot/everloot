@@ -85,7 +85,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   };
 }
 
-const position = (x: number, y: number) => `${x}, ${y}`;
+/** One decimal each, so 55.0 lines up with 55.7 instead of reading 55. */
+const position = (x: number, y: number) => `${x.toFixed(1)}, ${y.toFixed(1)}`;
 
 /** Whose land the game files say the zone is; contested stays plain, as a quest for both sides does. */
 const TERRITORY: Record<ZoneFaction, { label: string; tone: string }> = {

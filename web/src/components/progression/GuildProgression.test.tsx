@@ -20,6 +20,10 @@ test("section renders score tile, privacy, threshold, availability and every gui
   for (const text of ["Progression", "Guild progression score", "60", "cleared", "partial", "none", "5 of the roster", "40 of the roster", "size unknown", "not seen open yet", "Counts synced kills from every linked character in the armory roster"]) expect(html).toContain(text);
   expect(html).toContain("2 / 2 bosses");
   expect(html).not.toContain("no data from this character");
+  // Each value says what it is: the guild's clear state, then how many members a boss needs.
+  expect(html).toMatch(/Guild clear:(?:<[^>]*>)*\s*none/);
+  expect(html).toContain("A boss counts once 5 of the roster hold its kill");
+  expect(html).toContain("Group size unknown, so no boss counts here yet");
 });
 
 test("hub hook adds a public score board alongside the raid board only for positive readable scores", () => {

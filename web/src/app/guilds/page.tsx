@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
+import { Card, Container, DataTable, Disclosure, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
 import { FAMILIES } from "@/data/families";
 import { ARMORY_REGIONS, ARMORY_RULESETS, armoryGuildPath, armoryOn, metricValue, regionLabel } from "@/lib/armory";
 import type { ArmoryGuildRow } from "@/lib/armory-store";
@@ -237,9 +237,12 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
           {dir && (dir.state === "unreachable" ? <Unreachable /> : (
             <section aria-labelledby="directory" className="space-y-3">
-              <SectionHeading id="directory" note={`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}>
+              <SectionHeading id="directory" note="Counts come from the characters the armory has read; a hidden character is not counted.">
                 Read from Blizzard&apos;s API
               </SectionHeading>
+              <Disclosure summary="How this is counted">
+                <p className="text-sm">{`Members read counts the characters the armory has read whose guild this is, each as of its own read; the guild page counts the members of its last roster read instead, so the two can differ by a few. The roster is Blizzard's own count. ${LEVEL_60_READ_TIP} A character who asked to be hidden is not counted.`}</p>
+              </Disclosure>
               <FilterBar
                 label="Directory filters"
                 controls={directoryControls(d)}

@@ -100,6 +100,8 @@ export function characterPanel(c: ArmoryCharacter, id: CharacterTabId, parts: Sh
                 </ul>
               </section>;
             })}
+            {/* lib/instances.ts instanceRows: a page needs an entrance in a released zone, or 3 installs reporting one or a boss. */}
+            {instances.some((r) => !links[r.id]) && <p className="text-meta text-muted">Names without a link have no page yet: the game files place no entrance in a released zone, and 3 installs have not reported one or a boss there.</p>}
           </div>
         </Disclosure>
       </>;

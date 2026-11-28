@@ -72,6 +72,9 @@ const unreported = (value: ReactNode) => isValidElement<{ count?: number }>(valu
 /** A label inside a sentence: "Zone" reads "zone"; an abbreviation ("XP") keeps its capitals. */
 const sentenceCase = (label: string) => (/^\p{Lu}\p{Ll}/u.test(label) ? label[0].toLowerCase() + label.slice(1) : label);
 
+/** A label in the Not yet reported line: "Reported title" reads "title", so the row never says "not yet reported: reported title". */
+const unreportedName = (label: string) => sentenceCase(label.replace(/^Reported\s+/, ""));
+
 /**
  * The quick facts with every unreported one folded into a last "Not yet reported" row: one empty meter and their
  * labels as one plain line under the row's label ("chain, zone, start"), instead of a row of hollow diamonds each. A fact some installs have
@@ -88,7 +91,7 @@ function foldUnreported(facts: Fact[]): Fact[] {
       value: (
         <div className="flex items-start gap-2">
           <span className="inline-flex h-6 shrink-0 items-center"><AgreementMeter count={0} /></span>
-          <span className="min-w-0 py-0.5 text-fg-2">{missing.map((f, i) => <Fragment key={i}>{i > 0 && ", "}{typeof f.label === "string" ? sentenceCase(f.label) : f.label}</Fragment>)}</span>
+          <span className="min-w-0 py-0.5 text-fg-2">{missing.map((f, i) => <Fragment key={i}>{i > 0 && ", "}{typeof f.label === "string" ? unreportedName(f.label) : f.label}</Fragment>)}</span>
         </div>
       ),
     },

@@ -315,7 +315,9 @@ describe("the guild activity strip", () => {
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*Last 7 days/);
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*8 to 30 days/);
     expect(s).toMatch(/>0<\/span>\s*(?:\s*<[^>]*>)*\s*Longer/);
-    expect(s).toContain("Last login, as of the 2026-11-09 roster read");
+    // QA round 11: a login comes from the character's own read, which can be later than the roster read.
+    expect(s).toContain("Last login from each character&#x27;s latest read, counted back from the 2026-11-09 roster read");
+    expect(s).not.toContain("as of the 2026-11-09 roster read");
     const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
     expect(recent).toContain("Velkara Duskmantle</a>");
   });
@@ -517,6 +519,16 @@ describe("QA round 1: rosters and the directory", () => {
     expect(dir).toContain("Level 60 read: characters we read at level 60. It can be higher than the guild page&#x27;s count, because each character is counted as of its own read.");
     const guild = await html(pages.guild("eu", "ember-wardens"));
     expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+  });
+
+  test("QA round 11: the directory note is one line; how each count works sits behind a closed disclosure", async () => {
+    const dir = await html(pages.directory());
+    const heading = /^[^>]*>[^<]*<\/h2>(?:<\/div>)?<p[^>]*>([^<]*)<\/p>/.exec(dir.slice(dir.indexOf('id="directory"')));
+    expect(heading?.[1]).toBe("Counts come from the characters the armory has read; a hidden character is not counted.");
+    const fold = /<details[^>]*data-disclosure[^>]*>([\s\S]*?)<\/details>/.exec(dir.slice(dir.indexOf('id="directory"')))?.[1] ?? "";
+    expect(fold).toContain("How this is counted");
+    expect(fold).toContain("Members read counts the characters the armory has read whose guild this is");
+    expect(fold).toContain("Level 60 read: characters we read at level 60.");
   });
 
   test("the average item level order ranks guilds with at least 10 members read, and says so", async () => {

@@ -481,7 +481,7 @@ function ActivityStrip({ members, asOf, readDay, href }: { members: readonly Arm
   const counts = new Map<Activity | null, number>();
   for (const m of members) { const a = activityOf(m, asOf); counts.set(a, (counts.get(a) ?? 0) + 1); }
   const rows = ACTIVITY_ROWS.map((r) => ({ label: r.label, colour: r.colour, count: counts.get(r.key) ?? 0, href: r.key ? href(r.key) : null }));
-  return <CountStrip kind="activity" title={readDay ? `Last login, as of the ${readDay} roster read` : "Last login"} total={members.length} rows={rows} />;
+  return <CountStrip kind="activity" title={readDay ? `Last login from each character's latest read, counted back from the ${readDay} roster read` : "Last login"} total={members.length} rows={rows} />;
 }
 
 /** Members by level band as one bar, highest band first; each band with members links the roster filtered to it. */

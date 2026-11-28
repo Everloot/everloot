@@ -146,6 +146,18 @@ test("QA round 5: with no data for any instance the folded list names each insta
   expect(list.match(/>Naxxramas</g)).toHaveLength(1);
 });
 
+test("QA round 11: the folded list says why some names are plain text, and only when one is", () => {
+  const KEY = "Names without a link have no page yet";
+  const panel = (links: Record<number, string>) => renderToStaticMarkup(<>{characterTabs(full, { progression: {
+    instances: characterProgression(progressionCatalogue(null), null), links,
+  } }).find((t) => t.id === "progress")!.panel}</>);
+  const some = panel({ 33: "/database/instances/33-shadowfang-keep" });
+  expect(some).toContain(KEY);
+  expect(some.indexOf(KEY)).toBeGreaterThan(some.indexOf("Every dungeon, raid and world boss"));
+  const ids = [...panel({}).matchAll(/data-progression-instance="(\d+)"/g)].map((m) => Number(m[1]));
+  expect(panel(Object.fromEntries(ids.map((id) => [id, `/database/instances/${id}`])))).not.toContain(KEY);
+});
+
 test("QA round 4: Progress leaves out the unnamed map and shows Naxxramas once, under Raids", () => {
   const html = renderToStaticMarkup(<>{characterTabs(full, {}).find((t) => t.id === "progress")!.panel}</>);
   expect(html).not.toContain("Instance 3002");
