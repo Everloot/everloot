@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { CURRENT_BUILD, TABLES, type BuffTable } from "@/data/game-data/raid";
 import {
-  applyDrop, coverage, decodeRaid, describeRaid, emptySlots, encodeRaid, findCode, groupsOf, placeClass, removeSlot, resize, roleOf, roster, SIZES, swapSlots, treeNames,
+  applyDrop, coverage, decodeRaid, suggestNext, treeRole, describeRaid, emptySlots, encodeRaid, findCode, groupsOf, placeClass, removeSlot, resize, roleOf, roster, SIZES, swapSlots, treeNames,
   type Slot, type Slots,
 } from "./raid";
 
@@ -379,4 +379,34 @@ test("a raid is described by its size and roles, for page titles and link previe
   slots[3] = { class: "druid", tree: 2 };
   expect(describeRaid(10, slots)).toEqual({ title: "10-player raid", roles: "1 tank, 1 healer, 1 damage, 1 not known", filled: 4 });
   expect(describeRaid(20, emptySlots(20)).roles).toBe("0 tanks, 0 healers, 0 damage");
+});
+
+describe("suggestNext", () => {
+  test("names the class that would bring the most of what is missing, trying it in each group with room", () => {
+    // A druid brings two missing families, every other class one.
+    const two: BuffTable = { ...mini, entries: [...mini.entries, entry("thorns", "shout", "druid", "raid")] };
+    expect(suggestNext(raid(10, { 0: slot("warlock") }), two)).toEqual({ classes: ["druid"], count: 2 });
+  });
+
+  test("a party buff missing in one group counts when the class can go in that group", () => {
+    const party: BuffTable = { ...mini, families: mini.families.filter((f) => f.id === "aura"), entries: mini.entries.filter((e) => e.family === "aura") };
+    // Group 1 is full, so only group 2 has room, which is where the aura is missing.
+    const full = raid(10, { 0: slot("paladin"), 1: slot("paladin"), 2: slot("paladin"), 3: slot("paladin"), 4: slot("paladin") });
+    expect(suggestNext(full, party)).toEqual({ classes: ["paladin"], count: 1 });
+  });
+
+  test("a tie names every class that ties; nothing missing or no room names none", () => {
+    const tie: BuffTable = { ...mini, families: mini.families.filter((f) => f.id === "shout" || f.id === "aura"), entries: mini.entries.filter((e) => e.family === "shout" || e.family === "aura") };
+    expect(suggestNext(emptySlots(10), tie)).toEqual({ classes: ["warrior", "paladin"], count: 1 });
+    const done = raid(10, { 0: slot("warrior"), 1: slot("paladin"), 5: slot("paladin") });
+    expect(suggestNext(done, tie)).toEqual({ classes: [], count: 0 });
+    const packed = Array.from({ length: 10 }, () => slot("mage"));
+    expect(suggestNext(packed, tie)).toEqual({ classes: [], count: 0 });
+  });
+});
+
+test("a tree's role for the talent pages: only where the class's trees differ and the tree settles it", () => {
+  expect(["warrior", "paladin", "druid", "mage"].map((c) => [0, 1, 2].map((i) => treeRole(c as Slot["class"], i)))).toEqual([
+    ["damage", "damage", "tank"], ["healer", "tank", "damage"], ["damage", null, "healer"], [null, null, null],
+  ]);
 });

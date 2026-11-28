@@ -41,7 +41,7 @@ export default async function RaidView({ initialCode, classContext }: { initialC
         trail={trailFor("/tools/raid")!}
         title={TITLE}
         lede={lede}
-        banner={banner && assets ? { image: <BannerArt art={banner} eager /> } : undefined}
+        banner={banner && assets ? { image: <BannerArt art={banner} eager />, short: true } : undefined}
       />
       <Container>
         <RaidBuilder art={art} initialCode={initialCode} classContext={classContext} />

@@ -151,6 +151,19 @@ test("install steps, the upload page, privacy, data policy and source are linked
   }
 });
 
+test("first setup checks use the game's version and window, the site's saved count and Desktop confirmation", async () => {
+  const html = await render(() => Promise.resolve(Response.json(releases)));
+  const text = visible(html);
+  expect(text).toContain("Run /everloot version in chat");
+  expect(text).toContain("Open your dashboard with /everloot window");
+  expect(text).toContain("records saved");
+  expect(text).toContain("Choose the _forever_ game folder that contains WTF");
+  expect(text).toContain("Review your sharing choices and press Start");
+  expect(text).toContain("Watching");
+  expect(text).toContain("Confirmed count");
+  expect(html).toContain('href="/upload"');
+});
+
 test("with the showcase on, the privacy section links the sample character page; off, the page never points at a 404", async () => {
   vi.stubEnv("EVERLOOT_SHOWCASE", "1");
   const on = await render(() => Promise.resolve(Response.json(releases)));

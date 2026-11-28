@@ -18,6 +18,7 @@ import { absoluteUrl } from "@/lib/seo";
 import { DATA_SIZE } from "@/design/tokens";
 import { buildTitle, previewPath, summarizeBuild } from "@/lib/talents/summary";
 import type { PlanSet, Ranks, TalentCatalog } from "@/lib/talents/types";
+import { treeRole, type ClassName } from "@/lib/raid";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, CopyButton, Input, Segmented } from "@/components/ui";
 import GameTree from "./GameTree";
@@ -660,6 +661,11 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
           <div ref={trees} className="grid gap-4 p-4 max-md:pt-2 md:grid-cols-3" onFocus={keepClear} onPointerDown={onPointerDown} onPointerUp={endPress} onPointerLeave={endPress} onPointerCancel={endPress} onClickCapture={onClickCapture} onContextMenu={onContextMenu}>
             {catalog.trees.map((tree, i) => {
               const points = shownPerTree.get(tree.id) ?? 0;
+              // The next row this tree's points have not opened yet, said in words beside the tree, not only in each
+              // locked talent's label and tooltip.
+              const gates = catalog.nodes.map((n) => (n.treeId === tree.id ? n.unlock?.pointsInTree ?? 0 : 0)).filter((g) => g > points);
+              const gate = gates.length ? Math.min(...gates) : null;
+              const role = treeRole(catalog.classSlug as ClassName, i);
               return (
                 <section key={tree.id} className={`min-w-0 ${i === view ? "" : "hidden md:block"}`} aria-label={tree.name}>
                   {/* On a phone the switch above carries the tree's name and points, and its Reset follows the talents; the
@@ -668,12 +674,16 @@ export default function TalentCalculator({ catalog, treeIcons, classIcon = null,
                     <div className="flex items-center gap-2">
                       {treeIcons?.[i] && <GameIcon src={treeIcons[i]!} size={24} className="max-md:hidden" />}
                       <h2 className={`min-w-0 truncate text-base font-semibold max-md:sr-only ${classText}`}>{tree.name}</h2>
+                      {role && <span data-tree-role className="shrink-0 text-xs text-muted max-md:hidden">{role === "damage" ? "Damage" : role === "tank" ? "Tank" : "Healer"}</span>}
                       <span className={`ml-auto font-mono text-xl tabular-nums max-md:hidden ${points === 0 ? "text-muted" : "text-fg"}`}>{points}</span>
                       {!readOnly && <button type="button" className="min-h-11 px-1 text-sm text-muted hover:text-fg disabled:opacity-50 max-md:hidden" disabled={points === 0 || previewing !== null} aria-label={`Reset ${tree.name}`} onClick={() => onResetTree(tree.id, tree.name)}>Reset</button>}
                     </div>
                     <div className="h-1 overflow-hidden rounded-full bg-canvas max-md:hidden" aria-hidden="true">
                       <div className={`h-full rounded-full bg-current ${classText}`} style={{ width: `${shownAvailable ? Math.min(100, (points / shownAvailable) * 100) : 0}%` }} />
                     </div>
+                    {!readOnly && gate !== null && (
+                      <p data-tree-gate className="text-xs text-fg-2">Next row needs {gate} points in {tree.name}: {gate - points} more.</p>
+                    )}
                   </div>
                   {(() => {
                     const props = {

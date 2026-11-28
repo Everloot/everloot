@@ -54,6 +54,10 @@ beforeEach(() => {
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 0, records: [], dataAsOf: today.toISOString() });
 });
 
+test("bag upgrades links the inventory valuation tool", async () => {
+  expect(await page({})).toContain('href="/tools/bags/value"');
+});
+
 test("one house's cheapest bag per size; a size priced only on another house says so, never 0", async () => {
   const html = text(await page({ realm: "forever", house: "horde", b1: String(small), b2: String(small), b3: String(small), b4: String(small) }));
   expect(html).toContain("Cheapest bag of each size");

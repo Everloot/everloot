@@ -48,7 +48,8 @@ export function slugParam(raw: string): string | null {
 }
 
 export const realmHref = (realm: Pick<RealmRef, "slug">) => `${AH_PATH}/${encodeURIComponent(realm.slug)}`;
-export const itemHref = (realm: Pick<RealmRef, "slug">, itemId: number) => `${realmHref(realm)}/${itemId}`;
+export const itemHref = (realm: Pick<RealmRef, "slug">, itemId: number, house?: AuctionHouse | null) =>
+  `${realmHref(realm)}/${itemId}${house ? `?house=${houseSlug(house)}` : ""}`;
 export const crossRealmHref = (itemId: number) => `${AH_PATH}/item/${itemId}`;
 /** The realm's Market changes view, for one house (`?house=`) or the page's own pick without one. */
 export const changesHref = (realm: Pick<RealmRef, "slug">, house: AuctionHouse | null = null) =>

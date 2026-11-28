@@ -11,7 +11,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 // The address the app router reports to the client component, set per test.
 const address = vi.hoisted(() => ({ search: "" }));
 vi.mock("next/link", () => ({
-  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
+  default: ({ href, children, className, "aria-label": label }: { href: string; children: ReactNode; className?: string; "aria-label"?: string }) => (
+    <a href={href} className={className} aria-label={label}>{children}</a>
+  ),
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -23,7 +25,7 @@ import ClassPage, * as hubRoute from "./[class]/page";
 import UseClassButton, { RememberedClass } from "@/components/classes/UseClassButton";
 import { navItems, phoneGroups } from "@/components/Header";
 import { classesIndexable, classRaces, classSpellLevels, hubIndexable } from "@/lib/class-hub";
-import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
+import { CLASS_CONTEXT_SLOT, classLabel, contextLinks } from "@/lib/class-context";
 import { RACE_TABLE, RACIAL_NOTES } from "@/lib/race-traits";
 import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
 import { fixture } from "@/lib/talents/fixture";
@@ -199,6 +201,15 @@ describe("class hubs", () => {
     expect(visible(page)).toContain("Items a Mage can use by its proficiencies in the game files");
   });
 
+  test("the class navigation links its ability ranks, calculator and patch note search", async () => {
+    const doc = new DOMParser().parseFromString(await hub("mage"), "text/html");
+    const nav = doc.querySelector('nav[aria-label="Mage pages"]');
+    expect(nav?.querySelector('[aria-current="page"]')?.textContent).toBe("Overview");
+    expect(nav?.querySelector('a[href="/classes/mage/spells"]')?.textContent).toBe("Abilities");
+    expect(nav?.querySelector('a[href="/tools/talents/mage"]')?.textContent).toBe("Talents");
+    expect(nav?.querySelector('a[href="/changes?q=Mage"]')?.getAttribute("aria-label")).toBe("Patch notes mentioning Mage");
+  });
+
   test("the hub links the census narrowed to its class and the class ranking, and prints no count of its own", async () => {
     for (const [slug, name] of [["mage", "Mage"], ["druid", "Druid"]] as const) {
       const html = await hub(slug);
@@ -330,26 +341,34 @@ describe("class hubs", () => {
 });
 
 describe("the class index", () => {
-  const row = (html: string, slug: string) => html.match(new RegExp(`<tr[^>]*>(?:(?!</tr>)[\\s\\S])*href="/classes/${slug}"[\\s\\S]*?</tr>`))?.[0] ?? "";
+  const card = (doc: Document, slug: string) => doc.querySelector(`h2 > a[href="/classes/${slug}"]`)?.closest("li");
 
   test("lists the nine hubs with their reviewed guides, and is indexed once one hub is", async () => {
     const empty = await index();
-    for (const slug of TALENT_CLASSES) expect(empty, slug).toContain(`href="/classes/${slug}"`);
-    // The shared empty state under the table (guides-empty.test.tsx holds its words); the table links the class pages.
-    const note = new DOMParser().parseFromString(empty, "text/html").querySelector("[data-guides-empty]");
+    const doc = new DOMParser().parseFromString(empty, "text/html");
+    for (const slug of TALENT_CLASSES) {
+      const entry = card(doc, slug);
+      expect(entry, slug).toBeTruthy();
+      expect(entry?.querySelector("h2")?.textContent).toBe(classLabel(slug));
+      expect(entry?.querySelector(`a[href="/classes/${slug}/spells"]`)).toBeTruthy();
+      expect(entry?.querySelector(`a[href="/tools/talents/${slug}"]`)).toBeTruthy();
+      expect(entry?.querySelector(`a[href="/changes?q=${classLabel(slug)}"]`)).toBeTruthy();
+      for (const tree of (await loadCatalog(slug)).trees) expect(entry?.textContent).toContain(tree.name);
+    }
+    const note = doc.querySelector("[data-guides-empty]");
     expect(note?.textContent).toContain("No guide is reviewed yet.");
     expect(note?.querySelector('a[href="/classes"]')).toBeNull();
     expect(ledeOf(empty)).not.toMatch(/guide/i);
-    // No column of nine dashes: the guides column shows once a class has one.
-    expect(empty).not.toContain("Reviewed guides");
+    expect(empty).not.toMatch(/\d+ reviewed guides?/);
     // No guide yet, but every hub carries its races' traits, so the index is indexed too.
     expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
 
     stubGuides(SOME);
     const listed = await index();
-    expect(visible(row(listed, "mage"))).toMatch(/Mage\s+1\b/);
-    expect(visible(row(listed, "warrior"))).toMatch(/Warrior\s+1\b/);
-    expect(visible(row(listed, "priest"))).not.toMatch(/\d/);
+    const withGuides = new DOMParser().parseFromString(listed, "text/html");
+    expect(card(withGuides, "mage")?.textContent).toContain("1 reviewed guide");
+    expect(card(withGuides, "warrior")?.textContent).toContain("1 reviewed guide");
+    expect(card(withGuides, "priest")?.textContent).not.toContain("reviewed guide");
     expect(listed).not.toContain("data-guides-empty");
     expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
   });

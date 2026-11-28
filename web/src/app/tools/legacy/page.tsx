@@ -5,8 +5,8 @@ import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 
-const TITLE = "WoW Forever Legacy Perks";
-const lede = "Every Legacy perk tree in the WoW: Forever game files, with each perk's ids, ranks, prerequisites and spend gates. A list to read, not a planner.";
+const TITLE = "WoW Forever Legacy Perk Planner";
+const lede = "Plan ranks across the three WoW: Forever Legacy trees and share your build. See each perk's ranks, prerequisites and spend gates in the game-file reference.";
 const description = `${lede} Found in game files, unconfirmed.`;
 
 export const metadata: Metadata = pageMetadata({ title: TITLE, description, path: "/tools/legacy" });

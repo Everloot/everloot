@@ -174,12 +174,15 @@ test("a 7-day cell with no change to show says why on hover, on keyboard focus a
   expect(html).toMatch(/<span tabindex="0" title="(No public scan since [^"]+: a 7-day change needs one from today or yesterday)"><span aria-hidden="true" class="text-muted">—<\/span><span class="sr-only">\1<\/span><\/span>/);
 });
 
-test("the page opens on its title: the Blizzard data link sits in the links row under it, beside the daily report", async () => {
+test("current prices, the community report and AH Ledger deals are discoverable together under the title", async () => {
   const html = await hub({});
   const title = html.indexOf("<h1");
   const blizzard = html.indexOf('href="/blizzard-auctions"');
   expect(title).toBeGreaterThanOrEqual(0);
   expect(html.split('href="/blizzard-auctions"')).toHaveLength(2);
   expect(blizzard).toBeGreaterThan(html.indexOf("</header>"));
-  expect(html).toMatch(/<p [^>]*>(?:<a href="\/tools\/auctions\/report"[^>]*>Daily market report and share image<\/a>)[^<]*<a href="\/blizzard-auctions"[^>]*>Blizzard auction house data<\/a><\/p>/);
+  const tools = html.match(/<nav aria-label="Auction House tools"[\s\S]*?<\/nav>/)?.[0];
+  expect(tools).toContain('href="/blizzard-auctions"');
+  expect(tools).toContain('href="/tools/auctions/report"');
+  expect(tools).toContain('href="#market-deals"');
 });

@@ -85,6 +85,26 @@ test("a talent says its rank, row and why it is locked", async () => {
   expect(node(21).getAttribute("aria-label")).toBe("Talent 21, rank 0 of 5, row 2, locked. Needs 5 points spent in Left on rows above.");
 });
 
+test("each tree says in words what its next locked row needs, and stops once the points are there", async () => {
+  await render();
+  const gate = () => container.querySelector('section[aria-label="Left"] [data-tree-gate]')?.textContent ?? null;
+  expect(gate()).toBe("Next row needs 5 points in Left: 5 more.");
+  await click(node(11));
+  expect(gate()).toBe("Next row needs 5 points in Left: 4 more.");
+  for (let i = 0; i < 4; i++) await click(node(11));
+  expect(gate()).toBe("Next row needs 10 points in Left: 5 more.");
+});
+
+test("each tree's name carries its role from the raid planner's roles, where the class's trees differ and the tree settles it", async () => {
+  await render();
+  // Every mage tree deals damage, so the hint would say nothing.
+  expect(container.querySelector("[data-tree-role]")).toBeNull();
+  await act(async () => root.render(<TalentCalculator catalog={{ ...fixture, classSlug: "druid" }} />));
+  const roles = [...container.querySelectorAll("[data-tree-role]")].map((r) => r.textContent);
+  // The fixture's two trees as a druid's first two: Balance is damage, Feral is not settled (tank or damage).
+  expect(roles).toEqual(["Damage"]);
+});
+
 test("a click adds a point and announces it; a refused click explains itself", async () => {
   await render();
   await click(node(11));

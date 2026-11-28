@@ -6,7 +6,7 @@ import { CLASSES } from "@/design/tokens";
 import { glide } from "@/lib/motion";
 import { CURRENT_BUILD, TABLES, type BuffTable, type Scope } from "@/data/game-data/raid";
 import {
-  treeNames, SIZES, STATE_LABEL, applyDrop, coverage, decodeRaid, describeRaid, emptySlots, encodeRaid, findCode, groupsOf, resize,
+  treeNames, SIZES, STATE_LABEL, applyDrop, coverage, suggestNext, decodeRaid, describeRaid, emptySlots, encodeRaid, findCode, groupsOf, resize,
   titleCase, GROUP_SIZE, roster, swapSlots,
   type ClassName, type DragSource, type DropTarget, type FamilyCoverage, type Size, type Slot, type Slots, type State,
 } from "@/lib/raid";
@@ -234,6 +234,7 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
   };
 
   const cov = useMemo(() => coverage(slots, table), [slots]);
+  const next = useMemo(() => suggestNext(slots, table), [slots]);
   const ros = useMemo(() => roster(slots), [slots]);
   const roles = useMemo(() => describeRaid(size, slots).roles, [size, slots]);
   const groups = groupsOf(slots);
@@ -698,6 +699,18 @@ export default function RaidBuilder({ art = null, initialCode, classContext = fa
             </ul>
             {missing.length > MISSING_SHOWN && <span className="text-meta text-muted">and {missing.length - MISSING_SHOWN} more in the full coverage</span>}
           </div>
+        )}
+        {ros.filled > 0 && next.classes.length > 0 && (
+          <p data-raid-suggest className="text-meta text-fg-2">
+            <span className="font-medium text-fg">Suggested next: </span>
+            {next.classes.map((c, i) => (
+              <span key={c}>
+                {i === 0 ? "" : i === next.classes.length - 1 ? " or " : ", "}
+                <span className={`font-medium ${CLASS_TEXT[c]}`}>{titleCase(c)}</span>
+              </span>
+            ))}
+            {`, ${next.classes.length > 1 ? "each brings" : "brings"} ${next.count} of the missing`}
+          </p>
         )}
         <details data-coverage-details className="group border-t border-line">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-control font-medium text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
