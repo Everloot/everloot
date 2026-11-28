@@ -37,6 +37,7 @@ import LoreSection from "@/components/LoreSection";
 import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
+import { zoneByMapId } from "@/lib/zones";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "@kb/pending-loot";
@@ -162,7 +163,9 @@ export default async function ItemPage(props: Props) {
 
   // Beside each row, what the site already holds for it: the zone 3 installs measured a vendor in, and a recipe's
   // reagents and skill ranks from the game files (client-recipes.json). A column shows only where some row has a value.
-  const npcZones = (npcId: number) => edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === npcId);
+  // Released zones only, as the NPC and vendor pages name them: a zone the map holds back (heldBackZones, maybe
+  // unreleased) has no page and no name outside the spoiler switch, so its row shows the dash, never "zone 2548".
+  const npcZones = (npcId: number) => edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === npcId && zoneByMapId(z.toId));
   const vendorZones = (e: Edge) => (e.rel === "sold_by" ? npcZones(e.toId) : []);
   const zoneLinks = (zones: Edge[]) => <span className="inline-flex flex-wrap gap-x-2">{zones.map((z) => <span key={z.toId}><RelationTarget edge={z} rel={z.rel} client={edges.client} /></span>)}</span>;
   const recipeOf = (e: Edge) => (e.toKind === "spell" && (e.rel === "created_by" || e.rel === "reagent_for") ? recipeBySpell(e.toId) : undefined);

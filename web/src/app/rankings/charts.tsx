@@ -4,7 +4,7 @@ import type { CensusCount } from "@kb/census";
 import { axisStep, percentAxisStep } from "@/lib/chart-axis";
 import type { ChartSeries, RankingWeek } from "@/lib/rankings";
 import { useMeasuredWidth } from "@/lib/use-measured-width";
-import { fill, nameOf, number, percent, stroke, weekLabel, weekTick } from "./chart-words";
+import { fill, nameOf, number, percent, seriesMarks, weekLabel, weekTick } from "./chart-words";
 
 // The hub's two charts and a ranking's trend chart, drawn at the width they are laid out at, one viewBox unit a CSS pixel, so their labels keep
 // their size on a phone and at 1440 instead of scaling with the picture; 720 until the width is measured.
@@ -138,6 +138,7 @@ export function WeeklyLinesChart({ weeks, series, title }: { weeks: RankingWeek[
     .filter((e): e is { key: string; label: string; y: number } => e !== null)
     .sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 12);
+  const marks = seriesMarks(series);
   return (
     <div ref={box}>
       <svg viewBox={`0 0 ${width} ${LH}`} width={width} height={LH} role="img" aria-label={title} className="block max-w-full">
@@ -151,12 +152,12 @@ export function WeeklyLinesChart({ weeks, series, title }: { weeks: RankingWeek[
         {weeks.map((w, i) => (
           <text key={w.start} x={x(i)} y={LH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(w)}</text>
         ))}
-        {series.map((s) => (
+        {series.map((s, n) => (
           <g key={s.key}>
             <title>{nameOf(s)}</title>
-            <path d={path(s.points)} fill="none" strokeWidth={2} strokeLinejoin="round" strokeDasharray={s.faction === "Horde" ? "6 3" : undefined} className={stroke(s)} />
+            <path d={path(s.points)} fill="none" strokeWidth={2} strokeLinejoin="round" strokeDasharray={marks[n].horde ? "6 3" : undefined} className={marks[n].stroke} />
             {s.points.map((p, i) => p !== null && (
-              <circle key={i} cx={x(i)} cy={y(p)} r={4} className={`${fill(s)} stroke-panel`} strokeWidth={2}>
+              <circle key={i} cx={x(i)} cy={y(p)} r={4} className={`${marks[n].fill} stroke-panel`} strokeWidth={2}>
                 <title>{`${nameOf(s)}, ${weekLabel(weeks[i])}: ${percent(p)}`}</title>
               </circle>
             ))}
