@@ -43,6 +43,29 @@ test("invalid input and cross-site requests never call upstream", async () => {
   expect(fetchImpl).not.toHaveBeenCalled();
 });
 
+test("timing keeps scan coverage and uses an item-specific credit and fixed 28-day window", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({
+    item: { id: 42, name: "Copper Ore" },
+    pricesAsOf: "2026-11-28T06:00:00Z",
+    hours: [{ hour: 23, days: 8, listings: 41.5 }, { hour: 6, days: 0, listings: null }],
+    summary: { bestBuy: { startUtc: 0 }, bestSell: { startUtc: 23 }, confidence: "provisional" },
+  }, { headers: { "Cache-Control": "private, max-age=60" } }));
+  vi.stubGlobal("fetch", fetchImpl);
+  expect((await call("timing", "?item=42&days=90")).status).toBe(400);
+  expect(fetchImpl).not.toHaveBeenCalled();
+  const response = await call("timing", "?item=42");
+  expect((fetchImpl.mock.calls[0] as unknown[])[0]).toBe(`https://api.ahledger.com/v1/timing/${market}/42?days=28`);
+  expect(response.headers.get("Cache-Control")).toBe("private, max-age=60");
+  expect(await response.json()).toEqual({
+    ok: true,
+    timing: {
+      itemName: "Copper Ore", buy: 0, sell: 23, confidence: "provisional", asOf: "2026-11-28T06:00:00Z",
+      hours: [{ hour: 23, days: 8, listings: 41.5 }],
+    },
+    credit: { text: "Prices from AHledger", url: `https://ahledger.com/items/42/${market}` },
+  });
+});
+
 test("busy responses retain Retry-After and all upstream failures stay uncached", async () => {
   for (const status of [429, 503]) {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("busy", { status, headers: { "Retry-After": "12" } })));

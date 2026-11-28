@@ -251,6 +251,13 @@ between the player's own characters, the addon reads the trade partner's name, t
 sender of a letter with money, compares each with the player's own characters on the same realm, and drops it: none of
 these names is ever kept. The completion tracker's rows are unchanged.
 
+Sales cycles keep the original timestamp of an observed sold notice after a receipt is paid, and the active weekly
+reset bounds the client reported. The add-on uses these for its local peak-hour report and paid-auction rankings.
+The optional Auction House Activity tool lets a player open their SavedVariables file in an ad- and analytics-free
+document. It reads the sale and reset facts in browser memory, without sending the file, identifiers or sales to a
+server or storing them in browser storage. The separate item timing panel reads public AH Ledger scan statistics
+using only the item ID and selected market.
+
 Completion tracking (addon 0.3.3) is on in a new install as of the 2026-11-19 owner decision; an older install keeps its choice. `/everloot completion off` stops it and deletes its local rows. It follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
 `quest_chain_catalog`) hold only game facts the addon read from the game's own calls: ids, names,

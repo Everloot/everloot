@@ -491,3 +491,16 @@ assert(g.chartBase == 110 and g.scaleTop.text == '' and g.scaleBottom.text == U.
 assert(not U.failed, U.failed)
 """)
 print("Lua 5.1 Gold view: chart grid, scale, axis, empty days, tooltip and the zero rule")
+
+lua.execute("""
+local U = Everloot.Window
+U.OpenSaleCycles()
+local g = U.frame.gold
+assert(g.tab == "cycles" and g.pages.cycles.shown)
+assert(g.topSellers[1].item.text == "Linen Cloth" and tonumber(g.topSellers[1].sales.text) == 1)
+assert(g.peakHour.text:find("too few sale notices", 1, true))
+g.cycleButtons.week.scripts.OnClick(g.cycleButtons.week)
+assert(g.cycleStart.text:find("Weekly reset time unavailable", 1, true))
+assert(not g.topSellers[1].shown)
+assert(not U.failed, U.failed)
+""")

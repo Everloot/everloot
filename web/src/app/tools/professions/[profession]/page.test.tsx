@@ -85,6 +85,8 @@ test("a recipe row opens a shareable one-recipe shopping plan with the original 
   expect(html).toContain('id="recipe-shopping"');
   expect(html).toContain('value="3"');
   expect(html).toContain("Copy recipe shopping list");
+  expect(html).toContain('href="/tools/auctions/activity?item=2454');
+  expect(html).toContain("Auction activity for the finished item");
   expect(html).toContain('id="shopping-list"');
   expect(await render("alchemy", { recipe: "3755" })).not.toContain('id="recipe-shopping"');
 });

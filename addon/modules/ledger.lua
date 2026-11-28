@@ -184,11 +184,124 @@ function L.RecordSale(key, sale)
     row = {}
     s.sales[#s.sales + 1] = row
   end
+  -- The paid row keeps its collection time for accounting, plus the observed sale notice for timing.
+  row.noticeAt = row.at
   row.at, row.key, row.itemName, row.count = time(), key, sale.itemName, sale.count
   row.unit, row.total, row.deposit, row.cut, row.status = math.floor(sale.total / sale.count), sale.total, sale.deposit, sale.cut, "paid"
   evict(s)
   changed()
   return true
+end
+
+local function resetTime(fn)
+  if type(fn) ~= "function" then return nil end
+  local ok, value = pcall(fn)
+  if not ok then return nil end
+  value = E.Readable(value)
+  return whole(value, 0) and value or nil
+end
+
+-- Store the client's actual reset while its bounds are known, for the local browser report too.
+-- Keep a saved bound only until the next reset. Daily quest resets are a different clock.
+function L.AuctionReset(now)
+  now = now or time()
+  local s = store()
+  if C_DateAndTime then
+    local start = resetTime(C_DateAndTime.GetWeeklyResetStartTime)
+    local left = resetTime(C_DateAndTime.GetSecondsUntilWeeklyReset)
+    if start and left and left > 0 and start <= now and now + left - start <= 8 * DAY then
+      if type(s.auctionReset) ~= "table" or s.auctionReset.start ~= start or s.auctionReset.next ~= now + left then
+        s.auctionReset = { start = start, next = now + left }
+      end
+    end
+  end
+  local reset = s.auctionReset
+  if type(reset) == "table" and whole(reset.start, now - 8 * DAY) and reset.start <= now
+    and whole(reset.next, now + 1) and reset.next - reset.start <= 8 * DAY then return reset.start end
+end
+
+local CYCLES = { "day", "week", "month" }
+local NOTICE_DAYS = 28
+
+local function addNotice(hours, at)
+  local hour = math.floor(at / 3600) % 24
+  local row = hours[hour]
+  if not row then row = { notices = 0, dates = {} }; hours[hour] = row end
+  row.notices = row.notices + 1
+  row.dates[math.floor(at / DAY)] = true
+end
+
+local function peakHour(hours)
+  local peak
+  for hour = 0, 23 do
+    local row = hours[hour]
+    if row and row.notices >= 3 then
+      local days = 0
+      for _ in pairs(row.dates) do days = days + 1 end
+      if days >= 2 and (not peak or row.notices > peak.notices or (row.notices == peak.notices and days > peak.days)) then
+        peak = { hour = hour, notices = row.notices, days = days }
+      end
+    end
+  end
+  return peak
+end
+
+-- Rank actual paid auctions by receipt count. Seller invoices can omit stack size, so the ranking
+-- counts auctions. The peak uses sale notices, including outstanding ones, and never mailbox pickup hours.
+function L.SaleCycles(keys, itemName)
+  local now = time()
+  local month = now - now % DAY - (tonumber(date("!%d", now)) - 1) * DAY
+  local start = { day = now - DAY, week = L.AuctionReset(now), month = month }
+  local rank, items, hours = { day = {}, week = {}, month = {} }, {}, {}
+  local wanted = keySet(keys)
+  for _, row in ipairs(store().sales) do
+    if wanted[row.key] and (not itemName or row.itemName == itemName)
+      and validName(row.itemName) and whole(row.at, 0) and row.at <= now then
+      local item = items[row.itemName]
+      if not item then
+        item = { sales = { day = 0, week = 0, month = 0 }, totals = { day = 0, week = 0, month = 0 }, hours = {} }
+        items[row.itemName] = item
+      end
+      local notice = row.noticeAt
+      if row.status == "pending" or row.status == "unmatched" then notice = row.at end
+      if whole(notice, now - NOTICE_DAYS * DAY) and notice <= row.at then
+        addNotice(hours, notice)
+        addNotice(item.hours, notice)
+      end
+      if row.status == "paid" and whole(row.total, 1) then
+        for _, cycle in ipairs(CYCLES) do
+          if start[cycle] and row.at >= start[cycle] then
+            item.sales[cycle] = item.sales[cycle] + 1
+            item.totals[cycle] = item.totals[cycle] + row.total
+          end
+        end
+      end
+    end
+  end
+  for name, item in pairs(items) do
+    item.peak = peakHour(item.hours)
+    item.hours = nil
+    for _, cycle in ipairs(CYCLES) do
+      if item.sales[cycle] > 0 then
+        local rows = rank[cycle]
+        rows[#rows + 1] = { itemName = name, sales = item.sales[cycle], total = item.totals[cycle] }
+      end
+    end
+  end
+  for _, rows in pairs(rank) do
+    table.sort(rows, function(a, b)
+      if a.sales ~= b.sales then return a.sales > b.sales end
+      if a.total ~= b.total then return a.total > b.total end
+      return a.itemName < b.itemName
+    end)
+  end
+  return { start = start, rank = rank, items = items, peak = peakHour(hours) }
+end
+
+function L.PeakHourText(peak)
+  if not peak then return "Peak hour: too few sale notices (last 28 days)." end
+  return string.format("Peak hour %02d:00-%02d:00 UTC: %d sales noticed across %d days.",
+    peak.hour, (peak.hour + 1) % 24, peak.notices, peak.days)
 end
 
 --- Sets this character's closing gold for today (UTC); the day's last call wins. Keeps the newest 400 days.

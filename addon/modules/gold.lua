@@ -437,6 +437,7 @@ E:RegisterModule("gold", function()
       lastMoney = playerMoney()
       writeSnapshot(true)
       closeDay(lastMoney)
+      if E.Ledger and E.Ledger.AuctionReset then E.Ledger.AuctionReset() end
     elseif event == "PLAYER_MONEY" then
       local copper = playerMoney()
       if copper then rememberPeak(copper); closeDay(copper); moneyChanged(copper) end

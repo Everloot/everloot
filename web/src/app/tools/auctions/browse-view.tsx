@@ -310,6 +310,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <a href="/blizzard-auctions" className="btn">Browse current Blizzard prices</a>
             <Link href="/tools/auctions/report" className="btn">Community market report</Link>
             <a href="#market-deals" className="btn">AH Ledger deals</a>
+            <a href="/tools/auctions/activity" className="btn">Auction House activity</a>
           </nav>
         )}
         <ScansPaused state={state} now={now} className="mb-3" />

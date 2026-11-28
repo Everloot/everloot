@@ -384,7 +384,7 @@ assert L.RecordSale(A, extra(itemName="Linen Cloth", count=20, total=1990, depos
 sales_rows = py(g.EverlootDB.ledger.sales)
 assert len(sales_rows) == 3, "the sale filled a pending row, it did not add one"
 assert sales_rows[0] == {"at": NOW, "key": A, "itemName": "Linen Cloth", "count": 20, "unit": 99, "total": 1990,
-                         "deposit": 60, "cut": 105, "status": "paid"}, sales_rows[0]
+                         "deposit": 60, "cut": 105, "status": "paid", "noticeAt": NOW - 5000}, sales_rows[0]
 assert sales_rows[1]["status"] == "pending" and sales_rows[1]["at"] == NOW - 4000, "the newer pending row stays"
 by_item = py(L.SalesByItem(keys(A, B), 0, NOW))
 assert by_item == [{"itemName": "Linen Cloth", "count": 20, "total": 1990, "unit": 99, "sales": 1}], by_item

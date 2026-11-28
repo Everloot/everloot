@@ -265,7 +265,7 @@ local function layout(panel, width)
   panel.shareButton:SetWidth(math.min(120, column / 2))
   panel.lookup:SetWidth(math.max(40, math.min(300, column - 90)))
   panel.results:SetWidth(column)
-  panel.footer:SetWidth(math.max(1, width - 48 - panel.shareButton:GetWidth()))
+  panel.footer:SetWidth(math.max(1, width - 56 - panel.shareButton:GetWidth() - panel.salesButton:GetWidth()))
   layoutResults(panel)
 end
 
@@ -553,7 +553,7 @@ function T.SetMode(mode)
   if not (panel and panel.shop) then return end
   local shopping = mode == "shop"
   panel.mode = shopping and "shop" or "lookup"
-  for _, part in ipairs({ panel.scanButton, panel.shareButton, panel.status, panel.footer, panel.lookupLabel, panel.lookup, panel.searchButton, panel.results }) do
+  for _, part in ipairs({ panel.scanButton, panel.shareButton, panel.salesButton, panel.status, panel.footer, panel.lookupLabel, panel.lookup, panel.searchButton, panel.results }) do
     if shopping then part:Hide() else part:Show() end
   end
   if shopping then
@@ -695,6 +695,14 @@ local function buildPanel(house)
   shareButton:SetText("Save scan")
   shareButton:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   panel.shareButton = shareButton
+  local salesButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  salesButton:SetSize(108, 24)
+  salesButton:SetPoint("RIGHT", shareButton, "LEFT", -8, 0)
+  salesButton:SetText("Sales cycles")
+  salesButton:SetScript("OnClick", function()
+    if E.Window and E.Window.OpenSaleCycles then E.Window.OpenSaleCycles() end
+  end)
+  panel.salesButton = salesButton
 
   local status = words(panel, "GameFontHighlight")
   status:SetPoint("LEFT", scanButton, "RIGHT", 12, 0)

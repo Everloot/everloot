@@ -8,10 +8,11 @@ import { formatCopper } from "@kb/profession-path";
 import type { FullPriceRow } from "@kb/market";
 import { SELECT_CLASS } from "./controls";
 import { realmSlug } from "@/lib/auction-house";
+import { auctionActivityHref } from "@/lib/auction-activity-link";
 
 type SelectedMarket = { realm: string; house: string };
 
-export default function RecipeShopping({ recipe, initialCrafts, initialMarket }: { recipe: SearchRecipe; initialCrafts: number; initialMarket?: SelectedMarket }) {
+export default function RecipeShopping({ recipe, initialCrafts, initialMarket, outputItem }: { recipe: SearchRecipe; initialCrafts: number; initialMarket?: SelectedMarket; outputItem?: number }) {
   const [count, setCount] = useState(String(initialCrafts));
   const [houses, setHouses] = useState<Record<string, string[]> | null>(null);
   const [realm, setRealm] = useState("");
@@ -110,6 +111,7 @@ export default function RecipeShopping({ recipe, initialCrafts, initialMarket }:
           <div className="min-w-0">
             <h3 id="recipe-shopping-heading" className="break-words text-xl font-semibold text-fg">{recipe.name}</h3>
             <p className="mt-1 flex items-center gap-2 text-meta text-muted"><Badge tone="files" /> Materials from game files</p>
+            {outputItem && <a href={auctionActivityHref(outputItem, recipe.itemName)} className="lnk text-sm">Auction activity for the finished item</a>}
           </div>
           <label className="grid gap-1 text-cell text-fg-2">Crafts
             <Input className="w-24" type="number" min={1} max={999} step={1} value={count} onChange={e => changeCount(e.target.value)} />
@@ -142,7 +144,10 @@ export default function RecipeShopping({ recipe, initialCrafts, initialMarket }:
         {!valid && <p role="status">Enter a whole number from 1 to 999 crafts.</p>}
         <ul className="divide-y divide-line border-y border-line">
           {materials.map((r, index) => <li key={`${r.itemId}:${index}`} className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-2">
-            <span className="min-w-0 break-words">{r.amount !== null ? `${r.amount} × ` : ""}<Link href={`/database/items/${r.itemId}`} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{r.name}</Link></span>
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+              <span className="break-words">{r.amount !== null ? `${r.amount} × ` : ""}<Link href={`/database/items/${r.itemId}`} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{r.name}</Link></span>
+              <a className="lnk text-sm" aria-label={`Auction activity for ${r.name}`} href={auctionActivityHref(r.itemId, r.name)}>Activity</a>
+            </span>
             {current?.rows && <span className="text-right text-meta text-muted">{r.quote
               ? `${r.amount !== null ? formatCopper(r.quote[2] * r.amount) + " · " : ""}${formatCopper(r.quote[2])} each · ${r.quote[5]}${r.quote[8] > 2 ? " (stale)" : ""}`
               : "No quote"}</span>}

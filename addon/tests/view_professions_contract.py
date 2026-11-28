@@ -341,6 +341,19 @@ local function row(i) local r = c.rows[i]; return r.shown and r.name.text or nil
 assert(row(1) == 'Smelt Copper' and row(2) == 'Spiced Wolf Meat' and row(3) == 'Herb Baked Egg'
   and row(4) == 'Boiled Clams' and row(5) == 'Mystery Stew' and not c.rows[6].shown, tostring(row(1)))
 local r1 = c.rows[1]
+-- The finished item's sales come from the character's local ledger, by the invoice's item name.
+local itemInfo = GetItemInfo
+GetItemInfo = function(id) if id == 2840 then return 'Copper Bar' end end
+local key = E.CharacterKey()
+assert(key and E.Ledger.RecordSale(key, { itemName = 'Copper Bar', count = 20, total = 500 }))
+assert(E.Ledger.RecordSale(key, { itemName = 'Copper Ore', count = 20, total = 500 }))
+GameTooltip = { lines = {}, SetOwner = function(self) self.lines = {} end,
+  AddLine = function(self, s) self.lines[#self.lines + 1] = s end, Show = function() end }
+r1.scripts.OnEnter(r1)
+local saleTip = table.concat(GameTooltip.lines, '|')
+assert(saleTip:find('Copper Bar', 1, true) and saleTip:find('24h: 1', 1, true), saleTip)
+assert(not saleTip:find('Copper Ore', 1, true), saleTip)
+GetItemInfo, GameTooltip = itemInfo, nil
 -- Priced: the newest row's reagents (one Copper Ore at its 20c market value, not the vendor's 30c). A gain is signed
 -- and green.
 assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == '+' .. M(265), r1.profit.text)

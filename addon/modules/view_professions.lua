@@ -60,6 +60,7 @@ local HELP_PROFIT = "Profit is the estimated sale value of a craft's average out
 local HELP_COLOUR = "Green profit is a gain, red is a loss. Est. profitable only keeps the green ones."
 local HELP_SCANS = "Your scans: how the lowest buyout of what the recipe makes moved between your last two scans of this "
   .. "auction house, with bars for up to three scans. These are listings, not sales; hover a recipe for the numbers."
+  .. " The recipe tooltip also shows your sales activity."
 local NO_FILE = "No price file in the game yet: the Everloot Desktop App writes it, then /reload. Vendor prices you saw still count."
 local CHECKING = "Checking the price file..."
 local FAILED = "The price file failed its checksum and is not used. Vendor prices you saw still count."
@@ -498,7 +499,7 @@ end
 
 -- A recipe's material cost, item price and estimated profit after the auction house cut.
 local function evaluate(recipe, P)
-  local out = { key = recipe.key, name = recipe.name, parts = {}, unpriced = 0, cut = P.cut, yield = 1 }
+  local out = { key = recipe.key, name = recipe.name, product = recipe.product, parts = {}, unpriced = 0, cut = P.cut, yield = 1 }
   local output = recipe.output
   if not recipe.live then output = recipe.id and EverlootDB.recipeOutput and EverlootDB.recipeOutput[recipe.id] end
   if output and output.itemId == recipe.product then
@@ -918,6 +919,19 @@ buildCrafting = function(parent)
       GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
       GameTooltip:AddLine(self.row.name)
       for _, said in ipairs(self.row.marketChange.lines) do GameTooltip:AddLine(said, COLORS.text[1], COLORS.text[2], COLORS.text[3], true) end
+      local id = self.row.product
+      local key = E.CharacterKey()
+      local name = id and E.Shopping and E.Shopping.ItemName(id)
+      if key and name and E.Ledger and E.Ledger.SaleCycles then
+        local report = E.Ledger.SaleCycles({ key }, name)
+        local item = report.items[name]
+        local sales = item and item.sales
+        local week = report.start.week and (sales and sales.week or 0) or "unavailable"
+        GameTooltip:AddLine(name .. " · Your sales by item name", 1, 1, 1, true)
+        GameTooltip:AddLine(string.format("Paid auctions · 24h: %s · Reset: %s · Month: %s",
+          sales and sales.day or 0, week, sales and sales.month or 0), unpack(COLORS.text))
+        GameTooltip:AddLine(E.Ledger.PeakHourText(item and item.peak), COLORS.text[1], COLORS.text[2], COLORS.text[3], true)
+      end
       GameTooltip:Show()
     end)
     line:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
