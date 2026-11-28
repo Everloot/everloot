@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { trailFor } from "@/lib/breadcrumbs";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import Link from "@/components/Link";
@@ -86,10 +87,13 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
     };
   }
   const name = r.sub ? `${subclassLabel(r.sub).label} (${r.cls.label})` : r.cls.label;
-  const count = ((r.sub ? r.sub.items : r.cls.items) - (hidden ? filterItems(T, { classId: r.cls.id, subclassId: r.sub?.id }).filter((row) => hidden.has(row[0])).length : 0)).toLocaleString("en-US");
+  // What the list under it shows: the same filters, the same development leftovers and unnamed items left out.
+  const total = (await listOf(classSlug, subclassKey, search))!.rows.length;
+  const count = total.toLocaleString("en-US");
+  const noun = total === 1 ? "Item" : "Items";
   return {
     ...pageMetadata({
-      title: `${r.sub ? `WoW Forever ${name}: ${count} Items` : `WoW Forever ${name}: All ${count} Items`}${pageSuffix(page)}`,
+      title: `${r.sub ? `WoW Forever ${name}: ${count} ${noun}` : `WoW Forever ${name}: All ${count} ${noun}`}${pageSuffix(page)}`,
       description: `All ${count} ${name} items in WoW: Forever, with filters for slot, quality, item level, required level, binding and where players found them.`,
       path: itemsHref(r.cls.slug, r.sub?.slug, { page }),
     }),
@@ -110,32 +114,32 @@ const plural = (n: number) => `${n.toLocaleString("en-US")} item${n === 1 ? "" :
 /** A level range as a menu writes it: "11–20", "81+" for the open top bracket. */
 const bracket = (r: { min: number; max: number }) => (r.max >= 999 ? `${r.min}+` : r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
 
-export async function CategoryPage({ classSlug, subclassKey, search }: { classSlug?: string; subclassKey?: string; search: Search }) {
+/**
+ * The rows a category URL lists, with what the page draws them from: worked out once per request (React cache), so
+ * the page and its title count the same list, under the same filters and the same unnamed-item rule.
+ */
+const categoryList = cache(async (classSlug: string | undefined, subclassKey: string | undefined, searchKey: string) => {
+  const search = JSON.parse(searchKey) as Search;
   const r = resolve(classSlug, subclassKey, search);
-  if (!r) {
-    const moved = classSlug === undefined ? null : legacyHref(classSlug, subclassKey, search);
-    if (moved) permanentRedirect(moved);
-    notFound();
-  }
+  if (!r) return null;
   const { cls, sub, q } = r;
   // With a quality chosen and no order, the list reads by item level, highest first: an epic list opens on its best gear,
   // not its level-1 quest items. The URL carries no sort, so this order is the Sort menu's reset choice there. A name
   // search keeps its best-match order.
   const qualityFirst = Boolean(q.quality?.length) && !q.sort && !q.q;
   const order: CategoryQuery["sort"] = qualityFirst ? { key: "ilvl", desc: true } : q.sort;
-  // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
-  // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
-  // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
+  // A class context from a class hub narrows the list to what the class can use by the game files (lib/class-gear.ts):
+  // its proficiencies, at its level when the context gives one, and each item's class mask. An item the files say
+  // nothing about stays, counted.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
-  const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
   const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
   const fits = (row: ItemRow) => !usable || usable(row) !== "no";
   const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
   // One after the other: the seen items then come from the view the names just read, not from a second read of it.
   const listNames = await loadListNames();
   const seen = await loadListSeen();
-  const { agreed, matched, showsTip, degraded } = listNames;
+  const { showsTip } = listNames;
   // The names, the default order, the leftovers and the unnamed items, worked out once per version of the files.
   const index = itemListIndex(listNames, seen);
   const nameOf = index.name;
@@ -160,6 +164,26 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const unnamed: ReadonlySet<number> = folded ? index.unnamed : new Set();
   const rows = listed.filter((row) => !unnamed.has(row[0]));
   const unnamedCount = folded ? listed.length - rows.length : rows.filter((row) => !isNamed(row[0])).length;
+  return { qualityFirst, order, usable, fits, base, listNames, seen, index, wide, wideAssets, ctx, match, folded, unnamed, rows, unnamedCount };
+});
+const listOf = (classSlug: string | undefined, subclassKey: string | undefined, search: Search) => categoryList(classSlug, subclassKey, JSON.stringify(search));
+
+export async function CategoryPage({ classSlug, subclassKey, search }: { classSlug?: string; subclassKey?: string; search: Search }) {
+  const r = resolve(classSlug, subclassKey, search);
+  if (!r) {
+    const moved = classSlug === undefined ? null : legacyHref(classSlug, subclassKey, search);
+    if (moved) permanentRedirect(moved);
+    notFound();
+  }
+  const { cls, sub, q } = r;
+  // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
+  // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
+  // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
+  const read = parseClassContext(search);
+  const context = read.ok ? read.context : null;
+  const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
+  const { qualityFirst, order, usable, fits, base, listNames, seen, index, wide, wideAssets, ctx, match, folded, unnamed, rows, unnamedCount } = (await listOf(classSlug, subclassKey, search))!;
+  const { agreed, matched, showsTip, degraded } = listNames;
   // The development leftovers (test, placeholder and retired items) are out of the list unless asked for; the
   // menus count what the list can show, and the line above the table says how many are held back.
   const leftovers = index.leftovers;
