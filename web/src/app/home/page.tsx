@@ -21,7 +21,7 @@ import type { ArmoryCharacter } from "@/lib/armory-store";
 import { ADD_FROM_COOKIE } from "@/lib/auth/device-accounts";
 import { ownArmoryCharacters } from "@/lib/character-armory";
 import { characterLinksOn } from "@/lib/character-links";
-import { filterTimeline, loadTimeline, TYPE_LABEL, type ChangeEntry } from "@/lib/changes";
+import { filterTimeline, loadTimeline, oneRowPerTitleDay, TYPE_LABEL, type ChangeEntry } from "@/lib/changes";
 import { ownGold } from "@/lib/own-gold";
 import { postPath } from "@kb/blue-pages";
 import { HOME_REWRITE_HEADER, profilesOn } from "@/lib/profiles";
@@ -219,7 +219,8 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
   const activeBuilds = active ? saved.builds.filter((b) => b.characterId === active.id) : [];
   const facts = await describeBuilds(activeBuilds, publishedClassChanges);
   const forever = filterTimeline(await loadTimeline(), "all", "forever");
-  const latest = forever.slice(0, 5);
+  // Two posts under one title on one day are one line, as on the landing page.
+  const latest = oneRowPerTitleDay(forever, 5).map((r) => r.entry);
   // The account's linked characters and their synced gold, read only while character links are on. A failed read
   // (null) shows no linked character rather than taking the home down.
   const [linked, gold] = characterLinksOn()
@@ -228,7 +229,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
   const ownLinked = linked ?? [];
   const hero = heroOf(ownLinked, buildsEnabled ? main : null)?.hero ?? null;
   const login = hero?.lastLogin && Number.isFinite(Date.parse(hero.lastLogin)) ? hero.lastLogin : null;
-  const sincePosts = login ? forever.filter((e) => e.type === "post" && Date.parse(e.at) > Date.parse(login)).slice(0, 5) : [];
+  const sincePosts = login ? oneRowPerTitleDay(forever.filter((e) => e.type === "post" && Date.parse(e.at) > Date.parse(login)), 5).map((r) => r.entry) : [];
   // Back from "Add another account" through Battle.net as an account that was already here: Battle.net kept the
   // earlier login and signed it in again.
   const sameAccount = (await searchParams)?.added === "bnet"

@@ -20,7 +20,7 @@ import {
   itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
+import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, ScansPaused, UnnamedReason, itemQuality } from "../../parts";
 import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
@@ -132,6 +132,7 @@ export default async function RealmItemPage(props: Props) {
 
       <div className="space-y-10">
         <UnnamedReason id={itemId} names={names} />
+        <ScansPaused state={state} now={now} />
 
         {!state && (
           <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>

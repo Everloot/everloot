@@ -475,3 +475,23 @@ test("a realm item page's AH Ledger panels open on the page's own ruleset, regio
   expect(text(html)).toContain("AH Ledger prices, PvP US");
   expect(html).not.toContain("PvP US, US");
 });
+
+test("with no scan for 3 days, every page that names the newest scan says scans are paused and links Blizzard's prices", async () => {
+  const notice = /<p[^>]*role="status"[^>]*>Community scans are paused: the game stopped reporting realm names, so the addon holds scans back\. Current Blizzard prices are on <a href="\/blizzard-auctions"[^>]*>Blizzard auctions<\/a>\.<\/p>/;
+  const pages = async () => [
+    await hub({}),
+    await realmHtml("forever"),
+    renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))),
+    renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) })),
+  ];
+  // Today's scans: nothing to say.
+  for (const html of await pages()) expect(html).not.toContain("Community scans are paused");
+  // The newest scan anywhere is 3 days old.
+  const stale = foldMarket(emptyMarket(), [...scans(dayAgo(3), [[2589, 200, 205]]), ...scans(dayAgo(5), [[2589, 180, 190]])], today);
+  store.loadMarket.mockResolvedValue({ state: stale, dataAsOf: today.toISOString() });
+  for (const html of await pages()) expect(html).toMatch(notice);
+  // 2 days old is still current.
+  const recent = foldMarket(emptyMarket(), scans(dayAgo(2), [[2589, 200, 205]]), today);
+  store.loadMarket.mockResolvedValue({ state: recent, dataAsOf: today.toISOString() });
+  for (const html of await pages()) expect(html).not.toContain("Community scans are paused");
+});

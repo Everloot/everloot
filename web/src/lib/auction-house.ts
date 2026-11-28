@@ -407,6 +407,34 @@ export function newestScanDay(rows: readonly { value: { day: string } }[]): stri
   return newest;
 }
 
+/** Whole UTC days without any scan, on any realm, before the Auction House pages say community scans are paused. */
+export const SCANS_PAUSED_DAYS = 3;
+const newestAnywhereMemo = new WeakMap<MarketState, string | null>();
+
+/**
+ * The newest day any install scanned any realm, below the agreement gate too; null with none. Open days hold the newest
+ * scans (a full store closes the oldest open day, never the newest), so closed days are read only with no open day left.
+ * Kept per rollup, so the item pages read the store once per isolate.
+ */
+export function newestScanAnywhere(state: MarketState): string | null {
+  if (newestAnywhereMemo.has(state)) return newestAnywhereMemo.get(state)!;
+  const stores = [...Object.values(state.realms), ...Object.values(state.houses ?? {})];
+  const newest = (key: "open" | "closed") => {
+    let best: string | null = null;
+    for (const realm of stores) for (const item of Object.values(realm.items)) for (const day in item[key]) if (best === null || day > best) best = day;
+    return best;
+  };
+  const found = newest("open") ?? newest("closed");
+  newestAnywhereMemo.set(state, found);
+  return found;
+}
+
+/** Whether the newest scan anywhere is SCANS_PAUSED_DAYS or more days old; false without a rollup or any scan. */
+export function scansPaused(state: MarketState | null, now: Date): boolean {
+  const newest = state ? newestScanAnywhere(state) : null;
+  return newest !== null && todayNumber(now) - dayNumber(newest) >= SCANS_PAUSED_DAYS;
+}
+
 /** A public day as the pages write it: "Nov 20, 2026", the site's day form. */
 export function scanDayText(day: string): string {
   return utcDay(day) ?? day;
