@@ -18,7 +18,7 @@ import type { R2Config } from "./upload-store";
 
 export const NPC_FACTS_KEY = "snapshots/npc-facts.json";
 /** The table's shape in the file's stamp. Change it when a row changes shape, so the next job run rewrites the file. */
-export const NPC_FACTS_REVISION = "npc-facts-2";
+export const NPC_FACTS_REVISION = "npc-facts-3";
 const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 60_000;
 

@@ -11,7 +11,8 @@ import { SEARCH_NAMES_REVISION } from "./search-names-store";
  * stamp differs, so each one moved past the revision those files carry.
  */
 test("every stored view built from the corpus moved past the revision written with the sample rows", () => {
-  const written = { aggregates: "npc-facts-1", npcFacts: "npc-facts-1", instanceFacts: "instance-facts-1", farmAreas: "farm-2", searchNames: "names-2" };
+  // npc-facts-2 (#1679, level ranges) can be written before the sample filter deploys, so it counts as written too.
+  const written: Record<string, string[]> = { aggregates: ["npc-facts-1"], npcFacts: ["npc-facts-1", "npc-facts-2"], instanceFacts: ["instance-facts-1"], farmAreas: ["farm-2"], searchNames: ["names-2"] };
   const now = { aggregates: AGGREGATES_REVISION, npcFacts: NPC_FACTS_REVISION, instanceFacts: INSTANCE_FACTS_REVISION, farmAreas: FARM_AREAS_REVISION, searchNames: SEARCH_NAMES_REVISION };
-  for (const [view, revision] of Object.entries(now)) expect(revision, view).not.toBe(written[view as keyof typeof written]);
+  for (const [view, revision] of Object.entries(now)) expect(written[view], view).not.toContain(revision);
 });
