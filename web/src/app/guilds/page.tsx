@@ -10,6 +10,7 @@ import {
   GUILD_DIRECTORY_PAGE, GUILD_SORTS, guildDirectoryHref, guildDirectoryQuery, loadGuildDirectory, rulesetSlug, type GuildDirectoryQuery, type GuildSortSlug,
 } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
+import { utcDay } from "@/lib/time";
 import {
   factionLabel, guildPath, guildSearchPrefix, guildsOn, LADDER_LINE, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, RAIDS_LINE, raidsOpen, realmPath, START_LINE,
   type BossFirst, type LadderQuery, type RankedRow,
@@ -110,7 +111,7 @@ function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
     // A hover title, not a Tooltip button: the header is already the column's sort link.
     { key: "l60", header: <span title={LEVEL_60_READ_TIP}>Level 60 read</span>, numeric: true, sortable: true, cell: (g) => number(g.level60) },
     // Numeric cells already set figures in mono (dt-num).
-    { key: "at", header: "Newest read", numeric: true, cell: (g) => day(g.fetchedAt) || muted("—") },
+    { key: "at", header: "Newest read", numeric: true, cell: (g) => utcDay(g.fetchedAt) ?? muted("—") },
   ];
   // Before the directory's migration only the name, region, faction and roster size are known.
   return counted ? all : all.filter((c) => ["name", "where", "faction", "roster"].includes(c.key));

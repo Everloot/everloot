@@ -319,7 +319,7 @@ test("an instance's page lists the quests 3 installs file under its name, with i
     expect(text(row)).toContain("|The Book of Ur|");
     expect(row).toContain('href="/database/npcs/3849"');
     expect(row).toContain('data-agreement="3"');
-    expect(text(row)).toContain("2026-11-04");
+    expect(text(row)).toContain("Nov 4, 2026");
     expect(quests).not.toContain("/database/quests/1098");
     expect(quests).not.toContain("/database/quests/1014");
     // Every boss the files list is in the loot section, none with a creature tied yet.
@@ -379,7 +379,7 @@ test("the quest installs meter counts the installs that filed it under the heade
   try {
     const row = (await questsOf("33-shadowfang-keep")).split("<tr").find((r) => r.includes('href="/database/quests/1013"')) ?? "";
     expect(row).toContain('data-agreement="3"');
-    expect(text(row)).toContain("2026-11-04");
+    expect(text(row)).toContain("Nov 4, 2026");
     expect(text(row)).not.toContain("2026-11-09");
   } finally {
     state.seen = { unreachable: true };

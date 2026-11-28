@@ -284,6 +284,9 @@ test("the guild directory sorts from its headers, reads well on a phone and keep
     expect(table).toContain("US Normal · Alliance · 1 of 12 read · ilvl 30");
     expect(table).toContain('<a href="/armory/us/guilds/star-watch" class="dir-name">Star Watch</a>');
     expect(table).toContain('<tr class="dt-tr">');
+    // QA round 15: Last read in the site's day form, not 2026-11-19.
+    expect(table).toContain("Nov 19, 2026");
+    expect(table).not.toContain("2026-11-19");
   } finally { directory.recruiting = false; }
 });
 

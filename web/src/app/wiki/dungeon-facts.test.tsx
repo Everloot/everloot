@@ -57,7 +57,7 @@ test("a storage failure replaces recorded sections with an unknown-data notice",
 
 test("recorded panels date the corpus snapshot so older observations are not presented as launch-day play", () => {
   const html = renderToStaticMarkup(<DungeonRecordedFacts records={{ loot: [], quests: [], unavailable: false, dataAsOf: "2026-10-22T01:30:27.923Z" }} />);
-  expect(html).toContain("Corpus snapshot: 2026-10-22");
+  expect(html).toContain("Corpus snapshot: Oct 22, 2026");
   expect(html).toContain("Recorded observations may be from earlier builds");
 });
 

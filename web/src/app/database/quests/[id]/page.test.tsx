@@ -57,7 +57,7 @@ test("a catalog chain links its ordered previous and next quests with source and
   expect(fact(out, "Chain")).toContain('href="/database/quest-chains/900"');
   expect(fact(out, "Chain")).toContain("Found in game files, unconfirmed");
   expect(fact(out, "Chain")).toContain("0 of 3 installs reported");
-  expect(fact(out, "Chain")).toContain("2026-11-25");
+  expect(fact(out, "Chain")).toContain("Nov 25, 2026");
   expect(fact(out, "Previous quest")).toContain('href="/database/quests/7"');
   expect(fact(out, "Next quest")).toContain('href="/database/quests/9"');
 });
@@ -78,7 +78,7 @@ test("zone needs an agreed giver and three installs placing it, with source and 
   expect(zone).toContain('href="/database/zones/1429-elwynn-forest"');
   expect(zone).toContain("Player reports");
   expect(zone).toContain("3 of 3 installs agree");
-  expect(zone).toContain("2026-11-10");
+  expect(zone).toContain("Nov 10, 2026");
 });
 
 test("chain boundaries do not invent previous or next quests", async () => {
