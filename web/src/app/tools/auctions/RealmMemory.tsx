@@ -2,6 +2,7 @@
 
 import Link from "@/components/Link";
 import { useEffect, useState } from "react";
+import { RealmName } from "./RealmName";
 
 /**
  * The realm and house this browser last chose in any realm and house picker, as JSON:
@@ -71,7 +72,7 @@ export default function RealmMemory({ realm, name, house, known, houses, mode, l
   const href = `${linkBase}/${encodeURIComponent(offer.realm)}${offer.house ? `?house=${offer.house}` : ""}`;
   return (
     <p data-realm-memory className="text-meta text-fg-2">
-      Your last realm: <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{offer.name}</Link>
+      Your last realm: <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={offer.name} /></Link>
     </p>
   );
 }

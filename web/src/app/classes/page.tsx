@@ -43,6 +43,8 @@ const columns: Column<Row>[] = [
 /** The nine classes, each linked to its hub with the reviewed guides it lists. No class is put first. */
 export default function ClassesPage() {
   const list = rows();
+  // No column of nine dashes while no class has a reviewed guide.
+  const none = list.every((r) => r.guides === 0);
   return (
     <Container>
       <PageHeader
@@ -51,8 +53,8 @@ export default function ClassesPage() {
         lede="The nine WoW: Forever classes, each linked to its page: its talent calculator, the races that can play it and the database pages to plan with."
       />
       <RememberedClass />
-      <DataTable caption="WoW: Forever classes" columns={columns} rows={list} rowKey={(r) => r.slug} />
-      {list.every((r) => r.guides === 0) && <div className="mt-3"><GuidesEmpty /></div>}
+      <DataTable caption="WoW: Forever classes" columns={none ? columns.filter((c) => c.key !== "guides") : columns} rows={list} rowKey={(r) => r.slug} />
+      {none && <div className="mt-3"><GuidesEmpty /></div>}
     </Container>
   );
 }

@@ -77,6 +77,23 @@ test("contribution attribution is a separate unchecked choice after a durable up
   expect(container.textContent).toContain("does not mean this character authored every record");
 });
 
+test("the sample fills the preview but cannot be sent, and says so", async () => {
+  await click("Load sample");
+  expect(container.textContent).toContain("Preview — selected records to send");
+  expect(container.textContent).toContain("npc_sighting");
+  expect(container.textContent).toContain("This is a sample, to show what an upload holds. It is never sent. Choose your own file to upload.");
+  const sendButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Samples are not sent")!;
+  expect(sendButton.disabled).toBe(true);
+  await act(async () => sendButton.click());
+  expect(send).not.toHaveBeenCalled();
+  // A real file afterwards can be sent as before.
+  await load(1);
+  expect(container.textContent).not.toContain("This is a sample");
+  send.mockResolvedValueOnce(accepted());
+  await click("Send upload");
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
 test("a file without its own character key stays anonymous and explains the limit", async () => {
   await load(1); send.mockResolvedValueOnce(accepted()); await click("Send upload");
   expect(container.textContent).toContain("This file has no matching character key for attribution");

@@ -4,12 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false }));
+const observed = vi.hoisted(() => ({ edges: [] as unknown[] }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => facts,
   loadReportedItemFacts: async () => ({ shown: [], contested: [], progress: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadCraftedItems: async () => ({ items: new Set<number>(), unreachable: false }),
-  loadObservedEdges: async () => ({ edges: [], unreachable: false, dataAsOf: null }),
+  loadObservedEdges: async () => ({ edges: observed.edges, unreachable: false, dataAsOf: null }),
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, unreachable: false, dataAsOf: null }),
 }));
 vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable" }));
@@ -26,6 +27,7 @@ import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subc
 import ItemsPage from "./page";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY } from "@/lib/items";
+import { slotOf } from "@kb/item-taxonomy";
 import { PER_PAGE } from "../list-parts";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
 
@@ -123,6 +125,19 @@ test("filtered, sorted and searched views are noindex with the plain category as
   expect((await allMetadata({ searchParams: Promise.resolve({ page: "3" }) })).alternates?.canonical).toBe("/database/items?page=3");
 });
 
+// QA round 13: Plate filtered to feet read "Plate (Armor): 134 Items", as if the 134 were every plate item.
+test("a category title with a slot filter names the slot", async () => {
+  const feet = await subclassMetadata(sub("armor", "plate", { slot: "feet" }));
+  expect(feet.title).toMatch(/^WoW Forever Plate Feet \(Armor\): [\d,]+ Items?$/);
+  expect(String(feet.description)).toMatch(/^All [\d,]+ Plate Feet \(Armor\) items in WoW: Forever/);
+  const two = await subclassMetadata(sub("armor", "plate", { slot: "hands,feet" }));
+  expect(two.title).toMatch(/^WoW Forever Plate (?:Hands and Feet|Feet and Hands) \(Armor\): [\d,]+ Items?$/);
+  expect((await subclassMetadata(sub("armor", "plate"))).title).toMatch(/^WoW Forever Plate \(Armor\): [\d,]+ Items$/);
+  // The heading names the slot as the title does.
+  expect(await html(SubclassPage(sub("armor", "plate", { slot: "feet" })))).toMatch(/<h1[^>]*>Plate Feet<\/h1>/);
+  expect(await html(SubclassPage(sub("armor", "plate")))).toMatch(/<h1[^>]*>Plate<\/h1>/);
+});
+
 test("category titles lead with WoW Forever and the item count; descriptions carry no build or source wording", async () => {
   const weapons = CLIENT_TAXONOMY.classes.find((c) => c.slug === "weapons")!;
   const m = await generateMetadata(props("weapons"));
@@ -212,14 +227,15 @@ test("the Source column and filter: reported items show where they come from, th
     // Only the reported item has a source; the rest of the page shows a dash.
     expect(all.match(/>Drop<\/td>/g)).toHaveLength(1);
     expect(all).toContain(">Source</a></th>");
-    // The column shows wherever the Source menu does: a page or a filtered result with no reported row keeps it, so it
-    // does not come and go from page to page or vanish under a filter (?quality=epic with a Source menu and no column).
+    // The column is read over the category: a page or a filtered result with no reported row keeps it, so it does not
+    // come and go from page to page or vanish under a filter.
     if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).toContain(">Source</a></th>");
     expect(await html(SubclassPage(sub("armor", "cloth", { q: "#" + plain })))).toContain(">Source</a></th>");
     const epic = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === 1 && r[4] === 4);
     if (epic && epic[0] !== dropped) {
       const filtered = await html(SubclassPage(sub("armor", "cloth", { quality: "epic", unnamed: "1" })));
-      expect(filtered).toContain('data-filter="src"');
+      // The menu counts with the quality on (no epic cloth has a source, so it has nothing to offer); the column stays.
+      expect(filtered).not.toContain('data-filter="src"');
       expect(filtered).toContain(">Source</a></th>");
     }
     // A category where no item has a source has neither the menu nor the column.
@@ -266,6 +282,60 @@ test("a quality filter with no sort chosen lists by item level, highest first; a
   expect(await html(items({ quality: "epic", sort: "name" }))).toMatch(/aria-sort="ascending"[^>]*>(?:<[^>]*>)*Name/);
 });
 
+test("a quality filter's item-level order is named above the list, so a phone (name column only) sees it too", async () => {
+  expect(await html(items({ quality: "epic" }))).toMatch(/data-sort-note[^>]*>Sorted by item level, highest first\./);
+  for (const search of [{}, { quality: "epic", sort: "name" }, { slot: "feet" }] as Record<string, string>[]) {
+    expect(await html(items(search)), JSON.stringify(search)).not.toContain("data-sort-note");
+  }
+});
+
+test("each menu counts what the list would hold with every other filter on (faceted counts)", async () => {
+  const T = CLIENT_TAXONOMY;
+  const count = (page: string, menu: string, label: string) => {
+    const part = page.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const m = new RegExp(`>${label}</span><span class="tabular-nums text-muted">([\\d,]+)<`).exec(part);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  const isEpic = (r: (typeof T.items)[number]) => r[4] === 4;
+  const isFeet = (r: (typeof T.items)[number]) => slotOf(r[3])?.slug === "feet";
+  const epic = await html(items({ quality: "epic" }));
+  // The Slot and Class menus honour the quality; the Quality menu ignores its own filter.
+  expect(count(epic, "slot", "Feet")).toBe(T.items.filter((r) => isEpic(r) && isFeet(r)).length);
+  expect(count(epic, "class", "All classes")).toBe(T.items.filter(isEpic).length);
+  const armor = T.classes.find((c) => c.slug === "armor")!;
+  expect(count(epic, "class", "Armor")).toBe(T.items.filter((r) => isEpic(r) && r[1] === armor.id).length);
+  expect(count(epic, "quality", "Rare")).toBe(T.items.filter((r) => r[4] === 3).length);
+  // Two filters: each menu counts with the other one on.
+  const both = await html(items({ quality: "epic", slot: "feet" }));
+  expect(count(both, "quality", "Epic")).toBe(T.items.filter((r) => isEpic(r) && isFeet(r)).length);
+  expect(count(both, "slot", "Chest")).toBe(T.items.filter((r) => isEpic(r) && ["chest"].includes(slotOf(r[3])?.slug ?? "")).length);
+  // A class page's Type menu counts its types with the filters on.
+  const cloth = T.subclasses.find((s) => s.classId === armor.id && s.slug === "cloth")!;
+  const armorEpic = await html(ItemPage(props("armor", { quality: "epic" })));
+  expect(count(armorEpic, "type", "Cloth")).toBe(T.items.filter((r) => isEpic(r) && r[1] === armor.id && r[2] === cloth.id).length);
+});
+
+test("a vendor's zone column names released zones only; a zone held back from the site is a dash, never a raw id", async () => {
+  const seen = { evidence: "observed", build: null, installs: 4, firstSeen: "2026-11-20T00:00:00.000Z", lastSeen: "2026-11-25T00:00:00.000Z" };
+  const itemId = CLIENT_TAXONOMY.items[0][0];
+  observed.edges = [
+    { ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900001 },
+    { ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900002 },
+    // 2548 is a zone map.json holds back (heldBackZones); 1411 is Durotar, a released zone with a page.
+    { ...seen, fromKind: "npc", fromId: 900001, rel: "located_in", toKind: "zone", toId: 2548 },
+    { ...seen, fromKind: "npc", fromId: 900002, rel: "located_in", toKind: "zone", toId: 1411 },
+  ];
+  try {
+    const page = await html(ItemPage(props(String(itemId))));
+    expect(page).toContain(">Zone<");
+    expect(page).toContain(">Durotar</a>");
+    expect(page).not.toMatch(/zone 2548/i);
+    expect(page).not.toContain("Riverglades");
+  } finally {
+    observed.edges = [];
+  }
+});
+
 test("development leftovers are out of a list by default, counted honestly, and one click or an id brings them back", async () => {
   const cloth = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
   const [dev, real] = cloth;
@@ -280,7 +350,9 @@ test("development leftovers are out of a list by default, counted honestly, and 
     expect(list).toContain(`>${(total - 1).toLocaleString("en-US")}</span> items`);
     expect(list).toContain("Show 1 development leftover");
     expect(list).toContain('href="/database/items/armor/cloth?dev=1&amp;unnamed=1"');
-    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
+    // The plain list folds the unnamed items away, so its title counts the one named item it shows.
+    expect(String((await subclassMetadata(sub("armor", "cloth"))).title)).toMatch(/: 1 Item$/);
+    expect(String((await subclassMetadata(sub("armor", "cloth", { unnamed: "1" }))).title)).toContain(`${(total - 1).toLocaleString("en-US")} Items`);
     // Asked for, the leftover is listed and the control turns around; the view is its own URL and stays out of search.
     const all = await html(SubclassPage(sub("armor", "cloth", { dev: "1", unnamed: "1" })));
     expect(all).toContain("Deprecated Cloth Cap");
@@ -469,4 +541,67 @@ test("with upload storage out of reach, an item page and the item lists are mark
   } finally {
     facts.unreachable = false;
   }
+});
+
+test("the Slot menu lists the slots in the character window's order, head to feet, then the weapons", async () => {
+  const labels = (page: string) => [...(page.split('data-filter="slot"')[1]?.split("</details>")[0] ?? "").matchAll(/class="fm-lbl[^"]*">([^<]+)</g)].map((m) => m[1]);
+  const order = ["Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket",
+    "Main Hand", "One-Hand", "Two-Hand", "Off Hand", "Shield", "Held In Off-hand", "Ranged", "Thrown", "Ammo", "Quiver", "Relic", "Bag"];
+  for (const page of [await html(items()), await html(ItemPage(props("weapons"))), await html(ItemPage(props("armor")))]) {
+    const shown = labels(page);
+    expect(shown.length).toBeGreaterThan(1);
+    expect(shown.every((s) => order.includes(s)), shown.join(", ")).toBe(true);
+    expect(shown).toEqual([...shown].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+  }
+});
+
+test("a category's title counts what its list shows: the same filters, the unnamed items folded away the same", async () => {
+  const plate = CLIENT_TAXONOMY.subclasses.find((s) => s.classId === 4 && s.slug === "plate")!;
+  const ids = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === plate.id).map((r) => r[0]);
+  const feet = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === plate.id && slotOf(r[3])?.slug === "feet")![0];
+  // Three named plate items, one of them boots: the lists fold the rest away as unnamed.
+  facts.names = [...ids.slice(0, 2), feet].flatMap((itemId) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Plate ${itemId}` })));
+  const shown = (page: string) => /([\d,]+)<\/span> items?</.exec(page)?.[1];
+  try {
+    for (const [meta, page] of [
+      [await generateMetadata(props("armor")), await html(ItemPage(props("armor")))],
+      [await subclassMetadata(sub("armor", "plate")), await html(SubclassPage(sub("armor", "plate")))],
+      [await subclassMetadata(sub("armor", "plate", { slot: "feet" })), await html(SubclassPage(sub("armor", "plate", { slot: "feet" })))],
+    ] as const) {
+      const count = shown(page);
+      expect(count).toBeDefined();
+      expect(String(meta.title)).toMatch(new RegExp(`: (All )?${count} Items?$`));
+      expect(String(meta.description)).toContain(`All ${count} `);
+    }
+  } finally {
+    facts.names = [];
+  }
+});
+
+// QA round 13: the Sold by tab said "last seen 43 h ago" over rows saying "last seen 2026-11-26". Rows give the day in
+// the site's day form; the line above keeps its relative time only beside the absolute one in its title.
+test("an item's Sold by rows give the day as Nov 25, 2026, and the line above pairs its relative time with the absolute one", async () => {
+  const seen = { evidence: "observed", build: null, installs: 4, firstSeen: "2026-11-20T00:00:00.000Z", lastSeen: "2026-11-25T03:11:00.000Z" };
+  const itemId = CLIENT_TAXONOMY.items[0][0];
+  observed.edges = [{ ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900001 }];
+  try {
+    const page = await html(ItemPage(props(String(itemId))));
+    expect(page).toContain("4 installs, last seen Nov 25, 2026");
+    expect(page).not.toContain("last seen 2026-11-25");
+    expect(page).toMatch(/last seen <time dateTime="2026-11-25T03:11:00.000Z" title="Nov 25, 2026, 03:11 UTC">[^<]+ ago<\/time>/);
+  } finally {
+    observed.edges = [];
+  }
+});
+
+test("on a phone the active filters show under the Filters button as chips, each a link that drops that filter alone", async () => {
+  const page = await html(SubclassPage(sub("armor", "plate", { slot: "feet", quality: "epic" })));
+  const row = /<p data-filter-chips[^>]*>([\s\S]*?)<\/p>/.exec(page);
+  expect(row).not.toBeNull();
+  // Shown below 640 px only: from there the menus show their own choices.
+  expect(row![0]).toMatch(/class="[^"]*sm:hidden/);
+  expect(row![1]).toMatch(/<a href="\/database\/items\/armor\/plate\?quality=epic"[^>]*>Feet<span aria-hidden="true">×<\/span><span class="sr-only">\(remove\)<\/span><\/a>/);
+  expect(row![1]).toMatch(/<a href="\/database\/items\/armor\/plate\?slot=feet"[^>]*>Epic<span aria-hidden="true">×/);
+  const plain = await html(SubclassPage(sub("armor", "plate")));
+  expect(plain).not.toContain("data-filter-chips");
 });

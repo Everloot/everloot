@@ -11,8 +11,11 @@ export interface FilterOption {
 }
 
 export type FilterControl =
-  /** A dropdown button. `multi` draws a box before each option (several can be on at once). */
-  | { type: "menu"; key: string; label: string; options: FilterOption[]; multi?: boolean }
+  /**
+   * A dropdown button. `multi` draws a box before each option (several can be on at once). `note` is a plain line
+   * under the choices, not one itself: "Not recorded: 2,829", the rows no option holds.
+   */
+  | { type: "menu"; key: string; label: string; options: FilterOption[]; multi?: boolean; note?: string }
   /** A yes-only filter: on or off ("Crafted"). */
   | { type: "toggle"; key: string; label: string; href: string; on: boolean };
 
@@ -65,6 +68,7 @@ function Menu({ c: given, rel }: { c: Extract<FilterControl, { type: "menu" }>; 
             </Link>
           </li>
         ))}
+        {c.note && <li className="px-2 py-1.5 text-meta text-muted">{c.note}</li>}
       </ul>
     </details>
   );
@@ -87,8 +91,8 @@ function Controls({ search, controls, active, clearHref, nofollow }: FilterBarPr
             placeholder={search.placeholder}
             className={`ctl w-full min-w-0 border bg-panel px-3 text-fg placeholder:text-muted focus:border-accent focus:outline-none sm:w-44 ${search.value ? "border-accent" : "border-edge"}`}
           />
-          {/* Enter in the field submits; out of the tab order, so focus never lands on a ring around nothing. */}
-          <button type="submit" tabIndex={-1} className="sr-only">Filter</button>
+          {/* Enter in the field submits; the button beside it does the same for a mouse, and Tab reaches it. */}
+          <button type="submit" className={`${control} ${idle} ml-1 shrink-0 bg-panel focus-visible:border-accent`}>Filter</button>
         </form>
       )}
       {controls.map((c) => c.type === "menu"

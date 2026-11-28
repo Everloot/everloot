@@ -8,7 +8,7 @@ import { loadObjectFacts, OBJECT_KIND_LABELS, objectTraits, type ObjectTraits } 
 import { objectNames } from "@/lib/names";
 import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
-import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, plural, pageParams, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
 const META = {
   title: "WoW Forever objects: chests, herbs and ore",
@@ -113,7 +113,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
             rowKey={(o) => String(o.objectId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(o) => [kindOf(o), zoneOf(o), `${o.windows} loot windows · ${o.items} items · ${o.reporters} install IDs`].filter(Boolean).join(" · ")}
+            meta={(o) => [kindOf(o), zoneOf(o), `${plural(o.windows, "loot window")} · ${plural(o.items, "item")} · ${plural(o.reporters, "install ID")}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         </div>

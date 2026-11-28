@@ -105,7 +105,7 @@ test("every page stays out of search engines and carries the credit line", async
   for (const page of [() => pages.hub(), () => pages.character("eu", "velkara-duskmantle"), () => pages.guild("eu", "ember-wardens"), () => pages.board("item-level"), () => pages.hide(), () => pages.submit()]) {
     const out = await html(page());
     expect(out).toContain(BLIZZARD_CREDIT);
-    expect(out).toMatch(/Read 2026-11-09 \d\d:\d\d UTC/);
+    expect(out).toMatch(/Read Nov 9, 2026, \d\d:\d\d UTC/);
   }
 });
 
@@ -117,7 +117,7 @@ describe("the character page", () => {
     expect(out).toContain("Level 60 Troll Hunter");
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Last login");
-    expect(out).toMatch(/Last read<\/dt><dd[^>]*><time dateTime="2026-11-09T10:00:00.000Z" title="Read 2026-11-09 10:00 UTC"/);
+    expect(out).toMatch(/Last read<\/dt><dd[^>]*><time dateTime="2026-11-09T10:00:00.000Z" title="Read Nov 9, 2026, 10:00 UTC"/);
     expect(out).toContain('role="tablist"');
     // QA round 9: on a phone the eight tabs wrap onto a second line instead of hiding five past the edge.
     expect(out).toMatch(/<div[^>]*class="[^"]*\bflex-wrap\b[^"]*"[^>]*role="tablist"/);
@@ -131,7 +131,7 @@ describe("the character page", () => {
     expect(out).toContain("text-q-epic");
     expect(out).toContain("Main hand");
     expect(out).toContain('href="/armory/hide?region=eu&amp;name=Velkara&amp;surname=Duskmantle"');
-    expect(out).toContain("Read 2026-11-09 10:00 UTC");
+    expect(out).toContain("Read Nov 9, 2026, 10:00 UTC");
   });
 
   test("a rank shared with others says how many, and a rank read without a tie count reads as before", async () => {
@@ -224,7 +224,7 @@ describe("the character page", () => {
         ["Achievements", "3"], ["Quests completed", "4"], ["Last read", "3 days ago"],
       ]);
       // The exact read time stays one hover away.
-      expect(strip).toContain('title="Read 2026-11-09 10:00 UTC"');
+      expect(strip).toContain('title="Read Nov 9, 2026, 10:00 UTC"');
     });
 
     test("a visible line under the facts says what the item levels and Gear Score are, for phones that never hover", async () => {
@@ -528,14 +528,14 @@ describe("the guild page", () => {
     expect(out).toMatch(/>Horde<\/span> guild/);
     expect(out).toMatch(/>EU<\/span>Normal/);
     expect(out).toContain("3 members");
-    expect(out).toContain("2026-10-01");
+    expect(out).toContain("Oct 1, 2026");
     expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
     expect(out).not.toContain('href="/armory/eu/brannoc-tide"');
     expect(roster(out).indexOf("Brannoc")).toBeLessThan(roster(out).indexOf("Velkara"));
     expect(out).toContain("text-class-hunter");
     expect(out).toContain(">Unknown<");
     expect(out).toContain("57.41");
-    expect(out).toContain("Read 2026-11-09 09:00 UTC");
+    expect(out).toContain("Read Nov 9, 2026, 09:00 UTC");
   });
 
   test("a hidden member leaves the roster; an unknown guild is a 404; storage out of reach says so", async () => {
@@ -577,7 +577,7 @@ describe("the boards", () => {
     expect(out).toContain('href="/armory/eu/torvin-ashbrook"');
     expect(out).toContain('href="/armory/rankings/item-level?ruleset=15"');
     expect(out).toContain('href="/armory/rankings/honorable-kills"');
-    expect(out).toContain("Read 2026-11-09 11:30 UTC");
+    expect(out).toContain("Read Nov 9, 2026, 11:30 UTC");
     expect(await html(pages.board("gear-score"))).not.toContain("Torvin");
     expect(await html(pages.board("item-level", { region: "us" }))).toContain("No characters with item level read on US realms yet.");
     await expect(pages.board("dps")).rejects.toThrow("NEXT_NOT_FOUND");
@@ -641,7 +641,7 @@ describe("the hub", () => {
     expect(out).toContain('href="/players"');
     expect(out).toContain('href="/guilds"');
     expect(out).not.toContain('role="search"');
-    expect(out).toContain("Read 2026-11-09 11:30 UTC");
+    expect(out).toContain("Read Nov 9, 2026, 11:30 UTC");
     holder.store = broken();
     expect(await html(pages.hub())).toContain(STORAGE_UNREACHABLE);
   });

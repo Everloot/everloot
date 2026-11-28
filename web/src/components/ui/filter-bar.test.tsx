@@ -270,3 +270,49 @@ test("a dropdown choice is a 44 px tap target on a phone and keeps the dense 32 
   expect(rule).toContain("sm:min-h-8");
   expect(rule).not.toContain("min-h-8");
 });
+
+// QA round 12: Tab past the last choice of an open Class menu moved focus to Slot while the Class list stayed open
+// over "Sort" and the "Not listed" line.
+test("tabbing out of an open dropdown closes it; focus moving within it, or Escape, keeps the old behaviour", async () => {
+  const quality = menu("quality");
+  const klass = menu("class");
+  open(quality);
+  const [epic, rare] = quality.querySelectorAll("a");
+  await act(async () => epic.focus());
+  await act(async () => rare.focus());
+  expect(quality.open).toBe(true);
+  await act(async () => summaryOf(klass).focus());
+  expect(quality.open).toBe(false);
+  // Focus leaving for another field on the page closes it too.
+  open(quality);
+  await act(async () => rare.focus());
+  await act(async () => container.querySelector<HTMLInputElement>("#elsewhere-field")!.focus());
+  expect(quality.open).toBe(false);
+  expect(container.querySelector<HTMLDetailsElement>("#elsewhere")!.open).toBe(true);
+});
+
+test("the window losing focus leaves an open dropdown open", async () => {
+  const quality = menu("quality");
+  open(quality);
+  const link = quality.querySelector("a")!;
+  await act(async () => link.focus());
+  await act(async () => { link.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null })); });
+  expect(quality.open).toBe(true);
+});
+
+// QA round 13: the button showed only under keyboard focus, so a mouse user on /database/achievements never saw it.
+test("the name box's Filter button is in the tab order and always shown", () => {
+  const html = renderToStaticMarkup(<FilterBar {...props} />);
+  const button = html.match(/<button type="submit"[^>]*>Filter<\/button>/)![0];
+  expect(button).not.toContain("tabindex");
+  expect(button).not.toMatch(/\bsr-only\b/);
+  expect(button).toMatch(/class="[^"]*\bborder\b/);
+});
+
+test("a menu's note is a plain line under its choices, not a link, and a menu without one draws none", () => {
+  const withNote: FilterBarProps = { ...props, controls: [{ ...props.controls[0] as Extract<FilterBarProps["controls"][number], { type: "menu" }>, note: "Not recorded: 2,829" }] };
+  const html = renderToStaticMarkup(<FilterBar {...withNote} />);
+  expect(html).toMatch(/<li class="[^"]*"[^>]*>Not recorded: 2,829<\/li><\/ul>/);
+  expect(html).not.toMatch(/<a[^>]*>[^<]*Not recorded/);
+  expect(renderToStaticMarkup(<FilterBar {...props} />)).not.toContain("Not recorded");
+});

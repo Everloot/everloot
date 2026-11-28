@@ -15,6 +15,7 @@ import QuestChainFlow from "@/components/QuestChainFlow";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "@kb/edges";
 import { EntityPage, LINK, Unreachable } from "../../entity";
+import { plural } from "../../list-parts";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -58,13 +59,14 @@ export default async function QuestChainPage(props: Props) {
   const startName = known.startNpcId !== null && world ? npcNames(world).get(known.startNpcId) : undefined;
   // A chain cut at 80 quests has more than it lists.
   const count = entry ? `${entry.questIds.length}${entry.truncated ? "+" : ""}` : "";
+  const questCount = !entry ? null : entry.truncated ? `${count} quests` : plural(entry.questIds.length, "quest");
   // The page in a few lines: what it is, who reported it and when, and where the name came from. A chain only the
   // files list carries the files' name, so its name line says so rather than "no agreed name".
   const asOf = asOfLine(catalog?.dataAsOf ?? null, Date.now());
   const [what, observed, name] = entry ? entitySummary({
     identity: entry.truncated
       ? `A quest chain in WoW: Forever of more than ${entry.questIds.length} quests; the first ${entry.questIds.length} are listed.`
-      : `A quest chain in WoW: Forever of ${entry.questIds.length} ${entry.questIds.length === 1 ? "quest" : "quests"}.`,
+      : `A ${entry.questIds.length === 1 ? "one" : entry.questIds.length}-quest chain in WoW: Forever.`,
     observed: entry.confirmed
       ? `Players reported it, three installs agreeing${asOf ? ` (${asOf})` : ""}.`
       : catalog?.confirmations
@@ -81,8 +83,8 @@ export default async function QuestChainPage(props: Props) {
     <EntityPage
       name={title}
       jsonLd={entry && { name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` }}
-      header={{ trail, title, meta: ["Quest chain", entry ? `${count} quests` : null, known.levels ? `Level ${levelRange(known.levels)}` : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
-      box={entry && <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{count} quests</p></TooltipFrame>}
+      header={{ trail, title, meta: ["Quest chain", questCount, known.levels ? `Level ${levelRange(known.levels)}` : null, <span key="id" className="tabular-nums">ID {id}</span>] }}
+      box={entry && <TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`}><p>{questCount}</p></TooltipFrame>}
       facts={entry && [
         { label: "Quests", value: count, numeric: true },
         ...(known.levels ? [{ label: "Levels", value: levelRange(known.levels), numeric: true }] : []),

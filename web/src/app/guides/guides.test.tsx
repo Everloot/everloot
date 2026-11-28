@@ -521,6 +521,31 @@ describe("the guide index", () => {
     expect(visible(html)).toContain("Community-sourced checklist, unverified in Forever");
     expect(dom(html).querySelectorAll('[data-guide="darkmoon-faire"]')).toHaveLength(0);
   });
+
+  // QA round 13: the community checklist sat above "No guide is reviewed yet.", which read as a contradiction.
+  test("with no reviewed guide, the empty line comes first and the community checklist follows under its own heading", async () => {
+    const html = await index();
+    const empty = html.indexOf("No guide is reviewed yet.");
+    const community = html.indexOf('href="/guides/darkmoon-faire"');
+    expect(empty).toBeGreaterThan(-1);
+    expect(community).toBeGreaterThan(empty);
+    const section = dom(html).querySelector('a[href="/guides/darkmoon-faire"]')!.closest("section")!;
+    expect(section.querySelector("h2")?.textContent).toBe("Community reference");
+  });
+
+  test("with no reviewed guide, nothing promises a list of them: no 'guides below', no 'Everloot's reviewed guides' lede", async () => {
+    const empty = visible(await index());
+    expect(empty).not.toMatch(/\bbelow\b/);
+    expect(empty).not.toContain("Everloot's reviewed guides, each");
+    expect(empty).toContain("No guide is reviewed yet.");
+    // QA round 12: "Each is reviewed before it is listed here" beside "No guide is reviewed yet." implied a list.
+    expect(empty).not.toContain("Each is reviewed before it is listed here");
+    expect(empty).toContain("Guides appear here once reviewed.");
+    stubGuides(SOME);
+    const listed = visible(await index());
+    expect(listed).toContain("Everloot's reviewed guides, each a talent plan for one class");
+    expect(listed).not.toMatch(/\bbelow\b/);
+  });
   const listed = (html: string) => [...dom(html).querySelectorAll("[data-guide]")].map((li) => li.getAttribute("data-guide"));
 
   test("lists the published guides by class with the state of any that is not current, never a draft; an empty index says so and stays out of search", async () => {

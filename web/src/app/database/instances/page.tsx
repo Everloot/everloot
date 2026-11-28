@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import ArtThumb from "@/components/game/ArtThumb";
 import { Badge, Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, stripBelow } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { bossRows, compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, type InstanceRow } from "@/lib/instances";
+import { bossRows, compareInstances, instanceHref, instanceRows, instanceTitle, levelLabel, loadInstanceSightings, type InstanceRow } from "@/lib/instances";
 import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -43,7 +43,7 @@ const FILES_NAME = "The game files place no entrance for this instance and 3 ins
 export default async function InstancesPage(props: { searchParams?: Promise<Search> }) {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
-  const seen = await loadSightings();
+  const seen = await loadInstanceSightings();
   const all = [...instanceRows(seen.unreachable ? {} : seen).values()];
   // The box takes a name or an id: an instance with no name yet is found by its number.
   const text = q.q?.toLowerCase();

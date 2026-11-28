@@ -111,17 +111,34 @@ test("facts nobody has reported fold into one Not yet reported row with a single
       { label: "Type", value: known(undefined) },
       { label: "Rank", value: known(null, 2) },
       { label: "Zone", value: known("") },
+      { label: "XP", value: known(null) },
     ],
   }));
   const rows = [...html.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((m) => m[1]);
   // Rank has 2 of 3 installs: its own meter says so, so it keeps its row.
   expect(rows).toEqual(["Reported name", "Rank", "Not yet reported"]);
   expect(html.match(/data-agreement="0"/g)).toHaveLength(1);
-  // The labels are a left-aligned list under the row's label, one item each, not a right-aligned run that wraps.
+  // The labels are one left-aligned line of plain text under the row's label, never chips that read as buttons.
   const row = /<div([^>]*)><dt[^>]*>Not yet reported<\/dt><dd([^>]*)>(.*?)<\/dd>/.exec(html);
   expect(row?.[2]).not.toContain("text-right");
   expect(row?.[1]).toContain("flex-col");
-  expect([...(row?.[3] ?? "").matchAll(/<li[^>]*>([^<]*)<\/li>/g)].map((m) => m[1])).toEqual(["Level", "Type", "Zone"]);
+  expect(row?.[3]).not.toMatch(/<li|rounded-full/);
+  expect(row?.[3]).toMatch(/>level, type, zone, XP<\/span>/);
+});
+
+test("a folded Reported title or name reads as plain title or name, never 'Not yet reported … reported title'", () => {
+  const html = renderToStaticMarkup(EntityPage({
+    name: "Quest 5441",
+    header: { trail: [], title: "Quest 5441" },
+    facts: [
+      { label: "Reported title", value: known(null) },
+      { label: "Category", value: known(null) },
+      { label: "Zone", value: known(null) },
+    ],
+  }));
+  const row = /<dt[^>]*>Not yet reported<\/dt><dd[^>]*>(.*?)<\/dd>/.exec(html);
+  expect(row?.[1]).toMatch(/>title, category, zone<\/span>/);
+  expect(row?.[1]).not.toMatch(/reported/i);
 });
 
 test("quest and boss pages draw no box that would only repeat their header", async () => {

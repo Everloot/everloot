@@ -2,7 +2,7 @@ import GuildProgressionBoard from "@/components/progression/GuildProgressionBoar
 import type { GuildProgressionRank } from "@/lib/progression";
 import Link from "@/components/Link";
 import { Card, DataTable, LinkTabs, SectionHeading, Tooltip, type Column } from "@/components/ui";
-import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryBoardHref, GEAR_SCORE_HINT, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
+import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, armoryBoardHref, GEAR_SCORE_HINT, armoryCharacterPath, armoryGuildPath, metricValue, readAt, readLine, regionLabel, type ArmoryMetric, type ArmoryRegion } from "@/lib/armory";
 import { guildDirectoryHref } from "@/lib/armory-guilds";
 import type { ArmoryBoardRow, ArmoryGuildRow } from "@/lib/armory-store";
 import { guildPath, LADDER_LINE, START_LINE, type RankedRow } from "@/lib/guilds";
@@ -64,7 +64,11 @@ export function CharacterBoards({ board, region }: { board: CharacterBoard; regi
 }
 
 function GuildItemLevel({ guild: g }: { guild: ArmoryGuildRow }) {
-  return g.averageItemLevel === null ? muted("Not read") : <Tooltip label={`Average item level: ${metricValue("item-level", g.averageItemLevel)}. Average of the guild members read. Read ${new Date(g.fetchedAt).toUTCString()}.`}>{metricValue("item-level", g.averageItemLevel)}</Tooltip>;
+  if (g.averageItemLevel === null) return muted("Not read");
+  const when = readAt(g.fetchedAt);
+  const value = metricValue("item-level", g.averageItemLevel);
+  const label = `Average item level ${value} across the members the armory has read${when ? ` (${when})` : `. ${readLine(g.fetchedAt)}`}.`;
+  return <Tooltip label={label}>{value}</Tooltip>;
 }
 
 const gearColumns: Column<ArmoryGuildRow>[] = [

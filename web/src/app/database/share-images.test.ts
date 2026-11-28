@@ -33,6 +33,7 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => ({ ...(await importOri
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => ({ unreachable: true, sightings: [], asOf: undefined }),
+  loadInstanceSightings: async () => ({ unreachable: true }),
 }));
 vi.mock("@/lib/og-card", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/og-card")>();

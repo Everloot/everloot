@@ -64,7 +64,9 @@ test("an unknown class or race id reads Unknown, never a guess", () => {
 });
 
 test("the read line and the figures", () => {
-  expect(readLine("2026-11-09T10:00:00Z")).toBe("Read 2026-11-09 10:00 UTC");
+  // QA round 12: one read-time format on /rankings and the armory boards, the board tooltips' "Nov 9, 2026, 10:00".
+  expect(readLine("2026-11-09T10:00:00Z")).toBe("Read Nov 9, 2026, 10:00 UTC");
+  expect(readLine("2026-11-23T00:05:00Z")).toBe("Read Nov 23, 2026, 00:05 UTC");
   expect(readLine(null)).toBe("Read time unrecorded");
   expect(metricValue("item-level", 57.413)).toBe("57.41");
   expect(metricValue("honorable-kills", 12345)).toBe("12,345");

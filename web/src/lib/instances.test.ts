@@ -4,8 +4,11 @@ import type { EncounterRow, InstanceEntranceRow } from "@kb/instances";
 
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
+vi.mock("./instance-facts-store", () => ({ loadStoredInstanceFacts: vi.fn() }));
 
-import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, difficultyList, entranceLinks, instanceHref, instanceQuests, instanceRows as rowsWith, levelLabel, parseInstanceSegment, statisticNames } from "./instances";
+import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, difficultyList, entranceLinks, instanceHref, instanceQuests, instanceRows as rowsWith, levelLabel, loadInstanceSightings, parseInstanceSegment, statisticNames } from "./instances";
+import { loadInstanceFacts, loadItemFacts } from "./rollup-compute";
+import { loadStoredInstanceFacts } from "./instance-facts-store";
 
 // The synthetic world has no encounter list of its own; the one test that merges the files' bosses hands one in.
 const instanceRows = (seen?: Parameters<typeof rowsWith>[0], data?: Parameters<typeof rowsWith>[1]) => rowsWith(seen, data, {});
@@ -285,5 +288,34 @@ describe("instanceQuests", () => {
     // A fourth install that filed it under another header is not one of the installs that agreed.
     expect(list[0]!.installs).toBe(3);
     expect(instanceQuests(facts, null)).toEqual([]);
+  });
+});
+
+describe("loadInstanceSightings", () => {
+  const entrance: InstanceEntranceRow = { installId: "invented-a", instanceMapId: 33, name: "Invented Keep", instanceType: "party", mapId: 1, x: 10, y: 20 } as InstanceEntranceRow;
+  test("with the stored instance facts, the boss and instance pages never read the aggregate set", async () => {
+    vi.mocked(loadInstanceFacts).mockClear(); vi.mocked(loadItemFacts).mockClear();
+    vi.mocked(loadStoredInstanceFacts).mockResolvedValue({ dataAsOf: "2026-11-20T00:00:00Z", instances: { entrances: [entrance], encounters: [] } });
+    const seen = await loadInstanceSightings();
+    expect(seen).toEqual({ instances: { entrances: [entrance], encounters: [] }, asOf: new Date("2026-11-20T00:00:00Z"), unreachable: false });
+    expect(loadInstanceFacts).not.toHaveBeenCalled();
+    expect(loadItemFacts).not.toHaveBeenCalled();
+  });
+  test("without the file they read the aggregates' instance facts, and never the item facts", async () => {
+    vi.mocked(loadInstanceFacts).mockClear(); vi.mocked(loadItemFacts).mockClear();
+    vi.mocked(loadStoredInstanceFacts).mockResolvedValue(null);
+    vi.mocked(loadInstanceFacts).mockResolvedValue({ entrances: [entrance], encounters: [], sightings: [], unreachable: false, dataAsOf: null });
+    expect(await loadInstanceSightings()).toEqual({ instances: { entrances: [entrance], encounters: [] }, unreachable: false });
+    expect(loadItemFacts).not.toHaveBeenCalled();
+    vi.mocked(loadInstanceFacts).mockResolvedValue({ entrances: [], encounters: [], sightings: [], unreachable: true, dataAsOf: null });
+    expect(await loadInstanceSightings()).toEqual({ unreachable: true });
+  });
+  test("a page that reads the aggregate set anyway takes the facts from it, not from a second file", async () => {
+    vi.mocked(loadStoredInstanceFacts).mockClear(); vi.mocked(loadItemFacts).mockClear();
+    vi.mocked(loadStoredInstanceFacts).mockResolvedValue({ dataAsOf: null, instances: { entrances: [], encounters: [] } });
+    vi.mocked(loadInstanceFacts).mockResolvedValue({ entrances: [entrance], encounters: [], sightings: [], unreachable: false, dataAsOf: null });
+    expect(await loadInstanceSightings({ fromAggregates: true })).toEqual({ instances: { entrances: [entrance], encounters: [] }, unreachable: false });
+    expect(loadStoredInstanceFacts).not.toHaveBeenCalled();
+    expect(loadItemFacts).not.toHaveBeenCalled();
   });
 });

@@ -117,5 +117,56 @@ test("a filter value the list does not know is a 404", async () => {
 
 test("under the title, the list says what its count holds: the quests players confirmed and the ones the files add", async () => {
   const header = (await html()).split("data-page-header")[1]?.split("</header>")[0] ?? "";
-  expect(header).toMatch(/1 confirmed by players · 1 more from the game files, titled by the Warcraft Wiki/);
+  expect(header).toMatch(/1 confirmed by players · 1 more from the game files, titled by the Warcraft Wiki where it has a title; others show their number/);
+});
+
+test("each quest menu counts what the list would hold with every other filter on", async () => {
+  store.wiki = null;
+  store.quests = [
+    quest({ questId: 301, title: "Quest Alpha", level: 5, category: "Synthetic Vale", side: "alliance" }),
+    quest({ questId: 303, title: "Quest Gamma", level: 25, category: "Synthetic Vale", side: "horde" }),
+    quest({ questId: 304, title: "Quest Delta", level: 5, category: "Synthetic Marsh", side: "horde" }),
+  ];
+  const menuCount = (out: string, menu: string, label: string) => {
+    const part = out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const at = part.split(`>${label}</span><span class="tabular-nums text-muted">`)[1];
+    return at === undefined ? null : Number(at.split("<")[0].replace(/,/g, ""));
+  };
+  const low = await html({ level: "1-10" });
+  expect(menuCount(low, "category", "Synthetic Vale")).toBe(1);
+  expect(menuCount(low, "side", "Horde")).toBe(1);
+  // The Level menu counts too, ignoring its own filter.
+  expect(menuCount(low, "level", "21–30")).toBe(1);
+  const horde = await html({ side: "horde", category: "Synthetic Vale" });
+  expect(menuCount(horde, "level", "1–10")).toBeNull();
+  expect(menuCount(horde, "side", "Alliance")).toBe(1);
+  expect(menuCount(horde, "category", "Synthetic Marsh")).toBe(1);
+});
+
+test("each quest menu notes the rows it cannot hold, those with no value recorded, counted with the other filters on", async () => {
+  store.wiki = null;
+  store.quests = [
+    quest({ questId: 301, title: "Quest Alpha", level: 5, category: "Synthetic Vale", side: "alliance" }),
+    quest({ questId: 303, title: "Quest Gamma", level: null, category: null, side: "horde" }),
+    quest({ questId: 304, title: "Quest Delta", level: null, category: null, side: null }),
+    quest({ questId: 305, title: "Quest Epsilon", level: 25, category: "Synthetic Vale", side: "horde" }),
+  ];
+  const note = (out: string, menu: string) => /<li class="[^"]*">(Not recorded: [\d,]+)<\/li>/.exec(out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "")?.[1] ?? null;
+  const all = await html();
+  expect(note(all, "level")).toBe("Not recorded: 2");
+  expect(note(all, "category")).toBe("Not recorded: 2");
+  expect(note(all, "side")).toBe("Not recorded: 1");
+  expect(all).toMatch(/>21–30<\/span><span class="tabular-nums text-muted">1</);
+  // With Side on, the Level menu counts only the Horde quests: one has no level.
+  expect(note(await html({ side: "horde" }), "level")).toBe("Not recorded: 1");
+  // Every row has a value: no note.
+  store.quests = [quest({ questId: 301, title: "Quest Alpha", level: 5, category: "Synthetic Vale", side: "alliance" })];
+  expect(note(await html(), "level")).toBeNull();
+});
+
+test("the Level menu has a top bracket for quests above level 60", async () => {
+  store.wiki = null;
+  store.quests = [quest({ questId: 301, title: "Quest Alpha", level: 5 }), quest({ questId: 302, title: "Quest Beta", level: 62 })];
+  const menu = (await html()).split('data-filter="level"')[1]?.split("</details>")[0] ?? "";
+  expect(menu).toMatch(/>61\+<\/span><span class="tabular-nums text-muted">1</);
 });

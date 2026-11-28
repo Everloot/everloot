@@ -22,6 +22,7 @@ vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.val
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
+  loadInstanceSightings: async () => state.seen,
 }));
 
 // The asset manifest: no art unless a test hands in loading screens.
@@ -529,6 +530,10 @@ test("with some bosses confirmed, In short counts them of the table's rows, Inst
     // The phone line under each pending boss says "Not confirmed yet"; the legend names that text as well as the dash.
     expect(text(bosses)).toContain("Not confirmed yet");
     expect(text(bosses)).toContain("Not confirmed yet, or — in a column, means 3 installs have not reported that boss yet.");
+    // The legend also names the hollow diamond beside a boss named by the game files, drawn as the rows draw it.
+    expect(pending.some((r) => r.includes('data-badge="files"'))).toBe(true);
+    expect(bosses).toMatch(/data-badge="files"(?:(?!<tr)[\s\S])*?<\/span><\/span> marks a name from the game files, not yet confirmed by players\./);
+    expect(bosses.lastIndexOf('data-badge="files"')).toBeGreaterThan(bosses.lastIndexOf("</table>"));
   } finally {
     state.seen = { unreachable: true };
   }

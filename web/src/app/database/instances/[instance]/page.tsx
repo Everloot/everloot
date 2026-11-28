@@ -5,7 +5,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, DataTable, Disclosure, filledColumns, reportedLabel, Tabs, type Column, type Fact, type SparseColumn, type TabItem } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";
 import {
-  bossRows, difficultyLabel, difficultyList, groupSizeLabel, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
+  bossRows, difficultyLabel, difficultyList, groupSizeLabel, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadInstanceSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceQuest, type InstanceRow,
 } from "@/lib/instances";
 import { entityTitle } from "@/lib/entity-meta";
@@ -21,7 +21,7 @@ import { agreedNpc } from "@kb/world-pages";
 import { loadRenders } from "@/lib/game-renders";
 import EntityLink from "@/components/EntityLink";
 import { loadingArt, loadItemSetNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import { EntityIcon } from "@/components/game/EntityIcon";
 import GameIcon from "@/components/game/GameIcon";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
@@ -51,7 +51,8 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean; asOf?: Date } | null> {
   const id = parseInstanceSegment(segment);
   if (id === null) return null;
-  const seen = await loadSightings();
+  // The page reads the aggregate set for its quests anyway (loadWorldFacts below): one file, not two.
+  const seen = await loadInstanceSightings({ fromAggregates: true });
   const row = instanceRows(seen.unreachable ? {} : seen).get(id);
   return row ? { row, unreachable: seen.unreachable, asOf: seen.unreachable ? undefined : seen.asOf } : null;
 }
@@ -166,11 +167,15 @@ export default async function InstancePage(props: Props) {
   };
   const topDrops = (b: BossRow) => npcsOf(b).flatMap((id) => lootTables.get(id)?.rows ?? [])
     .sort((x, y) => y.rate - x.rate || y.withItem - x.withItem || x.itemId - y.itemId).slice(0, 3);
-  const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; };
+  const itemLink = (itemId: number) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} />; };
   // A column no row has a report for is left out (filledColumns), as on the database lists: a files-only list
   // reads as names with their unconfirmed marker, not rows of [?].
   // A row 3 installs have not reported has nothing to show in the report columns: a dash, explained once under the table.
   const DASH = <span className="text-muted">—</span>;
+  // The table's legend names the hollow diamond the name column draws beside a boss named by the game files.
+  const withFilesLegend = (note: string | undefined) => (bosses.some((b) => b.filesName)
+    ? <span><Badge tone="files" /> marks a name from the game files, not yet confirmed by players.{note && ` ${note}`}</span>
+    : note);
   const bossColumns: SparseColumn<BossRow>[] = [
     // Each boss links its own page (lib/bosses.ts), by the name this table shows.
     { key: "name", header: "Boss", cell: (b) => {
@@ -263,12 +268,12 @@ export default async function InstancePage(props: Props) {
         <DataTable
           dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
           meta={anyReport ? bossMeta : undefined}
-          footer={anyBossReported && bosses.some((b) => !b.boss) ? "Not confirmed yet, or — in a column, means 3 installs have not reported that boss yet."
+          footer={withFilesLegend(anyBossReported && bosses.some((b) => !b.boss) ? "Not confirmed yet, or — in a column, means 3 installs have not reported that boss yet."
             : bosses.length > 0 && !anyBossReported ? (unreachable
             ? "Players' reports cannot be shown right now; this list is the game files' own."
             : anyReport
               ? "No boss here has 3 installs reporting it yet. Kills and last seen show once one does."
-              : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
+              : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined)}
           empty={empty(EMPTY.bosses)}
         />
       ),

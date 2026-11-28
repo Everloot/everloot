@@ -20,6 +20,7 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
+  loadInstanceSightings: async () => state.seen,
 }));
 const clears = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock("@/lib/progression", () => ({ loadInstanceClears: async () => clears.value }));
@@ -76,6 +77,11 @@ test("a boss 3 installs report: kills, installs, the creature linked, its loot t
   const html = await page("2732-oggleflint");
   // The addon's count, so it does not read as the linked characters' kills the Kills tab lists.
   expect(text(html)).toMatch(/\|Kills reported by the addon\|3\|/);
+  expect(text(html)).toMatch(/\|Last seen\|Nov 4, 2026\|/);
+  // QA round 14: the installs that agree sit beside the kill count in one row, not as a label of their own that the
+  // two-column facts list can leave at the top of the next column.
+  expect(html).toMatch(/<dt[^>]*>Kills reported by the addon<\/dt><dd[^>]*>(?:<[^>]*>)*3(?:<[^>]*>)*\s*<span[^>]*data-agreement="3"/);
+  expect(html).not.toMatch(/<dt[^>]*>Installs<\/dt>/);
   expect(html).toContain('href="/database/npcs/11517"');
   const loot = panel(html, "loot");
   expect(loot).toContain('href="/database/items/14149"');
@@ -95,7 +101,7 @@ test("linked characters' kills of the boss are counts only, with no character na
   expect(html).toMatch(/aria-controls="[^"]*-panel-kills"[^>]*>Desktop App kills</);
   const kills = text(panel(html, "kills"));
   expect(kills).toContain("2 linked characters have killed this boss, 7 kills in all.");
-  expect(kills).toContain("First synced kill 2026-11-10");
+  expect(kills).toContain("First synced kill Nov 10, 2026");
   for (const name of ["Mira", "Tavi"]) expect(html).not.toContain(name);
   clears.value = null;
   expect(await page("2732-oggleflint")).not.toContain('data-tab-panel="kills"');

@@ -1,3 +1,4 @@
+import { fromFirstChange, storedExcerpt } from "./blue-forum.js";
 import { postPath } from "./blue-pages.js";
 import type { BlueGame, BluePost, BlueRegion } from "./blue-posts.js";
 import { clampExcerpt, clampText, isoTime, safeHttpUrl } from "./text-safety.js";
@@ -86,7 +87,8 @@ export function sanitizePost(raw: unknown): BluePost | null {
     category: clampText(raw.category, 100),
     game: raw.game,
     kind: raw.kind === "hotfix" ? "hotfix" : "post",
-    excerpt: clampExcerpt(raw.excerpt),
+    // A forum post reads without the headings flattened into its stored text (see storedExcerpt).
+    excerpt: clampExcerpt(source === "forum" ? storedExcerpt(clampExcerpt(raw.excerpt), raw.kind === "hotfix" ? "hotfix" : "post") : raw.excerpt),
     ...(topicId !== undefined ? { topicId, ...(slug ? { topicSlug: slug } : {}) } : {}),
     ...(postNumber !== undefined ? { postNumber, startedThread: postNumber === 1 } : {}),
     ...(summary ? { summary } : {}),
@@ -335,7 +337,11 @@ export function groupAnnouncements(entries: ChangeEntry[]): ChangeEntry[] {
     if (twin) twin.push(e);
     else out.push(e);
   }
-  for (const [primary, ...copies] of all) out.push(copies.length ? { ...primary, copies } : primary);
+  for (const [first, ...copies] of all) {
+    // The entry shown starts at its first change; copies keep their stored text, which grouping and fullerCopy compare.
+    const primary = first.type === "hotfix" && first.excerpt ? { ...first, excerpt: fromFirstChange(first.excerpt) } : first;
+    out.push(copies.length ? { ...primary, copies } : primary);
+  }
   return out.sort(newestFirst);
 }
 

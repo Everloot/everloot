@@ -21,6 +21,8 @@ type Props = { searchParams: Promise<Search> };
 
 const TITLE = "WoW Forever Guides";
 const LEDE = "Everloot's reviewed guides, each a talent plan for one class: who it is for, why it fits, how to play it and what we do not know yet.";
+/** While no guide is reviewed, the lede promises no list (the empty state under it says why). */
+const LEDE_EMPTY = "Talent plans for one class each, from Everloot: who it is for, why it fits, how to play it and what we do not know yet. Guides appear here once reviewed.";
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** 120 to 160 characters, and honest about the guides (guides.test.tsx). */
@@ -126,11 +128,7 @@ export default async function GuidesIndex({ searchParams }: Props) {
 
   return (
     <Container>
-      <PageHeader trail={trailFor("/guides")!} title="Guides" lede={LEDE} />
-      <section className="mt-6" aria-label="Community reference">
-        <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
-        <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Separate from the reviewed class guides below.</p>
-      </section>
+      <PageHeader trail={trailFor("/guides")!} title="Guides" lede={any ? LEDE : LEDE_EMPTY} />
       {any && <FilterBar label="Guide filters" controls={controls} active={active} clearHref="/guides" />}
       {error && <p className="mt-4 text-sm text-muted">{error} This page shows every guide instead.</p>}
       <div className="mt-8 space-y-10">
@@ -158,6 +156,12 @@ export default async function GuidesIndex({ searchParams }: Props) {
           </section>
         ))}
       </div>
+      {/* After the reviewed guides (or the line saying there are none yet), so the checklist never reads as one of them. */}
+      <section className="mt-10" aria-labelledby="community-reference">
+        <SectionHeading id="community-reference">Community reference</SectionHeading>
+        <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
+        <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Not one of Everloot&apos;s reviewed class guides.</p>
+      </section>
     </Container>
   );
 }

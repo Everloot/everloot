@@ -444,9 +444,13 @@ const PIN_HALF_PX = 13;
  * Which labels to draw. Greedy by priority: a label is drawn when it lies wholly inside the view and does
  * not overlap one already drawn, so a lower-priority label gives way. (x, y) is the anchor in yards.
  * A label never covers a pin in `pins` (in yards): one that would moves just below the pin, else just above,
- * else gives way; the pin keeps its place.
+ * else gives way; the pin keeps its place. A label never sits under a control drawn over the map (`covered`, boxes
+ * in pixels from the map's top left: the zoom buttons, Pin map centre): it gives way, as to a label already drawn.
  */
-export function placeLabels(candidates: LabelCandidate[], view: Box, widthPx: number, fontPx: number, pins: readonly { x: number; y: number }[] = []): LabelCandidate[] {
+export function placeLabels(
+  candidates: LabelCandidate[], view: Box, widthPx: number, fontPx: number, pins: readonly { x: number; y: number }[] = [],
+  covered: readonly { l: number; r: number; t: number; b: number }[] = [],
+): LabelCandidate[] {
   const k = widthPx / view.width, heightPx = view.height * k, h = fontPx * 1.4, pad = 2;
   const overlaps = (a: { l: number; r: number; t: number; b: number }, o: typeof a, gap = pad) => a.l < o.r + gap && o.l < a.r + gap && a.t < o.b + gap && o.t < a.b + gap;
   // No gap around a pin: a pin's own name starts 14 px from its centre, just clear of its 13 px half.
@@ -455,7 +459,7 @@ export function placeLabels(candidates: LabelCandidate[], view: Box, widthPx: nu
     return { l: sx - PIN_HALF_PX, r: sx + PIN_HALF_PX, t: sy - PIN_HALF_PX, b: sy + PIN_HALF_PX };
   });
   const shift = PIN_HALF_PX + h / 2 + pad;
-  const taken: { l: number; r: number; t: number; b: number }[] = [];
+  const taken: { l: number; r: number; t: number; b: number }[] = [...covered];
   const placed: LabelCandidate[] = [];
   for (const c of [...candidates].sort((a, b) => b.priority - a.priority || a.text.length - b.text.length || a.id.localeCompare(b.id))) {
     const sx = (c.x - view.x) * k, w = c.text.length * fontPx * 0.58 + 6;

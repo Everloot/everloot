@@ -156,7 +156,7 @@ test("unnamed NPC retains all agreed list traits, with unreported traits shown a
   facts.npcs = facts.npcs.slice(0, 2);
   const short = await html();
   // Short of 3 installs, the traits fold into the one Not yet reported row with its empty meter.
-  expect(fact(short, "Not yet reported")).toMatch(/data-agreement="0"[\s\S]*Level[\s\S]*Type/);
+  expect(fact(short, "Not yet reported")).toMatch(/data-agreement="0"[\s\S]*level[\s\S]*type/);
   expect(short).not.toContain("Humanoid");
 });
 

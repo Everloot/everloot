@@ -14,11 +14,12 @@ export const entityHref = (kind: EntityKind, id: number) => `/database/${PAGE[ki
  * A link to a database page: the agreed name (and icon, when the page has one) in place of
  * "Item 1234". Only an entity with no agreed name falls back to its id. Like every /database link it is never
  * prefetched, on view or on hover (see ./Link); `prefetch` is accepted and ignored. An item's name wears its `quality` colour;
- * `unconfirmed` adds the quiet mark of a name only the game files give, as the lists draw it.
+ * `unconfirmed` adds the quiet mark of a name only the game files give, as the lists draw it. `noCard` says the page
+ * knows the entity has no hover card (an item it can only show as "Item N"), so a hover asks for none.
  */
-export default function EntityLink({ kind, id, name, icon, quality, unconfirmed, prefetch: _prefetch, ...aria }: { kind: EntityKind; id: number; name?: string | null; icon?: string | null; quality?: Quality; unconfirmed?: boolean; prefetch?: boolean; "aria-describedby"?: string }) {
+export default function EntityLink({ kind, id, name, icon, quality, unconfirmed, noCard, prefetch: _prefetch, ...aria }: { kind: EntityKind; id: number; name?: string | null; icon?: string | null; quality?: Quality; unconfirmed?: boolean; noCard?: boolean; prefetch?: boolean; "aria-describedby"?: string }) {
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-2" data-no-hover-card={noCard || undefined}>
       {icon ? <GameIcon src={icon} size={18} /> : null}
       <Link href={entityHref(kind, id)} {...aria} className={`${quality ? QUALITY_TEXT[quality] : "text-fg"} underline decoration-edge underline-offset-4 hover:decoration-fg`}>{name || `${WORD[kind]} ${id}`}</Link>
       {unconfirmed && <Badge tone="files" />}

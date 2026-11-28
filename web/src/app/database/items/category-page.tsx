@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { trailFor } from "@/lib/breadcrumbs";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import Link from "@/components/Link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,
-  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, itemSkills, ITEM_LEVEL_BRACKETS, itemsHref,
-  listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
+  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacetCounts, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
+  listItems, matchingItems, NAME_FROM, slotOrder, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
 } from "@/lib/items";
 import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
@@ -67,6 +68,21 @@ export const ALL_ITEMS = {
 
 const pageSuffix = (page: number) => (page > 1 ? ` – Page ${page}` : "");
 
+/** The chosen slots in words, in the character window's order: "Feet", "Hands and Feet", "Head, Hands and Feet". */
+function slotWords(slugs: readonly string[] | undefined): string {
+  const names = [...(slugs ?? [])].sort(slotOrder).map((slug) => {
+    const row = T.items.find((r) => slotOf(r[3])?.slug === slug);
+    return (row && slotOf(row[3])?.name) ?? slug;
+  });
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names.join("");
+}
+
+/** What a category page lists, its heading and its title's lead: "Plate", or "Plate Feet" with a slot filter. */
+function categoryKind(label: string, slot: readonly string[] | undefined): string {
+  const slots = slotWords(slot);
+  return slots ? `${label} ${slots}` : label;
+}
+
 export async function categoryMetadata(classSlug: string | undefined, subclassKey: string | undefined, search: Search): Promise<Metadata> {
   const r = resolve(classSlug, subclassKey, search);
   if (!r) return { robots: { index: false, follow: true } };
@@ -85,11 +101,16 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
       ...(index ? {} : { robots: { index: false, follow: true } }),
     };
   }
-  const name = r.sub ? `${subclassLabel(r.sub).label} (${r.cls.label})` : r.cls.label;
-  const count = ((r.sub ? r.sub.items : r.cls.items) - (hidden ? filterItems(T, { classId: r.cls.id, subclassId: r.sub?.id }).filter((row) => hidden.has(row[0])).length : 0)).toLocaleString("en-US");
+  // A slot filter names its slots, so a count of plate feet never reads as every plate item.
+  const kind = categoryKind(r.sub ? subclassLabel(r.sub).label : r.cls.label, r.q.slot);
+  const name = r.sub ? `${kind} (${r.cls.label})` : kind;
+  // What the list under it shows: the same filters, the same development leftovers and unnamed items left out.
+  const total = (await listOf(classSlug, subclassKey, search))!.rows.length;
+  const count = total.toLocaleString("en-US");
+  const noun = total === 1 ? "Item" : "Items";
   return {
     ...pageMetadata({
-      title: `${r.sub ? `WoW Forever ${name}: ${count} Items` : `WoW Forever ${name}: All ${count} Items`}${pageSuffix(page)}`,
+      title: `${r.sub ? `WoW Forever ${name}: ${count} ${noun}` : `WoW Forever ${name}: All ${count} ${noun}`}${pageSuffix(page)}`,
       description: `All ${count} ${name} items in WoW: Forever, with filters for slot, quality, item level, required level, binding and where players found them.`,
       path: itemsHref(r.cls.slug, r.sub?.slug, { page }),
     }),
@@ -110,40 +131,42 @@ const plural = (n: number) => `${n.toLocaleString("en-US")} item${n === 1 ? "" :
 /** A level range as a menu writes it: "11–20", "81+" for the open top bracket. */
 const bracket = (r: { min: number; max: number }) => (r.max >= 999 ? `${r.min}+` : r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
 
-export async function CategoryPage({ classSlug, subclassKey, search }: { classSlug?: string; subclassKey?: string; search: Search }) {
+/**
+ * The rows a category URL lists, with what the page draws them from: worked out once per request (React cache), so
+ * the page and its title count the same list, under the same filters and the same unnamed-item rule.
+ */
+const categoryList = cache(async (classSlug: string | undefined, subclassKey: string | undefined, searchKey: string) => {
+  const search = JSON.parse(searchKey) as Search;
   const r = resolve(classSlug, subclassKey, search);
-  if (!r) {
-    const moved = classSlug === undefined ? null : legacyHref(classSlug, subclassKey, search);
-    if (moved) permanentRedirect(moved);
-    notFound();
-  }
+  if (!r) return null;
   const { cls, sub, q } = r;
   // With a quality chosen and no order, the list reads by item level, highest first: an epic list opens on its best gear,
   // not its level-1 quest items. The URL carries no sort, so this order is the Sort menu's reset choice there. A name
   // search keeps its best-match order.
   const qualityFirst = Boolean(q.quality?.length) && !q.sort && !q.q;
   const order: CategoryQuery["sort"] = qualityFirst ? { key: "ilvl", desc: true } : q.sort;
-  // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
-  // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
-  // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
+  // A class context from a class hub narrows the list to what the class can use by the game files (lib/class-gear.ts):
+  // its proficiencies, at its level when the context gives one, and each item's class mask. An item the files say
+  // nothing about stays, counted.
   const read = parseClassContext(search);
   const context = read.ok ? read.context : null;
-  const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
   const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
   const fits = (row: ItemRow) => !usable || usable(row) !== "no";
   const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
   // One after the other: the seen items then come from the view the names just read, not from a second read of it.
   const listNames = await loadListNames();
   const seen = await loadListSeen();
-  const { agreed, matched, showsTip, degraded } = listNames;
+  const { showsTip } = listNames;
   // The names, the default order, the leftovers and the unnamed items, worked out once per version of the files.
   const index = itemListIndex(listNames, seen);
   const nameOf = index.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
   // A level or binding filter or sort reads the levels of every row that may show them; the tooltips are this page's only.
-  const wide = Boolean(q.ilvl || q.req || q.bind) || order?.key === "ilvl" || order?.key === "req";
-  const wideIds = wide ? base.map((row) => row[0]).filter(showsTip) : [];
+  const levelFilter = Boolean(q.ilvl || q.req || q.bind);
+  const wide = levelFilter || order?.key === "ilvl" || order?.key === "req";
+  // A level or binding filter narrows the Class menu's counts too, so on a class page it reads every class's levels.
+  const wideIds = wide ? (levelFilter && cls ? T.items.filter(fits) : base).map((row) => row[0]).filter(showsTip) : [];
   const wideAssets = wideIds.length ? await loadSiteAssets() : null;
   const levels = wide ? await loadItemLevels(wideAssets, wideIds) : null;
   const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => levels?.get(id), order: index.order };
@@ -158,6 +181,26 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const unnamed: ReadonlySet<number> = folded ? index.unnamed : new Set();
   const rows = listed.filter((row) => !unnamed.has(row[0]));
   const unnamedCount = folded ? listed.length - rows.length : rows.filter((row) => !isNamed(row[0])).length;
+  return { qualityFirst, order, usable, fits, base, listNames, seen, index, wide, wideAssets, ctx, match, folded, unnamed, rows, unnamedCount };
+});
+const listOf = (classSlug: string | undefined, subclassKey: string | undefined, search: Search) => categoryList(classSlug, subclassKey, JSON.stringify(search));
+
+export async function CategoryPage({ classSlug, subclassKey, search }: { classSlug?: string; subclassKey?: string; search: Search }) {
+  const r = resolve(classSlug, subclassKey, search);
+  if (!r) {
+    const moved = classSlug === undefined ? null : legacyHref(classSlug, subclassKey, search);
+    if (moved) permanentRedirect(moved);
+    notFound();
+  }
+  const { cls, sub, q } = r;
+  // A class context from a class hub rides on every link of the list, never on its breadcrumb or canonical. It narrows
+  // the list to what the class can use by the game files (lib/class-gear.ts): its proficiencies, at its level when the
+  // context gives one, and each item's class mask. An item the files say nothing about stays, counted.
+  const read = parseClassContext(search);
+  const context = read.ok ? read.context : null;
+  const link = (classSlug?: string, subclassSlug?: string, query?: Partial<CategoryQuery>) => withClassContext(itemsHref(classSlug, subclassSlug, query), context);
+  const { qualityFirst, order, usable, fits, base, listNames, seen, index, wide, wideAssets, ctx, match, folded, unnamed, rows, unnamedCount } = (await listOf(classSlug, subclassKey, search))!;
+  const { agreed, matched, showsTip, degraded } = listNames;
   // The development leftovers (test, placeholder and retired items) are out of the list unless asked for; the
   // menus count what the list can show, and the line above the table says how many are held back.
   const leftovers = index.leftovers;
@@ -165,13 +208,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const pool = base.filter((row) => !gone(row[0]));
   // Only counted, so the rows with the leftovers are not sorted.
   const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : matchingItems(base, { ...q, dev: true }, ctx, match).filter((row) => !unnamed.has(row[0])).length - rows.length;
-  // What a class or type menu's count leaves out, counted for every class and type in one pass.
-  const hiddenCounts = new Map<string, number>();
-  for (const row of T.items) {
-    if (!gone(row[0]) && fits(row)) continue;
-    for (const key of ["", `${row[1]}`, `${row[1]}/${row[2]}`]) hiddenCounts.set(key, (hiddenCounts.get(key) ?? 0) + 1);
-  }
-  const hiddenIn = (classId?: number, subclassId?: number) => hiddenCounts.get(classId === undefined ? "" : subclassId === undefined ? `${classId}` : `${classId}/${subclassId}`) ?? 0;
+  // Every menu counts what the list would hold with all the other filters on, in one pass over the items any class
+  // could list; the Class and Type menus read every class, the others this page's class and type.
+  const candidates = cls ? T.items.filter((row) => fits(row) && !gone(row[0])) : pool;
+  const counts = itemFacetCounts(candidates, (row) => !cls || (row[1] === cls.id && (!sub || row[2] === sub.id)), q, ctx, cls && q.q ? matchItemNames(candidates, q, ctx) : match);
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
   const { shown, pages, per } = paged(rows, q);
@@ -186,7 +226,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The icon column, with the game's question mark where a row has no icon, only with the asset files.
   const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || iconOnly.has(row[0]) || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
   const here = (over: Partial<CategoryQuery>) => link(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
-  const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
+  const title = sub || cls ? categoryKind(sub ? subclassLabel(sub).label : cls!.label, q.slot) : "Items";
 
   const trail: Crumb[] = [
     ...trailFor("/database/items")!,
@@ -233,22 +273,17 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (row) => row[0] },
   ];
 
-  // Choices with their counts in this category, so a menu never offers an empty list.
-  const counted = <K,>(key: (row: ItemRow) => K) => { const m = new Map<K, number>(); for (const row of pool) m.set(key(row), (m.get(key(row)) ?? 0) + 1); return m; };
-  const slots = counted((row) => slotOf(row[3])?.slug ?? null);
-  const qualities = counted((row) => (row[4] === null ? UNRECORDED : QUALITIES[row[4]]?.slug ?? UNRECORDED));
+  // Choices with their counts (counts above); a choice that matches nothing drops out of its menu unless it is on.
+  const slots = counts.slot;
+  const qualities = counts.quality;
   const sourceOptions = SOURCES.map((x) => ({
     label: x.menu, href: link(cls?.slug, sub?.slug, toggled(q, "src", x.slug)), on: Boolean(q.src?.includes(x.slug)),
-    count: pool.reduce((n, row) => n + Number(seen.from.get(row[0])?.includes(x.slug) ?? false), 0),
+    count: counts.src.get(x.slug) ?? 0,
   }))
     .filter((o) => o.count > 0 || o.on);
   const facets = itemFacets();
   const inBase = (set: Set<number>) => pool.reduce((n, row) => n + Number(set.has(row[0])), 0);
-  // Each profession's count in one pass over the list, through the professions of each item.
-  const bySkill = new Map<number, number>();
-  const skillsOf = itemSkills();
-  for (const row of pool) for (const skill of skillsOf.get(row[0]) ?? []) bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
-  const skills = facets.professions.map((p) => ({ ...p, count: bySkill.get(p.id) ?? 0 })).filter((p) => p.count > 0 && (q.dev || !isDevelopmentItemName(p.name)));
+  const skills = facets.professions.map((p) => ({ ...p, count: counts.skill.get(p.id) ?? 0 })).filter((p) => (p.count > 0 || q.skill === p.slug) && (q.dev || !isDevelopmentItemName(p.name)));
   const slotNames = new Map(pool.map((row) => slotOf(row[3])).filter((s) => s !== null).map((s) => [s!.slug, s!.name]));
   const toggle = (key: "crafted" | "reagent" | "set" | "seen", label: string, count: number): FilterControl[] =>
     count > 0 || q[key] ? [{ type: "toggle", key, label, href: here({ [key]: q[key] ? undefined : true }), on: Boolean(q[key]) }] : [];
@@ -257,27 +292,27 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     {
       type: "menu", key: "class", label: "Class",
       options: [
-        { label: "All classes", href: link(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: T.items.length - hiddenIn() },
-        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: link(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: c.items - hiddenIn(c.id) })),
+        { label: "All classes", href: link(undefined, undefined, { ...q, page: 1 }), on: !cls, reset: true, count: counts.all },
+        ...T.classes.filter((c) => c.items > 0).map((c) => ({ label: c.label, href: link(c.slug, undefined, { ...q, page: 1 }), on: c.id === cls?.id, count: counts.classes.get(c.id) ?? 0 })),
       ],
     },
     ...(cls ? [{
       type: "menu" as const, key: "type", label: "Type",
       options: [
-        { label: `All ${cls.label.toLowerCase()}`, href: link(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: cls.items - hiddenIn(cls.id) },
-        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: link(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: s.items - hiddenIn(cls.id, s.id) })),
+        { label: `All ${cls.label.toLowerCase()}`, href: link(cls.slug, undefined, { ...q, page: 1 }), on: !sub, reset: true, count: counts.classes.get(cls.id) ?? 0 },
+        ...T.subclasses.filter((s) => s.classId === cls.id && s.items > 0).map((s) => ({ label: subclassLabel(s).label, href: link(cls.slug, s.slug, { ...q, page: 1 }), on: s.id === sub?.id, count: counts.subclasses.get(`${cls.id}/${s.id}`) ?? 0 })),
       ],
     }] : []),
     {
       type: "menu", key: "slot", label: "Slot", multi: true,
-      options: [...slotNames].map(([slug, name]) => ({ label: name, href: link(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
+      options: [...slotNames].sort(([a], [b]) => slotOrder(a, b)).map(([slug, name]) => ({ label: name, href: link(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
     },
     {
       type: "menu", key: "quality", label: "Quality", multi: true,
-      options: [...QUALITIES.filter((x) => qualities.has(x.slug)).map((x) => ({
+      options: [...QUALITIES.filter((x) => qualities.has(x.slug) || q.quality?.includes(x.slug)).map((x) => ({
         label: x.name, className: x.id <= 5 ? QUALITY_TEXT[qualityOf(x.id)] : undefined,
         href: link(cls?.slug, sub?.slug, toggled(q, "quality", x.slug)), on: Boolean(q.quality?.includes(x.slug)), count: qualities.get(x.slug) ?? 0,
-      })), ...(qualities.has(UNRECORDED) ? [{
+      })), ...(qualities.has(UNRECORDED) || q.quality?.includes(UNRECORDED) ? [{
         label: "Unrecorded", href: link(cls?.slug, sub?.slug, toggled(q, "quality", UNRECORDED)), on: Boolean(q.quality?.includes(UNRECORDED)), count: qualities.get(UNRECORDED) ?? 0,
       }] : [])],
     },
@@ -344,14 +379,16 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     ...(q.set ? [{ label: "Set piece", href: here({ set: undefined }) }] : []),
     ...(q.seen ? [{ label: "Seen by players", href: here({ seen: undefined }) }] : []),
   ];
+  // Each chip is a link to the list without that one filter.
+  const chipLinks = chips.map((c) => (
+    <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
+      {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
+    </Link>
+  ));
   const empty = active > 0 ? (
     <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
       <span>No items match these filters.</span>
-      {chips.map((c) => (
-        <Link key={c.href} href={c.href} className="inline-flex h-6 items-center gap-1 rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg">
-          {c.label}<span aria-hidden="true">×</span><span className="sr-only">(remove)</span>
-        </Link>
-      ))}
+      {chipLinks}
       <Link href={link(cls?.slug, sub?.slug)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>
     </div>
   ) : <p className="py-4 text-cell text-fg-2">{context ? `No items in this category a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}.` : "No items in this category."}</p>;
@@ -376,6 +413,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           active={active}
           clearHref={link(cls?.slug, sub?.slug)}
         />
+        {/* On a phone the menus fold into one "Filters (n)" button, so the filters that are on show here, each removable. */}
+        {rows.length > 0 && chips.length > 0 && <p data-filter-chips className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">{chipLinks}</p>}
         <ClassContextChip read={read} here={withoutClassContext(itemsHref(cls?.slug, sub?.slug), search)}>
           {context && (
             <span>
@@ -415,6 +454,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
           </p>
         )}
         {match.respelled && rows.length > 0 && <Respelled q={match.respelled} />}
+        {/* The order a quality filter brings is named, since a phone shows only the name column and no header arrow. */}
+        {qualityFirst && rows.length > 1 && <p data-sort-note className="mt-2 text-cell-2 text-muted">Sorted by item level, highest first.</p>}
         {/* Where wiki names come from, once for the page rather than under every row it names. */}
         {shown.some((row) => names.get(row[0])?.source === "wiki") && (
           <p data-name-note className="mt-2 text-cell-2 text-muted">
@@ -426,8 +467,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             dense
             caption={`${title}: ${plural(rows.length)}`}
             // A column nothing in the category has (Source, until an item the list can show has one) is left out. It is
-            // read over the category, not the filtered result, so it shows wherever the Source menu does and does not
-            // come and go from page to page or under a filter.
+            // read over the category, not the filtered result, so it does not come and go from page to page or under a filter.
             columns={filledColumns(columns, pool)}
             rows={shown}
             rowKey={(row) => String(row[0])}

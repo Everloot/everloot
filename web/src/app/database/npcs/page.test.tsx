@@ -53,7 +53,7 @@ test("the list is titled NPCs and links each NPC's page, a quest giver with no a
   expect(page).toContain(">NPCs<");
   expect(page).toContain('<a href="/database/npcs/101">Npc Alpha</a>');
   expect(page).toContain('<a href="/database/npcs/102">Npc Beta</a>');
-  expect(page).toContain('<a href="/database/npcs/202">NPC 202</a>');
+  expect(page).toContain('<a href="/database/npcs/202">Unnamed NPC 202</a>');
   expect(page).toContain('aria-label="NPC filters"');
 });
 
@@ -109,8 +109,103 @@ test("an NPC its own page names from the Warcraft Wiki is listed, searched and s
   store.npcs = [npc({ npcId: 103, drops: 4 }), npc({ npcId: 104, drops: 2 })];
   const page = await html();
   expect(page).toMatch(/<a href="\/database\/npcs\/103">Npc Gamma<\/a>(?:<[^>]*>)*\s*\(name from the warcraft wiki\)/);
-  expect(page).toContain('<a href="/database/npcs/104">NPC 104</a>');
+  expect(page).toContain('<a href="/database/npcs/104">Unnamed NPC 104</a>');
   const found = await html({ q: "gamma" });
   expect(found).toContain('<a href="/database/npcs/103">Npc Gamma</a>');
   expect(found).not.toContain('href="/database/npcs/104"');
+});
+
+test("each NPC menu counts what the list would hold with every other filter on, so no choice leads to an empty list", async () => {
+  const durotar = { mapId: 1411, name: "Durotar", continentId: 1, continentName: "Synthetic Continent" };
+  const hills = { mapId: 1426, name: "Synthetic Hills", continentId: 0, continentName: "Synthetic Continent" };
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", zone: durotar, creatureType: "Humanoid", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", zone: durotar, creatureType: "Humanoid", rank: "elite", reaction: "friendly", level: 12 }),
+    npc({ npcId: 103, name: "Npc Gamma", zone: hills, creatureType: "Beast", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 104, name: "Npc Delta", zone: hills, creatureType: "Beast", rank: "normal", reaction: "hostile", level: 30 }),
+  ];
+  // A menu choice's count, or null when the menu leaves the choice out (it would match nothing).
+  const count = (page: string, menu: string, label: string) => {
+    const part = page.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+    const m = new RegExp(`>${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span><span class="tabular-nums text-muted">([\\d,]+)<`).exec(part);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  const inZone = await html({ zone: "1411-durotar" });
+  expect(count(inZone, "type", "Humanoid")).toBe(2);
+  expect(count(inZone, "type", "Beast")).toBeNull();
+  expect(count(inZone, "rank", "Elite")).toBe(1);
+  // The Level and Reaction menus count too.
+  expect(count(inZone, "react", "Hostile")).toBe(1);
+  expect(count(inZone, "react", "Friendly")).toBe(1);
+  expect(count(inZone, "level", "1–10")).toBe(1);
+  expect(count(inZone, "level", "21–30")).toBeNull();
+  // A menu ignores its own filter: the other zone still counts what it holds.
+  expect(count(inZone, "zone", "Synthetic Hills")).toBe(2);
+  // Two filters: each menu counts with the other one on.
+  const beasts = await html({ type: "beast", level: "1-10" });
+  expect(count(beasts, "zone", "Durotar")).toBeNull();
+  expect(count(beasts, "zone", "Synthetic Hills")).toBe(1);
+  expect(count(beasts, "type", "Humanoid")).toBe(1);
+  expect(count(beasts, "level", "21–30")).toBe(1);
+  // With nothing on, the counts are the whole list's.
+  expect(count(await html(), "type", "Beast")).toBe(2);
+});
+
+test("each NPC menu notes the rows it cannot hold, those with no value recorded", async () => {
+  const durotar = { mapId: 1411, name: "Durotar", continentId: 1, continentName: "Synthetic Continent" };
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", zone: durotar, creatureType: "Humanoid", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", zone: null, creatureType: null, rank: null, reaction: null, level: null }),
+  ];
+  const note = (out: string, menu: string) => /<li class="[^"]*">(Not recorded: [\d,]+)<\/li>/.exec(out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "")?.[1] ?? null;
+  const page = await html();
+  for (const menu of ["zone", "level", "react", "type", "rank"]) expect(note(page, menu)).toBe("Not recorded: 1");
+});
+
+test("the Level menu has a top bracket for NPCs above level 60, so its counts and the note add up to the list", async () => {
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", level: 61 }),
+    npc({ npcId: 103, name: "Npc Gamma", level: 62 }),
+    npc({ npcId: 104, name: "Npc Delta", level: null }),
+  ];
+  const page = await html();
+  const menu = page.split('data-filter="level"')[1]?.split("</details>")[0] ?? "";
+  expect(menu).toMatch(/>61\+<\/span><span class="tabular-nums text-muted">2</);
+  expect(menu).toContain('href="/database/npcs?level=61-999"');
+  // The top bracket filters the list.
+  const top = await html({ level: "61-999" });
+  expect(top).toContain('href="/database/npcs/102"');
+  expect(top).not.toContain('href="/database/npcs/101"');
+});
+
+test("QA round 14: an NPC with no agreed name reads Unnamed NPC, and Named only (?named=1) leaves those rows out", async () => {
+  store.npcs = [npc({ npcId: 4540, drops: 24 }), npc({ npcId: 101, name: "Npc Alpha", drops: 3 })];
+  const all = await html({ sort: "drops", dir: "desc" });
+  expect(all).toContain('<a href="/database/npcs/4540">Unnamed NPC 4540</a>');
+  expect(all).not.toMatch(/>NPC 4540</);
+  // The toggle is off by default and links the named-only list.
+  expect(all).toMatch(/href="\/database\/npcs\?[^"]*named=1[^"]*"[^>]*>(?:<[^>]*>)*Named only/);
+  const named = await html({ sort: "drops", dir: "desc", named: "1" });
+  expect(named).not.toContain("/database/npcs/4540");
+  expect(named).toContain('<a href="/database/npcs/101">Npc Alpha</a>');
+  await expect(html({ named: "yes" })).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("QA round 14: a level range 3 installs report shows as 5–7 instead of a dash", async () => {
+  store.npcs = [npc({ npcId: 101, name: "Npc Alpha", levelRange: { min: 5, max: 7 } })];
+  const page = await html();
+  expect(page).toMatch(/<td[^>]*>5–7<\/td>/);
+  expect(page).toContain("Level 5–7");
+});
+
+test("QA round 14: the Zone header sorts the list by zone name", async () => {
+  const zone = (mapId: number, name: string) => ({ mapId, name, continentId: 1, continentName: "Kalimdor" });
+  store.npcs = [npc({ npcId: 101, name: "Npc Alpha", zone: zone(1413, "The Barrens") }), npc({ npcId: 102, name: "Npc Beta", zone: zone(1411, "Durotar") })];
+  expect(await html()).toMatch(/<a href="\/database\/npcs\?[^"]*sort=zone[^"]*"[^>]*>Zone/);
+  const page = await html({ sort: "zone" });
+  expect(page.indexOf("Npc Beta")).toBeLessThan(page.indexOf("Npc Alpha"));
 });

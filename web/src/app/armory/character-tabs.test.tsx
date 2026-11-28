@@ -132,18 +132,30 @@ test("QA round 4: with no kill at all Progress is one line, its notes and the in
   const firstDisclosure = html.indexOf("<details");
   expect(html.slice(0, firstDisclosure).match(/<\/p>/g)).toHaveLength(1);
   expect(html.indexOf("Kills come from linked characters")).toBeGreaterThan(firstDisclosure);
-  expect(html).toMatch(/Every dungeon and raid \(\d+\)/);
-  expect(html.indexOf("Every dungeon and raid")).toBeLessThan(html.indexOf("data-progression-instance="));
+  expect(html).toMatch(/Every dungeon, raid and world boss \(\d+\)/);
+  expect(html.indexOf("Every dungeon, raid and world boss")).toBeLessThan(html.indexOf("data-progression-instance="));
 });
 
 test("QA round 5: with no data for any instance the folded list names each instance once, with no per-row checklist or no data", () => {
   const html = renderToStaticMarkup(<>{characterTabs(full, {}).find((t) => t.id === "progress")!.panel}</>);
-  const list = html.slice(html.indexOf("Every dungeon and raid"));
+  const list = html.slice(html.indexOf("Every dungeon, raid and world boss"));
   const rows = [...list.matchAll(/data-progression-instance=/g)].length;
   expect(rows).toBeGreaterThan(30);
   for (const repeated of ["Boss checklist", "no data from this character", ">no data<", "availability unavailable"]) expect(list).not.toContain(repeated);
   expect(list).toContain(">Raids<");
   expect(list.match(/>Naxxramas</g)).toHaveLength(1);
+});
+
+test("QA round 11: the folded list says why some names are plain text, and only when one is", () => {
+  const KEY = "Names without a link have no page yet";
+  const panel = (links: Record<number, string>) => renderToStaticMarkup(<>{characterTabs(full, { progression: {
+    instances: characterProgression(progressionCatalogue(null), null), links,
+  } }).find((t) => t.id === "progress")!.panel}</>);
+  const some = panel({ 33: "/database/instances/33-shadowfang-keep" });
+  expect(some).toContain(KEY);
+  expect(some.indexOf(KEY)).toBeGreaterThan(some.indexOf("Every dungeon, raid and world boss"));
+  const ids = [...panel({}).matchAll(/data-progression-instance="(\d+)"/g)].map((m) => Number(m[1]));
+  expect(panel(Object.fromEntries(ids.map((id) => [id, `/database/instances/${id}`])))).not.toContain(KEY);
 });
 
 test("QA round 4: Progress leaves out the unnamed map and shows Naxxramas once, under Raids", () => {

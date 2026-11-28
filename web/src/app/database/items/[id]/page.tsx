@@ -16,10 +16,11 @@ import { loadDisenchant } from "@/lib/disenchant";
 import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, readItemTips, unknownItemIcon } from "@/lib/game-assets";
-import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, Tabs, filledTabs, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, DataTable, EvidenceLine, QUALITY_TEXT, SectionHeading, Tabs, filledTabs, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { categoryOf } from "@kb/item-taxonomy";
-import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
+import { edgesFrom, type Edge, type Rel } from "@kb/edges";
+import { utcDay } from "@/lib/time";
 import { CLIENT_LAYER } from "@kb/client-layer-file";
 import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
@@ -37,10 +38,12 @@ import LoreSection from "@/components/LoreSection";
 import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
+import { zoneByMapId } from "@/lib/zones";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "@kb/pending-loot";
 import { itemDropSources } from "@kb/loot-tables";
+import { dropTier } from "@kb/drop-rollup";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EmptyTab, EntityPage, known, LINK, ModelPicture, PinTable, Unreachable } from "../../entity";
 import { loadRenders } from "@/lib/game-renders";
@@ -54,6 +57,7 @@ import EntityScreenshots from "@/components/screenshots/EntityScreenshots";
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 /** How the files' tooltip prints the vendor price (lib/item-names.ts). */
 const SELL_PRICE = "Sell Price: ";
+const ITEM_LEVEL = "Item Level ";
 
 /** The segment is an item id, or a class slug (/database/items/weapons): numbers are items, words are classes. */
 type Props = { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
@@ -85,7 +89,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 /** Who vouches for a relation row: the installs that agree, or (the quiet marker) the game files. */
-const evidence = (e: Edge) => (e.evidence === "observed" ? evidenceLabel(e) : <Badge tone="files" href={e.build ? `/changes?show=builds&q=${e.build}` : undefined} />);
+// A player-seen row: its installs and the day it was last seen, in the site's day form.
+const evidence = (e: Edge) => (e.evidence === "observed" ? `${e.installs} installs${e.lastSeen ? `, last seen ${utcDay(e.lastSeen) ?? e.lastSeen}` : ""}` : <Badge tone="files" href={e.build ? `/changes?show=builds&q=${e.build}` : undefined} />);
 
 export default async function ItemPage(props: Props) {
   const params = await props.params;
@@ -162,7 +167,9 @@ export default async function ItemPage(props: Props) {
 
   // Beside each row, what the site already holds for it: the zone 3 installs measured a vendor in, and a recipe's
   // reagents and skill ranks from the game files (client-recipes.json). A column shows only where some row has a value.
-  const npcZones = (npcId: number) => edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === npcId);
+  // Released zones only, as the NPC and vendor pages name them: a zone the map holds back (heldBackZones, maybe
+  // unreleased) has no page and no name outside the spoiler switch, so its row shows the dash, never "zone 2548".
+  const npcZones = (npcId: number) => edges.observed.filter((z) => z.rel === "located_in" && z.fromKind === "npc" && z.fromId === npcId && zoneByMapId(z.toId));
   const vendorZones = (e: Edge) => (e.rel === "sold_by" ? npcZones(e.toId) : []);
   const zoneLinks = (zones: Edge[]) => <span className="inline-flex flex-wrap gap-x-2">{zones.map((z) => <span key={z.toId}><RelationTarget edge={z} rel={z.rel} client={edges.client} /></span>)}</span>;
   const recipeOf = (e: Edge) => (e.toKind === "spell" && (e.rel === "created_by" || e.rel === "reagent_for") ? recipeBySpell(e.toId) : undefined);
@@ -224,9 +231,11 @@ export default async function ItemPage(props: Props) {
   const icons = new Set(rel("same_icon").map((e) => e.toId));
   const iconEdges = edges.client.filter((o) => !(o.rel === "same_icon" && icons.has(o.toId) && o.fromId !== itemId && isDevelopmentItemName(shownItemName(o.fromId, agreed, matched?.names)?.name)));
   const sharers = (e: Edge) => iconEdges.filter((o) => o.rel === "same_icon" && o.toId === e.toId && o.fromId !== itemId).map((o) => o.fromId);
-  const related = [...rel("part_of_set"), ...rel("same_icon").filter((e) => sharers(e).length > 0)];
+  const related = rel("part_of_set");
+  // Items sharing the icon file: the least telling relation, so a section under the others, never a tab ahead of them.
+  const iconRows = rel("same_icon").filter((e) => sharers(e).length > 0);
   // Items sharing an icon file are named, and shown with their icon, only under the item name rule.
-  const sameIcon = related.filter((e) => e.rel === "same_icon").flatMap(sharers);
+  const sameIcon = iconRows.flatMap(sharers);
   const iconNamed = [...new Set(sameIcon)].filter((id) => shownItemName(id, agreed, matched?.names)).slice(0, 12);
   const iconTips = iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
   const itemName = (id: number) => shownItemName(id, agreed, matched?.names)?.name;
@@ -276,8 +285,8 @@ export default async function ItemPage(props: Props) {
           dense
           caption={`Items related to ${title}`}
           columns={[
-            { key: "what", header: "Relation", nowrap: true, cell: (e: Edge) => (e.rel === "same_icon" ? "Same icon" : "Part of set") },
-            { key: "target", header: "With", cell: (e: Edge) => (e.rel === "same_icon" ? <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> : <RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} />) },
+            { key: "what", header: "Relation", nowrap: true, cell: () => "Part of set" },
+            { key: "target", header: "With", cell: (e: Edge) => <RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} /> },
           ]}
           rows={related}
           rowKey={(e) => `${e.rel}-${e.toId}`}
@@ -323,11 +332,17 @@ export default async function ItemPage(props: Props) {
       ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
       : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} name={dropNames.objects.get(d.sourceObjectId!)?.name} />))),
     ...rel("created_by").map(relationSource),
+    ...rel("reward_from").map(relationSource),
   ].slice(0, 3);
+  // What its recipe takes (the first recipe with reagents; the Created by tab lists every recipe), from the game files.
+  const madeFrom = rel("created_by").map(recipeOf).find((r) => r?.reagents.length)?.reagents ?? [];
   // The page in four lines: what it is, what players saw, what nobody has reported, and where the name came from.
   const requiredLevel = tip?.lines.find((l) => l.startsWith("Requires Level"))?.replace("Requires Level ", "") ?? null;
   // The vendor price the files give (the tooltip's last line), as a fact beside the box.
   const sellPrice = tip?.lines.find((l) => l.startsWith(SELL_PRICE))?.slice(SELL_PRICE.length) || null;
+  // The item level and binding lines, as facts beside the box.
+  const itemLevel = tip?.lines.find((l) => l.startsWith(ITEM_LEVEL))?.slice(ITEM_LEVEL.length) || null;
+  const binding = tip?.lines.find((l) => l.startsWith("Binds ")) ?? null;
   const identity = [
     category?.subclass?.name ?? category?.class?.label,
     shownQuality,
@@ -336,6 +351,7 @@ export default async function ItemPage(props: Props) {
   const summary = itemSummary({
     identity: identity || "An item the game files list.",
     dropSources: page.drops.length,
+    confirmedDropSources: page.drops.filter((d) => dropTier(d.reporters) === "confirmed").length,
     mapPositions: page.pins.length,
     vendors: rel("sold_by").length,
     recipes: rel("created_by").length,
@@ -351,12 +367,18 @@ export default async function ItemPage(props: Props) {
       { label: "Slot", value: category.slot?.name ?? "—" },
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
+    ...(itemLevel ? [{ label: "Item level", value: itemLevel, numeric: true }] : []),
+    ...(requiredLevel ? [{ label: "Req. level", value: requiredLevel, numeric: true }] : []),
+    ...(binding ? [{ label: "Binding", value: binding }] : []),
     ...(sellPrice ? [{ label: "Sell price", value: sellPrice, numeric: true }] : []),
     ...(startsQuest ? [{ label: "Starts a quest", value: <>
       <EntityLink kind="quest" id={startsQuest.id} name={startsQuest.name} />
       <span className="block text-muted">{CLIENT_QUEST_STARTS.label}</span>
     </> }] : []),
     ...(getFrom.length ? [{ label: "Get it from", value: <span className="inline-flex flex-col gap-1">{getFrom}</span> }] : []),
+    ...(madeFrom.length ? [{ label: "Made from", value: <span className="inline-flex flex-col gap-1">{madeFrom.map((x) => (
+      <span key={x.itemId} className="inline-flex items-center gap-1"><EntityLink kind="item" id={x.itemId} name={itemName(x.itemId)} icon={reagentTips.get(x.itemId)?.icon} />{x.count > 1 && <span className="font-mono tabular-nums text-fg-2">×{x.count}</span>}</span>
+    ))}</span> }] : []),
     ...(facts.unreachable ? [] : [
       { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
       { label: "Drop sources", value: known(page.drops.length || null), numeric: true },
@@ -399,13 +421,25 @@ export default async function ItemPage(props: Props) {
         <Tabs label={`${title}: relations`} tabs={tabs} />
         <DarkmoonItemNote name={name?.name} />
         {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
-        <MarketBox itemId={itemId} rows={auctions} />
+        <MarketBox itemId={itemId} {...auctions} />
         {/* Blizzard Developer API Terms: no ads on a page showing Blizzard data. This page carries ads, so it reads none
             and only links to the ad-free page. A plain link, not next/link: the router's prefetch would fetch that
             page's data into this document, and the move must load a fresh document without AdSense. */}
         <p className="mt-2 mb-6 text-meta">
           <a href={`/blizzard-auctions/${itemId}`} className={LINK}>Blizzard auction house data for this item</a>
         </p>
+        {iconRows.length > 0 && (
+          <section aria-labelledby="same-icon" className="mb-6">
+            <SectionHeading id="same-icon" size="data">Same icon</SectionHeading>
+            <DataTable
+              dense
+              caption={`Items with the same icon as ${title}`}
+              columns={[{ key: "target", header: "Items", cell: (e: Edge) => <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> }]}
+              rows={iconRows}
+              rowKey={(e) => `${e.rel}-${e.toId}`}
+            />
+          </section>
+        )}
       </>}
       related={<>
         <LoreSection match={lore} />

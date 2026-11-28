@@ -95,7 +95,7 @@ test("one column of cards: date, type chip, title linked to the post's page on E
   expect(html).not.toContain("<table");
   expect(rows(html)).toBe(4);
   expect(html.indexOf("1.60.1.70460")).toBeLessThan(html.indexOf("Synthetic beta notice"));
-  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*>2026-10-16<\/time>/);
+  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*>Oct 16, 2026<\/time>/);
   expect(html).toMatch(/<span data-type="true"><span data-badge="neutral"[^>]*>Blue post<\/span><\/span>/);
   expect(html).toMatch(/<span data-type="true"><span data-badge="neutral"[^>]*>Hotfix<\/span><\/span>/);
   expect(html).toMatch(/<a href="\/changes\/us-1-synthetic-beta-notice-b"[^>]*>Synthetic beta notice &lt;b&gt;<\/a>/);
@@ -112,7 +112,7 @@ test("one column of cards: date, type chip, title linked to the post's page on E
 test("every card carries its own date, whatever the sort", async () => {
   for (const sort of [undefined, "date", "type", "-type", "title", "-title", "author", "source"]) {
     const html = await page(sort ? { sort } : {});
-    expect(html.match(/<time dateTime="[^"]+"[^>]*>\d{4}-\d{2}-\d{2}<\/time>/g), sort).toHaveLength(4);
+    expect(html.match(/<time dateTime="[^"]+"[^>]*>[A-Z][a-z]{2} \d{1,2}, \d{4}<\/time>/g), sort).toHaveLength(4);
   }
 });
 test("pages keep the sort: newest first by default, oldest first on request", async () => {
@@ -417,14 +417,17 @@ test("November 11 and 12: twins on both forums are one card, and two posts under
   expect(nov11).toContain("US · EU forum");
   expect(nov11).toMatch(/<span data-posts="true"[^>]*>2 posts<\/span>/);
   // Both posts' words, and a link to each post's page.
-  expect(nov11).toContain("Feral Rend and Tear now works on Pounce Bleed.");
+  expect(nov11).toContain("November 11, 2026: Rend and Tear now works on Pounce Bleed.");
   expect(nov11).toContain("Auction House changes");
   expect(nov11).toContain('href="/changes/us-30863849-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toContain('href="/changes/us-30863846-wow-forever-hotfixes-november-11-2026"');
   expect(nov11).toMatch(/<p data-thread-posts="true"[^>]*>Read <span><a [^>]*>post 7<\/a><\/span><span> · <a [^>]*>post 8<\/a><\/span><\/p>/);
+  // The later post's words are labelled with its number and time, so they do not read as a repeat; the first post's are not.
+  expect(nov11).toMatch(/<p data-excerpt="true"[^>]*><span data-post-label="true"[^>]*>Post 8 · 00:48 UTC: <\/span>November 11, 2026/);
+  expect(nov11.match(/data-post-label/g)).toHaveLength(1);
   // Posted at 00:48 UTC on the 12th, the card is dated the day its title names.
-  expect(nov11).toMatch(/<time dateTime="2026-11-12T00:48:47.076Z"[^>]*>2026-11-11<\/time>/);
-  expect(nov12).toMatch(/<time [^>]*>2026-11-12<\/time>/);
+  expect(nov11).toMatch(/<time dateTime="2026-11-12T00:48:47.076Z"[^>]*>Nov 11, 2026<\/time>/);
+  expect(nov12).toMatch(/<time [^>]*>Nov 12, 2026<\/time>/);
   expect(html.match(/data-change-row/g)).toHaveLength(2);
 });
 
@@ -446,7 +449,7 @@ test("November 10: the PvP update titled 'November 10' in the US and '11 Novembe
   const [card] = cards(html);
   expect(card).toContain("US · EU forum");
   expect(card).toMatch(/<span data-posts="true"[^>]*>2 posts<\/span>/);
-  expect(card).toMatch(/<time [^>]*>2026-11-10<\/time>/);
+  expect(card).toMatch(/<time [^>]*>Nov 10, 2026<\/time>/);
 });
 
 test("builds are plain cards without the blue edge", async () => {

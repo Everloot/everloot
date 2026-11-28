@@ -235,6 +235,9 @@ describe("player directory", () => {
     const recent = html.slice(html.indexOf('id="players-recent"'), html.indexOf('id="players-best"'));
     expect(recent.indexOf("/armory/eu/arla-quill")).toBeLessThan(recent.indexOf("/armory/eu/brin-mire"));
     expect(recent.indexOf("/armory/eu/brin-mire")).toBeLessThan(recent.indexOf("/armory/eu/velkara-duskmantle"));
+    // QA round 13: the Read day in the site's day form, in the cell and the phone line, never "2026-11-09".
+    expect(recent).toContain("Nov 9, 2026");
+    expect(recent).not.toContain("2026-11-09<");
     const best = html.slice(html.indexOf('id="players-best"'));
     expect(best).toContain('href="/armory/eu/arla-quill"');
     expect(best).not.toContain("/armory/eu/brin-mire");
@@ -421,6 +424,20 @@ describe("QA round 1: the directory's races, labels and phone line", () => {
     expect(horde).toContain('href="/armory/eu/gang-jubaster"');
     expect(horde).not.toContain("sora-vel");
     expect(results(await page({ race: "high order skyborne" }))).toContain('href="/armory/eu/sora-vel"');
+  });
+
+  // QA round 12: /players said "High Order Skyborne" and "Windshaper Skyborne" while /rankings and /census say
+  // "Skyborne (Alliance)" and "Skyborne (Horde)". The page now words them as the census does; the filter values stay.
+  test("the Skyborne races read as the census names them, Skyborne (Alliance) and Skyborne (Horde)", async () => {
+    armory.putCharacter(armoryCharacter({ slug: "gang-jubaster", name: "Gang", surname: "Jubaster", race: "Windshaper Skyborne", raceId: 96, class: "Rogue" }));
+    armory.putCharacter(armoryCharacter({ slug: "sora-vel", name: "Sora", surname: "Vel", race: "High Order Skyborne", raceId: 95, class: "Mage", faction: "Alliance" }));
+    const html = await page();
+    expect(html).toMatch(/href="\/players\?race=Windshaper\+Skyborne"[^>]*>(?:<[^>]*>)*Skyborne \(Horde\)</);
+    expect(html).toMatch(/href="\/players\?race=High\+Order\+Skyborne"[^>]*>(?:<[^>]*>)*Skyborne \(Alliance\)</);
+    expect(html).not.toContain("Windshaper Skyborne<");
+    expect(html).not.toContain("High Order Skyborne<");
+    expect(html).not.toMatch(/Level \d+ (?:High Order|Windshaper) Skyborne/);
+    expect(results(await page({ race: "Windshaper Skyborne" }))).toContain("Skyborne (Horde)");
   });
 
   test("a disbanded guild, no guild and unread gear say so in words", async () => {

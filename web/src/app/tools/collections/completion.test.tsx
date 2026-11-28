@@ -101,7 +101,7 @@ test("a character shows what is done and what is closest to done", async () => {
   // Total, then Quests achievements, Reputation and its Alliance header, Titles, Quest chains.
   expect(html.match(/role="progressbar"/g)).toHaveLength(6);
   expect(html).toContain('href="/tools/collections?view=achievements-quests&amp;install=owner-install&amp;character=0a1b2c3d"');
-  expect(html).toContain("Data as of 2026-10-19 06:30 UTC");
+  expect(html).toContain("Data as of Oct 19, 2026, 06:30 UTC");
 });
 
 test("a character key that is not in the upload is named, and the collection box still works", async () => {

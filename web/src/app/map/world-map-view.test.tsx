@@ -306,6 +306,23 @@ test("categories that wait for uploads are listed with their zero, greyed, with 
   for (const group of ["travel", "instances", "places"]) expect(container.querySelector(`[data-category-group=${group}] a[href="/addon"]`)).toBeNull();
 });
 
+test("a phone's List sheet puts view=list in the address only while it is open", async () => {
+  vi.useFakeTimers();
+  await mount();
+  const bar = $("[data-map-bar]");
+  const view = async () => { await act(async () => { vi.advanceTimersByTime(300); }); return new URLSearchParams(window.location.search).get("view"); };
+  await click(button("List", bar));
+  expect(await view()).toBe("list");
+  await click(button("Close", panel()));
+  expect(await view()).toBeNull();
+  // Going to an item from the list closes the sheet the same way.
+  await click(button("List", bar));
+  expect(await view()).toBe("list");
+  await click(Array.from($("[data-map-list]").querySelectorAll("button")).find((b) => b.textContent?.includes("Show on map"))!);
+  expect(panel().hasAttribute("data-open")).toBe(false);
+  expect(await view()).toBeNull();
+});
+
 test("the sidebar's state goes into the address and comes back from it", async () => {
   vi.useFakeTimers();
   window.history.replaceState(null, "", "/map/kalimdor?spoilers=1");

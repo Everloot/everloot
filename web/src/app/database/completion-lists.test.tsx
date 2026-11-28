@@ -664,3 +664,32 @@ test("the achievement list leaves out Points when no row on the page has any, an
   expect(some).toMatch(/<th[^>]*>(?:<[^>]*>)*Points</);
   expect(rowOf(some, "/database/achievements/50-loremaster")).not.toContain("—");
 });
+
+/** A menu choice's count, or null when the menu leaves the choice out (it would match nothing). */
+const menuCount = (out: string, menu: string, label: string) => {
+  const part = out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "";
+  const at = part.split(`>${label}</span><span class="tabular-nums text-muted">`)[1];
+  return at === undefined ? null : Number(at.split("<")[0].replace(/,/g, ""));
+};
+
+test("the achievement and faction menus count with the name box on, and a category counts what it lists", async () => {
+  expect(menuCount(await html(AchievementList(search())), "category", "General")).toBe(1);
+  const named = await html(AchievementList(search({ q: "elwynn" })));
+  expect(menuCount(named, "category", "Exploration")).toBe(1);
+  expect(menuCount(named, "category", "General")).toBeNull();
+  expect(menuCount(await html(FactionList(search())), "header", "Alliance")).toBe(1);
+  const factions = await html(FactionList(search({ q: "orgrimmar" })));
+  expect(menuCount(factions, "header", "Horde")).toBe(1);
+  expect(menuCount(factions, "header", "Alliance")).toBeNull();
+});
+
+// QA round 13: "1 quests" on /database/quest-chains; a one-quest chain says "1 quest", in the list and on its page.
+test("QA round 13: a one-quest chain counts one quest, singular", async () => {
+  game.questLines = [{ id: 1, name: "The Missing Diplomat", questIds: [11] }];
+  const list = await html(ChainList(search()));
+  expect(list).toContain("1 quest · ID 1");
+  expect(list).not.toContain("1 quests");
+  const one = await html(ChainPage(page("1-the-missing-diplomat")));
+  expect(one).toContain("1 quest");
+  expect(one).not.toContain("1 quests");
+});

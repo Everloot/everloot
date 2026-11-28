@@ -24,6 +24,16 @@ export interface ProgressionMatrixProps {
 
 const tracked = new Set(trackedDungeons().map((dungeon) => dungeon.id));
 
+/**
+ * The instances a character's Progress tab and a guild's Progression list. A map the files give no name or place ("Instance 3002") is left
+ * out, and so is a small map that shares a raid's name (map 2921, "Naxxramas" with one boss, beside raid 533), so the
+ * raid shows once under Raids. A row with a kill recorded always stays.
+ */
+export function shownProgress<R extends ProgressionMatrixProps["instances"][number]>(rows: readonly R[]): R[] {
+  const raids = new Set(rows.filter((r) => r.group === "Raids").map((r) => r.name));
+  return rows.filter((r) => ("killed" in r && (r.killed ?? 0) > 0) || (r.typeKnown && !(r.group !== "Raids" && raids.has(r.name))));
+}
+
 export default function ProgressionMatrix({ instances, links = {}, guild = false, notes = true, collapsed }: ProgressionMatrixProps) {
   const groups = PROGRESSION_GROUPS.filter((group) => instances.some((r) => r.group === group)).map((group) => <section key={group} aria-label={group} className="space-y-3">
       <h3 className="text-lg font-semibold text-fg">{group}</h3>
@@ -32,11 +42,10 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               {links[r.id] ? <Link href={links[r.id]} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.name}</Link> : <span className="text-fg">{r.name}</span>}
-              {r.unconfirmed && <Badge tone="files" />}
               {!r.typeKnown && <span className="text-xs text-muted">type unconfirmed</span>}
             </div>
             <div className="flex flex-wrap gap-1">
-              <Badge tone="neutral">{r.availability === "unknown" ? "availability unavailable" : r.availability}</Badge>
+              <Badge tone="neutral">{r.availability === "unknown" ? "availability unavailable" : r.availability}{r.unconfirmed && ` · ${r.group === "World bosses" ? "boss" : "instance"} unconfirmed`}</Badge>
               {!guild && tracked.has(r.id) && <Badge tone="neutral">Tracked dungeon</Badge>}
             </div>
           </div>
@@ -55,8 +64,8 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
             </details>}
           </div>
           <div className="space-y-2 text-sm">
-            <span className="text-fg">{r.state}</span>
-            {"threshold" in r && <p className="text-muted">{r.threshold === null ? "size unknown" : `${r.threshold} of the roster`}</p>}
+            {"threshold" in r ? <p className="text-fg"><span className="text-muted">Guild clear:</span> {r.state}</p> : <span className="text-fg">{r.state}</span>}
+            {"threshold" in r && <p className="text-muted">{r.threshold === null ? "Group size unknown, so no boss counts here yet" : `A boss counts once ${r.threshold} of the roster hold its kill`}</p>}
             {r.state === "no data" && <p className="text-muted">no data from this character</p>}
             {r.newestKillDay && <p className="text-muted">Newest kill <time dateTime={r.newestKillDay} className="font-mono tabular-nums">{r.newestKillDay}</time> UTC</p>}
           </div>

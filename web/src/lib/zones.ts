@@ -6,6 +6,7 @@ import { confirmedEntrances, instanceBosses, type InstanceBoss, type InstanceFac
 import { objectSpawns, type ObjectSpawnPin, type ObjectSpawnRow } from "@kb/object-spawns";
 import { slugify } from "@kb/lore-slug";
 import { RECHECK_SCOPES } from "./recheck-scopes";
+import { CLIENT_PLACES } from "@/data/game-data/client-places";
 import { WORLD_MAP } from "./world-map";
 
 /** The zone's own address segment: `1411-durotar`. A name with no letters or digits leaves the bare id. */
@@ -169,17 +170,27 @@ export function zoneContents(
     npcsHere.set(pin.mapId, (npcsHere.get(pin.mapId) ?? new Set()).add(pin.npcId));
   }
 
+  // The quest log files a quest under a zone or one of its subzones (Valley of Trials is Durotar's): those names, to the zone.
+  const zoneOfCategory = new Map<string, number>();
+  for (const s of CLIENT_PLACES.subzones) if (zones.some((z) => z.mapId === s.uiMapId)) zoneOfCategory.set(s.name, s.uiMapId);
+  for (const z of zones) zoneOfCategory.set(z.name, z.mapId);
   const byQuest = new Map<number, WorldFacts["quests"]>();
   for (const q of facts.quests) byQuest.set(q.questId, [...(byQuest.get(q.questId) ?? []), q]);
   for (const [questId, rows] of byQuest) {
     const q = questPage(questId, { npcs: facts.npcs, quests: rows, vendors: [], recheck: facts.recheck, ...(facts.agreedNpcs ? { agreedNpcs: facts.agreedNpcs } : {}) });
-    let side: QuestSide | null | undefined;
+    const traits = rows.some((r) => r.category !== undefined) ? questTraits(rows, facts) : null;
+    const filed = traits?.category ? zoneOfCategory.get(traits.category) : undefined;
+    let side: QuestSide | null | undefined = traits?.side;
+    const add = (mapId: number) => {
+      side ??= questTraits(rows, facts).side;
+      out.get(mapId)!.quests.push({ questId, title: q.title, level: q.level, giverNpcId: q.giverNpcId, turnInNpcId: q.turnInNpcId, side });
+    };
     for (const [mapId, npcs] of npcsHere) {
-      if ((q.giverNpcId !== null && npcs.has(q.giverNpcId)) || (q.turnInNpcId !== null && npcs.has(q.turnInNpcId))) {
-        side ??= questTraits(rows, facts).side;
-        out.get(mapId)!.quests.push({ questId, title: q.title, level: q.level, giverNpcId: q.giverNpcId, turnInNpcId: q.turnInNpcId, side });
-      }
+      if ((q.giverNpcId !== null && npcs.has(q.giverNpcId)) || (q.turnInNpcId !== null && npcs.has(q.turnInNpcId))) add(mapId);
+      else if (mapId === filed) add(mapId);
     }
+    // A zone with no placed NPC still lists the quests filed under it.
+    if (filed !== undefined && !npcsHere.has(filed)) add(filed);
   }
 
   for (const e of placedEntrances(data, seen)) {
@@ -205,11 +216,12 @@ export function zoneContents(
 
 /**
  * The lowest and highest level 3 installs agree on among the zone's NPCs that are not friendly (the creatures players
- * fight there, not its guards and townsfolk), or null when none has one. Player data, not the game files' range.
+ * fight there, not its guards and townsfolk), with how many it rests on, or null when none has one. Player data, not
+ * the game files' range.
  */
-export function creatureLevels(npcs: readonly Pick<ZoneNpc, "level" | "reaction">[]): { min: number; max: number } | null {
+export function creatureLevels(npcs: readonly Pick<ZoneNpc, "level" | "reaction">[]): { min: number; max: number; count: number } | null {
   const levels = npcs.filter((n) => n.level !== null && n.reaction !== null && n.reaction !== "friendly").map((n) => n.level!);
-  return levels.length ? { min: Math.min(...levels), max: Math.max(...levels) } : null;
+  return levels.length ? { min: Math.min(...levels), max: Math.max(...levels), count: levels.length } : null;
 }
 
 /** Players' reports or the game files put something on the page beyond the zone's name. */

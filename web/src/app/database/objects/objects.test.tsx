@@ -186,3 +186,10 @@ test("a chest has a type and no skill row; the list shows type and zone columns 
   const byType = await html(ObjectsPage({ searchParams: Promise.resolve({ sort: "type" }) }));
   expect(byType.indexOf('href="/database/objects/2843"')).toBeLessThan(byType.indexOf('href="/database/objects/1617"'));
 });
+
+test("the list counts read in the singular for one: 1 item, not 1 items", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([loot("install-a", 1731, [2770]), loot("install-b", 1731, [2770]), loot("install-c", 1731, [])]));
+  const list = await html(ObjectsPage({}));
+  expect(list).toContain("3 loot windows · 1 item · 3 install IDs");
+  expect(list).not.toContain("1 items");
+});

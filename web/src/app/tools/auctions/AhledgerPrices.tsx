@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Coins from "@/components/ui/Coins";
 import { DataTable, Segmented, type Column } from "@/components/ui";
 import { AHLEDGER_SITE, ahledgerCredit, ahledgerItemUrl, ahledgerMarketLabel, salesText, type AhledgerPrice } from "@/lib/ahledger";
+import { utcStamp } from "@/lib/time";
 
 /** One region's markets: "US" and the market ids AH Ledger lists there. */
 export interface AhledgerRegion { label: string; markets: string[] }
@@ -12,7 +13,6 @@ type Row = { market: string; price: AhledgerPrice | null; credit?: string };
 type Read = { state: "loading" } | { state: "failed" } | { state: "rows"; rows: Row[] };
 
 const NONE = <span className="text-muted">—</span>;
-const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 
 async function readMarket(market: string, itemId: number): Promise<Row> {
   const res = await fetch(`/api/ahledger/${market}?items=${itemId}`);
@@ -54,7 +54,7 @@ export default function AhledgerPrices({ itemId, regions, title = "AH Ledger pri
     { key: "sales", header: "Sold a day", numeric: true, cell: (r) => (r.price?.salesPerDay == null ? NONE : salesText(r.price.salesPerDay)) },
     {
       key: "seen", header: "Scanned", nowrap: true,
-      cell: (r) => (r.price?.observedAt ? <time dateTime={r.price.observedAt}>{UTC.format(new Date(r.price.observedAt))} UTC</time> : NONE),
+      cell: (r) => (r.price?.observedAt ? <time dateTime={r.price.observedAt}>{utcStamp(r.price.observedAt)}</time> : NONE),
     },
   ];
 

@@ -275,6 +275,95 @@ export function withoutHeadings(html: string): string {
     .replace(/(<li\b[^>]*>)\s*<(strong|b)>[^<]*<\/\2>\s*(?=<[uo]l\b)/gi, "$1");
 }
 
+/**
+ * The section headings of Blizzard's hotfix posts (a game's name heads its part of a shared post). "Camping" and
+ * "Cooldown Manager" head WoW: Forever hotfix days in November 2026.
+ */
+const HOTFIX_SECTIONS = "The Burning Crusade Classic|Mists of Pandaria Classic|Cataclysm Classic|Season of Discovery|Classes|Dungeons and Raids|Raids and Dungeons|Dungeons|Raids|Items|Quests|Creatures and NPCs|NPCs|Player versus Player|PvP|Professions|User Interface|Achievements|Bug Fixes|Battlegrounds|Camping|Cooldown Manager";
+/** Each class listed under "Classes", with the specs that head its part. */
+const CLASS_SPECS: Record<string, string> = {
+  "Death Knight": "Blood|Frost|Unholy", Druid: "Balance|Feral|Guardian|Restoration", Hunter: "Beast Mastery|Marksmanship|Survival",
+  Mage: "Arcane|Fire|Frost", Monk: "Brewmaster|Mistweaver|Windwalker", Paladin: "Holy|Protection|Retribution", Priest: "Discipline|Holy|Shadow",
+  Rogue: "Assassination|Combat|Outlaw|Subtlety", Shaman: "Elemental|Enhancement|Restoration", Warlock: "Affliction|Demonology|Destruction",
+  Warrior: "Arms|Fury|Protection",
+};
+const CLASSES = Object.keys(CLASS_SPECS).join("|");
+const SPECS = [...new Set(Object.values(CLASS_SPECS).join("|").split("|"))].join("|");
+/** Second words of spells that open with a spec's name ("Frost Nova", "Feral Charge"): a spec word before one is the spell. */
+const SPEC_SPELL_WORDS = "Nova|Bolt|Armor|Ward|Trap|Shock|Strike|Fever|Presence|Resistance|Blast|Ball|Shield|Missiles|Explosion|Intellect|Brilliance|Power|Barrage|Light|Fire|Wrath|Word|Weaving|Form|Charge|Instincts?|Swiftness|Aggression|Spirit|Tactics|Expertise|Mastery|Focus|Fury|Precision|Aura|Boil|Tap|Plague|Blight|Frenzy|Orbs?|Reach|Embrace|Trance|Breath|Concentration|Guidance|Endurance|Readiness";
+const STORED_DAY = /^(?:Hotfixes\s+)?((?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2},? \d{4}):?\s+/;
+/** A sentence's end, and the space after it; "10:45 a.m. PST" goes on. */
+const SENTENCE_END = /(?<![ap]\.m)[.!?]["\u201d\u2019)\]]*\s+/;
+// Each heading is matched where a sentence starts (sticky) and only before a capitalised word, as headings sit over a line.
+const SECTION_AT = new RegExp(`(?:${HOTFIX_SECTIONS})\\s+(?=[A-Z])`, "y");
+/** A spec word is a heading only right before another heading ("Balance Classes …"), never on its own. */
+const SPEC_BEFORE_HEADING_AT = new RegExp(`(?:${SPECS})\\s+(?=(?:${HOTFIX_SECTIONS}|${CLASSES})\\s+[A-Z])`, "y");
+/** "Mage Armor" is a spell; "Mage Mage Armor" is the heading over it. */
+const CLASS_AT = new RegExp(`(${CLASSES.replace("Mage", "Mage(?!\\s+Armor\\b)")})\\s+(?=[A-Z])`, "y");
+const CLASSES_HEADING_AT = /Classes\s+(?=[A-Z])/y;
+const specAt = (cls: string) => new RegExp(`(?:${CLASS_SPECS[cls]})\\s+(?!(?:${SPEC_SPELL_WORDS})\\b)(?=[A-Z])`, "y");
+/** Notices that open a hotfix post before its changes. */
+const PREAMBLE = /^(?:Please note\b|We[\u2019']ve temporarily removed Auction House changes\b|They will appear again in the hotfixes update\b)|\bthe following changes went live\b/i;
+
+function matchedAt(re: RegExp, text: string, at: number): RegExpExecArray | null {
+  re.lastIndex = at;
+  return re.exec(text);
+}
+
+/**
+ * Where the headings at a sentence start end. A hotfix: section headings, then a class with the spec right under it.
+ * A post: only a "Classes" heading with its class (and spec), since only hotfix posts are laid out under the others.
+ */
+function headingsEnd(text: string, at: number, kind: "hotfix" | "post"): number {
+  let i = at;
+  if (kind === "hotfix") {
+    for (let m; (m = matchedAt(SPEC_BEFORE_HEADING_AT, text, i) ?? matchedAt(SECTION_AT, text, i)); ) i += m[0].length;
+  } else {
+    const m = matchedAt(CLASSES_HEADING_AT, text, i);
+    if (!m || !matchedAt(CLASS_AT, text, i + m[0].length)) return at;
+    i += m[0].length;
+  }
+  const cls = matchedAt(CLASS_AT, text, i);
+  if (!cls) return i;
+  i += cls[0].length;
+  return i + (matchedAt(specAt(cls[1]), text, i)?.[0].length ?? 0);
+}
+
+function withoutStoredHeadings(text: string, kind: "hotfix" | "post"): string {
+  const starts = [0, ...[...text.matchAll(new RegExp(SENTENCE_END, "g"))].map((m) => m.index + m[0].length)];
+  let out = "", from = 0;
+  for (const start of starts) {
+    if (start < from) continue;
+    out += text.slice(from, start);
+    from = headingsEnd(text, start, kind);
+  }
+  return out + text.slice(from);
+}
+
+/**
+ * A hotfix excerpt from its first change, after the notices that open it ("Please note: … the following changes went
+ * live …"). An excerpt holding only notices stays as it is: nothing is made up.
+ */
+export function fromFirstChange(text: string): string {
+  let out = text;
+  for (let end; (end = SENTENCE_END.exec(out)) && PREAMBLE.test(out.slice(0, end.index)); ) out = out.slice(end.index + end[0].length);
+  return PREAMBLE.test(out) ? text : out;
+}
+
+/**
+ * A forum excerpt as it reads once the headings flattened into it are left out. A hotfix (stored before or after
+ * withoutHeadings ran: "November 25, 2026 Classes Druid Hurricane now…") gets its day as a lead-in and loses, at each
+ * sentence start, its section headings and a class heading with the spec right under it. A post loses only a
+ * "Classes" heading with its class. Only flat text is stored, so only known headings go, before a capitalised word;
+ * a spec word on its own may start a spell ("Feral Charge") and stays.
+ */
+export function storedExcerpt(body: string, kind: "hotfix" | "post"): string {
+  if (kind === "post") return withoutStoredHeadings(body, "post");
+  const day = STORED_DAY.exec(body);
+  const text = withoutStoredHeadings(day ? body.slice(day[0].length) : body, "hotfix");
+  return day ? `${day[1]}: ${text}` : text;
+}
+
 const displayName = (username: string, name: string) => clampText(name, 100) || username.replace(/-\d+$/, "");
 
 export const postId = (region: BlueRegion, id: number) => (region === "us" ? `forum:${id}` : `forum:${region}:${id}`);

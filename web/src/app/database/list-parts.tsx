@@ -18,6 +18,9 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
 export type Search = Record<string, string | string[] | undefined>;
 
+/** "1 item", "3 items": a count with its noun, singular for one. */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
 /** Rows on one page of a list when the address names no size (?per= picks another, lib/page-size.ts). */
 export { PER_PAGE };
 
@@ -121,8 +124,57 @@ export function range(search: Search, k: string): { min: number; max: number } |
 
 export const rangeParam = (r?: { min: number; max: number }) => (r ? (r.min === r.max ? String(r.min) : `${r.min}-${r.max}`) : undefined);
 
+/**
+ * Faceted menu counts, the item lists' rule: each menu counts what the list would hold with every other filter on.
+ * `tests` holds each filter's test, null while it is off. One pass gives the rows that pass every test (`matched`)
+ * and, for each filter, the rows that fail none but its own (`without`), which its menu counts.
+ */
+export function facetRows<T, K extends string>(rows: readonly T[], tests: Record<K, ((row: T) => boolean) | null>): { matched: T[]; without: Record<K, T[]> } {
+  const keys = Object.keys(tests) as K[];
+  const on = keys.filter((k) => tests[k] !== null);
+  const matched: T[] = [];
+  const without = Object.fromEntries(keys.map((k) => [k, [] as T[]])) as Record<K, T[]>;
+  for (const row of rows) {
+    let missed: K | null = null;
+    let many = false;
+    for (const k of on) {
+      if (tests[k]!(row)) continue;
+      if (missed !== null) { many = true; break; }
+      missed = k;
+    }
+    if (many) continue;
+    if (missed !== null) { without[missed].push(row); continue; }
+    matched.push(row);
+    for (const k of keys) without[k].push(row);
+  }
+  return { matched, without };
+}
+
+/**
+ * The note under a menu whose options leave rows out: how many of `rows` (a facet's `without`) have no value for it,
+ * so the options adding to less than the list says why. Undefined when every row has one.
+ */
+export function unrecordedNote<T>(rows: readonly T[], has: (row: T) => boolean): string | undefined {
+  let n = 0;
+  for (const row of rows) if (!has(row)) n++;
+  return n ? `Not recorded: ${n.toLocaleString("en-US")}` : undefined;
+}
+
+/** How many of `rows` each key holds, in one pass. */
+export function countBy<T, V>(rows: readonly T[], key: (row: T) => V): Map<V, number> {
+  const out = new Map<V, number>();
+  for (const row of rows) out.set(key(row), (out.get(key(row)) ?? 0) + 1);
+  return out;
+}
+
 /** The level brackets the level menus offer; any other range still works typed into the URL. */
 export const LEVEL_BRACKETS = [[1, 10], [11, 20], [21, 30], [31, 40], [41, 50], [51, 60]].map(([min, max]) => ({ min, max }));
+
+/**
+ * The level brackets of a counted Level menu (NPCs, quests), labelled: LEVEL_BRACKETS and a top "61+" bracket, so the
+ * few rows above level 60 have a choice and the counts with the "Not recorded" note add up to the list.
+ */
+export const COUNTED_LEVEL_BRACKETS = [...LEVEL_BRACKETS.map((b) => ({ ...b, label: `${b.min}–${b.max}` })), { min: 61, max: 999, label: "61+" }];
 
 /** A list URL with its parameters in the given order, empty ones left out. */
 export function listHref(path: string, params: [string, string | undefined][]): string {

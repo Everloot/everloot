@@ -49,17 +49,22 @@ beforeEach(() => {
 test("a confirmed quest chain: In short with its quest count, three installs and when, and Copy for AI", async () => {
   const out = await html("900-the-defias");
   expect(out).toContain("In short");
-  expect(out).toContain("A quest chain in WoW: Forever of 3 quests.");
+  expect(out).toContain("A 3-quest chain in WoW: Forever.");
   expect(out).toMatch(/Players reported it, three installs agreeing \(last upload [^)]+\)\./);
   expect(out).toContain("Players agree on the name.");
   expect(openData(out)).toEqual([
     "The Defias (quest chain 900)",
-    "A quest chain in WoW: Forever of 3 quests.",
+    "A 3-quest chain in WoW: Forever.",
     expect.stringMatching(/^Players reported it, three installs agreeing \(last upload [^)]+\)\.$/),
     "Players agree on the name.",
     "Source: https://everloot.app/database/quest-chains/900-the-defias",
   ]);
   expect(out).not.toContain("Raw JSON");
+});
+
+test("a one-quest chain says so in plain words", async () => {
+  serve(from(3, { questLineId: 902, name: "Short Walk", questIds: [5] }));
+  expect(await html("902-short-walk")).toContain("A one-quest chain in WoW: Forever.");
 });
 
 test("a chain cut at its listed quests says it is longer", async () => {

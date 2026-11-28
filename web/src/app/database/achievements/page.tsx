@@ -5,7 +5,7 @@ import Link from "@/components/Link";
 import { Card, Container, DataTable, DataTitle, FilterBar, ResultStrip, filledColumns, type FilterControl, type SparseColumn, stripBelow } from "@/components/ui";
 import { achievementHref, achievementRows, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { loadSiteAssets } from "@/lib/game-assets";
-import { byRank, nameMatches, Respelled,
+import { byRank, facetRows, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
   pageParams, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
@@ -48,8 +48,11 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
   const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
-  const matched = all.filter((x) =>
-    (!text || (id !== null ? x.achievementId === id : ranked!.has(x))) && (!q.category || inCategory(x, q.category)));
+  // The Category menu counts with the name box on, as the list would hold it (facetRows).
+  const { matched, without } = facetRows(all, {
+    q: text ? (x: Listed<AchievementEntry>) => (id !== null ? x.achievementId === id : ranked!.has(x)) : null,
+    category: q.category ? (x: Listed<AchievementEntry>) => inCategory(x, q.category!) : null,
+  });
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (x: Listed<AchievementEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "category" ? x.category.toLowerCase()
     : sort.key === "points" ? x.points : sort.key === "criteria" ? x.criteriaCount : x.achievementId;
@@ -75,7 +78,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
     {
       type: "menu", key: "category", label: "Category",
       options: [{ label: "Any category", href: here({ category: undefined }), on: !q.category, reset: true }, ...categories.map((c) => ({
-        label: c, href: here({ category: c }), on: q.category === c, count: all.filter((x) => x.category === c).length,
+        label: c, href: here({ category: c }), on: q.category === c, count: without.category.filter((x) => inCategory(x, c)).length,
       }))],
     },
   ];

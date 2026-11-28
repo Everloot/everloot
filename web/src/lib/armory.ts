@@ -1,4 +1,4 @@
-import { dataAgeLabel } from "./data-age";
+import { utcStamp } from "./time";
 
 /**
  * The armory (plan docs/superpowers/plans/2026-11-09-armory-blizzard-intake.md): a page for every WoW: Forever
@@ -200,6 +200,9 @@ const RACE_BY_ID: Record<number, string> = {
 };
 /** The race names the armory stores, as Blizzard's API spells them: Skyborne is one race per side. */
 export const ARMORY_RACES: readonly string[] = Object.values(RACE_BY_ID);
+/** A stored race as /census and /rankings word it: Skyborne with its side (game-data races.json: 95 Alliance, 96 Horde). */
+const RACE_LABEL: Record<string, string> = { "High Order Skyborne": "Skyborne (Alliance)", "Windshaper Skyborne": "Skyborne (Horde)" };
+export const raceLabel = (name: string): string => RACE_LABEL[name] ?? name;
 export const UNKNOWN = "Unknown";
 export const classTokenOfId = (id: number | null | undefined): string | null => (id == null ? null : CLASS_BY_ID[id] ?? null);
 export const raceOfId = (id: number | null | undefined): string => (id == null ? UNKNOWN : RACE_BY_ID[id] ?? UNKNOWN);
@@ -264,8 +267,13 @@ export function boardValue(
   }
 }
 
-/** "Read 2026-11-09 14:05 UTC": when the crawler last read the row, or that it is unrecorded. */
+/** "Nov 9, 2026, 14:05 UTC": the time in readLine's form, for a sentence that words "read" itself; null when unrecorded. */
+export function readAt(at: string | null | undefined): string | null {
+  return utcStamp(at);
+}
+
+/** "Read Nov 9, 2026, 14:05 UTC": when the crawler last read the row, or that it is unrecorded. The one read-time form. */
 export function readLine(at: string | null | undefined): string {
-  const label = dataAgeLabel(at);
-  return label.startsWith("Data as of ") ? `Read ${label.slice("Data as of ".length)}` : "Read time unrecorded";
+  const stamp = readAt(at);
+  return stamp ? `Read ${stamp}` : "Read time unrecorded";
 }

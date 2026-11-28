@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 import { guildProgression } from "@kb/guild-progression";
-import type { ProgressionInstance } from "@kb/progression";
+import { progressionCatalogue, type ProgressionInstance } from "@kb/progression";
 const loader = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/progression", () => ({ loadGuildProgression: loader }));
 import GuildProgression from "./GuildProgression";
@@ -20,6 +20,10 @@ test("section renders score tile, privacy, threshold, availability and every gui
   for (const text of ["Progression", "Guild progression score", "60", "cleared", "partial", "none", "5 of the roster", "40 of the roster", "size unknown", "not seen open yet", "Counts synced kills from every linked character in the armory roster"]) expect(html).toContain(text);
   expect(html).toContain("2 / 2 bosses");
   expect(html).not.toContain("no data from this character");
+  // Each value says what it is: the guild's clear state, then how many members a boss needs.
+  expect(html).toMatch(/Guild clear:(?:<[^>]*>)*\s*none/);
+  expect(html).toContain("A boss counts once 5 of the roster hold its kill");
+  expect(html).toContain("Group size unknown, so no boss counts here yet");
 });
 
 test("hub hook adds a public score board alongside the raid board only for positive readable scores", () => {
@@ -71,4 +75,19 @@ test("a score of 0 before ladders open says when they start, not 0; a score stil
     const after = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
     expect(after).toContain("Guild progression score");
   } finally { vi.useRealTimers(); }
+});
+
+test("QA round 10: the guild lists the instances the character tab lists: no unnamed map, Naxxramas once, under Raids", async () => {
+  const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
+  const rows = guildProgression(catalogue, []);
+  loader.mockResolvedValue({ score: 0, links: {}, instances: rows });
+  const html = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
+  expect(html).not.toContain("Instance 3002");
+  expect(html).not.toContain('data-progression-instance="2921"');
+  expect(html.match(/>Naxxramas</g)).toHaveLength(1);
+  expect(html.slice(html.indexOf('aria-label="Raids"'))).toContain('data-progression-instance="533"');
+  expect(html).toContain(`${catalogue.length - 2} instances with no kills yet`);
+  // A counted kill on such a map keeps its row.
+  loader.mockResolvedValue({ score: 0, links: {}, instances: rows.map((r) => (r.id === 2921 ? { ...r, state: "cleared", killed: 1 } : r)) });
+  expect(renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }))).toContain('data-progression-instance="2921"');
 });

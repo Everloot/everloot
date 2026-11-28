@@ -12,6 +12,7 @@ import { playableEncounters } from "@kb/encounter-set";
 import { objectNames } from "./names";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadInstanceFacts, loadItemFacts } from "./rollup-compute";
+import { loadStoredInstanceFacts, type StoredInstanceFacts } from "./instance-facts-store";
 import { WORLD_MAP } from "./world-map";
 import { placedEntrances, publicZones, type PlacedEntrance, type ZoneSightings } from "./zones";
 
@@ -290,4 +291,30 @@ export async function loadSightings(): Promise<ZoneSightings & { unreachable: bo
   if (instances.unreachable || items.unreachable) return { unreachable: true };
   const asOf = instances.dataAsOf && Number.isFinite(Date.parse(instances.dataAsOf)) ? new Date(instances.dataAsOf) : undefined;
   return { instances, sightings: instances.sightings, objectNames: objectNames(items), ...(asOf ? { asOf } : {}), unreachable: false };
+}
+
+/**
+ * The instance entrances and encounters players reported, and the corpus's date: from their small stored file
+ * (instance-facts-store.ts), else from the whole aggregate set. Null when neither can be read.
+ */
+export async function loadInstanceFactsStoredFirst(): Promise<StoredInstanceFacts | null> {
+  return (await loadStoredInstanceFacts()) ?? aggregateInstanceFacts();
+}
+
+async function aggregateInstanceFacts(): Promise<StoredInstanceFacts | null> {
+  const facts = await loadInstanceFacts().catch(() => null);
+  return facts && !facts.unreachable ? { dataAsOf: facts.dataAsOf, instances: { entrances: facts.entrances, encounters: facts.encounters } } : null;
+}
+
+/**
+ * `loadSightings` without the treasures and object names, for the pages that list only instances and bosses (the
+ * boss and instance pages and their share images): with the stored file they skip parsing the 10 MB aggregate set.
+ * `fromAggregates`: the page parses that set anyway (the instance page, for its quests and loot), so the facts come
+ * from it; holding the stored file too would only add heap.
+ */
+export async function loadInstanceSightings({ fromAggregates = false } = {}): Promise<ZoneSightings & { unreachable: boolean }> {
+  const facts = fromAggregates ? await aggregateInstanceFacts() : await loadInstanceFactsStoredFirst();
+  if (!facts) return { unreachable: true };
+  const asOf = facts.dataAsOf && Number.isFinite(Date.parse(facts.dataAsOf)) ? new Date(facts.dataAsOf) : undefined;
+  return { instances: facts.instances, ...(asOf ? { asOf } : {}), unreachable: false };
 }

@@ -5,6 +5,7 @@ import { SKILL_BRACKETS } from "@/lib/professions";
 import { clampPageSize, DEFAULT_RECIPE_PAGE_SIZE, RECIPE_PAGE_SIZES, recipePage } from "@/lib/recipe-list";
 import { AhledgerPanel } from "./AhledgerPanel";
 import CraftingTable from "./AhledgerCraftingTable";
+import { utcStamp } from "@/lib/time";
 
 /**
  * The profession page's AH Ledger crafting margins, read, filtered, sorted and paged on the server, with all of it in
@@ -86,7 +87,7 @@ export function craftingHref(path: string, search: Search, query: CraftingQuery,
 }
 
 /** "2026-11-24 05:45 UTC", as the page's other data times read. */
-const utc = (iso: string) => { const d = new Date(iso).toISOString(); return `${d.slice(0, 10)} ${d.slice(11, 16)} UTC`; };
+const utc = (iso: string) => utcStamp(iso) ?? iso;
 
 /** What the page read from AH Ledger for this market and profession. */
 export type CraftingRead = { ok: true; recipes: AhledgerCraft[]; asOf: string | null; credit: AhledgerCredit } | { ok: false };

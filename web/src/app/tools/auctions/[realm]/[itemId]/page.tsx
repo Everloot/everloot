@@ -20,11 +20,12 @@ import {
   itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
+import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, ScansPaused, UnnamedReason, itemQuality } from "../../parts";
 import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
 import { REGION_LABEL, RULESET_LABEL, realmRegion, realmRuleset } from "@/lib/realms";
+import { realmDisplayName } from "../../RealmName";
 
 type Props = { params: Promise<{ realm: string; itemId: string }> };
 
@@ -61,7 +62,9 @@ const loadFor = cache(async (rawRealm: string, rawItemId: string) => {
 });
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const { slug, itemId, row, realm, label } = await load(props.params);
+  const { slug, itemId, row, realm: recorded, label } = await load(props.params);
+  // The realm as the site shows it ("US1 · Realm 4 PvP"), not the recorded CAMWOW label.
+  const realm = realmDisplayName(recorded);
   const description = row
     ? `${label} on ${realm} in WoW: Forever, ${row.house} auction house: market value ${money(row.value.market)}, minimum buyout ${formatCopper(row.value.min)}, and 60 days of prices from player scans.`
     : `No public auction price for ${label} on ${realm} in WoW: Forever yet. A price shows once 3 reporters scan the item in one auction house on this realm.`;
@@ -84,6 +87,8 @@ export default async function RealmItemPage(props: Props) {
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
+  // Sentences name the realm as the site shows it; the store, the API link and AH Ledger read the recorded name.
+  const shown = realmDisplayName(realm);
   // AH Ledger's markets for this realm's ruleset and region, both factions; none for a realm the map cannot place.
   const ruleset = realmRuleset(realm);
   const region = realmRegion(realm);
@@ -92,7 +97,7 @@ export default async function RealmItemPage(props: Props) {
   const houseMarket = ahledger.find((m) => row && m.split(".")[2] === row.house.toLowerCase()) ?? ahledger[0];
   const moves = row ? ([1, 7] as const).flatMap((span) => {
     const move = priceMove(row, span, now);
-    return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${move.from.day} to ${move.to.day}` }] : [];
+    return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${scanDayText(move.from.day)} to ${scanDayText(move.to.day)}` }] : [];
   }) : [];
 
   return (
@@ -115,12 +120,12 @@ export default async function RealmItemPage(props: Props) {
         title={label}
         quality={quality}
         lede={row
-          ? `${row.house} auction house price on ${realm} in WoW: Forever. Each house is its own market${houses.length > 1 ? "; the Houses tab lists the others" : ""}.`
-          : `Auction House price on ${realm} in WoW: Forever, one auction house at a time.`}
+          ? `${row.house} auction house price on ${shown} in WoW: Forever. Each house is its own market${houses.length > 1 ? "; the Houses tab lists the others" : ""}.`
+          : `Auction House price on ${shown} in WoW: Forever, one auction house at a time.`}
         meta={v && (
           <Facts items={[
             `${row.house} auction house`,
-            `Newest scan ${scanDayText(v.day, now)}`,
+            `Newest scan ${scanDayText(v.day)}`,
             reportersText(v.reporters),
           ]} />
         )}
@@ -132,6 +137,7 @@ export default async function RealmItemPage(props: Props) {
 
       <div className="space-y-10">
         <UnnamedReason id={itemId} names={names} />
+        <ScansPaused state={state} now={now} />
 
         {!state && (
           <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>
@@ -140,7 +146,7 @@ export default async function RealmItemPage(props: Props) {
         {state && !v && (
           <EmptyState
             count={agreementSoFar(state, slug, itemId)}
-            message={`No price for ${label} on ${realm} yet: it needs scans from 3 players in one auction house.`}
+            message={`No price for ${label} on ${shown} yet: it needs scans from 3 players in one auction house.`}
           />
         )}
 
@@ -148,9 +154,9 @@ export default async function RealmItemPage(props: Props) {
           <>
             <PriceFacts facts={[
               { label: "Market value", value: v.market === null ? "unrecorded" : <CoinText text={money(v.market)} />, note: v.market === null ? "No solid day in the last 14" : "Weighted over 14 days" },
-              { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${v.day}` },
+              { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${scanDayText(v.day)}` },
               { label: "Historical", value: <CoinText text={formatCopper(v.historical)} />, note: "60-day median" },
-              { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${v.day}` },
+              { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${scanDayText(v.day)}` },
               ...moves,
             ]} note={coverageText(marketCoverage(row.points, now))} />
             <section aria-labelledby="ah-chart">
@@ -167,7 +173,7 @@ export default async function RealmItemPage(props: Props) {
               ...(row ? [{
                 id: "houses", label: "Houses", count: houses.length,
                 panel: houses.length
-                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} now={now} /></div>
+                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>
                   : <div className="pt-4"><EmptyState framed={false} count={Math.max(...HOUSES.map((h) => agreementSoFar(state, slug, itemId, h)))} message="No auction house has its own price for this item yet: a house's price needs scans from 3 players in that house." /></div>,
               }] : []),
               {

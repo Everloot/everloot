@@ -161,11 +161,12 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
  * A search field with instant suggestions in sections (characters, guilds, items, zones and NPCs, quests and objects,
  * then a row for every result on the search page), as a combobox: arrow keys move through the list, Enter opens the
  * one picked, or the first row named exactly what is typed, or searches; Escape closes. Inside a GET form, so without
- * JavaScript it is a plain search.
+ * JavaScript it is a plain search. With `listFillsForm` the list is as wide as the nearest positioned box around the
+ * field (a `relative` form holding the field and its button) instead of the field alone.
  */
-export function SuggestField({ id, name = "q", label, placeholder, defaultValue = "", scope = "", className, listClassName = "", inputRef, describedBy, after }: {
+export function SuggestField({ id, name = "q", label, placeholder, defaultValue = "", scope = "", className, listClassName = "", listFillsForm = false, inputRef, describedBy, after }: {
   id: string; name?: string; label: string; placeholder?: string; defaultValue?: string; scope?: string; className: string; listClassName?: string;
-  inputRef?: RefObject<HTMLInputElement | null>; describedBy?: string; after?: ReactNode;
+  listFillsForm?: boolean; inputRef?: RefObject<HTMLInputElement | null>; describedBy?: string; after?: ReactNode;
 }) {
   const [text, setText] = useState(defaultValue);
   const [open, setOpen] = useState(false);
@@ -205,18 +206,20 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setPicked(row.href)}
         onClick={() => setOpen(false)}
-        className={`flex h-11 items-center gap-3 px-3 text-cell sm:h-9 ${i === active ? "bg-canvas" : ""}`}
+        className={`flex min-h-11 items-center gap-3 px-3 py-1 text-cell sm:min-h-9 ${i === active ? "bg-canvas" : ""}`}
       >
         {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
         {row.faction && <span role="img" aria-label={row.faction} className={`h-2 w-2 shrink-0 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} />}
-        <span className={`min-w-0 flex-1 truncate ${labelColour(row)}`}>{row.label}</span>
+        {/* Never cut short: a long name ("Thunderfury, Blessed Blade of the Windseeker") wraps whole beside its ID at
+            390 px, and two names that start alike stay apart. */}
+        <span className={`min-w-0 flex-1 break-words ${labelColour(row)}`}>{row.label}</span>
         <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
       </Link>
     </li>
   );
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className={`${listFillsForm ? "" : "relative "}min-w-0 flex-1`}>
       <label htmlFor={id} className="sr-only">{label}</label>
       <input
         ref={inputRef}

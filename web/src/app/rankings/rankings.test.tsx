@@ -86,7 +86,9 @@ test("with two weeks: the weekly chart, the change column and the current week m
   expect(page).toMatch(/<th[^>]*>(?:<[^>]+>)*Change</);
   // Last week: Hunter 65, Priest 45, Warrior 30. This week Warrior leads with 80.
   // The first cell carries the phone line (change · count · share), then the columns follow.
-  expect(text(page)).toContain("1 Warrior ▲2 · 80 characters · 40% ▲2 up 2 80 40% 2026-11-20");
+  expect(text(page)).toContain("1 Warrior ▲2 · 80 characters · 40% ▲2 up 2 80 40% Nov 20, 2026");
+  // QA round 13: the data time in the site's timestamp form.
+  expect(text(page)).toContain("Data as of Nov 20, 2026, 12:00 UTC");
   expect(text(page)).toContain("2 Hunter ▼1 · 65 characters · 33% ▼1 down 1 65 33%");
   expect(text(page)).not.toContain(ONE_WEEK_LINE);
   // The hub: the stacked class chart with every class named, then each ranking's top rows with their change marks.
@@ -106,7 +108,7 @@ test("the hub's headline tiles, weekly totals and top movers, each row linking t
   const words = text(page);
   // 149 characters last week round to 150; 201 this week round to 200.
   expect(page).toContain("data-metric-tiles");
-  expect(words).toContain("Characters counted 200 This week so far (from 2026-11-16)");
+  expect(words).toContain("Characters counted 200 This week so far (from Nov 16, 2026)");
   // The week is still running: it is compared with the same days of last week.
   expect(words).toContain("Against the same days last week +50 +33% characters");
   // Mage and Warlock are hidden this week, so the tile names the leader among published classes and says why.
@@ -114,7 +116,7 @@ test("the hub's headline tiles, weekly totals and top movers, each row linking t
   expect(words).not.toContain("Most played class");
   expect(words).toContain("Reporting installs 3");
   expect(page).toContain("data-weekly-totals");
-  expect(words).toMatch(/Week of 2026-11-09 150 This week so far \(from 2026-11-16\) 200/);
+  expect(words).toMatch(/Week of Nov 9, 2026 150 This week so far \(from Nov 16, 2026\) 200/);
   const movers = page.match(/<ol data-movers[\s\S]*?<\/ol>/)![0];
   expect(text(movers)).toMatch(/▲2 up 2 Warrior Classes by players/);
   expect(movers).toContain('href="/census?class=warrior"');
@@ -227,4 +229,16 @@ test("an unknown ranking is a 404", async () => {
   store.loadCensus.mockResolvedValue(read([], "2026-11-15T12:00:00.000Z"));
   await expect(ranking("gold")).rejects.toThrow();
   expect(await meta("gold")).toEqual({});
+});
+
+// QA round 13: the hub's census lists and each full ranking are rounded counts too, so they carry /census's footnote.
+test("QA round 13: each census ranking says counts are rounded, as /census does", async () => {
+  store.loadCensus.mockResolvedValue(read([...week(WEEK1, "w"), ...week(WEEK2, "v", 80)], "2026-11-20T12:00:00.000Z"));
+  const footnote = "Counts are rounded to the nearest 5, so parts may not add up exactly.";
+  const page = await hub();
+  for (const slug of ["classes", "races", "factions"]) {
+    const card = page.slice(page.indexOf(`id="${slug}"`));
+    expect(card.slice(0, card.indexOf("</section>"))).toContain(footnote);
+    expect(await ranking(slug)).toContain(footnote);
+  }
 });

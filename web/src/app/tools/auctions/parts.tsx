@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
 import GameIcon from "@/components/game/GameIcon";
 import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
+import { SPARK_BOX, itemHref, itemLabel, percent, realmHref, scanDayText, scansPaused, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
-import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "@kb/market";
+import { HISTORY_DAYS, formatCopper, reportersText, trimDays, type MarketState, type PublicDay } from "@kb/market";
+import { axisStep } from "@/lib/chart-axis";
+import PriceLine from "./PriceLine";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import ClientCoins from "./ClientCoins";
@@ -51,13 +53,13 @@ export function Sparkline({ points, now }: { points: PublicDay[]; now: Date }) {
 }
 
 /** One item on one realm in each auction house: market value, minimum, units and its newest scan day. */
-export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption: string; now: Date }) {
+export function HousePrices({ rows, caption }: { rows: MarketRow[]; caption: string }) {
   const columns: Column<MarketRow>[] = [
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><ClientCoins copper={r.value.market} /></span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => <ClientCoins copper={r.value.min} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
-    { key: "updated", header: "Newest scan", numeric: true, cell: (r) => scanDayText(r.value.day, now) },
+    { key: "updated", header: "Newest scan", numeric: true, cell: (r) => scanDayText(r.value.day) },
   ];
   return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house} />;
 }
@@ -66,7 +68,7 @@ export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption
  * One line per ruleset: realms, items priced, the newest scan day and the week's biggest moves, across every house. A
  * ruleset with nothing says why: no realm is mapped to it yet, or its realms have no public prices yet.
  */
-export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetSummary[]; now: Date; names: ItemNames; href: (r: RulesetSlug) => string }) {
+export function RulesetSummaryTable({ rows, names, href }: { rows: RulesetSummary[]; names: ItemNames; href: (r: RulesetSlug) => string }) {
   const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
   const columns: Column<RulesetSummary>[] = [
     {
@@ -79,7 +81,7 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
       key: "updated", header: "Newest scan", nowrap: true,
       cell: (r) => (!r.mapped ? <span className="text-muted">Not mapped yet</span>
         : !r.items || r.newestDay === null ? <span className="text-muted">No public prices yet</span>
-        : scanDayText(r.newestDay, now)),
+        : scanDayText(r.newestDay)),
     },
     {
       key: "moves", header: "Biggest moves, 7 days",
@@ -96,6 +98,26 @@ export function RulesetSummaryTable({ rows, now, names, href }: { rows: RulesetS
     },
   ];
   return <DataTable dense caption="Auction House by ruleset, all houses" columns={columns} rows={rows} rowKey={(r) => r.ruleset} />;
+}
+
+/**
+ * With no scan anywhere for SCANS_PAUSED_DAYS, one line on why and where current prices are. It links Blizzard's prices
+ * and never shows them: those pages are ad-free, this one is not.
+ */
+export function ScansPaused({ state, now, className }: { state: MarketState | null; now: Date; className?: string }) {
+  return scansPaused(state, now) ? <ScansPausedNotice className={className} /> : null;
+}
+
+/** The scans-paused line itself, for a page that already knows scans are paused. */
+export function ScansPausedNotice({ className }: { className?: string }) {
+  return (
+    <Card className={className}>
+      <p className="text-fg-2" role="status">
+        Community scans are paused: the game stopped reporting realm names, so the addon holds scans back. Current Blizzard prices are on{" "}
+        <a href="/blizzard-auctions" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Blizzard auctions</a>.
+      </p>
+    </Card>
+  );
 }
 
 /** Contributing is the one way a realm gets prices: run a scan, upload it. */
@@ -177,28 +199,35 @@ export function PriceFacts({ facts, note }: { facts: { label: string; value: Rea
  * from the first public day to the newest, the two dates under it, so the line spans the box instead of sitting in
  * the last weeks of an empty window.
  */
+/** An axis label in coins, its zero parts after the first left off: 12000 is "1g 20s", 10000 "1g". */
+function coinAxis(copper: number): string {
+  const parts = formatCopper(copper).split(" ");
+  while (parts.length > 1 && /^0[gsc]$/.test(parts.at(-1)!)) parts.pop();
+  return parts.join(" ");
+}
+
 export function PriceChart({ points }: { points: PublicDay[] }) {
   if (points.length < 2) {
     return <p className="text-sm text-muted">The line starts once a second public day is in.</p>;
   }
-  const width = 1000, height = 140, pad = 8;
-  const days = points.map((p) => Date.parse(`${p.day}T00:00:00Z`) / 86_400_000);
-  const first = days[0]!, span = Math.max(1, days[days.length - 1]! - first);
+  // The scale follows the days the market value keeps: a day the trim took out (the page's note counts it) would
+  // otherwise flatten every other day against the floor.
+  const { trimmed } = trimDays(points);
   const values = points.map((p) => p.market);
+  const kept = points.filter((p) => !trimmed.has(p)).map((p) => p.market);
   const low = Math.min(...values), high = Math.max(...values);
-  const x = (d: number) => pad + ((d - first) / span) * (width - 2 * pad);
-  const y = (v: number) => (high === low ? height / 2 : pad + (1 - (v - low) / (high - low)) * (height - 2 * pad));
-  const line = points.map((p, i) => `${x(days[i]!).toFixed(1)},${y(p.market).toFixed(1)}`).join(" ");
+  const step = axisStep(Math.max(...kept));
+  const days = points.map((p) => ({
+    day: p.day, value: p.market, outlier: trimmed.has(p),
+    label: `${scanDayText(p.day)}: ${formatCopper(p.market)}${trimmed.has(p) ? ", trimmed as an outlier" : ""}`,
+  }));
   return (
     <figure className="space-y-2">
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-labelledby="ah-chart-title" className="h-36 w-full rounded-card border border-line bg-canvas text-accent">
-        <title id="ah-chart-title">{`Market value per public day, last ${HISTORY_DAYS} days: ${formatCopper(low)} to ${formatCopper(high)}`}</title>
-        {/* The box stretches to the column, so the line carries no dots that would stretch with it. */}
-        <polyline points={line} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      </svg>
+      <PriceLine days={days} step={step} axis={["0", coinAxis(step), coinAxis(step * 2)]} title={`Market value per public day, last ${HISTORY_DAYS} days: ${formatCopper(low)} to ${formatCopper(high)}`} />
       <figcaption className="flex flex-wrap justify-between gap-x-4 text-xs text-muted">
-        <span>{points[0]!.day} to {points.at(-1)!.day}</span>
+        <span>{scanDayText(points[0]!.day)} to {scanDayText(points.at(-1)!.day)}</span>
         <span className="font-mono tabular-nums"><CoinText text={formatCopper(low)} /> to <CoinText text={formatCopper(high)} /></span>
+        {trimmed.size > 0 && <span>Hollow dots are days trimmed as outliers.</span>}
       </figcaption>
     </figure>
   );
@@ -220,7 +249,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
     { key: "historical", header: "Historical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.historical)} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
-    { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
+    { key: "day", header: "Day", numeric: true, cell: (r) => scanDayText(r.value.day) },
   ];
   return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`} empty={<EmptyState framed={false} message={empty} />} />;
 }
@@ -228,7 +257,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
 /** The public days behind one price, newest first. */
 export function DayTable({ points, caption }: { points: PublicDay[]; caption: string }) {
   const columns: Column<PublicDay>[] = [
-    { key: "day", header: "Day", numeric: true, cell: (p) => p.day },
+    { key: "day", header: "Day", numeric: true, cell: (p) => scanDayText(p.day) },
     { key: "value", header: "Value", numeric: true, cell: (p) => <CoinText text={formatCopper(p.market)} /> },
     { key: "min", header: "Min buyout", numeric: true, cell: (p) => <CoinText text={formatCopper(p.min)} /> },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },

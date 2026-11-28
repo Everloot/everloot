@@ -124,3 +124,21 @@ test("with too few known item levels the page shows no ranked item level or Gear
   expect(facts).toContain("Item levels are known for 3 of 17 slots");
   expect(facts).not.toContain("computed on this page");
 });
+
+// QA round 14: set pieces worn are counted against the set the game files list, and an equal Gear Score says why.
+test("QA round 14: the gear names each item set worn with its pieces, 3/8, linked to the set's page", async () => {
+  const { Equipment } = await import("./profile");
+  const piece = (slot: string, itemId: number) => ({ slot, itemId, name: `Piece ${itemId}`, level: 66, quality: "EPIC", inventoryType: slot });
+  const c = armoryCharacter({ equipment: [piece("HEAD", 16846), piece("CHEST", 16845), piece("LEGS", 16847), piece("NECK", 1)] });
+  const gear = renderToStaticMarkup(<Equipment character={c} tips={new Map()} setNames={(id) => (id === 206 ? "Hunter Set Name" : undefined)} />);
+  expect(gear).toMatch(/data-item-sets[^>]*>(?:\s|<[^>]*>)*Sets:(?:\s|<[^>]*>)*<a [^>]*href="\/database\/item-sets\/206"[^>]*>Hunter Set Name<\/a>(?:\s|<[^>]*>)*3\/8/);
+  // Without set names (another page's gear), no line.
+  expect(renderToStaticMarkup(<Equipment character={c} tips={new Map()} />)).not.toContain("data-item-sets");
+});
+
+test("QA round 14: a Gear Score equal to the ranked item level says why the two match", () => {
+  const same = renderToStaticMarkup(<CharacterFacts character={armoryCharacter({ itemLevel: 63, gearScore: 63 })} lastRead={null} now={0} />);
+  expect(same).toContain("Gear Score weighs the same 17 item levels by each slot&#x27;s stat budget, so it matches the ranked item level when the gear&#x27;s levels are close.");
+  const apart = renderToStaticMarkup(<CharacterFacts character={armoryCharacter({ itemLevel: 60, gearScore: 63 })} lastRead={null} now={0} />);
+  expect(apart).not.toContain("so it matches");
+});

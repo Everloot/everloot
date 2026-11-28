@@ -204,3 +204,16 @@ test("an item page reads ?drops= for its Dropped by pages", async () => {
   const second = await page("2");
   expect(second).toContain("26–26");
 });
+
+test("an NPC that drops one item says 1 item in its quick facts, not 1 items", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    loot("install-aaaa", 40, [750], "2026-10-10T08:00:00.000Z"),
+    loot("install-bbbb", 40, [750], "2026-10-12T08:00:00.000Z"),
+    loot("install-cccc", 40, [750], "2026-10-14T08:00:00.000Z"),
+  ]));
+  const { Npc } = await pages();
+  const markup = await html(Npc(props("40")));
+  const drops = markup.split(">Drops</dt>")[1]?.split("</dd>")[0] ?? "";
+  expect(drops).toMatch(/>1 item$/);
+  expect(markup).not.toContain("1 items");
+});

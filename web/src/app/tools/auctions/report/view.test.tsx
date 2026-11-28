@@ -26,7 +26,7 @@ test("the report reads plain: the lede, UTC times, thousands separators", () => 
   const t = text(renderToStaticMarkup(<ReportView report={report} />));
   expect(t).toContain("Prices fell for 55 of 81 items compared with the day before.");
   expect(t).not.toContain("comparable item-house prices fell");
-  expect(t).toContain("Data time: 20 Nov, 04:21 UTC. Scan coverage as received by 21 Nov, 00:10 UTC.");
+  expect(t).toContain("Data time: Nov 20, 2026, 04:21 UTC. Scan coverage as received by Nov 21, 2026, 00:10 UTC.");
   expect(t).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   expect(t).toContain("6,748");
   expect(t).toContain("1,199 listed auctions");
@@ -35,7 +35,7 @@ test("the report reads plain: the lede, UTC times, thousands separators", () => 
 
 test("the latest report says when no newer one exists because nothing was scanned since", () => {
   const old = text(renderToStaticMarkup(<ReportView report={report} dates={["2026-11-20"]} now={new Date("2026-11-27T09:00:00Z")} />));
-  expect(old).toContain("No newer report: no scans since 20 Nov.");
+  expect(old).toContain("No newer report: no scans since Nov 20, 2026.");
   // Yesterday's report is the newest there can be.
   const current = text(renderToStaticMarkup(<ReportView report={report} dates={["2026-11-20"]} now={new Date("2026-11-21T09:00:00Z")} />));
   expect(current).not.toContain("No newer report");

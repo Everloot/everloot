@@ -21,7 +21,7 @@ import { loadRenders } from "@/lib/game-renders";
 import EntityMap from "../../EntityMap";
 import { entityMapZones } from "../../entity-map";
 import { NPC_LOOT_SORTS, NpcLootPanel, lootPage } from "../../loot-tables";
-import { listHref, nextSort, sortParam, sortRows } from "../../list-parts";
+import { listHref, nextSort, plural, sortParam, sortRows } from "../../list-parts";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
 import { unknownNpc } from "../../unknown";
@@ -30,7 +30,7 @@ import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames } from "@/lib/names";
 import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { npcIndexable } from "@/lib/indexable";
@@ -215,7 +215,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
           : known(null) },
         { label: "Map positions", value: known(page.pins.length || null), numeric: true },
         // Drop rows show from one install; their table labels the agreement tier.
-        { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
+        { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? plural(dropped.length, "item") : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
       ]}
       media={picture && <ModelPicture picture={picture} name={title} />}
       summary={summary}
@@ -236,7 +236,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
                   item={(itemId) => {
                     const x = look!(itemId);
                     // The tooltip draws its own icon in front; an item the files give only an icon for draws it in the link.
-                    return <ItemTip tip={x.tip}><EntityLink kind="item" id={itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} /></ItemTip>;
+                    return <ItemTip tip={x.tip}><EntityLink kind="item" id={itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} /></ItemTip>;
                   }}
                   sort={{ key: drops.key, direction: drops.desc ? "desc" : "asc" }}
                   sortHref={dropHref}

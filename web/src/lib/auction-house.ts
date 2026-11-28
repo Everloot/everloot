@@ -5,6 +5,7 @@ import {
   type ItemDays, type MarketState, type MarketValue, type MoveSpan, type PublicDay, type RealmDays,
 } from "@kb/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
+import { utcDay } from "./time";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -406,10 +407,37 @@ export function newestScanDay(rows: readonly { value: { day: string } }[]): stri
   return newest;
 }
 
-/** A public day as the pages write it: "20 Nov", with the year when it is not `now`'s. */
-export function scanDayText(day: string, now: Date): string {
-  const at = new Date(`${day}T00:00:00Z`);
-  return at.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(at.getUTCFullYear() !== now.getUTCFullYear() ? { year: "numeric" } : {}), timeZone: "UTC" });
+/** Whole UTC days without any scan, on any realm, before the Auction House pages say community scans are paused. */
+export const SCANS_PAUSED_DAYS = 3;
+const newestAnywhereMemo = new WeakMap<MarketState, string | null>();
+
+/**
+ * The newest day any install scanned any realm, below the agreement gate too; null with none. Open days hold the newest
+ * scans (a full store closes the oldest open day, never the newest), so closed days are read only with no open day left.
+ * Kept per rollup, so the item pages read the store once per isolate.
+ */
+export function newestScanAnywhere(state: MarketState): string | null {
+  if (newestAnywhereMemo.has(state)) return newestAnywhereMemo.get(state)!;
+  const stores = [...Object.values(state.realms), ...Object.values(state.houses ?? {})];
+  const newest = (key: "open" | "closed") => {
+    let best: string | null = null;
+    for (const realm of stores) for (const item of Object.values(realm.items)) for (const day in item[key]) if (best === null || day > best) best = day;
+    return best;
+  };
+  const found = newest("open") ?? newest("closed");
+  newestAnywhereMemo.set(state, found);
+  return found;
+}
+
+/** Whether the newest scan anywhere is SCANS_PAUSED_DAYS or more days old; false without a rollup or any scan. */
+export function scansPaused(state: MarketState | null, now: Date): boolean {
+  const newest = state ? newestScanAnywhere(state) : null;
+  return newest !== null && todayNumber(now) - dayNumber(newest) >= SCANS_PAUSED_DAYS;
+}
+
+/** A public day as the pages write it: "Nov 20, 2026", the site's day form. */
+export function scanDayText(day: string): string {
+  return utcDay(day) ?? day;
 }
 
 const moveMemo = new WeakMap<MarketRow, Map<string, Move | null>>();
@@ -440,8 +468,8 @@ export function noWeekMoveReason(row: MarketRow, now: Date): string | null {
   if (priceMove(row, 7, now)) return null;
   const to = solidDays(row.points).at(-1);
   if (!to) return "No public day to compare";
-  if (todayNumber(now) - dayNumber(to.day) > 1) return `No public scan since ${scanDayText(to.day, now)}: a 7-day change needs one from today or yesterday`;
-  return priceMoveOf(row.points, 7, now) ? "Unchanged over 7 days" : `No public scan 7 to 10 days before ${scanDayText(to.day, now)} to compare with`;
+  if (todayNumber(now) - dayNumber(to.day) > 1) return `No public scan since ${scanDayText(to.day)}: a 7-day change needs one from today or yesterday`;
+  return priceMoveOf(row.points, 7, now) ? "Unchanged over 7 days" : `No public scan 7 to 10 days before ${scanDayText(to.day)} to compare with`;
 }
 
 export const SPARK_DAYS = 14;

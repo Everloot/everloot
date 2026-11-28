@@ -60,3 +60,32 @@ test("a map whose box shrinks to nothing (a tab switch) keeps its view and draws
   expect(views.length).toBeGreaterThan(0);
   for (const v of views) expect([v.x, v.y, v.zoom].every(Number.isFinite), JSON.stringify(v)).toBe(true);
 });
+
+test("no label is drawn under a control laid over the map, and one shows once the control is gone", () => {
+  // The control covers the middle of the map, where Durotar's name sits; jsdom lays nothing out, so its box is set here.
+  const control = document.createElement("div");
+  control.setAttribute("data-map-overlay", "");
+  const rect = (l: number, t: number, r: number, b: number) => ({ left: l, top: t, right: r, bottom: b, x: l, y: t, width: r - l, height: b - t, toJSON() {} }) as DOMRect;
+  const real = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.hasAttribute("data-map-overlay")) return rect(250, 250, 550, 350);
+    if (this.classList.contains("leaflet-container")) return rect(0, 0, 800, 600);
+    return real.call(this);
+  });
+  try {
+    act(() => root.render(<LeafletMap {...props} />));
+    // Beside the map, as the page draws it (React clears the box on its first render).
+    host.append(control);
+    // A resize draws the labels again.
+    size.width = 801;
+    act(() => observed!());
+    const names = () => Array.from(host.querySelectorAll(".wm-label")).map((l) => l.textContent);
+    expect(names()).not.toContain("Durotar");
+    control.remove();
+    size.width = 800;
+    act(() => observed!());
+    expect(names()).toContain("Durotar");
+  } finally {
+    vi.restoreAllMocks();
+  }
+});

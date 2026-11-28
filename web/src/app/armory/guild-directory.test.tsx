@@ -169,7 +169,7 @@ describe("the guild page summary", () => {
     expect(out).toContain("Level 60");
     expect(out).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
     expect(out).toMatch(/Roster members read<\/dt><dd[^>]*>2<\/dd>/);
-    expect(out).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+    expect(out).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
     expect(out).toContain('data-population="classes"');
     expect(out).toContain("2 (66.7%)");
     expect(out).toContain("1 (33.3%)");
@@ -315,7 +315,12 @@ describe("the guild activity strip", () => {
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*Last 7 days/);
     expect(s).toMatch(/>1<\/span>\s*(?:\s*<[^>]*>)*\s*8 to 30 days/);
     expect(s).toMatch(/>0<\/span>\s*(?:\s*<[^>]*>)*\s*Longer/);
-    expect(s).toContain("Last login, as of the 2026-11-09 roster read");
+    // QA round 11: a login comes from the character's own read, which can be later than the roster read.
+    // QA round 14: the label stays short; the note under it says where a login comes from.
+    expect(s).toContain("Last login, counted back from the Nov 9, 2026 roster read");
+    expect(s).toContain("Last login is each member&#x27;s newest read, which can be after the roster read.");
+    expect(s).not.toContain("a login after that read counts");
+    expect(s).not.toContain("as of the 2026-11-09 roster read");
     const recent = roster(await html(pages.guild("eu", "ember-wardens", { active: "7d" })));
     expect(recent).toContain("Velkara Duskmantle</a>");
   });
@@ -357,7 +362,7 @@ describe("the guild home", () => {
     expect(header).toMatch(/data-region="eu"[^>]*>EU<\/span>/);
     expect(header).toContain("Normal");
     expect(header).toContain("3 members");
-    expect(header).toContain("2026-10-01");
+    expect(header).toContain("Oct 1, 2026");
   });
 
   test("roster rows carry the name in its class colour, linked when read, level, race and class, item level and last login", async () => {
@@ -365,7 +370,7 @@ describe("the guild home", () => {
     expect(out).toMatch(/<a href="\/armory\/eu\/velkara-duskmantle" class="[^"]*text-class-hunter[^"]*">Velkara Duskmantle<\/a>/);
     expect(out).toMatch(/<span class="[^"]*text-class-hunter[^"]*">Brannoc Tide<\/span>/);
     expect(out).toContain("Troll Hunter");
-    expect(out).toContain("2026-11-08");
+    expect(out).toContain("Nov 8, 2026");
     expect(out).toContain('aria-sort="ascending"');
   });
 
@@ -486,7 +491,7 @@ describe("the guild home", () => {
     expect(out).toContain("Ashka");
     expect(out).not.toContain("Usmir");
     // A roster member the armory has not read shows the day the addon saw them ("seen" in the sans face).
-    expect(out).toMatch(/2026-11-07[^<]*<span[^>]*><span class="font-sans">seen<\/span><\/span>/);
+    expect(out).toMatch(/Nov 7, 2026[^<]*<span[^>]*><span class="font-sans">seen<\/span><\/span>/);
     vi.stubEnv("EVERLOOT_GUILDS", "");
     expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain("Ashka");
   });
@@ -516,7 +521,17 @@ describe("QA round 1: rosters and the directory", () => {
     // Said in the visible note, not only on hover: phones never hover.
     expect(dir).toContain("Level 60 read: characters we read at level 60. It can be higher than the guild page&#x27;s count, because each character is counted as of its own read.");
     const guild = await html(pages.guild("eu", "ember-wardens"));
-    expect(guild).toMatch(/Level 60 on the roster<\/dt><dd[^>]*>1<\/dd>/);
+    expect(guild).toMatch(/Level 60 when the roster was read<\/dt><dd[^>]*>1<\/dd>/);
+  });
+
+  test("QA round 11: the directory note is one line; how each count works sits behind a closed disclosure", async () => {
+    const dir = await html(pages.directory());
+    const heading = /^[^>]*>[^<]*<\/h2>(?:<\/div>)?<p[^>]*>([^<]*)<\/p>/.exec(dir.slice(dir.indexOf('id="directory"')));
+    expect(heading?.[1]).toBe("Counts come from the characters the armory has read; a hidden character is not counted.");
+    const fold = /<details[^>]*data-disclosure[^>]*>([\s\S]*?)<\/details>/.exec(dir.slice(dir.indexOf('id="directory"')))?.[1] ?? "";
+    expect(fold).toContain("How this is counted");
+    expect(fold).toContain("Members read counts the characters the armory has read whose guild this is");
+    expect(fold).toContain("Level 60 read: characters we read at level 60.");
   });
 
   test("the average item level order ranks guilds with at least 10 members read, and says so", async () => {
@@ -555,6 +570,8 @@ describe("QA round 2: guild counts and the item level order", () => {
     expect(out).toMatch(/Average item level at 60<\/dt><dd[^>]*>57\.4 <span class="whitespace-nowrap">\(1 read\)<\/span><\/dd>/);
     const dir = await html(pages.directory());
     expect(dir).toMatch(/It can be higher than the guild page&#x27;s count, because each character is counted as of its own read/);
+    // QA round 10: 928 here, 931 on the guild page: the two count members differently, and the note says how.
+    expect(dir).toMatch(/the guild page counts the members of its last roster read instead, so the two can differ by a few/);
   });
 });
 
@@ -607,6 +624,6 @@ describe("QA round 4: the item level order without the database's minimum", () =
     expect(out).toMatch(/<td[^>]*><span class="text-muted">—<\/span><\/td>/);
     spy.mockRestore();
     const listed = await html(pages.directory());
-    expect(listed).toMatch(/Newest read among the guilds listed: 2026-11-09/);
+    expect(listed).toMatch(/Newest read among the guilds listed: Nov 9, 2026,/);
   });
 });

@@ -208,7 +208,7 @@ test("an NPC known only as a quest giver or a vendor is listed too", async () =>
   ] });
   const page = await html(NpcList(search()));
   expect(rows(page, "npcs")).toEqual([74, 240]);
-  expect(page).toContain(">NPC 240<");
+  expect(page).toContain(">Unnamed NPC 240<");
   expect(page.split("<thead>")[1]!.split("</thead>")[0]).not.toContain(">Reaction<");
 });
 
@@ -346,8 +346,11 @@ test("rows whose name repeats with nothing else to tell them apart say their ID"
   // Beside the name, not only in the small-screen line under it (a div).
   expect(row(3276)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3276<\/span>/);
   expect(row(3281)).toMatch(/>Heavy Linen Bandage<\/a><span[^>]*>ID 3281<\/span>/);
-  // A name that does not repeat gets nothing added.
+  // Once: the small-screen line under the name does not say the ID again.
+  expect(row(3276).match(/ID 3276/g)).toHaveLength(1);
+  // A name that does not repeat gets nothing added, and its ID stays in the line under it.
   expect(row(3275)).toMatch(/>Linen Bandage<\/a><\/span>/);
+  expect(row(3275)).toMatch(/class="dt-meta">ID 3275</);
 });
 
 test("a talent's level column is blank: its level is its row in the tree, as on the spell page", async () => {
@@ -460,4 +463,11 @@ test("drops list item, NPC and object row links navigate without prefetching", a
     expect(rowLinks.length, href).toBeGreaterThan(0);
     expect(rowLinks.every((link) => link.prefetch === false), href).toBe(true);
   }
+});
+
+// QA round 13: the NPC list's phone line counts one drop in the singular (Hogger drops one item).
+test("QA round 13: an NPC with one drop says 1 drop", async () => {
+  const all = await html(NpcList(search()));
+  expect(all).toContain("1 drop · ");
+  expect(all).not.toContain("1 drops");
 });

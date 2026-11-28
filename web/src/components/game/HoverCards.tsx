@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QUALITIES } from "@/design/tokens";
 import type { SiteCard } from "@/lib/site-card";
 import { CardPopup, GameCard, type CardContent } from "./GameCard";
 
@@ -10,8 +9,8 @@ import { CardPopup, GameCard, type CardContent } from "./GameCard";
 // holiday, hunter pet family, boss), mounted once in the root layout. It
 // listens on the document, so a list, a search result, the type-ahead or a link inside a page needs nothing of
 // its own: any <a href="/database/items/123"> gets the card. A pointer resting on the link for SHOW_DELAY or
-// keyboard focus opens it: the card's frame at once with the name and quality colour the link already shows, filled
-// in when the card arrives, and the whole card at once when it was asked for before. Leaving, blurring or Escape
+// keyboard focus opens it when the card arrives, at once when it was asked for before. A card that would only repeat
+// the name the link already shows does not open: it would say nothing and cover the next row. Leaving, blurring or Escape
 // closes it. Touch gets none and asks for none: a tap goes to the page. The card is the link's description while
 // open. It appears without motion, so there is nothing for reduced motion to turn off, and it sits in a fixed layer
 // over the page, so it moves nothing on it. Links that already carry their own card (ItemTip, SpellTip) are left alone.
@@ -103,22 +102,14 @@ export function cardFor(key: string): Promise<SiteCard | null> {
   return asked;
 }
 
-const QUALITY_CLASS = new RegExp(`(?:^|\\s)text-q-(${QUALITIES.join("|")})(?:\\s|$)`);
+/** A card with nothing but its name: no icon, no lines, no players' numbers, no note and no source line. */
+export const nameOnly = (card: CardContent) =>
+  !card.icon && card.lines.length === 0 && !card.evidence && !card.missing && !card.taught && !card.foot;
 
-const textOf = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
-
-/**
- * The card's frame from what the link shows, for the moment before the card arrives: the name in its quality colour
- * (the coloured part of the link, so a search row's "Item 123" beside the name stays out), else the link's text.
- * Null for a link with no text to show.
- */
-export function linkFrame(link: HTMLAnchorElement): CardContent | null {
-  const coloured = [link, ...link.querySelectorAll("[class]")].find((el) => QUALITY_CLASS.test(el.getAttribute("class") ?? ""));
-  const title = textOf(coloured ?? null) || textOf(link) || link.getAttribute("aria-label")?.trim();
-  if (!title) return null;
-  const quality = coloured ? QUALITIES.indexOf(QUALITY_CLASS.exec(coloured.getAttribute("class")!)![1] as (typeof QUALITIES)[number]) : null;
-  return { title, quality, icon: null, lines: [], foot: null };
-}
+const squash = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
+/** The card would say only what the link already says ("Linen Bandage" on a link reading Linen Bandage). */
+const repeatsLink = (card: CardContent, link: HTMLAnchorElement) =>
+  nameOnly(card) && squash(`${link.textContent ?? ""} ${link.getAttribute("aria-label") ?? ""}`).includes(squash(card.title));
 
 const linkIn = (target: EventTarget | null): HTMLAnchorElement | null => {
   const el = target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
@@ -150,23 +141,14 @@ export default function HoverCards() {
       const described = anchor.getAttribute("aria-describedby");
       const mine: NonNullable<typeof current> = { anchor, described, keyboard: x === null };
       const show = (card: CardContent) => {
-        if (current !== mine || !anchor.isConnected) return;
+        if (current !== mine || !anchor.isConnected || repeatsLink(card, anchor)) return;
         anchor.setAttribute("aria-describedby", described ? `${described} ${CARD_ID}` : CARD_ID);
         setOpen({ anchor, x, card });
       };
       mine.timer = setTimeout(() => {
-        // A card this visit already has shows whole, and a 404 shows nothing; otherwise the frame, then the card.
-        if (cards.has(key)) {
-          const card = cards.get(key);
-          if (card) show(card);
-          return;
-        }
-        const frame = linkFrame(anchor);
-        if (frame) show(frame);
+        // A card this visit already has shows at once, and a 404 shows nothing; otherwise the card when it arrives.
         void cardFor(key).then((card) => {
-          if (current !== mine) return;
-          if (card) show(card);
-          else close();
+          if (current === mine && card) show(card);
         });
       }, SHOW_DELAY);
       current = mine;
