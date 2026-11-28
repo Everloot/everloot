@@ -6,7 +6,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { matchItemNames,
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacetCounts, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
-  listItems, matchingItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
+  listItems, matchingItems, NAME_FROM, slotOrder, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type ItemSort, type NameSource,
 } from "@/lib/items";
 import { itemListIndex, loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
@@ -264,7 +264,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     }] : []),
     {
       type: "menu", key: "slot", label: "Slot", multi: true,
-      options: [...slotNames].map(([slug, name]) => ({ label: name, href: link(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
+      options: [...slotNames].sort(([a], [b]) => slotOrder(a, b)).map(([slug, name]) => ({ label: name, href: link(cls?.slug, sub?.slug, toggled(q, "slot", slug)), on: Boolean(q.slot?.includes(slug)), count: slots.get(slug) ?? 0 })),
     },
     {
       type: "menu", key: "quality", label: "Quality", multi: true,

@@ -527,3 +527,15 @@ test("with upload storage out of reach, an item page and the item lists are mark
     facts.unreachable = false;
   }
 });
+
+test("the Slot menu lists the slots in the character window's order, head to feet, then the weapons", async () => {
+  const labels = (page: string) => [...(page.split('data-filter="slot"')[1]?.split("</details>")[0] ?? "").matchAll(/class="fm-lbl[^"]*">([^<]+)</g)].map((m) => m[1]);
+  const order = ["Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket",
+    "Main Hand", "One-Hand", "Two-Hand", "Off Hand", "Shield", "Held In Off-hand", "Ranged", "Thrown", "Ammo", "Quiver", "Relic", "Bag"];
+  for (const page of [await html(items()), await html(ItemPage(props("weapons"))), await html(ItemPage(props("armor")))]) {
+    const shown = labels(page);
+    expect(shown.length).toBeGreaterThan(1);
+    expect(shown.every((s) => order.includes(s)), shown.join(", ")).toBe(true);
+    expect(shown).toEqual([...shown].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+  }
+});

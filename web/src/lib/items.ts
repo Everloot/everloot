@@ -84,6 +84,14 @@ export function categoryNamedEnough(classId: number | undefined, subclassId: num
 
 /** Slot slugs any item in the build uses, in inventory type order (robes and chest pieces share "chest"). */
 export const SLOT_SLUGS: string[] = [...new Set(CLIENT_TAXONOMY.items.map((r) => slotOf(r[3])?.slug).filter((s): s is string => Boolean(s)))];
+/**
+ * The slots in the character window's order (lib/character-showcase.ts PAPER_DOLL): its left column, its right column,
+ * then the weapons row and what goes with it, bags last. The Slot menu lists its choices in this order.
+ */
+const SLOT_ORDER = ["head", "neck", "shoulder", "back", "chest", "shirt", "tabard", "wrist", "hands", "waist", "legs", "feet", "finger", "trinket",
+  "main-hand", "one-hand", "two-hand", "off-hand", "shield", "held-in-off-hand", "ranged", "thrown", "ammo", "quiver", "relic", "bag"];
+/** Sorts slot slugs in the character window's order; a slot the order does not name goes last. */
+export const slotOrder = (a: string, b: string) => (SLOT_ORDER.indexOf(a) + 1 || 99) - (SLOT_ORDER.indexOf(b) + 1 || 99);
 export const QUALITY_SLUGS: string[] = QUALITIES.map((q) => q.slug);
 /** The quality filter also takes items whose quality the files leave unrecorded. */
 export const UNRECORDED = "unrecorded";
