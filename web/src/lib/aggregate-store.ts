@@ -31,7 +31,7 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 export const AGGREGATES_KEY = "snapshots/aggregates.json";
 /** The set's shape in the file's stamp. Change it when the set gains a table, so the next cron rewrites the file. */
-export const AGGREGATES_REVISION = "npc-facts-1";
+export const AGGREGATES_REVISION = "samples-out-1";
 /**
  * The stamp of a file that still holds the NPC sightings, written when the NPC facts could not be: the revision before
  * they moved out, so the next run, with the facts written, rewrites the file without them.

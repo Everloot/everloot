@@ -15,6 +15,7 @@ import { pullStore } from "@/lib/pull-store";
 import { guildKillProblem, guildsOn, hiddenGuildsForIntake, isGuildKillRow } from "@/lib/guilds";
 import { censusDailyCap } from "@kb/census-rows";
 import { isRecorderInstall } from "@kb/recorder-installs";
+import { isSampleInstall } from "@kb/sample-installs";
 import { RECORDER_KINDS, RECORDER_SOURCE, recorderCharacter } from "@/lib/polestar-recorder";
 import { settledForIntake, settledTally, settledTallyOn } from "@/lib/settled-store";
 import { matchSettled } from "@kb/settled-list";
@@ -148,7 +149,9 @@ async function handleIntake(req: Request, telemetry: Omit<IntakeTelemetry, "reas
   for (let i = 0; i < upload.records.length; i++) {
     const row = upload.records[i];
     const recorderProblem = recorder ? (RECORDER_KINDS.includes(row.kind) ? null : "A Polestar Recorder upload carries NPC positions, quests, loot, instance entrances, encounters and object sightings only.")
-      : isRecorderInstall(row.installId) ? "Install ids starting with ps- are given by the server to Polestar Recorder uploads." : null;
+      : isRecorderInstall(row.installId) ? "Install ids starting with ps- are given by the server to Polestar Recorder uploads."
+      // The upload page's "Load sample" rows are made up; four of them once agreed on an NPC that does not exist.
+      : isSampleInstall(row.installId) ? "This is the upload page's sample, which is never stored. Choose your own Everloot.lua to send." : null;
     if (recorderProblem) {
       receipt.rejected.push({ index: receipt.accepted[i].index, reason: recorderProblem });
       continue;

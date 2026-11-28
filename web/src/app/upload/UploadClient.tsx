@@ -36,6 +36,8 @@ async function loadSettled(build: unknown): Promise<SettledList | null> {
  */
 export default function UploadClient({ playerPages = false, pullSummaries = false }: { playerPages?: boolean; pullSummaries?: boolean } = {}) {
   const [payload, setPayload] = useState<unknown>(null);
+  // The sample is made up, to show the format: it fills the preview and is never sent (intake refuses it too).
+  const [isSample, setIsSample] = useState(false);
   const [settled, setSettled] = useState<SettledList | null>(null);
   const [choices, setChoices] = useState<SharingChoices>({});
   const [tokens, setTokens] = useState("");
@@ -69,7 +71,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
   async function loadFile(file: File) {
     if (busy) return;
     const id = ++loadId.current;
-    resetSession(); setPayload(null); setSettled(null); setChoices({}); setTokens(""); setLoading(true);
+    resetSession(); setPayload(null); setIsSample(false); setSettled(null); setChoices({}); setTokens(""); setLoading(true);
     try {
       if (file.size > 20_000_000) throw new Error("This file exceeds 20 MB. Keep the original and split it before uploading.");
       const text = await file.text();
@@ -88,7 +90,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
   }
   function sample() {
     if (busy) return;
-    resetSession(); setSettled(null); setChoices({}); setTokens("");
+    resetSession(); setSettled(null); setChoices({}); setTokens(""); setIsSample(true);
     const base = { installId: `sample-${crypto.randomUUID()}`, capturedAt: new Date().toISOString() };
     setPayload({ addonVersion: "0.2.0", records: [
       { ...base, eventId: "sample:1", kind: "npc_sighting", npcId: 1234, name: "Forest Spider", mapId: 141, x: 42.5, y: 61, level: 60, reaction: "hostile" },
@@ -96,7 +98,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
     ] });
   }
   async function send() {
-    if (!prepared.value || busy) return;
+    if (!prepared.value || busy || isSample) return;
     const active = saved.current ?? prepared.value;
     saved.current = active; setSession(active); setSending(true); setError(null);
     try {
@@ -221,8 +223,9 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         {prepared.value.held.links > 0 && <p className="mt-1 text-sm text-fg-2">Character link codes never go in an upload. The Everloot Desktop App, signed in to your account, sends them to your account.</p>}
         {prepared.value.held.local > 0 && <p className="mt-1 text-sm text-fg-2">Your professions, talents, character stats, PvP standing, raid lockouts and boss kills never go in an upload. They stay in your file. The Everloot Desktop App can sync your raid lockouts to your account.</p>}
         <p className="mt-2 text-sm text-fg-2">{prepared.value.batches.length} batches. A storage receipt confirms saved records. A batch whose every record is rejected is processed without saving its records, so later batches can continue. Named choices are checked against the grant on the server.</p>
-        <button disabled={busy || !prepared.value.batches.length || complete} onClick={() => void send()} className={outlineButton + " mt-4"}>
-          {sending ? "Sending…" : complete ? rejected ? "Upload processed" : "Upload complete" : session?.next ? "Resume upload" : "Send upload"}
+        {isSample && <p className="mt-3 text-sm text-fg-2">This is a sample, to show what an upload holds. It is never sent. Choose your own file to upload.</p>}
+        <button disabled={busy || isSample || !prepared.value.batches.length || complete} onClick={() => void send()} className={outlineButton + " mt-4"}>
+          {isSample ? "Samples are not sent" : sending ? "Sending…" : complete ? rejected ? "Upload processed" : "Upload complete" : session?.next ? "Resume upload" : "Send upload"}
         </button>
       </Card>}
       {session && <div role="status"><Card className="text-sm text-fg-2">

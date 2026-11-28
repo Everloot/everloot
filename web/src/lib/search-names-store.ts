@@ -23,7 +23,7 @@ import type { R2Config } from "./upload-store";
 
 export const SEARCH_NAMES_KEY = "snapshots/search-names.json";
 /** The file's shape in its stamp. Change it when the file gains a list, so the next cron rewrites it. */
-export const SEARCH_NAMES_REVISION = "names-2";
+export const SEARCH_NAMES_REVISION = "names-3";
 /** How long one server instance keeps the file before asking for it again; the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute. */

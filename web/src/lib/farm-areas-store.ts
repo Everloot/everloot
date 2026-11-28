@@ -17,7 +17,7 @@ import { npcRows } from "./world-lists";
 
 export const FARM_AREAS_KEY = "snapshots/farm-areas.json";
 /** The file's shape in its stamp. Change it when the file changes shape, so the next job run rewrites it. */
-export const FARM_AREAS_REVISION = "farm-2";
+export const FARM_AREAS_REVISION = "farm-3";
 const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 60_000;
 
