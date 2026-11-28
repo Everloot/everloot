@@ -281,7 +281,8 @@ test("the guild directory sorts from its headers, reads well on a phone and keep
     expect(table).toContain('href="/guilds?sort=level-60"');
     expect(await hub({ sort: "item-level", region: "us" })).toMatch(/aria-sort="descending"[^>]*><a href="\/guilds\?region=us&amp;sort=item-level"/);
     // The phone line carries what the folded columns hold.
-    expect(table).toContain("US Normal · Alliance · 1 of 12 read · ilvl 30");
+    // QA round 16: the folded Newest read column's day is on the phone line too.
+    expect(table).toContain("US Normal · Alliance · 1 of 12 read · ilvl 30 · newest read Nov 19, 2026");
     expect(table).toContain('<a href="/armory/us/guilds/star-watch" class="dir-name">Star Watch</a>');
     expect(table).toContain('<tr class="dt-tr">');
     // QA round 15: Last read in the site's day form, not 2026-11-19.
