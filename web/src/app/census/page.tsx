@@ -23,6 +23,7 @@ import {
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
 } from "@kb/census";
+import { utcDay, utcStamp } from "@/lib/time";
 
 const description =
   "Who plays what on WoW Forever: factions, races, classes and levels from Everloot uploads. Each character counts once; a count shows from 10 characters.";
@@ -34,6 +35,7 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 const CLASS_NAME = new Map<string, string>(CENSUS_CLASSES.map((c) => [c.token, c.name]));
 const RACE_NAME = new Map<string, string>(CENSUS_RACES.map((r) => [r.token, r.name]));
 const day = (iso: string) => iso.slice(0, 10);
+const dayText = (iso: string) => utcDay(iso) ?? day(iso);
 const number = (n: number) => n.toLocaleString("en-US");
 const plural = (n: number, one: string, many: string) => `${number(n)} ${n === 1 ? one : many}`;
 /** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
@@ -228,11 +230,11 @@ const trustedRule = (view: CensusView) =>
 
 /** The top of the page's content: an EmptyState until the window has numbers, then one sentence. */
 function Headline({ view, window: w }: { view: CensusView; window: CensusWindow }) {
-  const span = `(${day(w.from)} to ${day(w.to)}, UTC)`;
+  const span = `(${dayText(w.from)} to ${dayText(w.to)}, UTC)`;
   if (!view.launched) {
     return (
       <EmptyState
-        message={`WoW: Forever hasn't launched yet. The census starts counting at launch, ${day(view.launch)} at ${view.launch.slice(11, 16)} UTC, and nothing from before it, such as the beta, is counted.`}
+        message={`WoW: Forever hasn't launched yet. The census starts counting at launch, ${utcStamp(view.launch) ?? view.launch}, and nothing from before it, such as the beta, is counted.`}
       />
     );
   }
@@ -360,7 +362,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                 <DataTable
                   caption="Characters active each day of the last 7 days"
                   columns={[
-                    { key: "day", header: "Day (UTC)", cell: (d) => <><span className="font-mono tabular-nums">{d.day}</span>{d.day === today && <span className="text-muted"> (so far)</span>}</> },
+                    { key: "day", header: "Day (UTC)", cell: (d) => <><span className="font-mono tabular-nums">{dayText(d.day)}</span>{d.day === today && <span className="text-muted"> (so far)</span>}</> },
                     { key: "count", header: "Characters", numeric: true, cell: (d) => <Count count={d.count} /> },
                   ]}
                   rows={view.trend}

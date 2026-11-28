@@ -308,3 +308,11 @@ test("the name box's Filter button is in the tab order and always shown", () => 
   expect(button).not.toMatch(/\bsr-only\b/);
   expect(button).toMatch(/class="[^"]*\bborder\b/);
 });
+
+test("a menu's note is a plain line under its choices, not a link, and a menu without one draws none", () => {
+  const withNote: FilterBarProps = { ...props, controls: [{ ...props.controls[0] as Extract<FilterBarProps["controls"][number], { type: "menu" }>, note: "Not recorded: 2,829" }] };
+  const html = renderToStaticMarkup(<FilterBar {...withNote} />);
+  expect(html).toMatch(/<li class="[^"]*"[^>]*>Not recorded: 2,829<\/li><\/ul>/);
+  expect(html).not.toMatch(/<a[^>]*>[^<]*Not recorded/);
+  expect(renderToStaticMarkup(<FilterBar {...props} />)).not.toContain("Not recorded");
+});

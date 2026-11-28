@@ -20,7 +20,7 @@ import {
   itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
+import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, ScansPaused, UnnamedReason, itemQuality } from "../../parts";
 import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
@@ -120,7 +120,7 @@ export default async function RealmItemPage(props: Props) {
         meta={v && (
           <Facts items={[
             `${row.house} auction house`,
-            `Newest scan ${scanDayText(v.day, now)}`,
+            `Newest scan ${scanDayText(v.day)}`,
             reportersText(v.reporters),
           ]} />
         )}
@@ -132,6 +132,7 @@ export default async function RealmItemPage(props: Props) {
 
       <div className="space-y-10">
         <UnnamedReason id={itemId} names={names} />
+        <ScansPaused state={state} now={now} />
 
         {!state && (
           <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>
@@ -167,7 +168,7 @@ export default async function RealmItemPage(props: Props) {
               ...(row ? [{
                 id: "houses", label: "Houses", count: houses.length,
                 panel: houses.length
-                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} now={now} /></div>
+                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>
                   : <div className="pt-4"><EmptyState framed={false} count={Math.max(...HOUSES.map((h) => agreementSoFar(state, slug, itemId, h)))} message="No auction house has its own price for this item yet: a house's price needs scans from 3 players in that house." /></div>,
               }] : []),
               {

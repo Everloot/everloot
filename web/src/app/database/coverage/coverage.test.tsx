@@ -67,7 +67,7 @@ test("the index is a search box, then one row per zone with settled / confirmed 
   // Without the expected file a share has no denominator: [?], never 0%.
   expect(page).toContain("[?] / [?]");
   expect(page).toContain("No expected counts yet");
-  expect(page).toContain("Data as of 2026-10-20 00:00 UTC, from 4 installs");
+  expect(page).toContain("Data as of Oct 20, 2026, 00:00 UTC, from 4 installs");
   // No unagreed value, no breadcrumbs, no licence line.
   expect(page).not.toContain("Unagreed Name");
   expect(page).not.toContain('aria-label="Breadcrumb"');
@@ -202,7 +202,7 @@ test("the index states the plateau for quests, pins, vendors and drops, with how
   expect(page).toContain('id="plateau"');
   for (const h of ["Confirmed", "Settled", "Newly confirmed", "At plateau"]) expect(page).toContain(`>${h}<`);
   expect(page).toContain("at least 90% are confirmed, 75% are settled, and fewer than 0.5% became confirmed in the 28 days");
-  expect(page).toContain("Data as of 2026-10-20 00:00 UTC, from 4 installs; 4 installs reported in the 28 days from 2026-09-22.");
+  expect(page).toContain("Data as of Oct 20, 2026, 00:00 UTC, from 4 installs; 4 installs reported in the 28 days from 2026-09-22.");
   expect(page).not.toContain("Unagreed Name");
 });
 

@@ -86,7 +86,9 @@ test("with two weeks: the weekly chart, the change column and the current week m
   expect(page).toMatch(/<th[^>]*>(?:<[^>]+>)*Change</);
   // Last week: Hunter 65, Priest 45, Warrior 30. This week Warrior leads with 80.
   // The first cell carries the phone line (change · count · share), then the columns follow.
-  expect(text(page)).toContain("1 Warrior ▲2 · 80 characters · 40% ▲2 up 2 80 40% 2026-11-20");
+  expect(text(page)).toContain("1 Warrior ▲2 · 80 characters · 40% ▲2 up 2 80 40% Nov 20, 2026");
+  // QA round 13: the data time in the site's timestamp form.
+  expect(text(page)).toContain("Data as of Nov 20, 2026, 12:00 UTC");
   expect(text(page)).toContain("2 Hunter ▼1 · 65 characters · 33% ▼1 down 1 65 33%");
   expect(text(page)).not.toContain(ONE_WEEK_LINE);
   // The hub: the stacked class chart with every class named, then each ranking's top rows with their change marks.

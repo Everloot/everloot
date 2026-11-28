@@ -151,3 +151,15 @@ test("each NPC menu counts what the list would hold with every other filter on, 
   // With nothing on, the counts are the whole list's.
   expect(count(await html(), "type", "Beast")).toBe(2);
 });
+
+test("each NPC menu notes the rows it cannot hold, those with no value recorded", async () => {
+  const durotar = { mapId: 1411, name: "Durotar", continentId: 1, continentName: "Synthetic Continent" };
+  store.quests = [];
+  store.npcs = [
+    npc({ npcId: 101, name: "Npc Alpha", zone: durotar, creatureType: "Humanoid", rank: "normal", reaction: "hostile", level: 5 }),
+    npc({ npcId: 102, name: "Npc Beta", zone: null, creatureType: null, rank: null, reaction: null, level: null }),
+  ];
+  const note = (out: string, menu: string) => /<li class="[^"]*">(Not recorded: [\d,]+)<\/li>/.exec(out.split(`data-filter="${menu}"`)[1]?.split("</details>")[0] ?? "")?.[1] ?? null;
+  const page = await html();
+  for (const menu of ["zone", "level", "react", "type", "rank"]) expect(note(page, menu)).toBe("Not recorded: 1");
+});

@@ -121,7 +121,7 @@ describe("the guild part", () => {
     const rail = html.slice(html.indexOf('data-rail="sources"'));
     expect(rail).toContain("Last seen by the addon");
     expect(rail).toContain("2026-10-21");
-    expect(rail).toContain("Data as of 2026-10-24");
+    expect(rail).toContain("Data as of Oct 24, 2026");
     expect(rail).toContain('href="#character-guild"');
   });
 

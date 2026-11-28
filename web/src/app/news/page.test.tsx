@@ -110,6 +110,19 @@ test("an entry Everloot wrote never shows under From Blizzard, and is left out b
   expect(section).not.toContain("Golf roadmap");
 });
 
+test("two posts under one title on one day are one row under From Blizzard, as on the home page", async () => {
+  fixtures();
+  const av = (id: number, n: number, at: string): ChangeEntry => ({
+    ...cited, id: `forum:${id}`, at, title: "Alterac Valley Adjustments - November 25", topicId: 2410000, postNumber: n,
+    url: `https://us.forums.blizzard.com/en/wow/t/alterac-valley-adjustments-november-25/2410000/${n}`,
+  });
+  timeline.entries = [av(31000002, 2, "2026-11-25T23:04:00.000Z"), av(31000001, 1, "2026-11-25T18:00:00.000Z"), cited];
+  const { default: NewsHub } = await import("./page");
+  const section = renderToStaticMarkup(await NewsHub()).split('id="blizzard"')[1];
+  expect(section.match(/>Alterac Valley Adjustments - November 25</g)).toHaveLength(1);
+  expect(section).toContain("A Blizzard post");
+});
+
 test("with no published post the hub says so, points to the changes and the feed, and stays out of search", async () => {
   vi.stubEnv("NEWS_DIR", mkdtempSync(join(tmpdir(), "news-")));
   const { default: NewsHub, generateMetadata } = await import("./page");

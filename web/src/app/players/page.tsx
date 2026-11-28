@@ -25,6 +25,7 @@ import { loadSiteAssets } from "@/lib/game-assets";
 import { className, classText, playerRobots, raceName } from "./player-view";
 import { ClassIconStyle, ClassMark, classIcons, type ClassIcons } from "./class-icons";
 import { ArmoryCredit, newest, RegionChip } from "../armory/parts";
+import { utcDay } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ type DirectoryRow = LookupRow & { gearScore?: number | null; itemLevel?: number 
 
 const muted = (text: string) => <span className="text-muted">{text}</span>;
 // Numeric cells already set figures in mono (dt-num), so a day there is plain text.
-const day = (iso: string | undefined | null) => iso?.slice(0, 10) ?? "";
+const day = (iso: string | undefined | null) => utcDay(iso) ?? "";
 /** A read character whose gear the crawler has not read yet. */
 const GEAR_NOT_READ = "Gear not read yet";
 /** An item level or Gear Score of 0 (nothing counted yet, as at level 1) is a dash, as on the character page. */
@@ -195,7 +196,7 @@ function Recent({ rows, icons }: { rows: ArmoryDirectoryRow[]; icons: ClassIcons
         ]}
         rows={rows}
         rowKey={(r) => `${r.region}/${r.slug}`}
-        meta={(r) => `Level ${r.level} ${raceLabel(r.race)} ${r.class} · ${r.fetchedAt.slice(0, 10)}`}
+        meta={(r) => `Level ${r.level} ${raceLabel(r.race)} ${r.class} · ${day(r.fetchedAt)}`}
       />
     </section>
   );

@@ -95,7 +95,7 @@ test("the stored boards path: risers, fallers and the rows without a comparison,
   expect(t).toContain("3 items: 1 new, 1 thin, 1 no baseline");
   expect(t).toContain("Units listed are offered inventory on the scan day, not sales");
   // The header names the newest scan day, the same source every Auction House page reads.
-  expect(t).toContain("Newest scan 20 Nov");
+  expect(t).toContain("Newest scan Nov 20, 2026");
   expect(t).not.toContain("Scans up to");
   expect(html).toContain(`href="/tools/auctions/report/${day(0)}"`);
   expect(html).toContain('href="/tools/auctions/forever?house=horde"');
@@ -118,8 +118,8 @@ test("with every row stale the explanation names the newest scan day instead of 
   try {
     const t = text(await page("forever"));
     expect(t).not.toMatch(/End: ,|Start: ,/);
-    expect(t).toContain("No week comparison: the newest scan in this house is 20 Nov, older than yesterday (UTC), so the week has no current end.");
-    expect(t).toContain("Newest scan 20 Nov");
+    expect(t).toContain("No week comparison: the newest scan in this house is Nov 20, 2026, older than yesterday (UTC), so the week has no current end.");
+    expect(t).toContain("Newest scan Nov 20, 2026");
   } finally {
     vi.setSystemTime(now);
   }

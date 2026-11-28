@@ -23,7 +23,7 @@ import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
-import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
+import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, ScansPaused, Sparkline, count } from "./parts";
 import { RealmHousePicker } from "./RealmHousePicker";
 import TimeAgo from "./TimeAgo";
 import Icon from "@/components/ui/Icon";
@@ -295,9 +295,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <Facts items={[
               // With no prices to show, the time says when the rollup was last read, not that anything changed.
               ...(slug
-                ? [otherRegion ? `This realm isn't in ${REGION_LABEL[otherRegion]}` : newest ? `Newest scan ${scanDayText(newest, now)}` : "No public scan yet"]
+                ? [otherRegion ? `This realm isn't in ${REGION_LABEL[otherRegion]}` : newest ? `Newest scan ${scanDayText(newest)}` : "No public scan yet"]
                 : rebuilt === null ? ["Rebuild time unrecorded"]
-                : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest, now)}`}</>]),
+                : [<>{newest ? "Rebuilt" : "Checked"} <TimeAgo at={rebuilt} renderedAt={now.getTime()} />{newest && ` · newest scan ${scanDayText(newest)}`}</>]),
               ...(slug && board ? [`${count(board.reporters, "reporter")} this week`] : []),
               ...(!slug && realmsHere.length ? [count(realmsHere.length, "realm")] : []),
             ]} />
@@ -312,6 +312,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <a href="/blizzard-auctions" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Blizzard auction house data</a>
           </p>
         )}
+        <ScansPaused state={state} now={now} className="mb-3" />
         {slug && stored && <p className="mb-3 text-sm"><Link href={changesHref({ slug }, q.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Market changes this week: risers, fallers and what has no comparison yet</Link></p>}
         {!slug && state && (
           <>
@@ -323,7 +324,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <p className="mt-2 text-meta text-fg-2">Ruleset counts are totals across every house; the filters below do not change them.</p>
             {summaryRows.length > 0 && (
               <div className="mt-3 mb-4">
-                <RulesetSummaryTable rows={summaryRows} now={now} names={names} href={(r) => here({ ruleset: r })} />
+                <RulesetSummaryTable rows={summaryRows} names={names} href={(r) => here({ ruleset: r })} />
               </div>
             )}
           </>

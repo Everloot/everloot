@@ -574,3 +574,19 @@ test("a category's title counts what its list shows: the same filters, the unnam
     facts.names = [];
   }
 });
+
+// QA round 13: the Sold by tab said "last seen 43 h ago" over rows saying "last seen 2026-11-26". Rows give the day in
+// the site's day form; the line above keeps its relative time only beside the absolute one in its title.
+test("an item's Sold by rows give the day as Nov 25, 2026, and the line above pairs its relative time with the absolute one", async () => {
+  const seen = { evidence: "observed", build: null, installs: 4, firstSeen: "2026-11-20T00:00:00.000Z", lastSeen: "2026-11-25T03:11:00.000Z" };
+  const itemId = CLIENT_TAXONOMY.items[0][0];
+  observed.edges = [{ ...seen, fromKind: "item", fromId: itemId, rel: "sold_by", toKind: "npc", toId: 900001 }];
+  try {
+    const page = await html(ItemPage(props(String(itemId))));
+    expect(page).toContain("4 installs, last seen Nov 25, 2026");
+    expect(page).not.toContain("last seen 2026-11-25");
+    expect(page).toMatch(/last seen <time dateTime="2026-11-25T03:11:00.000Z" title="Nov 25, 2026, 03:11 UTC">[^<]+ ago<\/time>/);
+  } finally {
+    observed.edges = [];
+  }
+});

@@ -20,7 +20,7 @@ test("the promise, the three numbers each saying what it counts, and the data da
   expect(figure(html, "installs")).toBe("Installs that uploaded 14 Overall: every install that uploaded, in any zone.");
   expect(figure(html, "confirmed")).toBe("Confirmed facts 2,785 In released zones: facts that 3 or more installs agree on.");
   expect(figure(html, "waiting")).toBe("Facts waiting 12,250 In released zones: seen by 1 or 2 installs; each needs 1 or 2 more to agree.");
-  expect(text(html)).toContain("Data as of 2026-11-10 07:50 UTC, build 1.60.1.70862.");
+  expect(text(html)).toContain("Data as of Nov 10, 2026, 07:50 UTC, build 1.60.1.70862.");
   expect(text(html)).toContain("From the coverage report the snapshot job stores.");
   expect(text(html)).toContain("Uploads help confirm facts once 3 installs agree.");
   expect(text(html)).not.toMatch(/same score|MCP|every install that uploads moves|every upload confirms/i);

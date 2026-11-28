@@ -33,8 +33,14 @@ test("the line above a table gives the rows' own install count, the same number 
   });
   const now = Date.parse("2026-11-27T12:00:00.000Z");
   const same = renderToStaticMarkup(<EvidenceLine rows={[sold(2, 4, "2026-11-25T18:00:00.000Z"), sold(3, 4, "2026-11-24T18:00:00.000Z")]} now={now} />);
-  expect(same).toContain("4 installs agree on each row · last seen 42 h ago");
+  expect(same).toMatch(/4 installs agree on each row · last seen <time [^>]*>42 h ago<\/time>/);
   expect(same).not.toContain("3 of 3");
   const mixed = renderToStaticMarkup(<EvidenceLine rows={[sold(2, 3, "2026-11-25T18:00:00.000Z"), sold(3, 5, "2026-11-20T18:00:00.000Z")]} now={now} />);
-  expect(mixed).toContain("At least 3 installs agree on each row · last seen 42 h ago");
+  expect(mixed).toMatch(/At least 3 installs agree on each row · last seen <time [^>]*>42 h ago<\/time>/);
+});
+
+test("the relative time is a <time> with the machine-readable value and the absolute moment in its title", () => {
+  const observed: Edge = { ...file, evidence: "observed", build: null, installs: 4, lastSeen: "2026-11-25T18:00:00.000Z" };
+  const html = renderToStaticMarkup(<EvidenceLine rows={[observed]} now={Date.parse("2026-11-27T12:00:00.000Z")} />);
+  expect(html).toContain('last seen <time dateTime="2026-11-25T18:00:00.000Z" title="Nov 25, 2026, 18:00 UTC">42 h ago</time>');
 });

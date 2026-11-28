@@ -19,12 +19,15 @@ vi.mock("@/lib/auth/device-accounts", () => ({ ADD_FROM_COOKIE: "everloot_add_fr
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 vi.mock("../page", () => ({ default: () => <p>The landing page</p> }));
-vi.mock("@/lib/changes", () => ({
+// Entries a test puts in front of the timeline's eight.
+const newer = vi.hoisted(() => ({ entries: [] as object[] }));
+vi.mock("@/lib/changes", async (importOriginal) => ({
   TYPE_LABEL: { post: "Blue post", hotfix: "Hotfix", build: "Build" },
-  loadTimeline: () => Array.from({ length: 8 }, (_, i) => ({
+  oneRowPerTitleDay: (await importOriginal<typeof import("@/lib/changes")>()).oneRowPerTitleDay,
+  loadTimeline: () => [...newer.entries, ...Array.from({ length: 8 }, (_, i) => ({
     id: i === 0 ? "build:e0" : `forum:${i}`, type: i === 0 ? "build" : "post", game: i === 1 ? "classic" : "forever", at: `2026-10-${String(20 - i).padStart(2, "0")}T10:00:00Z`,
     title: `Entry ${i}`, url: i === 0 ? null : `https://us.forums.blizzard.com/t/${i}`,
-  })),
+  }))],
   filterTimeline: (all: Array<{ game: string }>, _f: string, game?: string) => all.filter((e) => !game || e.game === game),
 }));
 
@@ -64,7 +67,7 @@ beforeEach(() => {
     return [build({ id: "4b6f1c1e-3f43-4a4e-9a51-3d2a1f0c9e44", name: "Raid frost", character_id: JAINA, active: true }), build({ name: "Loose fire" })];
   });
 });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => { vi.unstubAllEnvs(); newer.entries = []; });
 
 test("with the switch off /home is a 404 and nothing is read", async () => {
   vi.stubEnv("EVERLOOT_PROFILES", "");
@@ -112,6 +115,22 @@ test("the three columns: the player, the Ask box and the active character's buil
   expect(html).not.toContain("Entry 6");
   // Never the BattleTag.
   expect(html).not.toContain("Thrall#1234");
+});
+
+test("two posts under one title on one day are one line in Latest from Forever and Since you last played", async () => {
+  const av = (id: number, at: string) => ({
+    id: `forum:${id}`, type: "post", game: "forever", at, title: "Alterac Valley Adjustments - November 25", url: `https://us.forums.blizzard.com/t/${id}`,
+  });
+  newer.entries = [av(91, "2026-10-25T23:04:00Z"), av(90, "2026-10-25T18:00:00Z")];
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  linked.characters = [armory({})];
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const latest = html.slice(html.indexOf('id="latest"'));
+  expect(latest.match(/>Alterac Valley Adjustments - November 25</g)).toHaveLength(1);
+  expect(latest).toContain("Entry 4");
+  const at = html.indexOf('aria-labelledby="since-last-played"');
+  const since = html.slice(at, html.indexOf("</section>", at));
+  expect(since.match(/>Alterac Valley Adjustments - November 25</g)).toHaveLength(1);
 });
 
 test("disabled saved builds keeps Home useful without character or build navigation", async () => {
@@ -332,7 +351,7 @@ test("since you last played: the Forever blue posts after the hero's last login,
   expect(at).toBeGreaterThan(-1);
   const since = html.slice(at, html.indexOf("</section>", at));
   expect(since).toContain("Since you last played");
-  expect(since).toContain('<time dateTime="2026-10-17T08:00:00Z">2026-10-17</time>');
+  expect(since).toContain('<time dateTime="2026-10-17T08:00:00Z">Oct 17, 2026</time>');
   // Entry 2 (10-18) and Entry 3 (10-17 10:00) are Forever blue posts after the login; Entry 0 is a build, Entry 1 Classic.
   expect(since).toMatch(/<a href="\/changes\/us-2-entry-2"[^>]*>Entry 2</);
   expect(since).toContain("Entry 3<");

@@ -13,6 +13,7 @@ import {
 } from "@/lib/rankings";
 import { StackedWeeksChart, WeeklyLinesChart, WeeklyTotalsChart } from "./charts";
 import { nameOf, number, percent, seriesMarks, stroke, weekLabel } from "./chart-words";
+import { utcDay } from "@/lib/time";
 
 export { percent, weekLabel };
 export const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -149,7 +150,7 @@ export function RankTable({ rows, caption, showChange, asOf, hrefOf }: { rows: R
         </span>
       ),
     },
-    { key: "date", header: "Data to", numeric: true, cell: () => asOf.slice(0, 10) },
+    { key: "date", header: "Data to", numeric: true, cell: () => utcDay(asOf) ?? asOf.slice(0, 10) },
   ];
   return (
     <DataTable
