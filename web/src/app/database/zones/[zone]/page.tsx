@@ -277,7 +277,7 @@ export default async function ZonePage(props: Props) {
   // Most useful first: what to do here, who is here, who sells; a tab with no rows is left out (Tabs).
   const all: TabItem[] = [
     { id: "quests", label: "Quests", count: quests.length, panel: <>
-      <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} meta={questMeta} empty={empty(EMPTY.zoneQuests)} />
+      <DataTable dense caption={missingNpcs.length === 2 ? `Quests players reported in ${zone.name}` : `Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} meta={questMeta} empty={empty(EMPTY.zoneQuests)} />
       {questNote && <p data-quest-npcs-note className="px-4 py-2 text-meta text-fg-2 sm:px-6">{questNote}</p>}
     </> },
     { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneNpcs)} /> },

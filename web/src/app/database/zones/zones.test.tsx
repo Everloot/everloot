@@ -548,6 +548,9 @@ test("QA round 15: a Giver or Turn-in column with nothing recorded on any row is
   expect(quests).not.toContain("unrecorded<");
   expect(quests).not.toMatch(/<th[^>]*>(?:<[^>]*>)*(?:Giver|Turn-in)</);
   expect(quests).toContain("No quest here has an agreed giver or turn-in NPC yet.");
+  // QA round 16: with both NPC columns gone, the caption no longer claims the quests are at confirmed NPCs.
+  expect(quests).toContain("<caption class=\"sr-only\">Quests players reported in Durotar</caption>");
+  expect(quests).not.toContain("at confirmed NPCs");
   // Below 640 px the quest name keeps the row, with its level and side on a line under it.
   expect(quests).toMatch(/class="dt-meta">Level 3/);
 });
@@ -559,4 +562,5 @@ test("QA round 15: a column some rows fill stays, and its empty cells still say 
   expect(quests).toContain(">Gornek</a>");
   expect(quests).toContain("unrecorded");
   expect(quests).not.toContain("No quest here has an agreed giver");
+  expect(quests).toContain("Quests given or turned in at confirmed NPCs in Durotar");
 });
