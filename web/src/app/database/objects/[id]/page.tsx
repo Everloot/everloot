@@ -121,7 +121,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         ...(profession ? [{ label: "Profession", value: <Link href={professionHref(profession.slug)} className={LINK}>{profession.name}</Link> }] : []),
         { label: zones.length > 1 ? "Zones" : "Zone", value: zoneLinks ?? known(null) },
         { label: "Loot windows", value: known(windows), numeric: true },
-        ...(perWindow ? [{ label: "Items per loot window", value: perWindow, numeric: true }] : []),
+        ...(perWindow ? [{ label: "Items per loot window, stacks counted", value: perWindow, numeric: true }] : []),
         { label: "Items seen", value: known(page.zero ? "None" : page.drops.length || null), numeric: true },
         { label: "Map positions", value: known(page.pins?.length || null), numeric: true },
       ]}

@@ -3,6 +3,7 @@ import { allBandYields, auctionCut, bandLabel, expectedValue, placer, type BandY
 import type { MarketRow, RealmBoard } from "./auction-house";
 import { CLIENT_DISENCHANT } from "../data/game-data/client-disenchant";
 import { loadDisenchantTables } from "./rollup-compute";
+import type { Corpus } from "./upload-store";
 
 /**
  * The disenchant tables the pages, the tool and the API read: every band of the current build with what it yields,
@@ -20,10 +21,10 @@ export interface DisenchantView {
 const NO_TABLES = { tables: { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() }, unreachable: true, dataAsOf: null };
 
 /** Never throws: a page that shows disenchants beside other facts keeps its other facts when these cannot be read. */
-export async function loadDisenchant(): Promise<DisenchantView> {
+export async function loadDisenchant(corpus?: Corpus): Promise<DisenchantView> {
   let read: Awaited<ReturnType<typeof loadDisenchantTables>>;
   try {
-    read = await loadDisenchantTables();
+    read = await loadDisenchantTables(corpus);
   } catch {
     read = NO_TABLES;
   }

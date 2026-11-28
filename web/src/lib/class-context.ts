@@ -80,7 +80,7 @@ export function contextLinks(ctx: ClassContext): ContextLink[] {
     { key: "spells", label: "Spells", href: withClassContext("/database/spells", ctx) },
     { key: "items", label: "Items", href: withClassContext("/database/items", ctx) },
     { key: "raid", label: "Raid builder", href: withClassContext("/tools/raid", ctx) },
-    { key: "professions", label: "Profession hubs", href: withClassContext("/tools/professions", ctx) },
+    { key: "professions", label: "Profession guides", href: withClassContext("/tools/professions", ctx) },
     { key: "dungeons", label: "Dungeons and raids", href: "/database/instances" },
   ];
 }

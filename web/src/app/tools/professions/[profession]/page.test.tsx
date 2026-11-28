@@ -36,6 +36,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => <a href={href} data-prefetch={prefetch === undefined ? undefined : String(prefetch)}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
 }));
@@ -64,7 +65,7 @@ beforeEach(() => {
 test("the game file recipes show in skill brackets, labelled, with the item and its reagents", async () => {
   store.loadCorpus.mockResolvedValue(empty);
   const html = await render();
-  expect(html).toContain("Alchemy recipes");
+  expect(html).toContain("Alchemy profession guide");
   expect(html).toContain("Found in game files, unconfirmed, build 1.60.1.71139");
   expect(html).toContain('data-skill-group="1"');
   expect(html).toContain("Skill 1–75");
@@ -87,7 +88,8 @@ test("a recipe row opens a shareable one-recipe shopping plan with the original 
   expect(html).toContain("Copy recipe shopping list");
   expect(html).toContain('href="/tools/auctions/activity?item=2454');
   expect(html).toContain("Auction activity for the finished item");
-  expect(html).toContain('id="shopping-list"');
+  expect(html).toContain("Alchemy leveling guide");
+  expect(html.indexOf("Alchemy leveling guide")).toBeLessThan(html.indexOf("Recipes from the game files"));
   expect(await render("alchemy", { recipe: "3755" })).not.toContain('id="recipe-shopping"');
 });
 
@@ -113,7 +115,7 @@ test("the skill line id and the id-slug segments redirect for good to the slug p
   await expect(render("762")).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(render("762-riding")).rejects.toThrow("NEXT_NOT_FOUND");
   // The slug itself does not redirect.
-  expect(await render("alchemy")).toContain("Alchemy recipes");
+  expect(await render("alchemy")).toContain("Alchemy profession guide");
 });
 
 test("with no observations the player layer says ranges are unrecorded, not zero", async () => {
@@ -177,7 +179,11 @@ test("the page keeps agreed colour ranges beside the device-side shopping planne
 });
 
 const three = ["install-aaaa", "install-bbbb", "install-cccc"];
-const section = (html: string, kind: string) => { const at = html.indexOf(`data-gather="${kind}"`); return at < 0 ? null : html.slice(at, html.indexOf("</section>", at)); };
+const section = (html: string, kind: string) => {
+  const marker = kind === "herb" || kind === "ore" ? 'data-section="zones"' : `data-gather="${kind}"`;
+  const at = html.indexOf(marker);
+  return at < 0 ? null : html.slice(at, html.indexOf("</section>", at));
+};
 
 test("Herbalism lists the zones where 3 installs gathered from the same herb spot; Mining has none yet and says so", async () => {
   // Silverleaf (object 1617) opened as an herb in Elwynn Forest (1429), at the same spot by three installs.
@@ -189,9 +195,9 @@ test("Herbalism lists the zones where 3 installs gathered from the same herb spo
     })),
   });
   const herbs = section(await render("herbalism"), "herb")!;
-  expect(herbs).toContain("Where to gather herb");
+  expect(herbs).toContain("Herb zones");
   expect(herbs).toMatch(/href="\/database\/zones\/1429-[^"]*"/);
-  expect(herbs).toContain("Spots");
+  expect(herbs).toContain("1 spot");
   const ore = section(await render("mining"), "ore")!;
   expect(ore).toContain("No ore zones yet");
   expect(ore).not.toContain("<table");
@@ -372,7 +378,12 @@ test("Herbs lands on gathering before the new Forever crafts, including when no 
   expect(metadata.description).toContain("gather herbs");
 });
 
-const spellLinks = (html: string) => html.match(/href="\/database\/spells\/\d+"/g)?.length ?? 0;
+const recipesSection = (html: string) => {
+  const start = html.indexOf('id="prof-recipes"');
+  const end = html.indexOf('aria-labelledby="prof-ranges"', start);
+  return html.slice(start, end === -1 ? html.indexOf('id="prof-contribute"', start) : end);
+};
+const spellLinks = (html: string) => recipesSection(html).match(/href="\/database\/spells\/\d+"/g)?.length ?? 0;
 
 test("the recipe table is paged on the server: 50 rows by default, the size clamped to 25..200, a page past the end shows the last", async () => {
   store.loadCorpus.mockResolvedValue(empty);
@@ -389,7 +400,7 @@ test("the recipe table is paged on the server: 50 rows by default, the size clam
   expect(spellLinks(await render("alchemy", { size: "100" }))).toBe(100);
   const most = await render("alchemy", { size: "5000" });
   expect(spellLinks(most)).toBe(Math.min(all, 200));
-  expect(first.length).toBeLessThan(most.length / 2);
+  expect(recipesSection(first).length).toBeLessThan(recipesSection(most).length / 2);
   const last = Math.ceil(all / 50);
   const past = await render("alchemy", { page: "999" });
   expect(spellLinks(past)).toBe(all - (last - 1) * 50);
@@ -421,7 +432,8 @@ test("the recipe tables' spell and item links load on click, not all at once as 
 
 // The recipe rows used to be some 4.4 kB of HTML each, and as much again in the page's RSC data (live alchemy: 901 kB).
 const recipeRows = (html: string) => {
-  const tables = html.slice(html.indexOf("data-skill-group="), html.indexOf('aria-labelledby="prof-path"'));
+  const section = recipesSection(html);
+  const tables = section.slice(section.indexOf("data-skill-group="));
   return { bytes: Buffer.byteLength(tables), rows: tables.match(/<tr class="dt-tr"/g)?.length ?? 0 };
 };
 

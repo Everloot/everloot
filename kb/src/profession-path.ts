@@ -329,7 +329,7 @@ export function formatProfessionPath(path: ProfessionPath): string {
   return lines.join("\n");
 }
 
-export function professionFactsFromRecords(records: unknown[]): { sightings: RecipeSighting[]; prices: PriceSighting[]; vendorPrices: Map<string, number> } {
+export function professionFactsFromRecords(records: unknown[], itemVendorPrices = agreeVendorPricesByItem(records)): { sightings: RecipeSighting[]; prices: PriceSighting[]; vendorPrices: Map<string, number> } {
   const sightings: RecipeSighting[] = [];
   const prices: PriceSighting[] = [];
   for (const raw of records) {
@@ -366,7 +366,7 @@ export function professionFactsFromRecords(records: unknown[]): { sightings: Rec
       prices.push({ installId: row.installId, item: row.item, copper: row.copper });
     }
   }
-  return { sightings, prices: [...prices, ...auctionPrices(records)], vendorPrices: agreeVendorPrices(records) };
+  return { sightings, prices: [...prices, ...auctionPrices(records)], vendorPrices: agreeVendorPrices(records, itemVendorPrices) };
 }
 
 /**
@@ -399,8 +399,21 @@ function itemNames(records: unknown[]): Map<number, string> {
  * priceCopper (same rule as vendorPage, across vendors). Several agreed
  * prices for one item keep the lowest: anyone can buy from that vendor.
  */
-export function agreeVendorPrices(records: unknown[]): Map<string, number> {
+export function agreeVendorPrices(records: unknown[], itemPrices = agreeVendorPricesByItem(records)): Map<string, number> {
   const names = itemNames(records);
+  const out = new Map<string, number>();
+  for (const [itemId, priceCopper] of itemPrices) {
+    const name = names.get(itemId);
+    if (!name) continue;
+    const key = clean(name);
+    const prev = out.get(key);
+    if (prev === undefined || priceCopper < prev) out.set(key, priceCopper);
+  }
+  return out;
+}
+
+/** Cheapest purchase price agreed by independent installs, keyed by item ID for the guide. */
+export function agreeVendorPricesByItem(records: unknown[]): Map<number, number> {
   const groups = new Map<string, { itemId: number; priceCopper: number; installs: Set<string> }>();
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
@@ -418,14 +431,11 @@ export function agreeVendorPrices(records: unknown[]): Map<string, number> {
       groups.set(key, group);
     }
   }
-  const out = new Map<string, number>();
+  const out = new Map<number, number>();
   for (const group of groups.values()) {
     if (group.installs.size < WORLD_AGREEMENT) continue;
-    const name = names.get(group.itemId);
-    if (!name) continue;
-    const key = clean(name);
-    const prev = out.get(key);
-    if (prev === undefined || group.priceCopper < prev) out.set(key, group.priceCopper);
+    const prev = out.get(group.itemId);
+    if (prev === undefined || group.priceCopper < prev) out.set(group.itemId, group.priceCopper);
   }
   return out;
 }

@@ -40,7 +40,8 @@ test("/tools lists every tool the header offers, under the header's group names,
       expect(section(group.title), link.href).toContain(TOOL_LINES[link.href].replaceAll("'", "&#x27;"));
     }
   }
-  expect(TOOL_GROUPS.find((g) => g.title === "Tools")!.links.map((l) => l.label)).toEqual(["Raid builder", "Talent calculator", "Professions"]);
+  expect(TOOL_GROUPS.find((g) => g.title === "Tools")!.links.map((l) => l.label)).toEqual(["Raid builder", "Talent calculator"]);
+  expect(TOOL_GROUPS.find((g) => g.title === "Guides")!.links.map((l) => l.label)).toContain("Profession guides");
 });
 
 test("/tools leaves out the tools hidden until polished, and the top bar's own items (Database, Chat)", async () => {
@@ -64,7 +65,7 @@ test("with the guild switch on, /tools offers Guilds in place of the guild board
 test("/about names the tools as the menu does and no longer uses the old names", async () => {
   const { default: About } = await import("../about/page");
   const html = renderToStaticMarkup(<About />);
-  for (const name of ["Guild board", "Professions"]) expect(html).toContain(`>${name}</a>`);
+  for (const name of ["Guild board", "Profession guides"]) expect(html).toContain(`>${name}</a>`);
   // Hidden until polished.
   expect(hrefs(html)).not.toContain("/tools/collections");
   for (const old of ["Completionist Tracker", "Forever Guild Tracker", "Profession Hubs", "Thottbot"]) expect(html).not.toContain(old);

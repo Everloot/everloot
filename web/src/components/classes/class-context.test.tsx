@@ -16,6 +16,7 @@ vi.mock("next/navigation", async () => {
     redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
     useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => window.location.search, () => window.location.search)),
     usePathname: () => window.location.pathname,
+    useRouter: () => ({ replace: vi.fn() }),
   };
 });
 // The game files' spell names and profession icons, the class talent catalogs (withdrawn when a test says so), and an

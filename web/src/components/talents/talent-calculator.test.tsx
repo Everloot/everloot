@@ -88,11 +88,13 @@ test("a talent says its rank, row and why it is locked", async () => {
 test("each tree says in words what its next locked row needs, and stops once the points are there", async () => {
   await render();
   const gate = () => container.querySelector('section[aria-label="Left"] [data-tree-gate]')?.textContent ?? null;
-  expect(gate()).toBe("Next row needs 5 points in Left: 5 more.");
+  expect(gate()).toBe("Next row: 5 more points in Left.");
   await click(node(11));
-  expect(gate()).toBe("Next row needs 5 points in Left: 4 more.");
-  for (let i = 0; i < 4; i++) await click(node(11));
-  expect(gate()).toBe("Next row needs 10 points in Left: 5 more.");
+  expect(gate()).toBe("Next row: 4 more points in Left.");
+  for (let i = 0; i < 3; i++) await click(node(11));
+  expect(gate()).toBe("Next row: 1 more point in Left.");
+  await click(node(11));
+  expect(gate()).toBe("Next row: 5 more points in Left.");
 });
 
 test("each tree's name carries its role from the raid planner's roles, where the class's trees differ and the tree settles it", async () => {

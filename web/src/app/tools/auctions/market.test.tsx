@@ -218,7 +218,7 @@ test("a realm filtered to a region it is not in says so in its header, links to 
   const words = text(html);
   expect(words).not.toContain("No public scan yet");
   expect(words).toContain("This realm isn't in EU");
-  expect(words).toContain("CAMWOW US1 Realm 4 PvP is not in EU, so this region filter hides its prices.");
+  expect(words).toContain("US1 · Realm 4 PvP is not in EU, so this region filter hides its prices.");
   expect(html).toMatch(/<a href="\/tools\/auctions\/camwow-us1-realm-4-pvp">Show its prices<\/a>/);
   expect(html).not.toContain('href="/addon"');
   expect(html).not.toContain("data-empty-state");
