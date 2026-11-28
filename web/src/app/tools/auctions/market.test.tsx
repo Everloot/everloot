@@ -454,13 +454,39 @@ test("tab counts use thousands separators", () => {
   expect(renderToStaticMarkup(<TabCount count={7150} />)).toContain("(7,150)");
 });
 
+const chartPoint = (day: string, market: number) => ({ day, market, min: market, quantity: 40, thin: false, reporters: 3 }) as PublicDay;
+
 test("the 60-day chart fits its axis to the public days, so the line runs end to end under its dates", () => {
-  const point = (day: string, market: number) => ({ day, market, min: market, quantity: 40, thin: false, reporters: 3 }) as PublicDay;
-  const html = renderToStaticMarkup(<PriceChart points={[point("2026-11-05", 100), point("2026-11-12", 120), point("2026-11-20", 110)]} />);
-  const line = /<polyline points="([^"]+)"/.exec(html)![1]!.split(" ");
-  expect(line[0]).toMatch(/^8\.0,/);
-  expect(line.at(-1)).toMatch(/^992\.0,/);
+  const html = renderToStaticMarkup(<PriceChart points={[chartPoint("2026-11-05", 100), chartPoint("2026-11-12", 120), chartPoint("2026-11-20", 110)]} />);
+  const xs = [...html.matchAll(/<circle data-point="[^"]+" cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+  const grid = /<line data-gridline="0" x1="([\d.]+)" x2="([\d.]+)"/.exec(html)!;
+  expect(xs[0]).toBe(Number(grid[1]));
+  expect(xs.at(-1)).toBe(Number(grid[2]));
   expect(text(html)).toContain("2026-11-05 to 2026-11-20");
+});
+
+test("the 60-day chart scales to the days the market value keeps, labels a round y-axis, and gives each day's value on hover", () => {
+  // Five solid days near 1s, and one day at 48s that the trim takes out as an outlier.
+  const days = [100, 110, 105, 4800, 115, 120].map((v, i) => chartPoint(`2026-11-0${i + 1}`, v));
+  const html = renderToStaticMarkup(<PriceChart points={days} />);
+  // 0 / 60c / 1s 20c: round steps over the kept days (lib/chart-axis.ts), not a scale up to 48s.
+  const labels = [...html.matchAll(/<text data-axis-label[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
+  expect(labels).toEqual(["0", "60c", "1s 20c"]);
+  // Each day is a hover and focus target carrying its value; the outlier says it was trimmed and is drawn at the top.
+  expect(html).toMatch(/<rect[^>]*aria-label="2026-11-01: 1s 0c"/);
+  expect(html).toMatch(/<rect[^>]*aria-label="2026-11-04: 48s 0c, trimmed as an outlier"/);
+  expect(html).toMatch(/<circle data-point="2026-11-04" data-outlier/);
+});
+
+test("a realm item page names the realm as the site shows it, not the raw CAMWOW label", async () => {
+  const name = "CAMWOW US1 Realm 4 PvP";
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), scans(dayAgo(0), [[2589, 900, 900]], name), today), dataAsOf: today.toISOString() });
+  const params = item("camwow-us1-realm-4-pvp", "2589");
+  const words = text(renderToStaticMarkup(await RealmItemPage(params)));
+  expect(words).toContain("Horde auction house price on US1 · Realm 4 PvP in WoW: Forever");
+  const meta = await itemMetadata(params);
+  expect(String(meta.title)).toContain("on US1 · Realm 4 PvP");
+  expect(String(meta.title)).not.toContain("CAMWOW");
 });
 
 test("a realm item page's AH Ledger panels open on the page's own ruleset, region and house", async () => {
