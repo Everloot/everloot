@@ -9,7 +9,7 @@ import EntityMap from "../../EntityMap";
 import { entityMapZones, type MapMark } from "../../entity-map";
 import {
   AgreementMeter, Badge, Card, DataTable, Disclosure, ResultStrip, SectionHeading, Tabs,
-  type Column, type TabItem,
+  filledColumns, type Column, type SparseColumn, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -190,7 +190,7 @@ export default async function ZonePage(props: Props) {
   // A giver or turn-in NPC that stands here goes by its agreed name; one elsewhere keeps its id.
   const npcNameHere = new Map((here?.npcs ?? []).filter((n) => n.name).map((n) => [n.npcId, n.name!]));
   const npcLink = (id: number | null) => (id === null ? "unrecorded" : <Link href={`/database/npcs/${id}`} className={link}>{npcNameHere.get(id) ?? `NPC ${id}`}</Link>);
-  const questColumns: Column<ZoneQuest>[] = [
+  const allQuestColumns: SparseColumn<ZoneQuest>[] = [
     { key: "title", header: "Quest", cell: (q) => {
       // A title players agree on; else the Warcraft Wiki's, with its source in the link's hover card.
       const wiki = q.title ? undefined : wikiTitles?.names.get(q.questId)?.name;
@@ -203,9 +203,23 @@ export default async function ZonePage(props: Props) {
     { key: "level", header: "Level", numeric: true, cell: (q) => q.level ?? "–" },
     // The side 3 installs agree it is offered to, in its faction's colour; a dash while unagreed.
     { key: "side", header: "Side", cell: (q) => (q.side ? <span className={SIDE_TONE[q.side]}>{SIDE_LABEL[q.side]}</span> : "–") },
-    { key: "giver", header: "Giver", cell: (q) => npcLink(q.giverNpcId) },
-    { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId) },
+    // Left out when no row has one (QA round 15: "unrecorded" on every row), and said once under the table.
+    { key: "giver", header: "Giver", cell: (q) => npcLink(q.giverNpcId), blank: (q) => q.giverNpcId === null },
+    { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId), blank: (q) => q.turnInNpcId === null },
   ];
+  const questColumns = filledColumns(allQuestColumns, quests);
+  const shownNpc = (id: number) => npcNameHere.get(id) ?? `NPC ${id}`;
+  // On a phone the quest name keeps the row; the other columns' facts go on one line under it.
+  const questMeta = (q: ZoneQuest) => [
+    q.level !== null ? `Level ${q.level}` : null,
+    q.side ? SIDE_LABEL[q.side] : null,
+    q.giverNpcId !== null ? `Giver ${shownNpc(q.giverNpcId)}` : null,
+    q.turnInNpcId !== null ? `Turn-in ${shownNpc(q.turnInNpcId)}` : null,
+  ].filter(Boolean).join(" · ");
+  const missingNpcs = ["giver", "turnin"].filter((k) => !questColumns.some((c) => c.key === k));
+  const questNote = quests.length > 0 && missingNpcs.length > 0
+    ? `No quest here has an agreed ${missingNpcs.length === 2 ? "giver or turn-in" : missingNpcs[0] === "giver" ? "giver" : "turn-in"} NPC yet.`
+    : null;
   const sourceLink = (s: ZoneItemSource) => <EntityLink kind={s.from.kind} id={s.from.id} name={s.from.name} />;
   // One source: its numbers are the row's. Several: the row counts the distinct sources and each source's frequency and likely range,
   // and each source's own windows, frequency and installs open under it (the numbers of two sources are never added).
@@ -262,7 +276,10 @@ export default async function ZonePage(props: Props) {
 
   // Most useful first: what to do here, who is here, who sells; a tab with no rows is left out (Tabs).
   const all: TabItem[] = [
-    { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty(EMPTY.zoneQuests)} /> },
+    { id: "quests", label: "Quests", count: quests.length, panel: <>
+      <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} meta={questMeta} empty={empty(EMPTY.zoneQuests)} />
+      {questNote && <p data-quest-npcs-note className="px-4 py-2 text-meta text-fg-2 sm:px-6">{questNote}</p>}
+    </> },
     { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneNpcs)} /> },
     { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty(EMPTY.zoneVendors)} /> },
     // The loot tables could not be read (the world facts could): the tab says so, with no count and no empty-list copy.

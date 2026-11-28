@@ -80,7 +80,12 @@ test("contribution attribution is a separate unchecked choice after a durable up
 test("the sample fills the preview but cannot be sent, and says so", async () => {
   await click("Load sample");
   expect(container.textContent).toContain("Preview — selected records to send");
-  expect(container.textContent).toContain("npc_sighting");
+  // QA round 15: each kind by its name, not its record key, and one batch is "1 batch".
+  const preview = [...container.querySelectorAll("li")].map((li) => li.textContent);
+  expect(preview).toEqual(expect.arrayContaining([expect.stringMatching(/^NPC sightings\d/), expect.stringMatching(/^Loot\d/)]));
+  expect(container.textContent).not.toContain("npc_sighting");
+  expect(container.textContent).toContain("1 batch.");
+  expect(container.textContent).not.toContain("1 batches");
   expect(container.textContent).toContain("This is a sample, to show what an upload holds. It is never sent. Choose your own file to upload.");
   const sendButton = [...container.querySelectorAll("button")].find((b) => b.textContent === "Samples are not sent")!;
   expect(sendButton.disabled).toBe(true);

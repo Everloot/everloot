@@ -105,6 +105,8 @@ test("newly confirmed lists the newest facts with their link, date, and an item'
   expect(block).toContain('href="/database/npcs/448"');
   expect(block).toContain("NPC");
   expect(block).toContain('dateTime="2026-11-25T18:00:00.000Z"');
+  // QA round 15: the site's day form, with the ISO time kept in dateTime.
+  expect(block).toMatch(/dateTime="2026-11-25T18:00:00.000Z"[^>]*>Nov 25, 2026</);
   // An item without an icon from the files keeps its name, as a plain link.
   expect(block).toContain(">Linen Cloth</a>");
   expect(block).toContain('href="/database/recent"');
@@ -250,7 +252,7 @@ test("round 5 copy: the panel notes say what each counts, the week names its win
   expect(panel(html, "live-ladder")).not.toContain("From kills two members");
   expect(panel(html, "live-newest")).toContain("Just confirmed by three installs.");
   const week = panel(html, "live-week");
-  expect(week).toContain("So far this week, from 2026-11-23.");
+  expect(week).toContain("So far this week, from Nov 23, 2026.");
   expect(week).toContain("The census page counts the last 7 days, so its shares can differ.");
   expect(html).not.toContain("Live-client verification is pending.");
 });

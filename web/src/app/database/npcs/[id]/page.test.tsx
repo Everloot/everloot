@@ -97,7 +97,11 @@ test("the summary counts the traits players agree on, and never says nobody repo
   expect(out).not.toContain("No player has reported it yet.");
   expect(out).toContain("Players agree on its level, type, reaction and rank.");
   facts.npcs = facts.npcs.slice(0, 2);
-  expect(await html()).toContain("No player has reported it yet.");
+  // QA round 15: the two installs name it differently, so the name meter reads 1 of 3, and the summary says so too.
+  const short = await html();
+  expect(short).not.toContain("No player has reported it yet.");
+  expect(short).toContain("1 install reported this name; it needs 3.");
+  expect(fact(short, "Reported name")).toContain("1 of 3");
 });
 
 test("one drop is counted in the singular", async () => {

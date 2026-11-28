@@ -45,6 +45,12 @@ export interface DataTableProps<Row> {
   meta?: (row: Row) => ReactNode;
   /** Sort links carry rel="nofollow": for a table whose every order is its own URL a crawler should not walk. */
   nofollow?: boolean;
+  /**
+   * Dense tables only. Off for a table that is not a long list (a chart's numbers, "Show as a table"): its header
+   * stays put and the table scrolls sideways in its own box at every width. A box that scrolls is the sticky
+   * header's scroll parent, so the site header's offset pushed the header down onto row 1.
+   */
+  stickyHeader?: boolean;
 }
 
 /**
@@ -132,7 +138,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
  * The dense list table. Every sortable header is a link that says its direction (▲ ascending, ▼ descending)
  * on the sorted column, with aria-sort. On a phone the first column carries the row; the others hide.
  */
-function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, meta, nofollow }: DataTableProps<Row>) {
+function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, meta, nofollow, stickyHeader = true }: DataTableProps<Row>) {
   // Without a phone line the other columns cannot fold away. Either way a table too wide for its column scrolls inside
   // itself below 1024 px (the sticky header needs the page as its scroll parent, so it applies from `lg`).
   const folds = Boolean(meta);
@@ -140,7 +146,7 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
   return (
     <div data-table data-dense className="min-w-0">
       {toolbar}
-      <div role="region" aria-label={caption} tabIndex={0} className="relative max-w-full overflow-x-auto lg:overflow-visible">
+      <div role="region" aria-label={caption} tabIndex={0} className={`relative max-w-full overflow-x-auto ${stickyHeader ? "lg:overflow-visible" : ""}`}>
         <table className="w-full border-collapse text-cell">
           <caption className="sr-only">{caption}</caption>
           <thead>
@@ -156,7 +162,7 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
                     aria-sort={ariaSort(sorted, col.sortable && sortHref)}
                     // Sticky under the site header from 1024 px up only: below that the table scrolls sideways inside
                     // its own box, which is then the sticky parent, so the offset pushed the header down onto the rows.
-                    className={`z-10 h-th lg:sticky lg:top-header whitespace-nowrap border-b border-line bg-canvas px-3 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"} ${phoneHidden(i)}`}
+                    className={`z-10 h-th ${stickyHeader ? "lg:sticky lg:top-header" : ""} whitespace-nowrap border-b border-line bg-canvas px-3 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"} ${phoneHidden(i)}`}
                   >
                     {col.sortable && sortHref ? (
                       // Block-level, so the link fills the 32 px cell without a line box around it.
