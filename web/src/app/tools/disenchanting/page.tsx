@@ -69,7 +69,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
   const realmName = realm?.realm.name ?? null;
   const where = house && realmName ? `the ${house} auction house on ${realmDisplayName(realmName)}` : null;
   // A material links to its price on the chosen house, else to its database page.
-  const materialHref = (id: number) => (board ? itemHref(board.realm, id) : itemPage(id));
+  const materialHref = (id: number) => (board ? itemHref(board.realm, id, house) : itemPage(id));
   const material = (id: number) => <ItemLink id={id} href={materialHref(id)} tip={tips.get(id)} names={names} />;
 
   const yieldList = (y: BandYield) => (
@@ -99,7 +99,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
     ] : []),
   ];
   const dealColumns: Column<Deal>[] = [
-    { key: "item", header: "Item", cell: (d) => <ItemLink id={d.itemId} href={itemHref(d.row.realm, d.itemId)} tip={tips.get(d.itemId)} names={names} /> },
+    { key: "item", header: "Item", cell: (d) => <ItemLink id={d.itemId} href={itemHref(d.row.realm, d.itemId, d.row.house)} tip={tips.get(d.itemId)} names={names} /> },
     { key: "band", header: "Band", cell: (d) => <span className="text-fg-2">{bandLabel(d.band.yield.band)}</span> },
     { key: "buy", header: "Min buyout", numeric: true, cell: (d) => <CoinText text={formatCopper(d.row.value.min)} /> },
     { key: "value", header: "Materials after cut", numeric: true, cell: (d) => <CoinText text={formatCopper(d.band.afterCut)} /> },
@@ -173,7 +173,10 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
         title={HEADING}
         lede={lede}
         meta={where ? <span>{house} auction house on <RealmName name={realmName!} /></span> : undefined}
-        actions={<Link href={AH_PATH} className="btn">Auction House</Link>}
+        actions={<>
+          <Link href={realmHouseHref(AH_PATH, {}, slug, house)} className="btn">Auction House</Link>
+          {board && <a href="#disenchant-deals" className="btn">Buy to disenchant</a>}
+        </>}
       />
       <div className="space-y-8">
         <RealmHousePicker

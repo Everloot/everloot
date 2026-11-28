@@ -22,7 +22,7 @@ test("browse has labelled filters, bounded server pages, house labels, publish t
   const doc = await render();
   expect(store.load).toHaveBeenCalledWith("us", 110);
   expect(doc.querySelectorAll("tbody tr")).toHaveLength(50);
-  expect(doc.querySelector('a[href="/blizzard-auctions/1"]')).not.toBeNull();
+  expect(doc.querySelector('a[href="/blizzard-auctions/1?region=us&house=110"]')).not.toBeNull();
   expect(doc.querySelectorAll("label")).toHaveLength(5);
   expect(doc.querySelector('select[name="house"]')!.textContent).toContain("Roleplay PvP, Horde");
   expect(doc.querySelector("time")!.getAttribute("datetime")).toBe(row(1).snapshotAt);
@@ -31,24 +31,38 @@ test("browse has labelled filters, bounded server pages, house labels, publish t
   const next = doc.querySelector('nav a')!.getAttribute("href")!;
   const second = await render(Object.fromEntries(new URL(next, "https://example.test").searchParams));
   expect(second.querySelectorAll("tbody tr")).toHaveLength(5);
-  expect(second.querySelector('a[href="/blizzard-auctions/51"]')).not.toBeNull();
+  expect(second.querySelector('a[href="/blizzard-auctions/51?region=us&house=110"]')).not.toBeNull();
 });
 
 test("search and all numeric sorts run before pagination, with URL state retained", async () => {
   for (const sort of ["minUnit", "quantity", "auctions"]) {
     const doc = await render({ region: "eu", house: "124", sort, dir: "desc" });
-    expect(doc.querySelector("tbody a")!.getAttribute("href")).toBe("/blizzard-auctions/55");
+    expect(doc.querySelector("tbody a")!.getAttribute("href")).toBe("/blizzard-auctions/55?region=eu&house=124");
     expect(doc.querySelector("nav a")!.getAttribute("href")).toContain(`sort=${sort}`);
     expect(store.load).toHaveBeenLastCalledWith("eu", 124);
   }
   const typical = await render({ sort: "typicalUnit" });
-  expect(typical.querySelector("tbody a")!.getAttribute("href")).toBe("/blizzard-auctions/55");
+  expect(typical.querySelector("tbody a")!.getAttribute("href")).toBe("/blizzard-auctions/55?region=us&house=110");
   const filtered = await render({ q: "iTeM 55", page: "999" });
   expect(filtered.querySelectorAll("tbody tr")).toHaveLength(1);
   expect(filtered.querySelector("tbody a")!.textContent).toBe("Item 55");
   expect(filtered.querySelector("nav")!.textContent).toContain("Page 1 of 1");
   await render({ region: "kr", house: "-1", page: "bad", sort: "toString", dir: "bad", q: ["55", "1"] });
   expect(store.load).toHaveBeenLastCalledWith("us", 110);
+});
+
+test("an official item opens on the region and house the player selected", async () => {
+  const doc = await render({ region: "eu", house: "124", q: "55" });
+  expect(doc.querySelector("tbody a")?.getAttribute("href")).toBe("/blizzard-auctions/55?region=eu&house=124");
+});
+
+test("a linked set of loot items is bounded and remains selected when changing market", async () => {
+  const doc = await render({ items: "51,55,990,55", region: "eu", house: "124" });
+  expect([...doc.querySelectorAll("tbody a")].map((link) => link.textContent)).toEqual(["Item 51", "Item 55"]);
+  expect(doc.querySelector('input[name="items"]')?.getAttribute("value")).toBe("51,55,990");
+  expect(doc.body.textContent).toContain("1 selected item has no quote in this market");
+  const excessive = await render({ items: Array.from({ length: 51 }, (_, i) => i + 1).join(",") });
+  expect(excessive.querySelector('input[name="items"]')).toBeNull();
 });
 
 test("missing migration and failed reads never become empty prices; names can degrade separately", async () => {

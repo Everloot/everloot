@@ -534,7 +534,8 @@ test("an achievement the files give 0 points says it has none in this game, neve
   game.achievements = { "50": { title: "Loremaster", points: 0, description: "Complete every zone.", criteria: [{ text: "Elwynn", amount: 1 }] } };
   const out = await html(AchievementPage(page("50-loremaster")));
   expect(out).toMatch(/>Points<\/dt><dd[^>]*>No points in this game</);
-  expect(out).toContain("<p>No points in this game</p>");
+  // Said once, in the facts: not again in the box (QA r15).
+  expect(out).not.toContain("<p>No points in this game</p>");
   expect(out).not.toMatch(/(?<![0-9])0 points/);
 });
 

@@ -1,12 +1,10 @@
 import Link from "@/components/Link";
 import { DataTable, SectionHeading, type Column } from "@/components/ui";
 import type { LegacyPerkCatalog, Node, Tree } from "@kb/legacy-perks/catalog";
+import LegacyPlanner from "./LegacyPlanner";
+import { orderedPerks, treeName } from "./plan";
 
-/**
- * The Legacy perk catalog as the game files hold it, read-only (docs/LEGACY_PERKS.md). Ids, ranks and prerequisites
- * are stored values. The cost, the cap and where a spend gate counts are readings of column names: they are shown as
- * such, an unknown one shows no number, and nothing on this page spends or enforces them.
- */
+/** All catalog rows stay available below the planner, including perks with unresolved rank availability. */
 export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog }) {
   // The columns of every tree share the same PosX values; number them left to right.
   const xs = [...new Set(catalog.trees.flatMap((t) => t.nodes.map((n) => n.x)).filter((x): x is number => x !== null))].sort((a, b) => a - b);
@@ -14,14 +12,18 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
   const cap = (id: number | null) => catalog.currencies.find((c) => c.id === id)?.cap;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       <p className="text-sm text-muted">
         Found in game files, unconfirmed.{" "}
         <Link href={`/changes?show=builds&q=${catalog.build.version}`} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{`Read from build ${catalog.build.version}`}</Link>
         {` on ${catalog.build.extractedAt.slice(0, 10)}, trait system ${catalog.traitSystemId}. `}
-        {catalog.credit}
+        {catalog.credit}{" "}
+        <a href="#legacy-reference" className="underline decoration-edge underline-offset-4 hover:decoration-fg">View the game-file reference</a>
       </p>
 
+      <LegacyPlanner catalog={catalog} />
+
+      <SectionHeading id="legacy-reference">Game-file perk reference</SectionHeading>
       {catalog.trees.map((tree) => {
         const id = `tree-${tree.id}`;
         const c = cap(tree.currencyId);
@@ -42,7 +44,7 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
             >
               {name ? `${name} tree` : `Legacy tree ${tree.id}`}
             </SectionHeading>
-            <DataTable caption={`Perks of the ${name ? `${name} tree` : `Legacy tree ${tree.id}`}`} columns={perkColumns(tree, column)} rows={sortNodes(tree.nodes, column)} rowKey={(n) => String(n.id)} />
+            <DataTable caption={`Perks of the ${name ? `${name} tree` : `Legacy tree ${tree.id}`}`} columns={perkColumns(tree, column)} rows={orderedPerks(tree.nodes)} rowKey={(n) => String(n.id)} />
             <p className="mt-2 text-xs text-muted">{`From the game files: ${files.join("; ")}.`}</p>
           </section>
         );
@@ -52,8 +54,8 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
         <SectionHeading id="legacy-open">What the files leave open</SectionHeading>
         <ul className="list-disc space-y-2 pl-5 text-sm text-fg-2">
           <li>Spend gates are partial: the points a gate asks for are stored, but where those points are counted is read from a column name and is unconfirmed.</li>
-          <li>The cost per rank and the most points a character holds are readings of column names. Nothing here spends points.</li>
-          <li>How points are earned, and whether they belong to the account or the character, is not in the tables read.</li>
+          <li>The cost per rank and the shared cap are readings of column names. The planner shows them as estimates.</li>
+          <li>This catalog leaves point sources and challenge criteria open. The achievement catalog shows point rewards on entries such as <Link href="/database/achievements/684" className="underline decoration-edge underline-offset-4 hover:decoration-fg">Conqueror of the Lair</Link>.</li>
           {catalog.emptyTreeIds.length > 0 && <li>{`Trait system ${catalog.traitSystemId} also holds ${catalog.emptyTreeIds.length === 1 ? "tree" : "trees"} ${catalog.emptyTreeIds.join(", ")}, with no perks.`}</li>}
           {catalog.warnings.map((w) => <li key={w}>{w}</li>)}
           {catalog.withdrawn.map((w) => (
@@ -63,19 +65,6 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
       </section>
     </div>
   );
-}
-
-const sortNodes = (nodes: Node[], column: (n: Node) => number | null) =>
-  [...nodes].sort((a, b) => (column(a) ?? Infinity) - (column(b) ?? Infinity) || (a.y ?? Infinity) - (b.y ?? Infinity) || a.id - b.id);
-
-/**
- * A tree's name from what it holds: its top perk (the lowest row, then the leftmost) that the files name. Null when
- * none is named. "Unknown" is a placeholder name in the files, not a perk's name.
- */
-function treeName(tree: Tree): string | null {
-  const named = tree.nodes.filter((n) => n.y !== null && n.entries[0]?.name && n.entries[0].name !== "Unknown");
-  named.sort((a, b) => a.y! - b.y! || (a.x ?? Infinity) - (b.x ?? Infinity) || a.id - b.id);
-  return named[0]?.entries[0]?.name ?? null;
 }
 
 const nodeName = (n: Node) => n.entries[0]?.name ?? "No name in the files";

@@ -100,7 +100,7 @@ export default async function MarketChangesPage(props: Props) {
   const realms = stored ? stored.boards(null).map((b) => ({ slug: b.realm.slug, name: b.realm.name, count: b.items })) : [];
   const counts = stored ? houseCounts(stored.boards, now, slug) : undefined;
   const pickHref = (realm: string | null, h: AuctionHouse | null) => changesHref({ slug: realm ?? slug }, h);
-  const item = (c: { row: Compared["row"] }) => <ItemLink id={c.row.value.itemId} href={itemHref(c.row.realm, c.row.value.itemId)} tip={tips.get(c.row.value.itemId)} names={names} />;
+  const item = (c: { row: Compared["row"] }) => <ItemLink id={c.row.value.itemId} href={itemHref(c.row.realm, c.row.value.itemId, c.row.house)} tip={tips.get(c.row.value.itemId)} names={names} />;
   const scope = board && shown ? `${realmName}, ${shown} auction house` : realmName;
 
   const compared = (noun: string, up: boolean): Column<Compared>[] => [

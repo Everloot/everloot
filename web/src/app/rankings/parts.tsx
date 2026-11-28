@@ -12,7 +12,7 @@ import {
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
 } from "@/lib/rankings";
 import { StackedWeeksChart, WeeklyLinesChart, WeeklyTotalsChart } from "./charts";
-import { nameOf, number, percent, seriesMarks, stroke, weekLabel } from "./chart-words";
+import { nameOf, number, percent, seriesMarks, stroke, weekLabel, weekTick } from "./chart-words";
 import { utcDay } from "@/lib/time";
 
 export { percent, weekLabel };
@@ -318,8 +318,8 @@ function ChartTable<T>({ caption, columns, rows, rowKey }: { caption: string; co
         <span aria-hidden="true" className="hidden font-mono text-muted group-open:inline">−</span>
         Show as a table
       </summary>
-      <div className="mt-2 overflow-x-auto">
-        <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />
+      <div className="mt-2">
+        <DataTable dense stickyHeader={false} caption={caption} columns={columns} rows={rows} rowKey={rowKey} />
       </div>
     </details>
   );
@@ -331,7 +331,7 @@ const shareCell = (p: number | null) => (p === null ? <span className="text-mute
 function SharesTable({ weeks, series, caption }: { weeks: RankingWeek[]; series: ChartSeries[]; caption: string }) {
   const columns: Column<ChartSeries>[] = [
     { key: "name", header: "Name", nowrap: true, cell: (s) => <span className="font-medium">{nameOf(s)}</span> },
-    ...weeks.map((w, i): Column<ChartSeries> => ({ key: w.start, header: w.current ? "So far" : w.start.slice(5), numeric: true, cell: (s) => shareCell(s.points[i]) })),
+    ...weeks.map((w, i): Column<ChartSeries> => ({ key: w.start, header: w.current ? "So far" : weekTick(w), numeric: true, cell: (s) => shareCell(s.points[i]) })),
   ];
   return <ChartTable caption={caption} columns={columns} rows={series} rowKey={(s) => s.key} />;
 }

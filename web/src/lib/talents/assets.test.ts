@@ -111,8 +111,8 @@ const root = join(__dirname, "../../../..");
 
 // The pages that show Blizzard's art, and the modules that read it for them. Nothing else may.
 const SHOWS_ART = new Set([
-  // A class hub's class and tree icons (the calculator's), and its spells by level with their icons and names.
-  "web/src/app/classes/[class]/page.tsx", "web/src/app/classes/[class]/spells/page.tsx",
+  // The class index and hub display the calculator's class icons. Hubs also show tree icons, and their spell levels page shows spell icons and names.
+  "web/src/app/classes/page.tsx", "web/src/app/classes/[class]/page.tsx", "web/src/app/classes/[class]/spells/page.tsx",
   // Lightweight armory equipment icons and race/class portrait fallback.
   "web/src/app/armory/profile.tsx", "web/src/app/armory/[region]/[slug]/page.tsx",
   // The player directory's 16 px class icons beside each name (one style rule per class).

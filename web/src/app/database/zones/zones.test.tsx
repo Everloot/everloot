@@ -534,3 +534,29 @@ test("QA round 14: a terrain list of 3 rows or fewer starts open; a longer one s
   const long = (await html(ZonePage(props("1436-westfall")))).split("data-zone-terrain")[1] ?? "";
   expect(long).not.toMatch(/<details[^>]*open/);
 });
+
+// QA round 15: Durotar's quests had no agreed giver or turn-in, so both columns read "unrecorded" on every row and, at
+// 390, squeezed the quest names to a word a line. Each install names a different giver here, so none is agreed.
+const ungivenQuest = (questId: number, title: string) => installs.map((installId, i) => ({
+  kind: "quest", installId, eventId: `q:${installId}:${questId}`, capturedAt: "2026-10-10T00:00:00.000Z", questId, title, level: 3, giverNpcId: 900 + i, rewardItemIds: [], category: "Durotar",
+}));
+
+test("QA round 15: a Giver or Turn-in column with nothing recorded on any row is left out, said once under the table, and names fold on a phone", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([...ungivenQuest(788, "Cutting Teeth"), ...ungivenQuest(789, "Sting of the Scorpid")]));
+  const quests = (await html(ZonePage(props("1411-durotar")))).split('data-tab-panel="quests"')[1]?.split("data-tab-panel")[0] ?? "";
+  expect(quests).toMatch(/>Cutting Teeth</);
+  expect(quests).not.toContain("unrecorded<");
+  expect(quests).not.toMatch(/<th[^>]*>(?:<[^>]*>)*(?:Giver|Turn-in)</);
+  expect(quests).toContain("No quest here has an agreed giver or turn-in NPC yet.");
+  // Below 640 px the quest name keeps the row, with its level and side on a line under it.
+  expect(quests).toMatch(/class="dt-meta">Level 3/);
+});
+
+test("QA round 15: a column some rows fill stays, and its empty cells still say unrecorded", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([...three(100, "Gornek", 1411, 42, 68), ...filedQuest(788, "Cutting Teeth", "Durotar", 100), ...ungivenQuest(789, "Sting of the Scorpid")]));
+  const quests = (await html(ZonePage(props("1411-durotar")))).split('data-tab-panel="quests"')[1]?.split("data-tab-panel")[0] ?? "";
+  expect(quests).toMatch(/<th[^>]*>(?:<[^>]*>)*Giver</);
+  expect(quests).toContain(">Gornek</a>");
+  expect(quests).toContain("unrecorded");
+  expect(quests).not.toContain("No quest here has an agreed giver");
+});

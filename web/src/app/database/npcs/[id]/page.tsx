@@ -172,6 +172,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
       now,
       unreachable ? [] : ([[traits.level !== null, "level"], [traits.creatureType !== null, "type"], [traits.reaction !== null, "reaction"], [traits.rank !== null, "rank"]] as const)
         .filter(([on]) => on).map(([, word]) => word),
+      page.name ? 0 : npcNameReporters(npcId, facts),
     ),
     nameFrom: shown.fromWiki ? "wiki" : page.name ? "players" : "none",
   });

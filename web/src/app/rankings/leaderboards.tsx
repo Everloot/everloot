@@ -75,7 +75,7 @@ const gearColumns: Column<ArmoryGuildRow>[] = [
   { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
   { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
   { key: "read", header: "Members read", numeric: true, cell: (g) => number(g.membersRead) },
-  { key: "il", header: <Tooltip label="Average item level of the guild members the armory has read. Item level averages the gear a character wears.">Avg item level</Tooltip>, numeric: true, cell: (g) => <GuildItemLevel guild={g} /> },
+  { key: "il", header: <Tooltip label="The average item level of the gear worn by the guild members the armory has read.">Avg item level</Tooltip>, numeric: true, cell: (g) => <GuildItemLevel guild={g} /> },
 ];
 
 const raidColumns: Column<RankedRow>[] = [

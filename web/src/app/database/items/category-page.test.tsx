@@ -605,3 +605,20 @@ test("on a phone the active filters show under the Filters button as chips, each
   const plain = await html(SubclassPage(sub("armor", "plate")));
   expect(plain).not.toContain("data-filter-chips");
 });
+
+test("rows whose name repeats on the page say what tells them apart beside the name", async () => {
+  const swords = CLIENT_TAXONOMY.subclasses.find((s) => s.slug === "one-handed-swords")!;
+  const [a, b, c] = CLIENT_TAXONOMY.items.filter((r) => r[1] === swords.classId && r[2] === swords.id).map((r) => r[0]).slice(-3);
+  const name = (itemId: number, n: string) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: n }));
+  try {
+    facts.names = [...name(a!, "Twin Blade"), ...name(b!, "Twin Blade"), ...name(c!, "Lone Blade")];
+    const list = await html(SubclassPage(sub("weapons", "one-handed-swords", { q: "blade" })));
+    const row = (id: number) => list.split("<tr").find((r) => r.includes(`href="/database/items/${id}"`)) ?? "";
+    // No item level in the tooltips here, so the IDs tell them apart.
+    expect(row(a!)).toMatch(new RegExp(`>Twin Blade</a>(?:<span class="sr-only">[^<]*</span>)?<span[^>]*>ID ${a}</span>`));
+    expect(row(b!)).toMatch(new RegExp(`>Twin Blade</a>(?:<span class="sr-only">[^<]*</span>)?<span[^>]*>ID ${b}</span>`));
+    expect(row(c!)).not.toContain(`>ID ${c}</span>`);
+  } finally {
+    facts.names = [];
+  }
+});

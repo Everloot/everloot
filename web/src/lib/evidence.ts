@@ -8,7 +8,7 @@
  * measured zero.
  */
 import type { Edge } from "@kb/edges";
-import { agreementLabel } from "@/components/ui/AgreementMeter";
+import { AGREEMENT_NEEDED, agreementLabel } from "@/components/ui/AgreementMeter";
 import { timeAgo } from "./time";
 
 /** The key, in the site's own words. Short enough to read and complete enough to trust. */
@@ -89,11 +89,18 @@ export function itemSummary(i: ItemSummaryInput): string[] {
   return bullets;
 }
 
-/** The line that says what players reported, with the count and the date, or that nobody has. */
-export function observedLine(parts: (string | null)[], lastSeen: string | null, now: number, agreed: readonly string[] = []): string {
+/**
+ * The line that says what players reported, with the count and the date, or that nobody has. `nameReporters`: installs
+ * that reported a name not yet agreed (short of 3); with nothing else to say, the line counts them, so it never says
+ * nobody reported it beside the name's partly filled meter. The agreement rule is the meter's, unchanged.
+ */
+export function observedLine(parts: (string | null)[], lastSeen: string | null, now: number, agreed: readonly string[] = [], nameReporters = 0): string {
   const said = parts.filter((p): p is string => Boolean(p));
   // Facts 3 installs agree on (a level, a side) are reports too: a page that shows them never says nobody reported it.
   const facts = agreed.length ? `agree on its ${wordList(agreed)}.` : "";
+  if (!said.length && !facts && nameReporters > 0) {
+    return `${nameReporters} ${nameReporters === 1 ? "install" : "installs"} reported this name; it needs ${AGREEMENT_NEEDED}.`;
+  }
   if (!said.length) return facts ? `Players ${facts}` : "No player has reported it yet.";
   const when = lastSeen ? `, last seen ${timeAgo(Date.parse(lastSeen), now)}` : "";
   return `Players reported ${wordList(said)}${when}.${facts ? ` They ${facts}` : ""}`;

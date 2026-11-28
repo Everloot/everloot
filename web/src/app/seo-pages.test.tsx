@@ -138,7 +138,7 @@ test("/changes opens with the latest build and its ItemList items are the entrie
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
   const [page] = blocks(html);
   expect(page["@type"]).toBe("CollectionPage");
-  expect(visible(html)).toMatch(/Latest build: WoW: Forever \d+\.\d+\.\d+\.\d+, first seen by Everloot on \d{4}-\d{2}-\d{2}\./);
+  expect(visible(html)).toMatch(/Latest build: WoW: Forever \d+\.\d+\.\d+\.\d+, first seen by Everloot on [A-Z][a-z]{2} \d{1,2}, \d{4}\./);
   expect(h1(html)).toBe(page.name);
   const shown = (html.match(/data-change-row/g) ?? []).length;
   expect(page.mainEntity.itemListElement).toHaveLength(shown);

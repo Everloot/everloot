@@ -77,7 +77,7 @@ describe("instance rows", () => {
       reportedBosses: new Map(),
       encounters: [],
     });
-    expect(bossLine(stockade.bosses[1]!)).toBe("Hogger (4 kills) from 3 installs, last seen 2026-10-21");
+    expect(bossLine(stockade.bosses[1]!)).toBe("Hogger (4 kills) from 3 installs, last seen Oct 21, 2026");
   });
 
   test("the files' encounters merge in the files' order: a reported boss takes its files place, a nameless one borrows the files' name, the rest stay unconfirmed", () => {

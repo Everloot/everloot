@@ -14,11 +14,13 @@ import GameIcon from "./GameIcon";
 // Without a tip (no asset URL, or no record for the item) the link is returned exactly as it was.
 
 // `icon` replaces the icon drawn in front (a caller that draws its own frame or fallback); the card keeps the tip's icon.
-export default function ItemTip({ tip, size = 20, icon, children }: { tip: Tip | null | undefined; size?: number; icon?: ReactNode; children: ReactElement }) {
-  return tip ? <Tipped tip={tip} size={size} icon={icon}>{children}</Tipped> : children;
+export default function ItemTip({ tip, size = 20, icon, className = "inline-flex items-center gap-1.5 align-middle", children }: {
+  tip: Tip | null | undefined; size?: number; icon?: ReactNode; className?: string; children: ReactElement;
+}) {
+  return tip ? <Tipped tip={tip} size={size} icon={icon} className={className}>{children}</Tipped> : children;
 }
 
-function Tipped({ tip, size, icon, children }: { tip: Tip; size: number; icon?: ReactNode; children: ReactElement }) {
+function Tipped({ tip, size, icon, className, children }: { tip: Tip; size: number; icon?: ReactNode; className: string; children: ReactElement }) {
   const id = useId();
   const anchorId = `item${id}`;
   const descId = `${anchorId}-desc`;
@@ -36,7 +38,7 @@ function Tipped({ tip, size, icon, children }: { tip: Tip; size: number; icon?: 
   return (
     <span
       id={anchorId}
-      className="inline-flex items-center gap-1.5 align-middle"
+      className={className}
       data-item-tip
       onPointerEnter={(e) => { if (e.pointerType !== "touch") setOpen({ anchor: e.currentTarget, x: e.clientX }); }}
       onPointerLeave={() => setOpen(null)}

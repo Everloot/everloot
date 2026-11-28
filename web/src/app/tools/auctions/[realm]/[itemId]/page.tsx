@@ -16,7 +16,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
-  AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseSlug, indexable, itemHref, itemIdParam,
+  AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseParam, houseSlug, indexable, itemHref, itemIdParam,
   itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, scanDayText, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
@@ -25,9 +25,10 @@ import AhledgerPrices from "../../AhledgerPrices";
 import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
 import { REGION_LABEL, RULESET_LABEL, realmRegion, realmRuleset } from "@/lib/realms";
+import { craftingLinks } from "@/lib/professions";
 import { realmDisplayName } from "../../RealmName";
 
-type Props = { params: Promise<{ realm: string; itemId: string }> };
+type Props = { params: Promise<{ realm: string; itemId: string }>; searchParams?: Promise<{ house?: string | string[] }> };
 
 export const revalidate = 300;
 export async function generateStaticParams() {
@@ -75,15 +76,19 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 export default async function RealmItemPage(props: Props) {
-  const { raw, slug, itemId, now, market, row, others, houses, tip, names, realm, label } = await load(props.params);
-  if (decodeURIComponent(raw.realm) !== slug) permanentRedirect(itemHref({ slug }, itemId));
+  const [{ raw, slug, itemId, now, market, row: defaultRow, others, houses, tip, names, realm, label }, search] =
+    await Promise.all([load(props.params), props.searchParams]);
+  const requested = houseParam(typeof search?.house === "string" ? search.house : undefined);
+  const row = requested ? houses.find((price) => price.house === requested) ?? null : defaultRow;
+  if (decodeURIComponent(raw.realm) !== slug) permanentRedirect(itemHref({ slug }, itemId, requested));
   const state = market.state;
   const quality = itemQuality(itemId, tip, names.has(itemId)) ?? undefined;
-  // The cron's stored days. With no stored file to read the history is unrecorded: the page never reads the whole corpus.
-  const stored = row ? await storedAuctionHistory(realm, itemId) : null;
-  const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : row ? STORAGE_UNREACHABLE : null;
+  // The legacy single-listing file has a realm and item but no retained house dimension.
+  const hasRealmHistory = row !== null && !requested;
+  const stored = hasRealmHistory ? await storedAuctionHistory(realm, itemId) : null;
+  const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : hasRealmHistory ? STORAGE_UNREACHABLE : null;
   // A rollup or stored history that could not be read is kept seconds, not five minutes.
-  const degraded = await keepBrieflyIf(market.state === null || (row !== null && stored === null));
+  const degraded = await keepBrieflyIf(market.state === null || (hasRealmHistory && stored === null));
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
@@ -94,7 +99,10 @@ export default async function RealmItemPage(props: Props) {
   const region = realmRegion(realm);
   const ahledger = region ? ahledgerMarkets(ruleset, region) : [];
   // The history opens on the page's own house when AH Ledger has a market for it (none for Neutral).
-  const houseMarket = ahledger.find((m) => row && m.split(".")[2] === row.house.toLowerCase()) ?? ahledger[0];
+  const activeHouse = requested ?? row?.house;
+  const recipes = names.has(itemId) || houses.length > 0 || others.length > 0
+    ? craftingLinks(itemId, activeHouse ? { realm: slug, house: houseSlug(activeHouse) } : undefined) : [];
+  const houseMarket = activeHouse ? ahledger.find((m) => m.split(".")[2] === houseSlug(activeHouse)) : ahledger[0];
   const moves = row ? ([1, 7] as const).flatMap((span) => {
     const move = priceMove(row, span, now);
     return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${scanDayText(move.from.day)} to ${scanDayText(move.to.day)}` }] : [];
@@ -131,11 +139,17 @@ export default async function RealmItemPage(props: Props) {
         )}
         actions={<>
           <Link href={crossRealmHref(itemId)} className="btn">All realms</Link>
+          {requested && <Link href={`${realmHref({ slug })}?house=${houseSlug(requested)}`} className="btn">Back to {requested} prices</Link>}
           <Link href={`/database/items/${itemId}`} className="btn">Item details</Link>
+          {recipes.slice(0, 3).map((recipe) => <Link key={recipe.key} href={recipe.href} className="btn">Price {recipe.profession} reagents</Link>)}
         </>}
       />
 
       <div className="space-y-10">
+        {(requested || houses.length > 1) && <nav aria-label="Item auction house" className="flex flex-wrap gap-2">
+          {HOUSES.map((house) => <Link key={house} href={itemHref({ slug }, itemId, house)} className="btn"
+            aria-current={activeHouse === house ? "page" : undefined}>{house}</Link>)}
+        </nav>}
         <UnnamedReason id={itemId} names={names} />
         <ScansPaused state={state} now={now} />
 
@@ -145,8 +159,10 @@ export default async function RealmItemPage(props: Props) {
 
         {state && !v && (
           <EmptyState
-            count={agreementSoFar(state, slug, itemId)}
-            message={`No price for ${label} on ${shown} yet: it needs scans from 3 players in one auction house.`}
+            count={agreementSoFar(state, slug, itemId, requested)}
+            message={requested
+              ? `No public price in the ${requested} auction house on ${shown}. Choose another house to see its own prices.`
+              : `No price for ${label} on ${shown} yet: it needs scans from 3 players in one auction house.`}
           />
         )}
 
@@ -166,15 +182,13 @@ export default async function RealmItemPage(props: Props) {
           </>
         )}
 
-        {state && (row || others.length > 0) && (
+        {state && (houses.length > 0 || others.length > 0) && (
           <Tabs
             label="Prices"
             tabs={[
-              ...(row ? [{
+              ...(houses.length > 0 ? [{
                 id: "houses", label: "Houses", count: houses.length,
-                panel: houses.length
-                  ? <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${realm}`} /></div>
-                  : <div className="pt-4"><EmptyState framed={false} count={Math.max(...HOUSES.map((h) => agreementSoFar(state, slug, itemId, h)))} message="No auction house has its own price for this item yet: a house's price needs scans from 3 players in that house." /></div>,
+                panel: <div className="pt-4"><HousePrices rows={houses} caption={`${label} in each auction house on ${shown}`} /></div>,
               }] : []),
               {
                 id: "other-realms", label: "Other realms", count: others.length,
@@ -182,7 +196,7 @@ export default async function RealmItemPage(props: Props) {
               },
               ...(row ? [{
                 id: "daily", label: "Daily values", count: row.points.length,
-                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${realm}, ${row.house} auction house`} /></div>,
+                panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${shown}, ${row.house} auction house`} /></div>,
               }] : []),
             ]}
           />
@@ -196,7 +210,7 @@ export default async function RealmItemPage(props: Props) {
             regions={[{ label: REGION_LABEL[region], markets: ahledger }]}
           />
         )}
-        {houseMarket && <AhledgerHistory itemId={itemId} defaultMarket={houseMarket} />}
+        {houseMarket && <AhledgerHistory key={houseMarket} itemId={itemId} defaultMarket={houseMarket} />}
 
         <Contribute />
 

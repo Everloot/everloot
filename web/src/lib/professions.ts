@@ -112,3 +112,12 @@ export function recipeItemIds(recipes: readonly RecipeView[]): number[] {
 const RECIPE_BY_SPELL = new Map(CLIENT_PROFESSIONS.flatMap((p) => p.recipes.map((r) => [r.spellId, r] as const)));
 /** The recipe a spell is in the files (its ranks and reagents); undefined for a spell no profession lists. */
 export const recipeBySpell = (spellId: number): RecipeView | undefined => RECIPE_BY_SPELL.get(spellId);
+
+export function craftingLinks(itemId: number, market?: { realm: string; house: string }) {
+  return CLIENT_PROFESSIONS.flatMap((profession) => profession.recipes
+    .filter((recipe) => recipe.itemId === itemId && recipe.reagents.length > 0)
+    .map((recipe) => ({
+      key: recipe.spellId, profession: profession.name,
+      href: `${professionHref(profession.slug)}?${new URLSearchParams({ recipe: String(recipe.spellId), ...market })}#recipe-shopping`,
+    })));
+}

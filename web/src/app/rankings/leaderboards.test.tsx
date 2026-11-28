@@ -265,3 +265,10 @@ test("the item level and Gear Score boards carry one line on why the two numbers
   for (const metric of ["item-level", "gear-score"]) expect(section(await hub({ metric }), "characters")).toContain("weighs the same item levels by slot");
   expect(section(await hub({ metric: "honorable-kills" }), "characters")).not.toContain("weighs the same item levels by slot");
 });
+
+test("QA round 15: the Guilds by gear item level header's tooltip is one sentence", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const html = section(await hub(), "guilds");
+  expect(html).toContain("The average item level of the gear worn by the guild members the armory has read.");
+  expect(html).not.toContain("Item level averages the gear a character wears.");
+});

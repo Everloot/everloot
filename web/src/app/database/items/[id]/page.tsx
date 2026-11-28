@@ -26,7 +26,7 @@ import { CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } f
 import { BEGINS_QUEST, FACT_WORD, withReported } from "@/lib/item-names";
 import { CLIENT_QUEST_STARTS, questStartedBy } from "@/data/game-data/client-quest-starts";
 import { itemTooltip } from "@/lib/item-tooltip";
-import { recipeBySpell } from "@/lib/professions";
+import { craftingLinks, recipeBySpell } from "@/lib/professions";
 import { taughtItemId } from "@/lib/recipe-catalog";
 import { itemSetOf, setBonusText } from "@/lib/item-sets";
 import { GameCard } from "@/components/game/GameCard";
@@ -138,6 +138,7 @@ export default async function ItemPage(props: Props) {
 
   const all = edgesFrom([...edges.observed, ...edges.client], "item", itemId);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
+  const recipesToPrice = rel("created_by").length ? craftingLinks(itemId).slice(0, 3) : [];
   // The clock the page's "last seen" lines are written against, and the newest date among the observed rows.
   const now = Date.now();
   const newestSeen = [...all]
@@ -236,8 +237,11 @@ export default async function ItemPage(props: Props) {
   const iconRows = rel("same_icon").filter((e) => sharers(e).length > 0);
   // Items sharing an icon file are named, and shown with their icon, only under the item name rule.
   const sameIcon = iconRows.flatMap(sharers);
+  // They share one icon file, so each shows the same icon: this item's own, else the first a sharer's tooltip has.
   const iconNamed = [...new Set(sameIcon)].filter((id) => shownItemName(id, agreed, matched?.names)).slice(0, 12);
-  const iconTips = iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
+  const ownIcon = tip?.icon ?? filesIcon;
+  const iconTips = !ownIcon && iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
+  const sharedIcon = ownIcon ?? [...iconTips.values()].find((t) => t.icon)?.icon ?? undefined;
   const itemName = (id: number) => shownItemName(id, agreed, matched?.names)?.name;
   // What disenchanting it gives: the band the game files (or players' reported item level) place it in.
   const disenchant = await loadDisenchant();
@@ -419,6 +423,9 @@ export default async function ItemPage(props: Props) {
       summary={summary}
       main={<>
         <Tabs label={`${title}: relations`} tabs={tabs} />
+        {recipesToPrice.length > 0 && <div className="my-4 flex flex-wrap gap-2">
+          {recipesToPrice.map((recipe) => <Link key={recipe.key} href={recipe.href} className="btn">Price {recipe.profession} reagents</Link>)}
+        </div>}
         <DarkmoonItemNote name={name?.name} />
         {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
         <MarketBox itemId={itemId} {...auctions} />
@@ -434,7 +441,7 @@ export default async function ItemPage(props: Props) {
             <DataTable
               dense
               caption={`Items with the same icon as ${title}`}
-              columns={[{ key: "target", header: "Items", cell: (e: Edge) => <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> }]}
+              columns={[{ key: "target", header: "Items", cell: (e: Edge) => <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} icon={sharedIcon} /> }]}
               rows={iconRows}
               rowKey={(e) => `${e.rel}-${e.toId}`}
             />

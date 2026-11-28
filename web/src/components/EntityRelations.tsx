@@ -116,11 +116,11 @@ export function EntityRelations({ kind, id, observed, client, skip = [], spellIc
 }
 
 /**
- * Items that share an icon file. An item with a name to show is a link, with its icon when the page has one; the
- * rest are not listed by id, only counted in one muted line.
+ * Items that share an icon file. An item with a name to show is a link, each with the one icon they share when the page
+ * has it; the rest are not listed by id, only counted in one muted line.
  */
-export function SameIcon({ edge, self, client, itemName, itemIcon }: {
-  edge: Edge; self: number; client: readonly Edge[]; itemName?: (id: number) => string | undefined; itemIcon?: (id: number) => string | undefined;
+export function SameIcon({ edge, self, client, itemName, icon }: {
+  edge: Edge; self: number; client: readonly Edge[]; itemName?: (id: number) => string | undefined; icon?: string | null;
 }) {
   const others = client.filter((o) => o.rel === "same_icon" && o.toId === edge.toId && o.fromId !== self).map((o) => o.fromId);
   const named = others.filter((id) => itemName?.(id));
@@ -131,7 +131,6 @@ export function SameIcon({ edge, self, client, itemName, itemIcon }: {
       {`Icon file ${edge.toId}`}
       {shown.length > 0 && ", shared with "}
       {shown.map((item, i) => {
-        const icon = itemIcon?.(item);
         return (
           <span key={item}>
             {i > 0 ? ", " : ""}

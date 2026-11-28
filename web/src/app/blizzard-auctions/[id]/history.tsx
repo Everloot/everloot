@@ -5,7 +5,7 @@ import { houseLabel, houseOrder } from "@/lib/blizzard-houses";
 import { formatCopper } from "@kb/market";
 import { blizzardTime } from "./blizzard-auctions";
 
-export function BlizzardHistory({ read }: { read: BlizzardBrowseRead<BlizzardHistoryPrice> }) {
+export function BlizzardHistory({ read, scope }: { read: BlizzardBrowseRead<BlizzardHistoryPrice>; scope?: string }) {
   if (!read.ok) return <section className="mt-6"><h2 className="text-control font-medium text-fg">30-day price history</h2><p role="status">{read.reason === "unavailable" ? "Blizzard auction house history is not available yet." : "Blizzard auction house history could not be read. Try again in a few minutes."}</p></section>;
   const houses = new Map<string, BlizzardHistoryPrice[]>();
   for (const row of [...read.rows].sort((a, b) => a.region.localeCompare(b.region) * -1 || houseOrder(a.houseId) - houseOrder(b.houseId) || b.day.localeCompare(a.day) || a.kind.localeCompare(b.kind))) {
@@ -22,7 +22,7 @@ export function BlizzardHistory({ read }: { read: BlizzardBrowseRead<BlizzardHis
   return <section className="mt-6">
     <h2 className="text-control font-medium text-fg">30-day price history</h2>
     <p className="mb-3 text-meta text-fg-2">Each UTC day&apos;s newest listing for this item, per house and document. Days without a stored listing are omitted.</p>
-    {!houses.size && <p>No Blizzard auction house history for this item yet.</p>}
+    {!houses.size && <p>{scope ? `No Blizzard auction house history for this item in ${scope} yet.` : "No Blizzard auction house history for this item yet."}</p>}
     {[...houses].map(([key, rows]) => <div key={key} className="mb-4">
       <h3 className="mb-2 text-control text-fg">{rows[0].region.toUpperCase()} · {houseLabel(rows[0].houseId, rows[0].houseName)}</h3>
       <DataTable caption={`${rows[0].region.toUpperCase()} ${houseLabel(rows[0].houseId, rows[0].houseName)} daily unit prices`} columns={columns} rows={rows} rowKey={(r) => `${r.day}:${r.kind}`} />

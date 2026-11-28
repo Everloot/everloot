@@ -55,6 +55,28 @@ const cells = (html: string, href: string) => {
   return [...row.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/g)].map((m) => text(m[1]!).replace(/^\||\|$/g, ""));
 };
 
+test("the finder combines level, zone and type and carries them through sorting and name search", async () => {
+  const html = renderToStaticMarkup(await InstancesPage({ searchParams: Promise.resolve({ level: "16-20", zone: "1436-westfall", type: "dungeon", per: "25" }) }));
+  expect(html).toContain('href="/database/instances/36-deadmines"');
+  expect(html).not.toContain('href="/database/instances/389-ragefire-chasm"');
+  expect(html).not.toContain('href="/database/instances/409-molten-core"');
+  expect(html).toMatch(/href="\/database\/instances\?[^" ]*level=16-20[^" ]*zone=1436-westfall[^" ]*type=dungeon[^" ]*sort=name[^" ]*per=25"/);
+  for (const [key, value] of [["level", "16-20"], ["zone", "1436-westfall"], ["type", "dungeon"], ["per", "25"]]) {
+    expect(html).toContain(`<input type="hidden" name="${key}" value="${value}"/>`);
+  }
+});
+
+test("New in Forever includes announced dungeons under the same finder, without inventing a database record", async () => {
+  const html = renderToStaticMarkup(await InstancesPage({ searchParams: Promise.resolve({ level: "29", zone: "1416-alterac-mountains", new: "1" }) }));
+  const row = html.split("<tr").find((r) => r.includes("City of Dalaran")) ?? "";
+  expect(text(row)).toContain("28–33");
+  expect(text(row)).toContain("Blizzard announcement");
+  expect(row).not.toContain('href="/database/instances/');
+  expect(row).not.toContain('href="/wiki/');
+  expect(html).not.toContain("Blackmaw Hold");
+  expect(html).toContain("https://worldofwarcraft.blizzard.com/en-us/news/24301455");
+});
+
 test("the list has a Level column and starts with the lowest level; a range the files lack is a dash", async () => {
   const html = renderToStaticMarkup(await InstancesPage({}));
   // A sortable header carries the arrow of the order the list is in.
@@ -154,7 +176,11 @@ test("an instance's page links its prep page only when a published wiki page bin
   try {
     const page = async (segment: string) => renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) }));
     // The published fixture binds the Deadmines; the draft fixture binds Ragefire Chasm.
-    expect(await page("36-deadmines")).toContain('<a href="/wiki/test-dungeon">Prepare for this dungeon</a>');
+    const prepared = await page("36-deadmines");
+    expect(prepared.split('data-slot="top"')[0]).toMatch(/<a\b[^>]*href="\/wiki\/test-dungeon"[^>]*>Prepare for this dungeon<\/a>/);
+    expect(prepared).toContain('href="#entrance"');
+    expect(prepared).toContain('href="#quests"');
+    expect(prepared).toContain('href="#loot"');
     const draft = await page("389-ragefire-chasm");
     expect(draft).not.toContain("Prepare for this");
     expect(draft).not.toContain("/wiki/");
@@ -267,6 +293,7 @@ test("the list labels an instance the game files place no entrance for, with the
     const row = html.split("<tr").find((r) => r.includes('href="/database/instances/3002"')) ?? "";
     expect(text(row)).toContain("|Instance 3002|no entrance in the game files|");
     expect(row).toMatch(/title="The game files place no entrance for this instance[^"]*"/);
+    expect(text(row)).toContain("Entrance unrecorded · 1 of 2 bosses confirmed");
     // A named instance carries no such label.
     expect(html.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"'))).not.toContain("no entrance in the game files");
     // The note squares the list's count with the hub's "in game files" one: the extra row is the players'.
@@ -293,6 +320,9 @@ test("instance 2999 takes the name the game files' kill statistic for its boss R
     // The statistic's own title is never quoted.
     expect(row).not.toContain("Kills (");
     expect(list).not.toContain("Instance 2999");
+    const newList = renderToStaticMarkup(await InstancesPage({ searchParams: Promise.resolve({ new: "1", q: "Ruins of Lordaeron" }) }));
+    expect(newList).toContain('href="/database/instances/2999-ruins-of-lordaeron"');
+    expect(text(newList)).toContain("Level 15–20 (announced)");
     const page = text(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "2999-ruins-of-lordaeron" }) })));
     expect(page).toContain("|Name|Ruins of Lordaeron|unconfirmed|name from the game files; they place no entrance for it|");
     expect(page).not.toContain("Kills (");
@@ -319,7 +349,7 @@ test("an instance's page lists the quests 3 installs file under its name, with i
     expect(text(row)).toContain("|The Book of Ur|");
     expect(row).toContain('href="/database/npcs/3849"');
     expect(row).toContain('data-agreement="3"');
-    expect(text(row)).toContain("2026-11-04");
+    expect(text(row)).toContain("Nov 4, 2026");
     expect(quests).not.toContain("/database/quests/1098");
     expect(quests).not.toContain("/database/quests/1014");
     // Every boss the files list is in the loot section, none with a creature tied yet.
@@ -379,7 +409,7 @@ test("the quest installs meter counts the installs that filed it under the heade
   try {
     const row = (await questsOf("33-shadowfang-keep")).split("<tr").find((r) => r.includes('href="/database/quests/1013"')) ?? "";
     expect(row).toContain('data-agreement="3"');
-    expect(text(row)).toContain("2026-11-04");
+    expect(text(row)).toContain("Nov 4, 2026");
     expect(text(row)).not.toContain("2026-11-09");
   } finally {
     state.seen = { unreachable: true };
@@ -463,7 +493,10 @@ test("each boss in the Bosses tab and the loot section links its boss page", asy
 });
 
 test("an instance's facts give the group size the files give its difficulties and the entrance with its zone", async () => {
-  const facts = async (segment: string) => renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })).split("data-tab-panel")[0]!;
+  const facts = async (segment: string) => {
+    const html = renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) }));
+    return html.split('aria-label="Quick facts"')[1]?.split("</section>")[0] ?? "";
+  };
   const deadmines = await facts("36-deadmines");
   expect(text(deadmines)).toMatch(/\|Players\|5\|/);
   // The entrance fact links its outdoor zone and the spot on the map.
@@ -578,7 +611,7 @@ test("the Terrain tab names each item as its own page and hover card do (the nam
   }
 });
 
-test("the list's boss count matches the page: reported of listed when players confirmed only some, the intro says what it counts", async () => {
+test("the list's boss count matches the page: reported of listed when players confirmed only some", async () => {
   // One of Ragefire Chasm's four encounters confirmed by 3 installs; its page lists all four.
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
   try {

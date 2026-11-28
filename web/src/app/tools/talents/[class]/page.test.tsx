@@ -39,6 +39,10 @@ test("a class page is titled with its class, canonical at its own address, with 
   expect(text(/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)![1]!).trim()).toBe(pageTitle(className));
   // The calculator links its class's hub.
   expect(html).toContain(`href="/classes/${slug}"`);
+  const nav = html.match(new RegExp(`<nav aria-label="${className} pages"[\\s\\S]*?</nav>`))?.[0] ?? "";
+  expect(nav).toContain('aria-current="page">Talents');
+  expect(nav).toContain(`href="/classes/${slug}/spells"`);
+  expect(nav).toContain(`href="/changes?q=${className}"`);
 });
 
 test("an address that is not a catalog class is a 404 with no metadata", async () => {

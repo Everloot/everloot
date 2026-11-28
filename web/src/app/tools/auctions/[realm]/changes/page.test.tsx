@@ -83,7 +83,7 @@ test("the stored boards path: risers, fallers and the rows without a comparison,
   expect(t).toContain("Horde auction house");
   expect(t).toContain(`End: ${day(0)}`);
   expect(t).toContain(`Start: ${day(7)}`);
-  expect(html).toContain('href="/tools/auctions/forever/101"');
+  expect(html).toContain('href="/tools/auctions/forever/101?house=horde"');
   expect(t).toMatch(/Made-up Cloth.*1s 0c.*1s 25c.*\+25%.*rose/);
   expect(t).toMatch(/Made-up Herb.*2s 0c.*1s 50c.*−25%.*fell/);
   expect(t).toContain(`${day(7)} → ${day(0)}`);

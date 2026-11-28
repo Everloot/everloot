@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
+import Link from "@/components/Link";
 import ClassPicker from "@/components/talents/ClassPicker";
 import { classChoices } from "@/components/talents/class-choices";
 import { Container, Disclosure, PageHeader, SectionHeading } from "@/components/ui";
@@ -29,7 +30,12 @@ export default async function TalentsIndexPage() {
   return (
     <Container>
       <JsonLd data={webApplicationJsonLd({ name: TITLE, path: "/tools/talents", description: lede })} />
-      <PageHeader trail={trailFor("/tools/talents")!} title={TITLE} lede={lede} />
+      <PageHeader
+        trail={trailFor("/tools/talents")!}
+        title={TITLE}
+        lede={lede}
+        actions={<Link href="/classes" className="btn min-h-11">Browse classes</Link>}
+      />
 
       <ClassPicker variant="tiles" classes={classes} />
 

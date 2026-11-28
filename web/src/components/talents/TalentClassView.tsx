@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "@/components/Link";
+import ClassNavigation from "@/app/classes/ClassNavigation";
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
 import { Container, Disclosure, PageHeader, SectionHeading } from "@/components/ui";
@@ -54,7 +54,7 @@ export default async function TalentClassView({ slug, initialCodes, saved }: {
       <JsonLd data={webApplicationJsonLd({ name: pageTitle(catalog.className), path, description: classLede(facts), hubPath: "/tools/talents" })} />
       {/* On a phone the lede gives its lines to the calculator, which shows the same points, level and trees. */}
       <PageHeader trail={trailFor(path)!} title={<span className={CLASS_TEXT[slug]}>{pageTitle(catalog.className)}</span>} lede={<span className="hidden sm:inline">{classLede(facts)}</span>} />
-      <p className="mb-4 text-sm text-fg-2"><Link href={`/classes/${slug}`} className="underline underline-offset-4 hover:text-accent">{catalog.className} overview and guides</Link></p>
+      <ClassNavigation slug={slug} current="talents" />
 
       <div className="space-y-3 sm:space-y-4">
         <ClassPicker variant="strip" classes={classes} current={slug} />

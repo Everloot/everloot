@@ -89,7 +89,7 @@ export function RulesetSummaryTable({ rows, names, href }: { rows: RulesetSummar
         <span className="flex flex-wrap gap-x-3">
           {r.moves.map((m) => (
             <span key={`${m.row.realm.key}:${m.row.value.itemId}`}>
-              <Link href={itemHref(m.row.realm, m.row.value.itemId)} className={link}>{itemLabel(m.row.value.itemId, names)}</Link>{" "}
+              <Link href={itemHref(m.row.realm, m.row.value.itemId, m.row.house)} className={link}>{itemLabel(m.row.value.itemId, names)}</Link>{" "}
               <span className={m.change > 0 ? "text-accent" : "text-fg"}>{percent(m.change)}</span>
             </span>
           ))}
@@ -213,9 +213,9 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
   // The scale follows the days the market value keeps: a day the trim took out (the page's note counts it) would
   // otherwise flatten every other day against the floor.
   const { trimmed } = trimDays(points);
-  const values = points.map((p) => p.market);
+  // The range is the kept days' too: the trimmed day's own label gives its value.
   const kept = points.filter((p) => !trimmed.has(p)).map((p) => p.market);
-  const low = Math.min(...values), high = Math.max(...values);
+  const low = Math.min(...kept), high = Math.max(...kept);
   const step = axisStep(Math.max(...kept));
   const days = points.map((p) => ({
     day: p.day, value: p.market, outlier: trimmed.has(p),
@@ -241,7 +241,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
   const columns: Column<MarketRow>[] = [
     {
       key: "realm", header: "Realm", nowrap: true,
-      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
+      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId, r.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
     },
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><ClientCoins copper={r.value.market} /></span> },

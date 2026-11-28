@@ -40,6 +40,25 @@ test("the slots sit as a paper doll: left, an empty model space, right, then the
   expect(html).toContain('aria-label="Weapons"');
 });
 
+test("a profile without recorded equipment avoids an empty paper doll and still shows available stats", () => {
+  const character = armoryCharacter({ equipment: [] });
+  const html = renderToStaticMarkup(<Equipment character={character} tips={new Map()} center={<p>Average item level 58</p>} />);
+  expect(html).toContain("Nothing equipped when it was read.");
+  expect(html).toContain("Average item level 58");
+  expect(html).not.toContain("data-paper-doll");
+  expect(html).not.toContain("Not equipped");
+});
+
+test("the item link includes its icon and name in one target and describes the tooltip", () => {
+  const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip()]])} unknownIcon={UNKNOWN} />);
+  const href = 'href="/database/items/16846"';
+  expect(html.split(href)).toHaveLength(2);
+  const anchor = html.match(/<a[^>]*href="\/database\/items\/16846"[^>]*>.*?<\/a>/)?.[0];
+  expect(anchor).toContain("icons/132111.webp");
+  expect(anchor).toContain("Giantstalker");
+  expect(anchor).toContain("aria-describedby");
+});
+
 test("every equipped slot shows an icon in its quality border: its own art, or the question mark", () => {
   const html = renderToStaticMarkup(<Equipment character={armoryCharacter()} tips={new Map([[16846, tip()]])} unknownIcon={UNKNOWN} />);
   expect(html.match(/data-game-icon/g)).toHaveLength(2);

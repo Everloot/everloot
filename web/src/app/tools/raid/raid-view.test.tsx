@@ -29,3 +29,11 @@ test("the banner is not inside the page's column, so its full-width art lines up
   expect(banner).toBeGreaterThan(-1);
   expect(html.indexOf("data-container=")).toBeGreaterThan(banner);
 });
+
+test("the planner's banner is the short one, so the planner starts above the fold", async () => {
+  const { default: RaidView } = await import("./RaidView");
+  const html = renderToStaticMarkup(await RaidView());
+  const banner = /<div data-banner[=\s][^>]*>/.exec(html)![0];
+  expect(banner).toContain("data-banner-short");
+  expect(banner).not.toContain("min-h-64");
+});

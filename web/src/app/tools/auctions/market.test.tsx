@@ -101,6 +101,24 @@ test("same base name keeps ruleset and region in distinct page URLs and house pr
   }
 });
 
+test("opening a filtered item keeps its house and never substitutes another house for a missing price", async () => {
+  const records = [
+    ...scans(dayAgo(0), [[2589, 901, 901], [765, 150, 150]], "Forever", undefined, { house: "Horde" }),
+    ...scans(dayAgo(0), [[2589, 101, 101]], "Forever", ["install-d", "install-e", "install-f"], { house: "Alliance" }),
+  ];
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), records, today), dataAsOf: today.toISOString() });
+  const browse = new JSDOM(await realmHtml("forever", { house: "alliance" })).window.document;
+  expect(browse.querySelector('a[href="/tools/auctions/forever/2589?house=alliance"]')).not.toBeNull();
+  const scoped = (id: string) => RealmItemPage({ ...item("forever", id), searchParams: Promise.resolve({ house: "alliance" }) });
+  const linen = new JSDOM(renderToStaticMarkup(await scoped("2589"))).window.document;
+  expect(linen.querySelector("main")?.textContent ?? linen.body.textContent).toContain("Last 60 days, Alliance auction house");
+  expect(linen.querySelector('a[href="/tools/auctions/forever?house=alliance"]')).not.toBeNull();
+  const herb = text(renderToStaticMarkup(await scoped("765")));
+  expect(herb).toContain("No public price in the Alliance auction house");
+  expect(herb).not.toContain("Last 60 days, Horde auction house");
+  await expect(realmHtml("forever", { q: "2589", house: "alliance" })).rejects.toThrow("REDIRECT /tools/auctions/forever/2589?house=alliance");
+});
+
 test("the hub is the browse view across realms: names, realms, house switch, category tree and the way to add a realm", async () => {
   const html = await hub({});
   const words = text(html);
@@ -114,7 +132,7 @@ test("the hub is the browse view across realms: names, realms, house switch, cat
   expect(html).toContain('href="/tools/auctions/malganis"');
   // Two reporters are not enough: Nightfall is not listed.
   expect(html).not.toContain("Nightfall");
-  expect(html).toContain('href="/tools/auctions/forever/2589"');
+  expect(html).toContain('href="/tools/auctions/forever/2589?house=horde"');
   expect(words).toContain("Linen Cloth");
   expect(words).toContain("Item 765");
   expect(html).not.toContain("Item 2589");
@@ -164,7 +182,7 @@ test("the old page's links and an item id land on the item pages; a word filters
 
 test("a realm page sorts, filters and switches house in the URL; only its plain list is indexed", async () => {
   const html = await realmHtml("forever");
-  expect(html).toContain('href="/tools/auctions/forever/2589"');
+  expect(html).toContain('href="/tools/auctions/forever/2589?house=horde"');
   expect(text(html)).toContain("1s 98c"); // weighted market: (205*15 + 190*12) / 27 = 198
   expect(text(html)).toMatch(/(?<!\d)2s(?! \d+c)/);
   // Only historical days: the market value is unrecorded, never zero.
@@ -252,7 +270,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(words).toContain(`Newest scan ${todayText}`);
   expect(words).toMatch(new RegExp(`Newest scan[\\s\\S]*Horde1s 98c2s[\\d,]+${todayText}`));
   expect(html).toContain("<svg");
-  expect(html).toContain('href="/tools/auctions/malganis/2589"');
+  expect(html).toContain('href="/tools/auctions/malganis/2589?house=horde"');
   expect(html).toContain('href="/tools/auctions/item/2589"');
   // The page names the house its price is for; the Houses tab lists each house.
   expect(words).toContain("Horde auction house price on Forever");
@@ -339,7 +357,7 @@ test("the item database page gets a small Auction House box only when a price is
   expect(box).toMatch(/<th[^>]*>(?:<[^>]*>)*Scanned</);
   expect(text(box)).toContain(todayText);
   expect(box).toContain('href="/tools/auctions/item/2589"');
-  expect(box).toContain('href="/tools/auctions/forever/2589"');
+  expect(box).toContain('href="/tools/auctions/forever/2589?house=horde"');
   expect((await loadMarketBox(9999, today)).rows).toEqual([]);
   expect(renderToStaticMarkup(<MarketBox itemId={9999} rows={[]} paused={false} />)).toBe("");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }))).toContain("data-market-box");
@@ -372,7 +390,7 @@ test("the item database page reads its one item for the Auction House box: no re
   for (const spy of spies) spy.mockClear();
   const html = renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }));
   expect(html).toContain("data-market-box");
-  expect(html).toContain('href="/tools/auctions/forever/2589"');
+  expect(html).toContain('href="/tools/auctions/forever/2589?house=horde"');
   for (const spy of spies) expect(spy).not.toHaveBeenCalled();
 });
 
@@ -499,6 +517,12 @@ test("a realm item page names the realm as the site shows it, not the raw CAMWOW
   const params = item("camwow-us1-realm-4-pvp", "2589");
   const words = text(renderToStaticMarkup(await RealmItemPage(params)));
   expect(words).toContain("Horde auction house price on US1 · Realm 4 PvP in WoW: Forever");
+  // QA round 15: the tables' captions (and their scroll regions' names) too.
+  const page = renderToStaticMarkup(await RealmItemPage(params));
+  const captions = [...page.matchAll(/<caption[^>]*>([^<]*)<\/caption>/g)].map((m) => m[1]);
+  expect(captions.length).toBeGreaterThan(0);
+  for (const c of captions) expect(c).not.toContain("CAMWOW");
+  expect(captions.some((c) => c.includes("on US1 · Realm 4 PvP"))).toBe(true);
   const meta = await itemMetadata(params);
   expect(String(meta.title)).toContain("on US1 · Realm 4 PvP");
   expect(String(meta.title)).not.toContain("CAMWOW");
