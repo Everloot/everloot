@@ -3,7 +3,7 @@ import EntityLink from "@/components/EntityLink";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { Badge, DataTable, type Column } from "@/components/ui";
 import { instanceHref } from "@/lib/instances";
-import type { ItemLook } from "@/lib/item-look";
+import { lookHasCard, type ItemLook } from "@/lib/item-look";
 import { NO_AREA, speedLabel, TERRAIN_PATH, triggerLabel, type TerrainGear } from "@/lib/terrain";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 
@@ -43,7 +43,7 @@ function Where({ gear, names, zone }: { gear: TerrainGear; names: GearNames; zon
  */
 function Item({ id, names }: { id: number; names: GearNames }) {
   const x = names.item(id);
-  return <EntityLink prefetch={false} kind="item" id={id} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />;
+  return <EntityLink prefetch={false} kind="item" id={id} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} />;
 }
 
 export default function TerrainGearTable({ gear, names, caption, zone, empty }: { gear: readonly TerrainGear[]; names: GearNames; caption: string; zone?: number; empty?: string }) {

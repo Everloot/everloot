@@ -212,7 +212,7 @@ test("an instance's page lists each boss's loot: the creature's own loot table, 
     expect(loot).toContain('href="/database/npcs/11517"');
     const row = loot.split("<tr").find((r) => r.includes('href="/database/items/14149"')) ?? "";
     // Six windows, all six holding the item, from 3 installs.
-    expect(text(row)).toContain("|6|6|100.0% (61.0%–100.0%) · few windows|confirmed by 3 players|");
+    expect(text(row)).toContain("|6|6|100.0% (61.0%–100.0%) · few windows|confirmed by 3 installs|");
     expect(text(loot)).toContain("Data as of 2026-11-05.");
   } finally {
     state.seen = { unreachable: true };
@@ -225,7 +225,7 @@ test("a boss whose creature one install looted shows the reported rate; one nobo
   state.loot = looted(11517, ["install-a"], 2);
   try {
     const short = await lootOf("389-ragefire-chasm");
-    expect(text(short)).toContain("reported by 1 player");
+    expect(text(short)).toContain("reported by 1 install");
     expect(short).toContain("/database/items/");
     state.loot = new Map();
     expect(text(await lootOf("389-ragefire-chasm"))).toContain("Nobody has looted this NPC in Forever yet.");

@@ -79,7 +79,7 @@ test("a boss 3 installs report: kills, installs, the creature linked, its loot t
   expect(html).toContain('href="/database/npcs/11517"');
   const loot = panel(html, "loot");
   expect(loot).toContain('href="/database/items/14149"');
-  expect(text(loot)).toContain("confirmed by 3 players");
+  expect(text(loot)).toContain("confirmed by 3 installs");
   expect(html).toContain('src="https://a.test/renders/x.webp"');
 });
 

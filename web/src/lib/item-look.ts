@@ -18,6 +18,9 @@ export interface ItemLook {
   tip: ItemTip | undefined;
 }
 
+/** Whether the item's hover card has anything to show: one with no name, tooltip or icon is a 404 or a bare "Item N". */
+export const lookHasCard = (look: ItemLook): boolean => Boolean(look.name || look.tip || look.icon);
+
 const NOTHING: ItemLook = { name: null, quality: undefined, icon: null, tip: undefined };
 let taxonomyQuality: Map<number, number | null> | null = null;
 

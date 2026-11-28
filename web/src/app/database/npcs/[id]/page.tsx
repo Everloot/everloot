@@ -30,7 +30,7 @@ import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames } from "@/lib/names";
 import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { npcIndexable } from "@/lib/indexable";
@@ -236,7 +236,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }>; 
                   item={(itemId) => {
                     const x = look!(itemId);
                     // The tooltip draws its own icon in front; an item the files give only an icon for draws it in the link.
-                    return <ItemTip tip={x.tip}><EntityLink kind="item" id={itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} /></ItemTip>;
+                    return <ItemTip tip={x.tip}><EntityLink kind="item" id={itemId} name={x.name?.name} quality={x.quality} icon={x.tip ? null : x.icon} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} /></ItemTip>;
                   }}
                   sort={{ key: drops.key, direction: drops.desc ? "desc" : "asc" }}
                   sortHref={dropHref}

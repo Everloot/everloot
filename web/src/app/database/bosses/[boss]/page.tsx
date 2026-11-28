@@ -11,7 +11,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { observedLine } from "@/lib/evidence";
 import { entityTitle } from "@/lib/entity-meta";
 import { loadingArt, loadSiteAssets } from "@/lib/game-assets";
-import { loadItemLooks } from "@/lib/item-look";
+import { loadItemLooks, lookHasCard } from "@/lib/item-look";
 import { loadRenders } from "@/lib/game-renders";
 import { difficultyLabel, difficultyList, instanceHref, instanceRows, instanceTitle, loadSightings, parseInstanceSegment } from "@/lib/instances";
 import { PLACEHOLDER } from "@/lib/item-names";
@@ -168,7 +168,7 @@ export default async function BossPage(props: Props) {
                   title={title}
                   dataAsOf={loot!.dataAsOf}
                   pages={{ page: dropPage, href: (page) => `${listHref(path, [["drops", page === 1 ? undefined : String(page)]])}#loot` }}
-                  item={(itemId) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} />; }}
+                  item={(itemId) => { const x = look!(itemId); return <EntityLink kind="item" id={itemId} name={x.name?.name} icon={x.icon} quality={x.quality} unconfirmed={x.name?.source === "files"} noCard={!lookHasCard(x)} />; }}
                 />
               </div>
             ))}

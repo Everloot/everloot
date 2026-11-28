@@ -257,3 +257,15 @@ test("on a phone each group shows three links and More… for the rest; the open
   const database = container.querySelector("#database-menu-phone")!;
   expect(Array.from(database.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(true);
 });
+
+test("More… from the keyboard hands focus to the first link it showed, so the next Tab is not lost on the page body", async () => {
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  await act(async () => toggle.click());
+  const database = container.querySelector("#database-menu-phone")!;
+  const more = Array.from(database.querySelectorAll("button")).find((b) => b.textContent === "More…")!;
+  more.focus();
+  await act(async () => more.click());
+  const fourth = database.querySelectorAll("a")[3];
+  expect(fourth).toBeDefined();
+  expect(document.activeElement).toBe(fourth);
+});

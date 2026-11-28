@@ -125,6 +125,16 @@ test("filtered, sorted and searched views are noindex with the plain category as
   expect((await allMetadata({ searchParams: Promise.resolve({ page: "3" }) })).alternates?.canonical).toBe("/database/items?page=3");
 });
 
+// QA round 13: Plate filtered to feet read "Plate (Armor): 134 Items", as if the 134 were every plate item.
+test("a category title with a slot filter names the slot", async () => {
+  const feet = await subclassMetadata(sub("armor", "plate", { slot: "feet" }));
+  expect(feet.title).toMatch(/^WoW Forever Plate Feet \(Armor\): [\d,]+ Items?$/);
+  expect(String(feet.description)).toMatch(/^All [\d,]+ Plate Feet \(Armor\) items in WoW: Forever/);
+  const two = await subclassMetadata(sub("armor", "plate", { slot: "hands,feet" }));
+  expect(two.title).toMatch(/^WoW Forever Plate (?:Hands and Feet|Feet and Hands) \(Armor\): [\d,]+ Items?$/);
+  expect((await subclassMetadata(sub("armor", "plate"))).title).toMatch(/^WoW Forever Plate \(Armor\): [\d,]+ Items$/);
+});
+
 test("category titles lead with WoW Forever and the item count; descriptions carry no build or source wording", async () => {
   const weapons = CLIENT_TAXONOMY.classes.find((c) => c.slug === "weapons")!;
   const m = await generateMetadata(props("weapons"));

@@ -464,3 +464,10 @@ test("drops list item, NPC and object row links navigate without prefetching", a
     expect(rowLinks.every((link) => link.prefetch === false), href).toBe(true);
   }
 });
+
+// QA round 13: the NPC list's phone line counts one drop in the singular (Hogger drops one item).
+test("QA round 13: an NPC with one drop says 1 drop", async () => {
+  const all = await html(NpcList(search()));
+  expect(all).toContain("1 drop · ");
+  expect(all).not.toContain("1 drops");
+});

@@ -129,10 +129,6 @@ export default async function GuidesIndex({ searchParams }: Props) {
   return (
     <Container>
       <PageHeader trail={trailFor("/guides")!} title="Guides" lede={any ? LEDE : LEDE_EMPTY} />
-      <section className="mt-6" aria-label="Community reference">
-        <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
-        <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Not one of Everloot&apos;s reviewed class guides.</p>
-      </section>
       {any && <FilterBar label="Guide filters" controls={controls} active={active} clearHref="/guides" />}
       {error && <p className="mt-4 text-sm text-muted">{error} This page shows every guide instead.</p>}
       <div className="mt-8 space-y-10">
@@ -160,6 +156,12 @@ export default async function GuidesIndex({ searchParams }: Props) {
           </section>
         ))}
       </div>
+      {/* After the reviewed guides (or the line saying there are none yet), so the checklist never reads as one of them. */}
+      <section className="mt-10" aria-labelledby="community-reference">
+        <SectionHeading id="community-reference">Community reference</SectionHeading>
+        <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
+        <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Not one of Everloot&apos;s reviewed class guides.</p>
+      </section>
     </Container>
   );
 }

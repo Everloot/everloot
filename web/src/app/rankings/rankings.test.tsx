@@ -228,3 +228,15 @@ test("an unknown ranking is a 404", async () => {
   await expect(ranking("gold")).rejects.toThrow();
   expect(await meta("gold")).toEqual({});
 });
+
+// QA round 13: the hub's census lists and each full ranking are rounded counts too, so they carry /census's footnote.
+test("QA round 13: each census ranking says counts are rounded, as /census does", async () => {
+  store.loadCensus.mockResolvedValue(read([...week(WEEK1, "w"), ...week(WEEK2, "v", 80)], "2026-11-20T12:00:00.000Z"));
+  const footnote = "Counts are rounded to the nearest 5, so parts may not add up exactly.";
+  const page = await hub();
+  for (const slug of ["classes", "races", "factions"]) {
+    const card = page.slice(page.indexOf(`id="${slug}"`));
+    expect(card.slice(0, card.indexOf("</section>"))).toContain(footnote);
+    expect(await ranking(slug)).toContain(footnote);
+  }
+});

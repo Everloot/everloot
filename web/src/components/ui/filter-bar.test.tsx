@@ -300,9 +300,11 @@ test("the window losing focus leaves an open dropdown open", async () => {
   expect(quality.open).toBe(true);
 });
 
-test("the name box's Filter button is in the tab order and shows itself when focused", () => {
+// QA round 13: the button showed only under keyboard focus, so a mouse user on /database/achievements never saw it.
+test("the name box's Filter button is in the tab order and always shown", () => {
   const html = renderToStaticMarkup(<FilterBar {...props} />);
   const button = html.match(/<button type="submit"[^>]*>Filter<\/button>/)![0];
   expect(button).not.toContain("tabindex");
-  expect(button).toMatch(/class="[^"]*\bsr-only\b[^"]*\bfocus-visible:not-sr-only\b/);
+  expect(button).not.toMatch(/\bsr-only\b/);
+  expect(button).toMatch(/class="[^"]*\bborder\b/);
 });

@@ -522,6 +522,17 @@ describe("the guide index", () => {
     expect(dom(html).querySelectorAll('[data-guide="darkmoon-faire"]')).toHaveLength(0);
   });
 
+  // QA round 13: the community checklist sat above "No guide is reviewed yet.", which read as a contradiction.
+  test("with no reviewed guide, the empty line comes first and the community checklist follows under its own heading", async () => {
+    const html = await index();
+    const empty = html.indexOf("No guide is reviewed yet.");
+    const community = html.indexOf('href="/guides/darkmoon-faire"');
+    expect(empty).toBeGreaterThan(-1);
+    expect(community).toBeGreaterThan(empty);
+    const section = dom(html).querySelector('a[href="/guides/darkmoon-faire"]')!.closest("section")!;
+    expect(section.querySelector("h2")?.textContent).toBe("Community reference");
+  });
+
   test("with no reviewed guide, nothing promises a list of them: no 'guides below', no 'Everloot's reviewed guides' lede", async () => {
     const empty = visible(await index());
     expect(empty).not.toMatch(/\bbelow\b/);

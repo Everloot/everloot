@@ -12,7 +12,7 @@ import { wikiNpcNames } from "@/lib/wiki-npc-names";
 import { NAME_FROM } from "@/lib/items";
 import { LINK } from "../entity";
 import { byRank, countBy, facetRows, nameMatches, Respelled,
-  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, range, rangeParam, sortRows, Unreadable,
+  flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, NoObservations, paged, pageParams, plural, range, rangeParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -193,7 +193,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
             rowKey={(n) => String(n.npcId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(n) => [n.creatureType, n.rank && n.rank !== "normal" && RANK_LABEL[n.rank], n.reaction && REACTION_LABEL[n.reaction], n.level !== null && `Level ${n.level}`, n.drops > 0 && `${n.drops} drops`, n.zone?.name, `ID ${n.npcId}`].filter(Boolean).join(" · ")}
+            meta={(n) => [n.creatureType, n.rank && n.rank !== "normal" && RANK_LABEL[n.rank], n.reaction && REACTION_LABEL[n.reaction], n.level !== null && `Level ${n.level}`, n.drops > 0 && plural(n.drops, "drop"), n.zone?.name, `ID ${n.npcId}`].filter(Boolean).join(" · ")}
             empty={empty}
           />
         )}</div>

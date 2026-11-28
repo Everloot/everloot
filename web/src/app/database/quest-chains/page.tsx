@@ -9,7 +9,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import EntityLink from "@/components/EntityLink";
 import { byRank, nameMatches, Respelled,
   ConfirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, NameCell, nextSort, NoMatches, noneListed, NoObservations, paged,
-  pageParams, sortRows, Unreadable, type ListQuery, type Search,
+  pageParams, plural, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
 const META = { title: "WoW Forever Quest Chain List", description: "Quest chains in WoW: Forever by quest count and quest line ID. From the game files; confirmed once three installs report each the same way.", path: "/database/quest-chains" };
@@ -87,7 +87,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
             rowKey={(x) => String(x.questLineId)}
             sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
             sortHref={(k, dir) => here({ sort: nextSort(k, dir, DEFAULT_SORT) })}
-            meta={(x) => `${count(x)} quests · ID ${x.questLineId}`}
+            meta={(x) => `${x.truncated ? `${count(x)} quests` : plural(x.questIds.length, "quest")} · ID ${x.questLineId}`}
             empty={empty}
           />
         </div>

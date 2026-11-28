@@ -68,6 +68,15 @@ export const ALL_ITEMS = {
 
 const pageSuffix = (page: number) => (page > 1 ? ` – Page ${page}` : "");
 
+/** The chosen slots in words, in the character window's order: "Feet", "Hands and Feet", "Head, Hands and Feet". */
+function slotWords(slugs: readonly string[] | undefined): string {
+  const names = [...(slugs ?? [])].sort(slotOrder).map((slug) => {
+    const row = T.items.find((r) => slotOf(r[3])?.slug === slug);
+    return (row && slotOf(row[3])?.name) ?? slug;
+  });
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names.join("");
+}
+
 export async function categoryMetadata(classSlug: string | undefined, subclassKey: string | undefined, search: Search): Promise<Metadata> {
   const r = resolve(classSlug, subclassKey, search);
   if (!r) return { robots: { index: false, follow: true } };
@@ -86,7 +95,10 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
       ...(index ? {} : { robots: { index: false, follow: true } }),
     };
   }
-  const name = r.sub ? `${subclassLabel(r.sub).label} (${r.cls.label})` : r.cls.label;
+  // A slot filter names its slots, so a count of plate feet never reads as every plate item.
+  const slots = slotWords(r.q.slot);
+  const kind = slots ? `${r.sub ? subclassLabel(r.sub).label : r.cls.label} ${slots}` : r.sub ? subclassLabel(r.sub).label : r.cls.label;
+  const name = r.sub ? `${kind} (${r.cls.label})` : kind;
   // What the list under it shows: the same filters, the same development leftovers and unnamed items left out.
   const total = (await listOf(classSlug, subclassKey, search))!.rows.length;
   const count = total.toLocaleString("en-US");

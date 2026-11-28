@@ -77,8 +77,8 @@ export default function Page() {
       <P>
         A drop rate is the share of recorded loot windows on a creature or object that held the item. A kill nobody looted
         is not counted, because the addon never saw it. The API field for that count is named <C>kills</C>, but it counts
-        loot windows. Rates and measured zeros show from one install: reported by 1 player, verified by 2 players,
-        confirmed by 3 or more players. Source names use the same tiers when every counted name report agrees.
+        loot windows. Rates and measured zeros show from one install: reported by 1 install, verified by 2 installs,
+        confirmed by 3 or more installs. Source names use the same tiers when every counted name report agrees.
       </P>
 
       <H2 id="unconfirmed">Found in game files, unconfirmed</H2>
