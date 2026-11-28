@@ -129,7 +129,7 @@ test("/tools/auctions carries WebApplication named by its H1; with no lead line,
 test("the profession hub's H1 names WoW Forever and is its title", async () => {
   const { default: Page, metadata } = await import("./tools/professions/page");
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
-  expect(h1(html)).toBe("WoW Forever Profession Hubs");
+  expect(h1(html)).toBe("WoW Forever Profession Guides");
   expect(metadata.title).toBe(h1(html));
 });
 

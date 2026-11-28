@@ -162,13 +162,13 @@ export const tools: Tool[] = [
   },
   {
     slug: "professions",
-    group: "Tools",
-    line: "Every profession's recipes from the game files, with skill-up paths and recipe ranges from what players uploaded.",
-    title: "Forever Profession Hubs",
-    shortTitle: "Professions",
-    tagline: "Every recipe, plus player leveling paths.",
+    group: "Guides",
+    line: "Plan crafting levels and your shopping list, or find gathering zones and trainers.",
+    title: "WoW Forever Profession Guides",
+    shortTitle: "Profession guides",
+    tagline: "Crafting routes, shopping lists and gathering zones.",
     description:
-      "One page per Forever profession: every recipe in the game files with its reagents and skill ranks, and the skill-up paths and recipe ranges players upload.",
+      "Level your WoW: Forever professions with crafting routes, shopping lists, gathering zones and trainers.",
     status: "collecting",
     keywords: [
       "wow forever professions",

@@ -13,7 +13,7 @@
  */
 import recipesJson from "../../web/src/data/game-data/client-recipes.json" with { type: "json" };
 import { INDEPENDENT_INSTALLS } from "./drop-rollup.js";
-import { agreePrices, formatCopper, median, mergeVendorPrices, professionFactsFromRecords, reagentKey, type AgreedRecipe, type PriceSighting, type Reagent } from "./profession-path.js";
+import { agreePrices, agreeVendorPricesByItem, formatCopper, median, mergeVendorPrices, professionFactsFromRecords, reagentKey, type AgreedRecipe, type PriceSighting, type Reagent } from "./profession-path.js";
 
 /** Recipe spell id (the trade-skill recipe id) to the profession the game files list it under, by the files' English name. */
 const FILE_PROFESSIONS = new Map(recipesJson.professions.flatMap((p) => p.recipes.map((r) => [r[0] as number, p.name] as const)));
@@ -54,7 +54,7 @@ export function recipeFactsFromRecords(records: unknown[]): { observations: Reci
 }
 
 /** `trainerNpcId` and `skillLineId` are kept when the addon sent them; older addons send neither. */
-export interface TrainerRow { installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number; trainerNpcId?: number; skillLineId?: number }
+export interface TrainerRow { installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number; trainerNpcId?: number; skillLineId?: number; spellId?: number }
 
 export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
   const out: TrainerRow[] = [];
@@ -64,10 +64,10 @@ export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
       typeof r.recipe !== "string" || !Number.isInteger(r.requiredRank) || (r.requiredRank as number) < 1) continue;
     const cost = Number.isInteger(r.costCopper) && (r.costCopper as number) >= 0 ? (r.costCopper as number) : undefined;
     const id = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? { value: v as number } : null);
-    const npc = id(r.trainerNpcId), line = id(r.skillLineId);
+    const npc = id(r.trainerNpcId), line = id(r.skillLineId), spell = id(r.spellId);
     out.push({
       installId: r.installId, profession: r.profession, recipe: r.recipe, requiredRank: r.requiredRank as number, costCopper: cost,
-      ...(npc ? { trainerNpcId: npc.value } : {}), ...(line ? { skillLineId: line.value } : {}),
+      ...(npc ? { trainerNpcId: npc.value } : {}), ...(line ? { skillLineId: line.value } : {}), ...(spell ? { spellId: spell.value } : {}),
     });
   }
   return out;
@@ -113,10 +113,12 @@ export function derivedSteps(observations: RecipeObservation[], trainers: Traine
 
 /** Everything the profession path reads: reported recipes, prices, and steps derived from colours and trainers. */
 export function pathFactsFromRecords(records: unknown[]) {
-  const { sightings, prices, vendorPrices } = professionFactsFromRecords(records);
+  const byItem = agreeVendorPricesByItem(records);
+  const { sightings, prices, vendorPrices } = professionFactsFromRecords(records, byItem);
   const observations = recipeObservationsFromRecords(records);
   const trainers = trainerRowsFromRecords(records);
-  return { sightings, prices, vendorPrices, observations, trainers, derived: derivedSteps(observations, trainers) };
+  const vendorPricesByItem: ReadonlyMap<number, number> | undefined = byItem;
+  return { sightings, prices, vendorPrices, vendorPricesByItem, observations, trainers, derived: derivedSteps(observations, trainers) };
 }
 
 /** The list the most installs saw, when at least three did and no other list ties it. */

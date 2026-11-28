@@ -136,8 +136,8 @@ export async function loadLootTables(): Promise<{ tables: LootTables; unreachabl
 }
 
 /** Disenchants by band and by item, and the items players' reports placed in a band. Empty and unreachable when the store cannot be read. */
-export async function loadDisenchantTables(): Promise<{ tables: DisenchantTables; unreachable: boolean; dataAsOf: string | null }> {
-  const agg = await loadAggregates();
+export async function loadDisenchantTables(read?: Corpus): Promise<{ tables: DisenchantTables; unreachable: boolean; dataAsOf: string | null }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { tables: { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() }, unreachable: true, dataAsOf: null };
   return { tables: agg.disenchant, unreachable: false, dataAsOf: agg.dataAsOf };
 }

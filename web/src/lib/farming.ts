@@ -1,5 +1,5 @@
 import { CLIENT_TAXONOMY } from "./items";
-import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnRow, type SkillRange } from "@kb/object-spawns";
+import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnPin, type ObjectSpawnRow, type SkillRange } from "@kb/object-spawns";
 import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
 import type { KillPlace } from "@kb/world-pages";
 import type { NpcRow } from "./world-lists";
@@ -131,11 +131,16 @@ export function farmingAreas(
  */
 export function gatherAreas(rows: readonly ObjectSpawnRow[], kind: "herb" | "ore", zones: readonly ZoneSummary[]): FarmArea[] {
   const kinds = agreedGatherKinds([...rows]);
+  const pins = objectSpawns([...rows]).pins.filter((pin) => kinds.get(pin.objectId) === kind);
+  return areasFromGatherPins(rows, kind, zones, pins);
+}
+
+function areasFromGatherPins(rows: readonly ObjectSpawnRow[], kind: "herb" | "ore", zones: readonly ZoneSummary[], pins: ObjectSpawnPin[]): FarmArea[] {
   const byMap = new Map(zones.map((z) => [z.mapId, z]));
   const count = new Map<number, number>();
   const counted = new Set<string>();
-  for (const pin of objectSpawns([...rows]).pins) {
-    if (kinds.get(pin.objectId) !== kind || !byMap.has(pin.mapId)) continue;
+  for (const pin of pins) {
+    if (!byMap.has(pin.mapId)) continue;
     count.set(pin.mapId, (count.get(pin.mapId) ?? 0) + 1);
     counted.add(`${pin.objectId}|${pin.mapId}`);
   }
@@ -224,6 +229,12 @@ export interface HerbZone extends FarmArea {
   herbs: number[];
 }
 
+export interface NodeGatheringZone extends FarmArea {
+  installs: number;
+  itemIds: number[];
+  objectIds: number[];
+}
+
 /**
  * The herb zones of `gatherAreas`, each with the herbs players looted there: the items with a public loot frequency
  * (3 installs, the drop rollup's rule) from the herb objects that have a spot in the zone, kept to `HERB_IDS`. A
@@ -234,22 +245,36 @@ export function herbZones(
   rates: readonly { sourceObjectId?: number; itemId: number; drops: number; public: boolean }[],
   zones: readonly ZoneSummary[],
 ): HerbZone[] {
-  const kinds = agreedGatherKinds([...rows]);
   const herbSet = new Set(HERB_IDS);
+  return nodeGatheringZones(rows, rates, zones, "herb", herbSet).map(({ itemIds, objectIds: _objectIds, ...area }) => ({ ...area, herbs: itemIds }));
+}
+
+/** Items are agreed at the source, then joined to each released zone that has a confirmed spot of that source. */
+export function nodeGatheringZones(
+  rows: readonly ObjectSpawnRow[],
+  rates: readonly { sourceObjectId?: number; itemId: number; drops: number; public: boolean }[],
+  zones: readonly ZoneSummary[],
+  kind: "herb" | "ore",
+  allowedItems?: ReadonlySet<number>,
+): NodeGatheringZone[] {
+  const kinds = agreedGatherKinds([...rows]);
+  const pins = objectSpawns([...rows]).pins.filter((pin) => kinds.get(pin.objectId) === kind);
   const loot = new Map<number, Set<number>>();
   for (const r of rates) {
-    if (!r.public || r.drops <= 0 || r.sourceObjectId === undefined || !herbSet.has(r.itemId)) continue;
+    if (!r.public || r.drops <= 0 || r.sourceObjectId === undefined || (allowedItems && !allowedItems.has(r.itemId))) continue;
     loot.set(r.sourceObjectId, (loot.get(r.sourceObjectId) ?? new Set()).add(r.itemId));
   }
   const objects = new Map<number, Set<number>>();
-  for (const pin of objectSpawns([...rows]).pins) {
-    if (kinds.get(pin.objectId) === "herb") objects.set(pin.mapId, (objects.get(pin.mapId) ?? new Set()).add(pin.objectId));
+  for (const pin of pins) objects.set(pin.mapId, (objects.get(pin.mapId) ?? new Set()).add(pin.objectId));
+  const installs = new Map<number, Set<string>>();
+  for (const row of rows) {
+    if (row.mapId === undefined || !row.installId.trim() || !objects.get(row.mapId)?.has(row.objectId)) continue;
+    installs.set(row.mapId, (installs.get(row.mapId) ?? new Set()).add(row.installId.trim()));
   }
-  return gatherAreas(rows, "herb", zones).map((area) => {
+  return areasFromGatherPins(rows, kind, zones, pins).map((area) => {
     const here = objects.get(area.zone.mapId) ?? new Set<number>();
-    const installs = new Set(rows.filter((r) => r.mapId === area.zone.mapId && here.has(r.objectId)).map((r) => r.installId.trim()));
-    const herbs = [...new Set([...here].flatMap((id) => [...(loot.get(id) ?? [])]))].sort((a, b) => a - b);
-    return { ...area, installs: installs.size, herbs };
+    const itemIds = [...new Set([...here].flatMap((id) => [...(loot.get(id) ?? [])]))].sort((a, b) => a - b);
+    return { ...area, installs: installs.get(area.zone.mapId)?.size ?? 0, itemIds, objectIds: [...here].sort((a, b) => a - b) };
   });
 }
 

@@ -71,7 +71,6 @@ export function navItems({ guilds = false, players = false, savedBuilds = false,
       links: [
         ...(reviewedGuides ? [{ label: "All guides", href: "/guides" }] : []),
         { label: "Dungeons and raids", href: "/database/instances" },
-        { label: "Herbalism gathering", href: "/tools/professions/herbalism/gathering" },
         { label: "Addon directory guide", href: "/docs/guides/addon-directory" },
         { label: "Write a wiki page", href: "/docs/guides/wiki" },
         ...catalogue("Guides"),
