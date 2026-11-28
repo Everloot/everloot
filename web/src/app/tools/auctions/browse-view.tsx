@@ -23,7 +23,7 @@ import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
-import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
+import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, ScansPaused, Sparkline, count } from "./parts";
 import { RealmHousePicker } from "./RealmHousePicker";
 import TimeAgo from "./TimeAgo";
 import Icon from "@/components/ui/Icon";
@@ -312,6 +312,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <a href="/blizzard-auctions" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Blizzard auction house data</a>
           </p>
         )}
+        <ScansPaused state={state} now={now} className="mb-3" />
         {slug && stored && <p className="mb-3 text-sm"><Link href={changesHref({ slug }, q.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Market changes this week: risers, fallers and what has no comparison yet</Link></p>}
         {!slug && state && (
           <>
