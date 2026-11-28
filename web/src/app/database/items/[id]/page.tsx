@@ -237,8 +237,11 @@ export default async function ItemPage(props: Props) {
   const iconRows = rel("same_icon").filter((e) => sharers(e).length > 0);
   // Items sharing an icon file are named, and shown with their icon, only under the item name rule.
   const sameIcon = iconRows.flatMap(sharers);
+  // They share one icon file, so each shows the same icon: this item's own, else the first a sharer's tooltip has.
   const iconNamed = [...new Set(sameIcon)].filter((id) => shownItemName(id, agreed, matched?.names)).slice(0, 12);
-  const iconTips = iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
+  const ownIcon = tip?.icon ?? filesIcon;
+  const iconTips = !ownIcon && iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
+  const sharedIcon = ownIcon ?? [...iconTips.values()].find((t) => t.icon)?.icon ?? undefined;
   const itemName = (id: number) => shownItemName(id, agreed, matched?.names)?.name;
   // What disenchanting it gives: the band the game files (or players' reported item level) place it in.
   const disenchant = await loadDisenchant();
@@ -438,7 +441,7 @@ export default async function ItemPage(props: Props) {
             <DataTable
               dense
               caption={`Items with the same icon as ${title}`}
-              columns={[{ key: "target", header: "Items", cell: (e: Edge) => <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} itemIcon={(id) => iconTips.get(id)?.icon ?? undefined} /> }]}
+              columns={[{ key: "target", header: "Items", cell: (e: Edge) => <SameIcon edge={e} self={itemId} client={iconEdges} itemName={itemName} icon={sharedIcon} /> }]}
               rows={iconRows}
               rowKey={(e) => `${e.rel}-${e.toId}`}
             />

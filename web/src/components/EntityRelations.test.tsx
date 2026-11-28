@@ -79,11 +79,12 @@ test("only observed relations: no game-file notice; none at all: says what is ne
 test("items sharing an icon: named ones are links with their icon, nameless ones are one muted count, never a list of ids", () => {
   const icon = [10, 11, 12, 13, 14].map((id) => client(id, "same_icon", "icon", 135249));
   const names = new Map([[11, "Linen Cloak"], [12, "Wool Cloak"]]);
-  const html = renderToStaticMarkup(<SameIcon edge={icon[0]} self={10} client={icon} itemName={(id) => names.get(id)} itemIcon={(id) => (id === 11 ? "https://x.test/cloak.jpg" : undefined)} />);
+  const html = renderToStaticMarkup(<SameIcon edge={icon[0]} self={10} client={icon} itemName={(id) => names.get(id)} icon="https://x.test/cloak.jpg" />);
   expect(html).toContain("Icon file 135249, shared with ");
   expect(html).toContain('href="/database/items/11">Linen Cloak</a>');
   expect(html).toContain('href="/database/items/12">Wool Cloak</a>');
-  expect(html).toContain("cloak.jpg");
+  // They share the icon file, so every named item shows that one icon, not only those whose tooltip was read.
+  expect(html.match(/cloak\.jpg/g)).toHaveLength(2);
   expect(html).toContain('<span class="text-muted">; 2 items with no name yet</span>');
   expect(html).not.toMatch(/item 1[34]/);
   // No names at all: only the count.
