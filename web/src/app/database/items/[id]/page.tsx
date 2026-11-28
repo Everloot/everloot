@@ -406,7 +406,7 @@ export default async function ItemPage(props: Props) {
         <Tabs label={`${title}: relations`} tabs={tabs} />
         <DarkmoonItemNote name={name?.name} />
         {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
-        <MarketBox itemId={itemId} rows={auctions} />
+        <MarketBox itemId={itemId} {...auctions} />
         {/* Blizzard Developer API Terms: no ads on a page showing Blizzard data. This page carries ads, so it reads none
             and only links to the ad-free page. A plain link, not next/link: the router's prefetch would fetch that
             page's data into this document, and the move must load a fresh document without AdSense. */}

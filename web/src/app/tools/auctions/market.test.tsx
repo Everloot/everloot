@@ -319,20 +319,23 @@ test("an unnamed item's price pages say why the name is missing and still link t
 });
 
 test("the item database page gets a small Auction House box only when a price is public", async () => {
-  const rows = await loadMarketBox(2589, today);
+  const { rows } = await loadMarketBox(2589, today);
   expect(rows.map((r) => [r.realm.name, r.house, r.value.market])).toEqual([["Forever", "Horde", 198], ["Mal'Ganis", "Horde", 300]]);
-  const box = renderToStaticMarkup(<MarketBox itemId={2589} rows={rows} />);
+  const box = renderToStaticMarkup(<MarketBox itemId={2589} rows={rows} paused={false} />);
   expect(text(box)).toContain("Auction House");
+  // Each price says the day it was scanned.
+  expect(box).toMatch(/<th[^>]*>(?:<[^>]*>)*Scanned</);
+  expect(text(box)).toContain(todayText);
   expect(box).toContain('href="/tools/auctions/item/2589"');
   expect(box).toContain('href="/tools/auctions/forever/2589"');
-  expect(await loadMarketBox(9999, today)).toEqual([]);
-  expect(renderToStaticMarkup(<MarketBox itemId={9999} rows={[]} />)).toBe("");
+  expect((await loadMarketBox(9999, today)).rows).toEqual([]);
+  expect(renderToStaticMarkup(<MarketBox itemId={9999} rows={[]} paused={false} />)).toBe("");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "765" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "4306" }) }))).toContain("data-market-box");
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2592" }) }))).not.toContain("data-market-box");
   store.loadMarket.mockRejectedValue(new Error("down"));
-  expect(await loadMarketBox(2589, today)).toEqual([]);
+  expect(await loadMarketBox(2589, today)).toEqual({ rows: [], paused: false });
 });
 
 test("the browse page's realm and house picker: realms keep the filters, houses keep the realm, and ?realm= still lands on the realm", async () => {
@@ -382,7 +385,7 @@ test("every price names its house: All houses lists each house's price apart, an
   expect(item).toMatch(/Houses \(2\)/);
   expect(item).toMatch(/Alliance1s1s[\s\S]*Horde9s9s/);
   expect(item).not.toMatch(/(?<!\d)50?s(?! \d+c)/);
-  const box = await loadMarketBox(2589, today);
+  const { rows: box } = await loadMarketBox(2589, today);
   expect(box.map((r) => [r.house, r.value.market])).toEqual([["Alliance", 100], ["Horde", 900]]);
 });
 
@@ -483,6 +486,8 @@ test("with no scan for 3 days, every page that names the newest scan says scans 
     await realmHtml("forever"),
     renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))),
     renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) })),
+    // The database item page's Auction House box too.
+    renderToStaticMarkup(<MarketBox itemId={2589} {...await loadMarketBox(2589, today)} />),
   ];
   // Today's scans: nothing to say.
   for (const html of await pages()) expect(html).not.toContain("Community scans are paused");

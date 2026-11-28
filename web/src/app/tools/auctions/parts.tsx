@@ -103,7 +103,11 @@ export function RulesetSummaryTable({ rows, names, href }: { rows: RulesetSummar
  * and never shows them: those pages are ad-free, this one is not.
  */
 export function ScansPaused({ state, now, className }: { state: MarketState | null; now: Date; className?: string }) {
-  if (!scansPaused(state, now)) return null;
+  return scansPaused(state, now) ? <ScansPausedNotice className={className} /> : null;
+}
+
+/** The scans-paused line itself, for a page that already knows scans are paused. */
+export function ScansPausedNotice({ className }: { className?: string }) {
   return (
     <Card className={className}>
       <p className="text-fg-2" role="status">
