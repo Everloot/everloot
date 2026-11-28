@@ -37,6 +37,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => null,
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
 }));
@@ -54,6 +55,8 @@ const obs = (installId: string, rank: number, difficulty: string, recipe = "Less
 });
 const render = async (profession = "alchemy", search: Record<string, string> = {}) =>
   renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession }), searchParams: Promise.resolve(search) }));
+const renderReference = (profession = "alchemy", search: Record<string, string> = {}) =>
+  render(profession, { ...search, view: "reference" });
 const empty = { uploads: 0, records: [], dataAsOf: "2026-10-10T00:00:00.000Z" };
 
 beforeEach(() => {
@@ -64,8 +67,8 @@ beforeEach(() => {
 
 test("the game file recipes show in skill brackets, labelled, with the item and its reagents", async () => {
   store.loadCorpus.mockResolvedValue(empty);
-  const html = await render();
-  expect(html).toContain("Alchemy profession guide");
+  const html = await renderReference();
+  expect(html).toContain("Alchemy profession reference");
   expect(html).toContain("Found in game files, unconfirmed, build 1.60.1.71139");
   expect(html).toContain('data-skill-group="1"');
   expect(html).toContain("Skill 1–75");
@@ -79,23 +82,43 @@ test("the game file recipes show in skill brackets, labelled, with the item and 
   expect(html).toContain('data-badge="files"');
 });
 
+test("the default planner renders its route and shopping list without reading either reference market", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const range = { from: "1", to: "150", realm: "CAMWOW US1 Realm 4 PvP", house: "Horde" };
+  const html = await render("tailoring", range);
+  expect(html).toContain("Tailoring leveling guide");
+  expect(html).toContain("Copy shopping list");
+  expect(html).toContain('href="/tools/professions/tailoring?from=1&amp;to=150&amp;realm=CAMWOW+US1+Realm+4+PvP&amp;house=Horde&amp;view=reference" data-prefetch="false"');
+  expect(html).not.toContain('id="prof-recipes"');
+  expect(html).not.toContain('id="ahledger-margins"');
+  expect(html).not.toContain("Where to farm cloth");
+  expect(store.loadMarket).not.toHaveBeenCalled();
+  expect(ledger.read).not.toHaveBeenCalled();
+  const reference = await renderReference("tailoring", range);
+  expect(reference).toContain('id="prof-recipes"');
+  expect(reference).toContain('id="ahledger-margins"');
+  expect(reference).not.toContain("Copy shopping list");
+  expect(reference).toContain('href="/tools/professions/tailoring?from=1&amp;to=150&amp;realm=CAMWOW+US1+Realm+4+PvP&amp;house=Horde"');
+  expect(Buffer.byteLength(html)).toBeLessThan(Buffer.byteLength(reference));
+});
+
 test("a recipe row opens a shareable one-recipe shopping plan with the original filters", async () => {
   store.loadCorpus.mockResolvedValue(empty);
-  expect(await render("alchemy", { q: "Minor Strength" })).toContain("recipe=2329&amp;q=Minor+Strength#recipe-shopping");
+  expect(await render("alchemy", { q: "Minor Strength" })).toContain("view=reference&amp;recipe=2329&amp;q=Minor+Strength#recipe-shopping");
   const html = await render("alchemy", { recipe: "2329", crafts: "3" });
   expect(html).toContain('id="recipe-shopping"');
   expect(html).toContain('value="3"');
   expect(html).toContain("Copy recipe shopping list");
   expect(html).toContain('href="/tools/auctions/activity?item=2454');
   expect(html).toContain("Auction activity for the finished item");
-  expect(html).toContain("Alchemy leveling guide");
-  expect(html.indexOf("Alchemy leveling guide")).toBeLessThan(html.indexOf("Recipes from the game files"));
+  expect(html).toContain("Alchemy profession reference");
+  expect(html).not.toContain("Alchemy leveling guide");
   expect(await render("alchemy", { recipe: "3755" })).not.toContain('id="recipe-shopping"');
 });
 
 test("on a phone the recipe tables scroll sideways instead of hiding what a recipe makes and takes", async () => {
   store.loadCorpus.mockResolvedValue(empty);
-  const html = await render();
+  const html = await renderReference();
   const recipes = html.slice(html.indexOf('data-skill-group="1"'));
   expect(recipes).toContain("overflow-x-auto");
   expect(recipes).not.toContain("hidden sm:table-cell");
@@ -120,7 +143,7 @@ test("the skill line id and the id-slug segments redirect for good to the slug p
 
 test("with no observations the player layer says ranges are unrecorded, not zero", async () => {
   store.loadCorpus.mockResolvedValue(empty);
-  const html = await render();
+  const html = await renderReference();
   expect(html).toContain("data-empty-state");
   expect(html).toContain("No recipe ranges for Alchemy yet");
   expect(html).not.toContain(">Players saw<");
@@ -131,7 +154,7 @@ test("three agreeing installs show the inferred range", async () => {
     uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z",
     records: [obs("install-aaaa", 50, "optimal"), obs("install-bbbb", 60, "medium"), obs("install-cccc", 55, "medium")],
   });
-  expect(await render()).toContain("Lesser Healing Potion (Alchemy), 3 installs: yellow from 51-55");
+  expect(await renderReference()).toContain("Lesser Healing Potion (Alchemy), 3 installs: yellow from 51-55");
 });
 
 test("a range players agree on sits beside the game file recipe of the same name, labelled by its installs", async () => {
@@ -140,7 +163,7 @@ test("a range players agree on sits beside the game file recipe of the same name
     uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z",
     records: [obs("install-aaaa", 50, "optimal", recipe), obs("install-bbbb", 60, "medium", recipe), obs("install-cccc", 55, "medium", recipe)],
   });
-  const html = await render();
+  const html = await renderReference();
   expect(html).toContain(">Players saw<");
   expect(html).toContain("3 installs</span> yellow 51–55");
 });
@@ -158,10 +181,10 @@ test("agreed reagents priced by auction scans show a cost per craft", async () =
       ]),
     ],
   });
-  expect(await render()).toContain("Reagents: 2 Peacebloom. Estimated cost per craft: 60c.");
+  expect(await renderReference()).toContain("Reagents: 2 Peacebloom. Estimated cost per craft: 60c.");
 });
 
-test("the page keeps agreed colour ranges beside the device-side shopping planner", async () => {
+test("the planner keeps its skill range while the evidence lives in reference", async () => {
   const ids = ["install-aaaa", "install-bbbb", "install-cccc"];
   const reagents = [{ item: "Peacebloom", count: 1 }];
   store.loadCorpus.mockResolvedValue({
@@ -173,9 +196,10 @@ test("the page keeps agreed colour ranges beside the device-side shopping planne
   });
   const html = await render("alchemy", { from: "1", to: "11" });
   expect(html).toContain("Shopping list");
-  expect(html).toContain("Lesser Healing Potion (Alchemy), 3 installs");
+  expect(html).not.toContain("Lesser Healing Potion (Alchemy), 3 installs");
   expect(html).toContain('value="11"');
   expect(html).not.toContain("install-aaaa");
+  expect(await renderReference("alchemy", { from: "1", to: "11" })).toContain("Lesser Healing Potion (Alchemy), 3 installs");
 });
 
 const three = ["install-aaaa", "install-bbbb", "install-cccc"];
@@ -237,8 +261,8 @@ const clothAndLeather = () => corpusOf([...mob(three, 500, "Defias Bandit", 15, 
 
 test("Tailoring and First Aid list the same cloth zones; Skinning lists the leather ones", async () => {
   store.loadCorpus.mockResolvedValue(clothAndLeather());
-  const tailoring = section(await render("tailoring"), "cloth");
-  const firstAid = section(await render("first-aid"), "cloth");
+  const tailoring = section(await renderReference("tailoring"), "cloth");
+  const firstAid = section(await renderReference("first-aid"), "cloth");
   expect(tailoring).toContain("Where to farm cloth");
   expect(zonesIn(tailoring)).toEqual([1429]);
   // The same section, apart from the page's own links in the level menu.
@@ -258,7 +282,7 @@ test("the mob-backed gathering pages read the corpus once", async () => {
         (input as Request).url.endsWith("snapshots/item-view.json") ? new Response(view) : new Response(null, { status: 404 })));
       forgetItemView();
       store.loadCorpus.mockReset().mockResolvedValue(corpus);
-      await render(profession);
+      await renderReference(profession);
       expect(store.loadCorpus, profession).toHaveBeenCalledTimes(1);
     }
   } finally {
@@ -275,7 +299,7 @@ test("one or two installs place nothing: gathering zones need 3", async () => {
     expect(herbs, `${installs.length} herb`).toContain("No herb zones yet");
     expect(herbs).not.toContain("<table");
     for (const profession of ["tailoring", "first-aid"]) {
-      const cloth = section(await render(profession), "cloth")!;
+      const cloth = section(await renderReference(profession), "cloth")!;
       expect(cloth, `${installs.length} ${profession}`).toContain("No cloth zones yet");
       expect(cloth).not.toContain("<table");
     }
@@ -287,8 +311,8 @@ test("a mob level range from the URL filters the leather and cloth zones, and th
   // `level` belongs to the class context and filters nothing.
   const mid = await render("tailoring", { from: "5", mobs: "11-20", class: "mage", level: "3" });
   expect(zonesIn(section(mid, "cloth"))).toEqual([1429]);
-  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3&amp;mobs=1-10#gather"');
-  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3#gather"');
+  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3&amp;view=reference&amp;mobs=1-10#gather"');
+  expect(section(mid, "cloth")).toContain('href="/tools/professions/tailoring?from=5&amp;class=mage&amp;level=3&amp;view=reference#gather"');
   const low = section(await render("first-aid", { mobs: "1-10" }), "cloth")!;
   expect(low).toContain("Nothing here for levels 1-10.");
   expect(low).not.toContain("No cloth zones yet");
@@ -306,9 +330,9 @@ test("when the corpus reads but the world facts or the rollups do not, the secti
     fail.rollups = which === "rollups";
     store.loadCorpus.mockResolvedValue(clothAndLeather());
     for (const [profession, kind] of [["tailoring", "cloth"], ["first-aid", "cloth"], ["skinning", "leather"]]) {
-      const part = section(await render(profession), kind)!;
+      const part = section(await renderReference(profession), kind)!;
       expect(part, `${which} ${profession}`).toContain("Storage unreachable");
-      expect(edgeDegraded(await render(profession)), `${which} ${profession}`).toBe(true);
+      expect(edgeDegraded(await renderReference(profession)), `${which} ${profession}`).toBe(true);
       expect(part).not.toContain("zones yet");
       expect(part).not.toContain("<table");
     }
@@ -317,7 +341,7 @@ test("when the corpus reads but the world facts or the rollups do not, the secti
   fail.world = false; fail.rollups = false;
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   for (const [profession, kind] of [["tailoring", "cloth"], ["herbalism", "herb"]]) {
-    expect(section(await render(profession), kind), profession).toContain("Storage unreachable");
+    expect(section(await renderReference(profession), kind), profession).toContain("Storage unreachable");
   }
 });
 
@@ -335,7 +359,7 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
   const named = three.map((installId, i) => ({ kind: "item_seen", eventId: `seen${i}`, installId, capturedAt: "2026-10-10T00:00:00.000Z", itemId: 2449, name: "Earthroot" }));
   const corpus = { ...clothAndLeather(), records: [...clothAndLeather().records, obs("a", 1, "optimal"), obs("b", 1, "optimal"), obs("c", 1, "optimal"), ...named] };
   store.loadCorpus.mockResolvedValue(corpus);
-  const before = await render(profession);
+  const before = await renderReference(profession);
   if (profession === "alchemy") {
     expect(before).toContain(">Earthroot<");
     expect(before).toContain("https://icons.test/2449.jpg");
@@ -354,7 +378,7 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
         ? encodeProfessions(buildProfessions(corpus), "now")
         : url.endsWith("snapshots/item-view.json") ? JSON.stringify(view) : "{}" );
   }));
-  expect(await render(profession)).toEqual(before);
+  expect(await renderReference(profession)).toEqual(before);
   const served = vi.mocked(fetch).mock.calls.map(([input]) => (input as Request).url);
   expect(served.some((url) => url.endsWith("snapshots/item-view.json"))).toBe(true);
   expect(store.loadCorpus).not.toHaveBeenCalled();
@@ -389,10 +413,10 @@ test("the recipe table is paged on the server: 50 rows by default, the size clam
   store.loadCorpus.mockResolvedValue(empty);
   const all = professionBySegment("alchemy")!.recipes.length;
   expect(all).toBeGreaterThan(100);
-  const first = await render();
+  const first = await renderReference();
   expect(spellLinks(first)).toBe(50);
   expect(first).toContain(`${all.toLocaleString("en-US")}</span> recipes`);
-  expect(first).toContain('href="/tools/professions/alchemy?page=2#prof-recipes"');
+  expect(first).toContain('href="/tools/professions/alchemy?view=reference&amp;page=2#prof-recipes"');
   // The duplicated client-side list and its search box are gone; the table's own search is a GET form.
   expect(first).not.toContain("Search recipes");
   expect(first).toContain('action="/tools/professions/alchemy#prof-recipes"');
@@ -415,7 +439,7 @@ test("search and skill range filter on the server and keep the page's other para
   expect(named).toContain("1</span> recipe");
   const ranged = await render("alchemy", { min: "76", max: "150", from: "1", to: "11" });
   expect([...ranged.matchAll(/data-skill-group="([^"]+)"/g)].map((m) => m[1])).toEqual(["76"]);
-  expect(ranged).toContain('href="/tools/professions/alchemy?from=1&amp;to=11&amp;min=76&amp;max=150&amp;size=100#prof-recipes"');
+  expect(ranged).toContain('href="/tools/professions/alchemy?from=1&amp;to=11&amp;view=reference&amp;min=76&amp;max=150&amp;size=100#prof-recipes"');
   expect(ranged).toContain('type="hidden" name="min" value="76"');
   const none = await render("alchemy", { q: "no recipe is called this" });
   expect(spellLinks(none)).toBe(0);
@@ -424,7 +448,7 @@ test("search and skill range filter on the server and keep the page's other para
 
 test("the recipe tables' spell and item links load on click, not all at once as the page opens", async () => {
   store.loadCorpus.mockResolvedValue(empty);
-  const html = await render();
+  const html = await renderReference();
   const links = [...html.matchAll(/<a href="\/database\/(?:spells|items)\/\d+"([^>]*)>/g)];
   expect(links.length).toBeGreaterThan(2);
   for (const [a, attrs] of links) expect(attrs, a).toContain('data-prefetch="false"');
@@ -449,7 +473,7 @@ test("a recipe row stays within a byte budget, with every link, icon, count and 
   // (The icons themselves: the stored-facts test above shows Earthroot's.)
   expect(html).toMatch(/<span class="pf-q">2×<\/span><a[^>]*href="\/database\/items\/2449"[^>]*>[^<]+<\/a>/);
   expect(html).toContain('data-badge="files" title="From the game files, not yet confirmed by players"');
-  expect(html).toContain('href="/tools/professions/alchemy?recipe=2329&amp;size=200#recipe-shopping"');
+  expect(html).toContain('href="/tools/professions/alchemy?view=reference&amp;recipe=2329&amp;size=200#recipe-shopping"');
 });
 
 test("the recipe table's client data names each item once and carries ids, not markup", async () => {
@@ -491,11 +515,11 @@ test("the AH Ledger margins follow the realm and house picker: the realm's regio
   expect(html).toContain("data-realm-house-picker");
   expect(ledgerMarketText(html)).toBe("AH Ledger market: PvP Horde");
   // The picker's links keep the page's other parameters and land back on the margins.
-  expect(html).toContain('href="/tools/professions/alchemy?sort=-net&amp;realm=camwow-eu1-realm-4-pvp&amp;house=alliance#ahledger-margins"');
-  expect(ledgerMarketText(await render("alchemy", { realm: "camwow-eu1-realm-4-pvp", house: "alliance" }))).toBe("AH Ledger market: PvP Alliance");
+  expect(html).toContain('href="/tools/professions/alchemy?sort=-net&amp;view=reference&amp;realm=camwow-eu1-realm-4-pvp&amp;house=alliance#ahledger-margins"');
+  expect(ledgerMarketText(await renderReference("alchemy", { realm: "CAMWOW EU1 Realm 4 PvP", house: "Alliance" }))).toBe("AH Ledger market: PvP Alliance");
   // The neutral house and a realm AH Ledger has no market for say so instead of reading a market.
-  expect(ledgerMarketText(await render("alchemy", { realm: "camwow-eu1-realm-4-pvp", house: "neutral" }))).toContain("no market for the neutral auction house");
-  expect(ledgerMarketText(await render("alchemy", { realm: "nowhere" }))).toBe("AH Ledger has no market for this realm.");
+  expect(ledgerMarketText(await renderReference("alchemy", { realm: "camwow-eu1-realm-4-pvp", house: "neutral" }))).toContain("no market for the neutral auction house");
+  expect(ledgerMarketText(await renderReference("alchemy", { realm: "nowhere" }))).toBe("AH Ledger has no market for this realm.");
   // A profession AH Ledger has no margins for neither shows the picker nor reads the market.
   store.loadMarket.mockClear();
   expect(await render("fishing")).not.toContain("data-realm-house-picker");
@@ -506,7 +530,7 @@ test("an old margins link with ?market= still shows that market; with no realm o
   store.loadCorpus.mockResolvedValue(empty);
   expect(ledgerMarketText(await render("alchemy", { market: "forever.rp.horde.eu" }))).toBe("AH Ledger market: RP Horde");
   expect(ledgerMarketText(await render("alchemy", { market: "forever.hardcore.horde.us" }))).toBe("AH Ledger market: PvE Alliance");
-  expect(ledgerMarketText(await render("alchemy"))).toBe("AH Ledger market: PvE Alliance");
+  expect(ledgerMarketText(await renderReference("alchemy"))).toBe("AH Ledger market: PvE Alliance");
   // A realm in the link wins over the old parameter, and the picker's links drop it.
   const state = foldMarket(emptyMarket(), ledgerScans("CAMWOW US1 Realm 2 PvP", "Alliance"), new Date());
   store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
@@ -537,14 +561,14 @@ test("the AH Ledger margins are read once on the server for the chosen market an
   expect(edgeDegraded(html)).toBe(false);
 
   ledger.read.mockResolvedValue({ ok: false });
-  const failed = await render("alchemy");
+  const failed = await renderReference("alchemy");
   expect(failed).toContain('data-ahledger="failed"');
   expect(edgeDegraded(failed)).toBe(true);
 
   // No market, or a profession AH Ledger lacks: nothing is asked.
   ledger.read.mockClear();
   await render("fishing");
-  await render("alchemy", { realm: "nowhere" });
+  await renderReference("alchemy", { realm: "nowhere" });
   expect(ledger.read).not.toHaveBeenCalled();
 });
 
