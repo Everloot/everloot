@@ -257,10 +257,11 @@ describe("the character page", () => {
       expect(badges).toMatch(/data-badge="neutral"[^>]*>EU Normal · Item level #2 of 2</);
     });
 
-    test("spec cards, the largest tree first and brightest, then profession bars, all before the gear", async () => {
+    test("gear comes before the spec cards and profession bars", async () => {
       mem.putCharacter(detailed());
       const out = await html(pages.character("eu", "velkara-duskmantle"));
-      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      expect(out.indexOf("data-paper-doll")).toBeLessThan(out.indexOf("data-character-overview"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf('data-slot="dungeon-raid-progress"'));
       expect(out.indexOf("data-character-overview")).toBeGreaterThan(-1);
       const cards = [...overview.matchAll(/data-spec-card="([^"]+)"[^>]*><p class="([^"]*)"/g)].map((m) => [m[1], m[2].includes("text-fg-2") ? "fg-2" : "fg"]);
       expect(cards).toEqual([["Marksmanship", "fg"], ["Beast Mastery", "fg-2"], ["Survival", "fg-2"]]);
@@ -284,7 +285,7 @@ describe("the character page", () => {
     test("with both reads the overview puts the spec cards beside the professions on a wide screen, professions in two columns", async () => {
       mem.putCharacter(detailed());
       const out = await html(pages.character("eu", "velkara-duskmantle"));
-      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf('data-slot="dungeon-raid-progress"'));
       expect(overview).toMatch(/data-character-overview="side-by-side" class="[^"]*lg:grid-cols-\[/);
       expect(overview).toMatch(/<ul data-profession-grid="" class="[^"]*sm:grid-cols-2/);
       // One read alone fills the width: no empty column beside it.
@@ -296,7 +297,7 @@ describe("the character page", () => {
     test("numbers in mono, words in sans: spec points and the read age", async () => {
       mem.putCharacter(detailed());
       const out = await html(pages.character("eu", "velkara-duskmantle"));
-      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf("data-paper-doll"));
+      const overview = out.slice(out.indexOf("data-character-overview"), out.indexOf('data-slot="dungeon-raid-progress"'));
       // "31 points": the number is mono with tabular figures, the word is not.
       expect(overview).toMatch(/<span class="font-mono text-lg tabular-nums">31<\/span> points/);
       expect(overview).not.toMatch(/class="[^"]*font-mono[^"]*">\d+ points/);

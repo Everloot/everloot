@@ -27,13 +27,10 @@ const ICON = 40;
 /**
  * The character's gear as the game's character sheet lays it out. Every equipped slot draws its icon in its quality's
  * border: the item's own art where the game files have it, else the game's question mark (`unknownIcon`, as item pages
- * do); no icon at all without the asset files. The icon and the name both link the item page, so the shared hover card
- * (or the item's own tooltip) opens from either. `center` fills the model's place (the summary on the armory page); on
- * a phone it comes first and the slots follow as one list. The right column mirrors the left from a wide screen up.
- * `heading={false}` inside a tab, whose label names it already. An item in `unknown` (the game files carry nothing for
- * it, lib/equipped-item-tips.ts) has a nameless database page and a hover card that would 404, so it gets no link and
- * a tooltip from what Blizzard's armory read (name, quality, item level, slot) instead. With `setNames`, the item sets
- * the worn pieces belong to (as the game files list them) are counted under the heading: "Name 3/8".
+ * do); no icon at all without the asset files. The full equipped row links to the item page and opens the hover card.
+ * Items without a named database page get a focusable row with a tooltip from Blizzard's armory fields.
+ * `center` fills the model's place (the summary on the armory page). The right column mirrors the left on wide screens.
+ * `heading={false}` inside a tab, whose label names it already. With `setNames`, worn set pieces are counted above the grid.
  */
 export function Equipment({ character: c, tips, unknownIcon = null, unknown: unknownIds, heading = true, center, fromFiles, setNames }: {
   character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; unknown?: ReadonlySet<number>; heading?: boolean; center?: ReactNode;
@@ -57,45 +54,53 @@ export function Equipment({ character: c, tips, unknownIcon = null, unknown: unk
     const unknown = item && !known && unknownIds?.has(item.itemId) ? armoryOnlyTip(item, key, unknownIcon) : undefined;
     const tip = known ?? unknown;
     const src = tip?.icon ?? unknownIcon;
-    const href = item && !unknown ? `/database/items/${item.itemId}` : "";
-    const art = item && src ? <GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /> : null;
-    const icon = art
-      ? (href ? <Link href={href} tabIndex={-1} aria-hidden="true" className="shrink-0">{art}</Link> : <span aria-hidden="true" className="shrink-0">{art}</span>)
+    const icon = item && src
+      ? <GameIcon src={src} size={ICON} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} />
       : <span aria-hidden="true" className="h-10 w-10 shrink-0 rounded-sm border border-dashed border-line" />;
-    const nameClass = `text-cell [overflow-wrap:anywhere] ${quality(item?.quality ?? null)}`;
-    const name = item && (href
-      ? <Link href={href} className={`${nameClass} underline decoration-edge underline-offset-4 hover:decoration-fg`}>{item.name}</Link>
-      : <span tabIndex={0} className={nameClass}>{item.name}</span>);
-    return <li key={key} data-equipment-slot={key} className={`flex min-h-14 min-w-0 items-center gap-3 rounded-control border border-line bg-panel px-2 py-2 ${mirror ? "lg:flex-row-reverse lg:text-right" : ""}`}>
+    const row = `flex min-h-14 min-w-0 items-center gap-3 rounded-control px-2 py-2 ${mirror ? "lg:flex-row-reverse lg:text-right" : ""}`;
+    const content = <>
       {icon}
-      <div className="min-w-0 flex-1">
-        <p className={`flex items-baseline gap-2 text-cell-2 text-muted ${mirror ? "lg:justify-end" : ""}`}>
+      <span className="min-w-0 flex-1">
+        <span className={`flex items-baseline gap-2 text-cell-2 text-muted ${mirror ? "lg:justify-end" : ""}`}>
           <span>{slotLabel(key)}</span>
           {item?.level != null && (fromFiles?.has(key)
             ? <span className="font-mono tabular-nums text-fg-2 underline decoration-dotted underline-offset-4" title="Item level from the game files" aria-label={`Item level ${item.level}, from the game files`}>{item.level}</span>
             : <span className="font-mono tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>)}
-        </p>
-        {item ? (tip ? <ItemTip tip={tip} icon={null}>{name!}</ItemTip> : name) : <p className="text-cell text-muted">Not equipped</p>}
-      </div>
+        </span>
+        {item ? <span className={`block text-cell [overflow-wrap:anywhere] ${quality(item.quality)} ${unknown ? "" : "underline decoration-edge underline-offset-4 group-hover:decoration-fg"}`}>{item.name}</span>
+          : <span className="block text-cell text-muted">Not equipped</span>}
+      </span>
+    </>;
+    return <li key={key} data-equipment-slot={key} className="min-w-0 rounded-control border border-line bg-panel">
+      {item
+        ? <ItemTip tip={tip} icon={null} className="block">{unknown
+          ? <span tabIndex={0} className={row}>{content}</span>
+          : <Link href={`/database/items/${item.itemId}`} className={`group ${row}`}>{content}</Link>}
+        </ItemTip>
+        : <div className={row}>{content}</div>}
     </li>;
   };
   return <section aria-labelledby={heading ? "armory-gear" : undefined} aria-label={heading ? undefined : "Equipment"} className="space-y-3">
     {heading && <SectionHeading id="armory-gear">Equipment</SectionHeading>}
-    {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
     {sets.length > 0 && <p data-item-sets className="text-meta text-fg-2">
       Sets:{" "}{sets.map((s, i) => <span key={s.id}>{i > 0 && " · "}<Link href={itemSetHref(s.id)} className={link}>{s.name}</Link> <span className="font-mono tabular-nums">{s.worn}/{s.total}</span></span>)}
     </p>}
     {fromFiles && fromFiles.size > 0 && <p data-file-levels className="text-meta text-muted">
       Blizzard&apos;s armory no longer sends item levels, so the levels underlined with dots are the game files&apos; levels for the same items.
     </p>}
-    <div data-paper-doll className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,19rem)_minmax(0,1fr)]">
-      <ol aria-label="Left side" className="grid content-start gap-2">{LEFT.map((k) => slot(k, false))}</ol>
-      {center
-        ? <div data-model-space className="order-first sm:col-span-2 lg:order-none lg:col-span-1">{center}</div>
-        : <div aria-hidden="true" data-model-space className="hidden lg:block" />}
-      <ol aria-label="Right side" className="grid content-start gap-2">{RIGHT.map((k) => slot(k, true))}</ol>
-    </div>
-    <ol aria-label="Weapons" className="grid gap-2 sm:grid-cols-3">{WEAPONS.map((k) => slot(k, false))}</ol>
+    {equipped.size ? <>
+      <div data-paper-doll className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,19rem)_minmax(0,1fr)]">
+        <ol aria-label="Left side" className="grid content-start gap-2">{LEFT.map((k) => slot(k, false))}</ol>
+        {center
+          ? <div data-model-space className="order-last sm:col-span-2 lg:order-none lg:col-span-1">{center}</div>
+          : <div aria-hidden="true" data-model-space className="hidden lg:block" />}
+        <ol aria-label="Right side" className="grid content-start gap-2">{RIGHT.map((k) => slot(k, true))}</ol>
+      </div>
+      <ol aria-label="Weapons" className="grid gap-2 sm:grid-cols-3">{WEAPONS.map((k) => slot(k, false))}</ol>
+    </> : <>
+      <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>
+      {center}
+    </>}
   </section>;
 }
 
